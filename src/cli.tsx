@@ -116,7 +116,7 @@ const App = () => {
   const tLines = T.split('\n')
 
   const w = 69
-  const topLabel = ' local AI agent with a portable ethereum identity '
+  const topLabel = ' privacy-first AI agent with a portable ethereum identity '
 
   return (
     <Box flexDirection="column" alignSelf="flex-start" padding={1}>

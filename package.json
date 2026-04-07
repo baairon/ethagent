@@ -1,7 +1,7 @@
 {
   "name": "ethagent",
-  "version": "0.1.0",
-  "description": "A local-first AI agent with an Ethereum identity",
+  "version": "0.2.0",
+  "description": "A privacy-first AI agent with an Ethereum identity",
   "type": "module",
   "bin": {
     "ethagent": "./bin/ethagent.js"
@@ -17,9 +17,13 @@
     "ethereum",
     "agent",
     "ai",
-    "local-first",
+    "privacy-first",
+    "local-llm",
+    "ipfs",
     "ERC-8004",
-    "onchain"
+    "onchain",
+    "offline",
+    "ens"
   ],
   "author": "bairon.eth",
   "license": "MIT",
@@ -28,7 +32,5 @@
     "react": "^19.2.4",
     "tsx": "^4.21.0"
   },
-  "devDependencies": {
-    "ansi-to-svg": "^1.4.3"
-  }
+  "devDependencies": {}
 }

@@ -1,43 +1,56 @@
-<img src="preview/cli.png" alt="ethagent" width="600" />
+<img src="https://bairon.dev/preview/cli.png" alt="ethagent" width="600" />
 
-A local-first AI agent with a permanent Ethereum identity. Runs entirely on your machine.
+
+A privacy-first AI agent with a permanent Ethereum identity. Your knowledge base lives on IPFS. Your agent's identity is registered onchain, tied to your wallet. Your inference never leaves your machine.
 
 ```bash
 npm install -g ethagent
 ```
 
-## Why
+## What It Is
 
-When you use cloud AI, every prompt you send, every codebase you share, every reasoning chain you build becomes training data. Your workflows, your thinking, your decision patterns. That data is worth far more than the $20/mo subscription you're paying. It trains the next generation of models, informs product roadmaps, and builds competitive moats for companies that don't share the upside with you.
+ethagent bootstraps a local LLM on your machine and builds a personal knowledge base from sources you define. It works completely offline. No wifi, no API, just your hardware. The model is hotswappable, and if you need to, you can point it at a cloud model without losing any context. Offline-capable agents are going to be a core part of how software gets built, and ethagent is built for that from day one.
 
-ethagent runs inference entirely on your hardware. Your prompts never leave your machine. Your knowledge base is yours.
+- Your Ethereum address owns and controls your agent
+- Your knowledge base is pinned to IPFS, content-addressed and portable
+- Your agent is registered onchain via [ERC-8004](https://eips.ethereum.org/EIPS/eip-8004)
+- Everything you teach it compounds across sessions, not just within them
 
-
-## Your agent
-
-Think of it like a tamagotchi you raise on your own machine. You feed it knowledge. Every conversation you have, every document you give it, every correction you make compounds. ethagent builds a knowledge base that's specific to you, your domain, your way of thinking. It doesn't reset between sessions. It doesn't flatten your context into a generic system prompt. It accumulates.
-
-Your inference runs on your hardware, your agent lives on your identity, and everything it learns stays with you. No usage limits. No rate caps. Just your machine, working for you.
-
-
-## How it works
-
-ethagent bootstraps a local LLM on your machine and builds a knowledge base from sources you define. Your agent gets a permanent onchain identity using [ERC-8004](https://eips.ethereum.org/EIPS/eip-8004), the token standard for registering autonomous agents on Ethereum. Identity is tied to an Ethereum address or ENS name, so it can be restored on any machine.
-
-All inference runs locally. Your data never leaves your hardware. The knowledge base is pinned to IPFS so it's portable and verifiable.
-
-
-## Portability
-
-Your agent is tied to your Ethereum identity, not your machine. Knowledge lives on IPFS. Identity lives onchain. Wipe your laptop, restore from your address, and you're back exactly where you left off.
+Wipe your laptop, restore from your address or ENS name, and you're back exactly where you left off.
 
 ```bash
 npx ethagent init --from bairon.eth
 npx ethagent init --from 0xA1E977e700bF82019beb381F1582575303A389CE
 ```
 
-As long as Ethereum exists, so does your agent.
+## Why It Exists
 
----
+AI platforms compete aggressively and users switch between them constantly. Every time you do, your conversation history, custom instructions, and everything your agent learned about you resets to zero. But every prompt you sent to the old platform is still there, training their next model.
 
-MIT License
+ethagent breaks that cycle. Your knowledge lives on IPFS, your identity lives on Ethereum. Switch models whenever you want. Your agent remembers everything regardless. Your data stays yours, not by policy, but by architecture.
+
+## How It Works
+
+ethagent accumulates a personal knowledge base from conversations, documents, and corrections you provide. That knowledge base is pinned to IPFS, so it's content-addressed, verifiable, and not locked to any single device. The underlying model is hotswappable, so you can run a local LLM or swap in a cloud model without losing any context.
+
+Your agent's identity is registered onchain using ERC-8004, the token standard for autonomous agents on Ethereum. Identity is tied to an Ethereum address or ENS name, meaning your agent can be fully restored on any machine from just your address.
+
+Think of it like a tamagotchi that lives in your wallet. You raise it, you feed it knowledge, and only your key can summon it. Every interaction compounds. It doesn't flatten your context into a generic system prompt. It accumulates. And because it lives on IPFS, it follows you to any machine you bring your wallet to.
+
+| Layer | Where | What it does |
+|-------|-------|--------------|
+| Inference | Your machine (or cloud) | Hotswappable model, local-first by default |
+| Knowledge | IPFS | Content-addressed, verifiable, portable across any machine |
+| Identity | Ethereum | Permanent agent registration via ERC-8004, restorable from address or ENS |
+
+Your knowledge base is encrypted with your wallet's key. Only you can decrypt it. Even though the data lives on IPFS, it's unreadable to anyone without your key. Nobody can clone your agent, read its memories, or extract what it knows about you.
+
+## Links
+
+- [npm package](https://www.npmjs.com/package/ethagent)
+- [GitHub](https://github.com/baairon/ethagent)
+- [ERC-8004 specification](https://eips.ethereum.org/EIPS/eip-8004)
+
+## License
+
+MIT
