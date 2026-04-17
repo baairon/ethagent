@@ -1,17 +1,21 @@
 {
   "name": "ethagent",
-  "version": "0.2.0",
-  "description": "A privacy-first AI agent with an Ethereum identity",
+  "version": "0.2.1",
+  "description": "A privacy-first AI agent with a portable Ethereum identity",
   "type": "module",
   "bin": {
-    "ethagent": "./bin/ethagent.js"
+    "ethagent": "bin/ethagent.js"
   },
   "files": [
     "bin",
     "src"
   ],
   "scripts": {
-    "start": "node bin/ethagent.js"
+    "start": "node bin/ethagent.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=20.0.0"
   },
   "keywords": [
     "ethereum",
@@ -25,12 +29,21 @@
     "offline",
     "ens"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/baairon/ethagent.git"
+  },
   "author": "bairon.eth",
   "license": "MIT",
   "dependencies": {
     "ink": "^6.8.0",
     "react": "^19.2.4",
-    "tsx": "^4.21.0"
+    "tsx": "^4.21.0",
+    "zod": "^3.25.76"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "@types/react": "^19.2.14",
+    "typescript": "^5.9.3"
+  }
 }
