@@ -1,4 +1,4 @@
-<img src="https://raw.githubusercontent.com/baairon/ethagent/master/preview/cli.png" alt="ethagent" width="600" />
+<img src="https://raw.githubusercontent.com/baairon/ethagent/master/preview/image.png" alt="ethagent" width="600" />
 
 
 A privacy-first AI agent with a portable Ethereum identity. Your knowledge base lives on IPFS. Your agent's identity is registered onchain, tied to your wallet. Your inference never leaves your machine.
@@ -19,8 +19,8 @@ ethagent bootstraps a local LLM on your machine and builds a personal knowledge 
 Wipe your laptop, restore from your address or ENS name, and you're back exactly where you left off.
 
 ```bash
-npx ethagent init --from bairon.eth
-npx ethagent init --from 0xA1E977e700bF82019beb381F1582575303A389CE
+ethagent init --from bairon.eth
+ethagent init --from 0xA1E977e700bF82019beb381F1582575303A389CE
 ```
 
 ## Why It Exists

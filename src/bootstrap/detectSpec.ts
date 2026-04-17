@@ -1,4 +1,6 @@
 import os from 'node:os'
+import path from 'node:path'
+import fs from 'node:fs/promises'
 import { spawn } from 'node:child_process'
 
 export type OllamaModel = {
@@ -89,6 +91,32 @@ async function detectOllamaVersion(): Promise<string | null> {
   return match ? match[0] : result.stdout.trim() || null
 }
 
+async function detectOllamaOnDisk(): Promise<boolean> {
+  const candidates: string[] = []
+  if (process.platform === 'win32') {
+    const localAppData = process.env.LOCALAPPDATA
+    if (localAppData) {
+      candidates.push(path.join(localAppData, 'Programs', 'Ollama', 'ollama.exe'))
+      candidates.push(path.join(localAppData, 'Programs', 'Ollama', 'Ollama.exe'))
+    }
+  } else if (process.platform === 'darwin') {
+    candidates.push('/Applications/Ollama.app/Contents/Resources/ollama')
+    candidates.push('/usr/local/bin/ollama')
+    candidates.push('/opt/homebrew/bin/ollama')
+  } else {
+    candidates.push('/usr/local/bin/ollama', '/usr/bin/ollama')
+  }
+  for (const candidate of candidates) {
+    try {
+      await fs.access(candidate)
+      return true
+    } catch {
+      continue
+    }
+  }
+  return false
+}
+
 async function fetchInstalledModels(): Promise<{ up: boolean; models: OllamaModel[] }> {
   const response = await fetchWithTimeout(`${OLLAMA_HOST}/api/tags`, 400)
   if (!response || !response.ok) return { up: false, models: [] }
@@ -122,10 +150,11 @@ export async function detectSpec(): Promise<SpecSnapshot> {
   const isAppleSilicon = platform === 'darwin' && arch === 'arm64'
   const effectiveRamBytes = isAppleSilicon ? Math.floor(totalRamBytes * 0.75) : totalRamBytes
 
-  const [gpuVramBytes, ollamaVersion, tagsResult] = await Promise.all([
+  const [gpuVramBytes, ollamaVersion, tagsResult, onDisk] = await Promise.all([
     isAppleSilicon ? Promise.resolve(null) : detectNvidiaVram(),
     detectOllamaVersion(),
     fetchInstalledModels(),
+    detectOllamaOnDisk(),
   ])
 
   return {
@@ -136,7 +165,7 @@ export async function detectSpec(): Promise<SpecSnapshot> {
     effectiveRamBytes,
     isAppleSilicon,
     gpuVramBytes,
-    hasOllama: ollamaVersion !== null || tagsResult.up,
+    hasOllama: ollamaVersion !== null || tagsResult.up || onDisk,
     ollamaVersion,
     ollamaDaemonUp: tagsResult.up,
     installedModels: tagsResult.models,
