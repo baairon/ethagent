@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react'
 import { Box, Text } from 'ink'
-import { Splash } from '../ui/splash.js'
+import { Splash } from '../ui/Splash.js'
 import { Select } from '../ui/Select.js'
 import { TextInput } from '../ui/TextInput.js'
 import { theme } from '../ui/theme.js'
 import { detectSpec, type SpecSnapshot } from './detectSpec.js'
-import { recommendModel, qwenLadder } from './recommend.js'
+import { recommendModel } from './recommend.js'
+import { OllamaBootstrap } from './OllamaBootstrap.js'
 import {
   saveConfig,
   defaultModelFor,
@@ -19,8 +20,8 @@ type Step =
   | { kind: 'detecting' }
   | { kind: 'detect-error'; message: string }
   | { kind: 'choose-path'; spec: SpecSnapshot }
-  | { kind: 'ollama-pick'; spec: SpecSnapshot }
-  | { kind: 'ollama-missing'; spec: SpecSnapshot }
+  | { kind: 'ollama-setup'; spec: SpecSnapshot }
+  | { kind: 'ollama-manual'; spec: SpecSnapshot }
   | { kind: 'cloud-provider' }
   | { kind: 'cloud-key'; provider: ProviderId; error?: string }
   | { kind: 'cloud-key-saving'; provider: ProviderId }
@@ -38,8 +39,8 @@ const STATUS: Record<Step['kind'], string> = {
   'detecting':         'first-run setup · inspecting machine',
   'detect-error':      'first-run setup · detection failed',
   'choose-path':       'first-run setup · choose how to run',
-  'ollama-pick':       'first-run setup · pick a local model',
-  'ollama-missing':    'first-run setup · ollama not ready',
+  'ollama-setup':      'first-run setup · ollama',
+  'ollama-manual':     'first-run setup · ollama manual',
   'cloud-provider':    'first-run setup · pick a cloud provider',
   'cloud-key':         'first-run setup · paste API key',
   'cloud-key-saving':  'first-run setup · storing key',
@@ -135,7 +136,6 @@ export const FirstRun: React.FC<FirstRunProps> = ({ onComplete, onCancel }) => {
   if (step.kind === 'choose-path') {
     const { spec } = step
     const recommended = recommendModel(spec)
-    const ollamaReady = spec.ollamaDaemonUp && spec.installedModels.length > 0
     return (
       <Box flexDirection="column" padding={1}>
         <Splash statusLine={STATUS['choose-path']} />
@@ -155,19 +155,12 @@ export const FirstRun: React.FC<FirstRunProps> = ({ onComplete, onCancel }) => {
         <Select<'ollama' | 'cloud'>
           label="how do you want to run?"
           options={[
-            {
-              value: 'ollama',
-              label: ollamaReady ? 'local ollama (private, offline-capable)' : 'local ollama (needs setup)',
-              hint: ollamaReady ? '' : 'install ollama + pull a model first',
-            },
-            { value: 'cloud', label: 'cloud API', hint: 'requires a key' },
+            { value: 'ollama', label: 'local ollama (private, offline-capable)' },
+            { value: 'cloud',  label: 'cloud API', hint: 'requires a key' },
           ]}
           onSubmit={choice => {
-            if (choice === 'ollama') {
-              goTo(ollamaReady ? { kind: 'ollama-pick', spec } : { kind: 'ollama-missing', spec })
-            } else {
-              goTo({ kind: 'cloud-provider' })
-            }
+            if (choice === 'ollama') goTo({ kind: 'ollama-setup', spec })
+            else goTo({ kind: 'cloud-provider' })
           }}
           onCancel={onCancel}
         />
@@ -176,76 +169,55 @@ export const FirstRun: React.FC<FirstRunProps> = ({ onComplete, onCancel }) => {
     )
   }
 
-  if (step.kind === 'ollama-missing') {
+  if (step.kind === 'ollama-setup') {
+    return (
+      <Box flexDirection="column" padding={1}>
+        <Splash statusLine={STATUS['ollama-setup']} />
+        <OllamaBootstrap
+          spec={step.spec}
+          onDone={model => setStep({
+            kind: 'saving',
+            config: {
+              version: 1,
+              provider: 'ollama',
+              model,
+              baseUrl: defaultBaseUrlFor('ollama'),
+              firstRunAt: new Date().toISOString(),
+            },
+          })}
+          onManual={() => setStep({ kind: 'ollama-manual', spec: step.spec })}
+          onBack={goBack}
+        />
+      </Box>
+    )
+  }
+
+  if (step.kind === 'ollama-manual') {
     const recModel = recommendModel(step.spec).model
     return (
       <Box flexDirection="column" padding={1}>
-        <Splash statusLine={STATUS['ollama-missing']} />
-        <Text color={theme.accentPrimary}>ollama isn&apos;t installed or running yet.</Text>
+        <Splash statusLine={STATUS['ollama-manual']} />
+        <Text color={theme.accentPrimary}>set ollama up yourself:</Text>
         <Box flexDirection="column" marginTop={1} marginBottom={1}>
           <Text color={theme.dim}>  1. install from https://ollama.com/download</Text>
           <Text color={theme.dim}>  2. start the daemon (open the app, or run: ollama serve)</Text>
           <Text color={theme.dim}>  3. pull the recommended model:  ollama pull {recModel}</Text>
           <Text color={theme.dim}>  4. re-run: ethagent</Text>
         </Box>
-        <Select<'cloud' | 'back'>
-          label="or pick a cloud API instead?"
+        <Select<'cloud' | 'back' | 'quit'>
+          label="what next?"
           options={[
             { value: 'cloud', label: 'switch to cloud API setup' },
             { value: 'back',  label: 'go back' },
+            { value: 'quit',  label: 'quit setup' },
           ]}
-          onSubmit={choice => choice === 'cloud' ? goTo({ kind: 'cloud-provider' }) : goBack()}
+          onSubmit={choice => {
+            if (choice === 'cloud') goTo({ kind: 'cloud-provider' })
+            else if (choice === 'back') goBack()
+            else onCancel()
+          }}
           onCancel={goBack}
         />
-        {hint(true)}
-      </Box>
-    )
-  }
-
-  if (step.kind === 'ollama-pick') {
-    const { spec } = step
-    const recommended = recommendModel(spec)
-    const installedNames = new Set(spec.installedModels.map(m => m.name))
-    const options: Array<{ value: string; label: string; hint?: string; disabled?: boolean }> = []
-    for (const variant of qwenLadder) {
-      const installed = installedNames.has(variant.model)
-      options.push({
-        value: variant.model,
-        label: variant.model,
-        hint: installed
-          ? (variant.model === recommended.model ? 'installed · recommended' : 'installed')
-          : `not installed · ~${variant.approxDownloadGB}GB`,
-        disabled: !installed,
-      })
-    }
-    for (const m of spec.installedModels) {
-      if (!qwenLadder.some(v => v.model === m.name)) {
-        options.push({ value: m.name, label: m.name, hint: 'installed (other)' })
-      }
-    }
-    const firstInstalled = options.findIndex(o => !o.disabled)
-    return (
-      <Box flexDirection="column" padding={1}>
-        <Splash statusLine={STATUS['ollama-pick']} />
-        <Text color={theme.accentSecondary} bold>pick a local model</Text>
-        <Text color={theme.dim}>only installed models selectable. to add more, pull them with ollama.</Text>
-        <Box marginTop={1}>
-          <Select
-            options={options}
-            initialIndex={firstInstalled === -1 ? 0 : firstInstalled}
-            onSubmit={model => setStep({
-              kind: 'saving',
-              config: {
-                version: 1,
-                provider: 'ollama',
-                model,
-                baseUrl: defaultBaseUrlFor('ollama'),
-                firstRunAt: new Date().toISOString(),
-              },
-            })}
-            onCancel={goBack}
-          />
-        </Box>
         {hint(true)}
       </Box>
     )

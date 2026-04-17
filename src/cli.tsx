@@ -4,10 +4,12 @@ import { render, Box, Text } from 'ink'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { Splash } from './ui/splash.js'
+import { Splash } from './ui/Splash.js'
+import { PreviewSplash } from './ui/PreviewSplash.js'
 import { theme } from './ui/theme.js'
-import { FirstRun } from './bootstrap/firstRun.js'
+import { FirstRun } from './bootstrap/FirstRun.js'
 import { loadConfig, deleteConfig, getConfigPath, type EthagentConfig } from './config/store.js'
+import { runModelList, runModelPull, runModelUse } from './commands/model.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -146,6 +148,16 @@ function runDefault(): Promise<number> {
   })
 }
 
+async function runPreviewCommand(variant: string | undefined): Promise<number> {
+  if (variant !== 'coming-soon') {
+    process.stderr.write(`preview: unknown variant '${variant ?? ''}'\navailable: coming-soon\n`)
+    return 2
+  }
+  const instance = render(<PreviewSplash />)
+  await instance.waitUntilExit()
+  return 0
+}
+
 async function main(): Promise<number> {
   const argv = process.argv.slice(2)
   const [cmd, ...rest] = argv
@@ -168,9 +180,18 @@ async function main(): Promise<number> {
     case 'doctor':
       return notImplemented('doctor')
     case 'model':
-      return notImplemented(`model ${rest[0] ?? ''}`.trim())
+      switch (rest[0]) {
+        case 'list': return runModelList()
+        case 'pull': return runModelPull(rest[1])
+        case 'use':  return runModelUse(rest[1])
+        default:
+          process.stderr.write('usage: ethagent model list | pull <name> | use <name>\n')
+          return 2
+      }
     case 'key':
       return notImplemented(`key ${rest[0] ?? ''}`.trim())
+    case 'preview':
+      return runPreviewCommand(rest[0])
     default:
       process.stderr.write(`unknown command: ${cmd}\nrun 'ethagent --help' for usage\n`)
       return 2
