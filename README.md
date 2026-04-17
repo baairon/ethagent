@@ -1,7 +1,7 @@
-<img src="https://bairon.dev/preview/cli.png" alt="ethagent" width="600" />
+<img src="https://raw.githubusercontent.com/baairon/ethagent/master/preview/cli.png" alt="ethagent" width="600" />
 
 
-A privacy-first AI agent with a permanent Ethereum identity. Your knowledge base lives on IPFS. Your agent's identity is registered onchain, tied to your wallet. Your inference never leaves your machine.
+A privacy-first AI agent with a portable Ethereum identity. Your knowledge base lives on IPFS. Your agent's identity is registered onchain, tied to your wallet. Your inference never leaves your machine.
 
 ```bash
 npm install -g ethagent

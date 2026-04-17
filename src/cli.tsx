@@ -1,147 +1,185 @@
 #!/usr/bin/env node
-import React from 'react'
-import {render, Text, Box} from 'ink'
+import React, { useEffect, useState } from 'react'
+import { render, Box, Text } from 'ink'
+import fs from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { Splash } from './ui/splash.js'
+import { theme } from './ui/theme.js'
+import { FirstRun } from './bootstrap/firstRun.js'
+import { loadConfig, deleteConfig, getConfigPath, type EthagentConfig } from './config/store.js'
 
-const eth = `░░░░░░░╗░░░░░░░░╗░░╗  ░░╗
-░░╔════╝╚══░░╔══╝░░║  ░░║
-░░░░░╗     ░░║   ░░░░░░░║
-░░╔══╝     ░░║   ░░╔══░░║
-░░░░░░░╗   ░░║   ░░║  ░░║
-╚══════╝   ╚═╝   ╚═╝  ╚═╝`
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
-const A = [
-  ` █████╗ `,
-  `██╔══██╗`,
-  `███████║`,
-  `██╔══██║`,
-  `██║  ██║`,
-  `╚═╝  ╚═╝`,
-].join('\n')
-
-const G = [
-  ` ██████╗ `,
-  `██╔════╝ `,
-  `██║  ███╗`,
-  `██║   ██║`,
-  `╚██████╔╝`,
-  ` ╚═════╝ `,
-].join('\n')
-
-const E = [
-  `███████╗`,
-  `██╔════╝`,
-  `█████╗  `,
-  `██╔══╝  `,
-  `███████╗`,
-  `╚══════╝`,
-].join('\n')
-
-const N = [
-  `███╗   ██╗`,
-  `████╗  ██║`,
-  `██╔██╗ ██║`,
-  `██║╚██╗██║`,
-  `██║ ╚████║`,
-  `╚═╝  ╚═══╝`,
-].join('\n')
-
-const T = [
-  `████████╗`,
-  `╚══██╔══╝`,
-  `   ██║   `,
-  `   ██║   `,
-  `   ██║   `,
-  `   ╚═╝   `,
-].join('\n')
-
-const eyes = `
-                                         -+:
-                   :=-                    -%@@@%.
-             *@@@@@#-                           *@@-
-          +@@.                                     +@
-        @@=                               -#=-+++=+:
-      #%        .:===-:                   -@* +@@@@%
-           *@-+@@@@@:                    %@@+  @@@=#@
-          *@=   @@@@@@@-                .@.@@@@@@@ :
-        @@+=@@@@@@@@@@@@:               .% *@@@@@*-=
-       #:-@ -@@@@@@@@@-+%                @  -@@@- #
-       :  #+  @@@@@@@- -%                 =#     =
-           -@:        *@                      .+%%
-              :%#: --
-              .-:
-                                                           `
-
-const palette = [
-  [0xe8, 0xa0, 0xa0],
-  [0xe8, 0xbe, 0x8f],
-  [0xe8, 0xdf, 0x9a],
-  [0x96, 0xd4, 0xa8],
-  [0x90, 0xb8, 0xe8],
-]
-
-function gradientColor(t) {
-  const s = Math.max(0, Math.min(1, t)) * (palette.length - 1)
-  const i = Math.min(Math.floor(s), palette.length - 2)
-  const f = s - i
-  const [r1, g1, b1] = palette[i]
-  const [r2, g2, b2] = palette[i + 1]
-  const r = Math.round(r1 + (r2 - r1) * f)
-  const g = Math.round(g1 + (g2 - g1) * f)
-  const b = Math.round(b1 + (b2 - b1) * f)
-  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`
+function readVersion(): string {
+  try {
+    const pkgPath = path.resolve(__dirname, '..', 'package.json')
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8')) as { version?: string }
+    return pkg.version ?? '0.0.0'
+  } catch {
+    return '0.0.0'
+  }
 }
 
-const Eyes = () => {
-  const lines = eyes.split('\n')
-  const maxLen = Math.max(...lines.map(l => l.trimEnd().length))
+function printHelp(): void {
+  const lines = [
+    'ethagent — privacy-first AI agent with an ethereum identity',
+    '',
+    'usage:',
+    '  ethagent                      start the agent (first run triggers setup)',
+    '  ethagent doctor               print diagnostics',
+    '  ethagent config               print resolved config',
+    '  ethagent reset                wipe config (keys kept)',
+    '  ethagent model list           list installed ollama models',
+    '  ethagent model pull <name>    pull an ollama model',
+    '  ethagent model use <name>     set default model',
+    '  ethagent key set <provider>   store API key (openai|anthropic|gemini)',
+    '  ethagent key rm <provider>    remove stored key',
+    '  ethagent --version            print version',
+    '  ethagent --help               print this help',
+  ]
+  for (const line of lines) process.stdout.write(line + '\n')
+}
+
+async function runConfigCommand(): Promise<number> {
+  const config = await loadConfig()
+  if (!config) {
+    process.stdout.write(`no config at ${getConfigPath()}\n`)
+    return 1
+  }
+  process.stdout.write(JSON.stringify(config, null, 2) + '\n')
+  process.stdout.write(`path: ${getConfigPath()}\n`)
+  return 0
+}
+
+async function runResetCommand(): Promise<number> {
+  await deleteConfig()
+  process.stdout.write(`config removed: ${getConfigPath()}\n`)
+  return 0
+}
+
+function notImplemented(command: string): number {
+  process.stderr.write(`${command}: not implemented yet\n`)
+  return 2
+}
+
+type AppPhase =
+  | { kind: 'loading' }
+  | { kind: 'setup' }
+  | { kind: 'ready'; config: EthagentConfig }
+  | { kind: 'cancelled' }
+  | { kind: 'error'; message: string }
+
+const AppRoot: React.FC<{ onExit: (code: number) => void }> = ({ onExit }) => {
+  const [phase, setPhase] = useState<AppPhase>({ kind: 'loading' })
+
+  useEffect(() => {
+    if (phase.kind !== 'loading') return
+    let cancelled = false
+    loadConfig()
+      .then(config => {
+        if (cancelled) return
+        setPhase(config ? { kind: 'ready', config } : { kind: 'setup' })
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return
+        setPhase({ kind: 'error', message: (err as Error).message })
+      })
+    return () => { cancelled = true }
+  }, [phase])
+
+  useEffect(() => {
+    if (phase.kind === 'cancelled') {
+      const t = setTimeout(() => onExit(1), 10)
+      return () => clearTimeout(t)
+    }
+    if (phase.kind === 'error') {
+      const t = setTimeout(() => onExit(1), 10)
+      return () => clearTimeout(t)
+    }
+    return undefined
+  }, [phase, onExit])
+
+  if (phase.kind === 'loading') {
+    return (
+      <Box padding={1}>
+        <Text color={theme.dim}>loading config…</Text>
+      </Box>
+    )
+  }
+  if (phase.kind === 'setup') {
+    return (
+      <FirstRun
+        onComplete={config => setPhase({ kind: 'ready', config })}
+        onCancel={() => setPhase({ kind: 'cancelled' })}
+      />
+    )
+  }
+  if (phase.kind === 'cancelled') {
+    return (
+      <Box padding={1}>
+        <Text color={theme.dim}>setup cancelled.</Text>
+      </Box>
+    )
+  }
+  if (phase.kind === 'error') {
+    return (
+      <Box padding={1}>
+        <Text color="#e87070">error: {phase.message}</Text>
+      </Box>
+    )
+  }
   return (
-    <Box flexDirection="column">
-      {lines.map((line, li) => (
-        <Text key={li}>
-          {line.split('').map((char, ci) => (
-            <Text key={ci} color={gradientColor(ci / Math.max(maxLen - 1, 1))}>{char}</Text>
-          ))}
-        </Text>
-      ))}
+    <Box flexDirection="column" padding={1}>
+      <Splash statusLine={`ready · ${phase.config.provider} · ${phase.config.model}`} />
+      <Text color={theme.dim}>chat coming soon. press ctrl+c to exit.</Text>
     </Box>
   )
 }
 
-const App = () => {
-  const ethLines = eth.split('\n')
-  const aLines = A.split('\n')
-  const gLines = G.split('\n')
-  const eLines = E.split('\n')
-  const nLines = N.split('\n')
-  const tLines = T.split('\n')
-
-  const w = 69
-  const topLabel = ' privacy-first AI agent with a portable ethereum identity '
-
-  return (
-    <Box flexDirection="column" alignSelf="flex-start" padding={1}>
-      <Eyes />
-      <Text>
-        <Text color="#555555">╔═</Text>
-        <Text color="#777777">{topLabel}</Text>
-        <Text color="#555555">{'═'.repeat(w - topLabel.length - 1)}╗</Text>
-      </Text>
-      {ethLines.map((line, i) => (
-        <Box key={i}>
-          <Text color="#555555">║</Text>
-          <Text color="#555555">{ethLines[i]}</Text>
-          <Text color="#555555">{aLines[i]}</Text>
-          <Text color="#555555">{gLines[i]}</Text>
-          <Text color="#555555">{eLines[i]}</Text>
-          <Text color="#555555">{nLines[i]}</Text>
-          <Text color="#555555">{tLines[i]}</Text>
-          <Text color="#555555">║</Text>
-        </Box>
-      ))}
-      <Text color="#555555">{'╚' + '═'.repeat(w) + '╝'}</Text>
-      <Text color="#777777">{'\n coming soon...\n'}</Text>
-    </Box>
-  )
+function runDefault(): Promise<number> {
+  return new Promise(resolve => {
+    const instance = render(<AppRoot onExit={code => {
+      instance.unmount()
+      resolve(code)
+    }} />)
+  })
 }
 
-render(<App />)
+async function main(): Promise<number> {
+  const argv = process.argv.slice(2)
+  const [cmd, ...rest] = argv
+
+  if (!cmd) return runDefault()
+  if (cmd === '--version' || cmd === '-v') {
+    process.stdout.write(`ethagent ${readVersion()}\n`)
+    return 0
+  }
+  if (cmd === '--help' || cmd === '-h' || cmd === 'help') {
+    printHelp()
+    return 0
+  }
+
+  switch (cmd) {
+    case 'config':
+      return runConfigCommand()
+    case 'reset':
+      return runResetCommand()
+    case 'doctor':
+      return notImplemented('doctor')
+    case 'model':
+      return notImplemented(`model ${rest[0] ?? ''}`.trim())
+    case 'key':
+      return notImplemented(`key ${rest[0] ?? ''}`.trim())
+    default:
+      process.stderr.write(`unknown command: ${cmd}\nrun 'ethagent --help' for usage\n`)
+      return 2
+  }
+}
+
+main()
+  .then(code => process.exit(code))
+  .catch(err => {
+    process.stderr.write(`${(err as Error).message}\n`)
+    process.exit(1)
+  })
