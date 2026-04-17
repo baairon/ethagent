@@ -92,7 +92,7 @@ type SplashProps = {
   compact?: boolean
 }
 
-const TAGLINE = ' privacy-first AI agent with a portable ethereum identity '
+const TAGLINE = ' privacy-first AI agent with a portable Ethereum identity '
 
 export const Splash: React.FC<SplashProps> = ({ statusLine, compact }) => {
   const width = process.stdout.columns ?? 80

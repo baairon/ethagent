@@ -23,7 +23,7 @@ function readVersion(): string {
 
 function printHelp(): void {
   const lines = [
-    'ethagent — privacy-first AI agent with an ethereum identity',
+    'ethagent: privacy-first AI agent with a portable Ethereum identity',
     '',
     'usage:',
     '  ethagent                      start the agent (first run triggers setup)',
