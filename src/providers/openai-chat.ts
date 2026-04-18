@@ -1,11 +1,15 @@
 import type { ProviderId } from '../storage/config.js'
 import type { Message, Provider, StreamEvent } from './contracts.js'
+import { ProviderError } from './contracts.js'
+import { providerErrorFromResponse } from './errors.js'
+import { iterSseFrames } from './sse.js'
 
 type Options = {
   id: ProviderId
   model: string
   baseUrl: string
   apiKey?: string
+  loadApiKey?: () => Promise<string | null>
 }
 
 type ChatChunk = {
@@ -30,20 +34,29 @@ export class OpenAIChatProvider implements Provider {
   readonly model: string
   private readonly baseUrl: string
   private readonly apiKey: string
+  private readonly loadApiKey?: () => Promise<string | null>
 
   constructor(opts: Options) {
     this.id = opts.id
     this.model = opts.model
     this.baseUrl = opts.baseUrl.replace(/\/+$/, '')
     this.apiKey = opts.apiKey ?? ''
+    this.loadApiKey = opts.loadApiKey
   }
 
   async *complete(messages: Message[], signal: AbortSignal): AsyncIterable<StreamEvent> {
+    const apiKey = await this.resolveApiKey()
+    if (!apiKey && this.id !== 'ollama') {
+      const error = new ProviderError(`missing API key for ${this.id} (/doctor to verify)`)
+      yield { type: 'error', message: error.message }
+      return
+    }
+
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       Accept: 'text/event-stream',
     }
-    if (this.apiKey) headers.Authorization = `Bearer ${this.apiKey}`
+    if (apiKey) headers.Authorization = `Bearer ${apiKey}`
 
     let response: Response
     try {
@@ -66,8 +79,8 @@ export class OpenAIChatProvider implements Provider {
     }
 
     if (!response.ok) {
-      const detail = await safeReadText(response)
-      yield { type: 'error', message: `HTTP ${response.status}${detail ? `: ${detail}` : ''}` }
+      const error = await providerErrorFromResponse(this.id, response)
+      yield { type: 'error', message: error.message }
       return
     }
     if (!response.body) {
@@ -115,73 +128,10 @@ export class OpenAIChatProvider implements Provider {
     if (signal.aborted) return
     yield { type: 'done', inputTokens, outputTokens }
   }
-}
 
-async function safeReadText(response: Response): Promise<string> {
-  try {
-    const text = await response.text()
-    return text.trim().slice(0, 400)
-  } catch {
-    return ''
+  private async resolveApiKey(): Promise<string> {
+    if (this.apiKey) return this.apiKey
+    if (!this.loadApiKey) return ''
+    return (await this.loadApiKey()) ?? ''
   }
-}
-
-async function* iterSseFrames(
-  body: ReadableStream<Uint8Array>,
-  signal: AbortSignal,
-  readTimeoutMs: number,
-): AsyncIterable<string> {
-  const reader = body.getReader()
-  const decoder = new TextDecoder()
-  let buffer = ''
-  try {
-    while (!signal.aborted) {
-      const { done, value } = await readWithTimeout(reader, readTimeoutMs)
-      if (done) break
-      buffer += decoder.decode(value, { stream: true })
-      let idx: number
-      while ((idx = buffer.indexOf('\n\n')) !== -1) {
-        const raw = buffer.slice(0, idx)
-        buffer = buffer.slice(idx + 2)
-        const payload = extractDataPayload(raw)
-        if (payload !== null) yield payload
-      }
-    }
-    const tail = buffer.trim()
-    if (tail) {
-      const payload = extractDataPayload(tail)
-      if (payload !== null) yield payload
-    }
-  } finally {
-    try { reader.releaseLock() } catch { void 0 }
-  }
-}
-
-async function readWithTimeout(
-  reader: ReadableStreamDefaultReader<Uint8Array>,
-  timeoutMs: number,
-): Promise<ReadableStreamReadResult<Uint8Array>> {
-  let timer: NodeJS.Timeout | undefined
-  const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => {
-      reject(new Error(`no response from model in ${Math.round(timeoutMs / 1000)}s`))
-    }, timeoutMs)
-  })
-  try {
-    return await Promise.race([reader.read(), timeout])
-  } finally {
-    if (timer) clearTimeout(timer)
-  }
-}
-
-function extractDataPayload(frame: string): string | null {
-  const lines = frame.split('\n')
-  const dataLines: string[] = []
-  for (const line of lines) {
-    if (line.startsWith('data:')) {
-      dataLines.push(line.slice(5).replace(/^ /, ''))
-    }
-  }
-  if (dataLines.length === 0) return null
-  return dataLines.join('\n')
 }
