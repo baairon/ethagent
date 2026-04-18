@@ -18,7 +18,7 @@ The model is replaceable. The memory is portable. The identity is durable.
 - Your agent is registered onchain via [ERC-8004](https://eips.ethereum.org/EIPS/eip-8004)
 - Everything you teach it compounds across sessions instead of resetting with each vendor switch
 
-## What It Does Today
+## What It Does
 
 `ethagent` gives you a portable agent workflow:
 
