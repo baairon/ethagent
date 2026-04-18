@@ -168,4 +168,4 @@ function truncateToFit(text: string, max: number): string {
   return text.slice(0, max - 1) + '…'
 }
 
-export default BrandSplash
+

@@ -616,7 +616,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
   const slashSuggestions = useMemo(getSlashSuggestions, [])
 
   const contextLine = `${config.provider} · ${config.model} · ${compressHome(process.cwd())}`
-  const tipLine = '/help for commands · alt+enter for newline'
+  const tipLine = 'tip: type /help to get started · alt+enter for newline'
 
   const placeholderHints = useMemo(() => {
     if (streaming) return ['streaming… esc to cancel']
@@ -700,7 +700,6 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
           turns={turns}
           approxTokens={approxTokens}
           startedAt={startedAt}
-          streaming={streaming}
         />
       </Box>
     </Box>
@@ -772,4 +771,3 @@ function formatBytes(bytes: number): string {
   return `${kb.toFixed(0)}KB`
 }
 
-export default ChatScreen

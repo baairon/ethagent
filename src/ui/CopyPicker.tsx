@@ -49,4 +49,4 @@ export const CopyPicker: React.FC<CopyPickerProps> = ({ turnText, turnLabel, onD
   )
 }
 
-export default CopyPicker
+

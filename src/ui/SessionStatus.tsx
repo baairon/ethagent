@@ -8,7 +8,6 @@ type StatusBarProps = {
   turns: number
   approxTokens: number
   startedAt: number
-  streaming?: boolean
 }
 
 const SessionStatusInner: React.FC<StatusBarProps> = ({
@@ -17,7 +16,6 @@ const SessionStatusInner: React.FC<StatusBarProps> = ({
   turns,
   approxTokens,
   startedAt,
-  streaming: _streaming,
 }) => {
   return (
     <Box flexDirection="row">
@@ -47,4 +45,3 @@ export function formatElapsed(ms: number): string {
   return `${hours}h${minRem.toString().padStart(2, '0')}m`
 }
 
-export default SessionStatus

@@ -31,4 +31,4 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ progress, width = 40, 
   )
 }
 
-export default ProgressBar
+
