@@ -1,20 +1,26 @@
 export const palette: Array<[number, number, number]> = [
-  [0xe8, 0xa0, 0xa0],
-  [0xe8, 0xbe, 0x8f],
-  [0xe8, 0xdf, 0x9a],
-  [0x96, 0xd4, 0xa8],
+  [0xbc, 0xd9, 0xc9],
+  [0xcf, 0xe5, 0xbd],
+  [0xe4, 0xe3, 0xb5],
+  [0xe7, 0xcd, 0xb7],
+  [0xd9, 0xca, 0xe8],
+  [0x9f, 0xd0, 0xbb],
   [0x90, 0xb8, 0xe8],
 ]
 
 export const theme = {
-  accentPrimary: '#e8a0a0',
-  accentWarm: '#e8be8f',
-  accentNeutral: '#e8df9a',
-  accentSecondary: '#96d4a8',
+  accentPrimary: '#cfe5bd',
+  accentWarm: '#d8cda8',
+  accentNeutral: '#e4e3b5',
+  accentSecondary: '#9fd0bb',
+  accentMint: '#bcd9c9',
+  accentPeach: '#e7cdb7',
+  accentLavender: '#d9cae8',
   accentInfo: '#90b8e8',
   border: '#555555',
   dim: '#777777',
-  text: '#cccccc',
+  text: '#f1f1f1',
+  textSubtle: '#9b9b9b',
 } as const
 
 export function gradientColor(t: number): string {

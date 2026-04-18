@@ -1,15 +1,15 @@
 #!/usr/bin/env node
 import React, { useEffect, useState } from 'react'
-import { render, Box, Text } from 'ink'
+import { render, Box, Text, useApp, useInput } from 'ink'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { Splash } from './ui/Splash.js'
 import { PreviewSplash } from './ui/PreviewSplash.js'
 import { theme } from './ui/theme.js'
 import { FirstRun } from './bootstrap/FirstRun.js'
-import { loadConfig, deleteConfig, getConfigPath, type EthagentConfig } from './config/store.js'
-import { runModelList, runModelPull, runModelUse } from './commands/model.js'
+import { ChatScreen } from './ui/ChatScreen.js'
+import { KeybindingProvider } from './keybindings/KeybindingProvider.js'
+import { loadConfig, deleteConfig, getConfigPath, type EthagentConfig } from './storage/config.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -28,41 +28,20 @@ function printHelp(): void {
     'ethagent: privacy-first AI agent with a portable Ethereum identity',
     '',
     'usage:',
-    '  ethagent                      start the agent (first run triggers setup)',
-    '  ethagent doctor               print diagnostics',
-    '  ethagent config               print resolved config',
-    '  ethagent reset                wipe config (keys kept)',
-    '  ethagent model list           list installed ollama models',
-    '  ethagent model pull <name>    pull an ollama model',
-    '  ethagent model use <name>     set default model',
-    '  ethagent key set <provider>   store API key (openai|anthropic|gemini)',
-    '  ethagent key rm <provider>    remove stored key',
-    '  ethagent --version            print version',
-    '  ethagent --help               print this help',
+    '  ethagent           start the agent (first run triggers setup)',
+    '  ethagent reset     wipe config (keys kept)',
+    '  ethagent --version print version',
+    '  ethagent --help    print this help',
+    '',
+    'inside the agent, type /help for slash commands.',
   ]
   for (const line of lines) process.stdout.write(line + '\n')
-}
-
-async function runConfigCommand(): Promise<number> {
-  const config = await loadConfig()
-  if (!config) {
-    process.stdout.write(`no config at ${getConfigPath()}\n`)
-    return 1
-  }
-  process.stdout.write(JSON.stringify(config, null, 2) + '\n')
-  process.stdout.write(`path: ${getConfigPath()}\n`)
-  return 0
 }
 
 async function runResetCommand(): Promise<number> {
   await deleteConfig()
   process.stdout.write(`config removed: ${getConfigPath()}\n`)
   return 0
-}
-
-function notImplemented(command: string): number {
-  process.stderr.write(`${command}: not implemented yet\n`)
-  return 2
 }
 
 type AppPhase =
@@ -72,8 +51,9 @@ type AppPhase =
   | { kind: 'cancelled' }
   | { kind: 'error'; message: string }
 
-const AppRoot: React.FC<{ onExit: (code: number) => void }> = ({ onExit }) => {
+const AppRoot: React.FC<{ setExitCode: (code: number) => void }> = ({ setExitCode }) => {
   const [phase, setPhase] = useState<AppPhase>({ kind: 'loading' })
+  const { exit } = useApp()
 
   useEffect(() => {
     if (phase.kind !== 'loading') return
@@ -92,15 +72,22 @@ const AppRoot: React.FC<{ onExit: (code: number) => void }> = ({ onExit }) => {
 
   useEffect(() => {
     if (phase.kind === 'cancelled') {
-      const t = setTimeout(() => onExit(1), 10)
+      setExitCode(1)
+      const t = setTimeout(() => exit(), 10)
       return () => clearTimeout(t)
     }
     if (phase.kind === 'error') {
-      const t = setTimeout(() => onExit(1), 10)
+      setExitCode(1)
+      const t = setTimeout(() => exit(), 10)
       return () => clearTimeout(t)
     }
     return undefined
-  }, [phase, onExit])
+  }, [phase, exit, setExitCode])
+
+  useInput((input, key) => {
+    if (phase.kind === 'ready') return
+    if (key.ctrl && (input === 'c' || input === 'd')) exit()
+  })
 
   if (phase.kind === 'loading') {
     return (
@@ -132,20 +119,30 @@ const AppRoot: React.FC<{ onExit: (code: number) => void }> = ({ onExit }) => {
     )
   }
   return (
-    <Box flexDirection="column" padding={1}>
-      <Splash statusLine={`ready · ${phase.config.provider} · ${phase.config.model}`} />
-      <Text color={theme.dim}>chat coming soon. press ctrl+c to exit.</Text>
-    </Box>
+    <ChatScreen
+      config={phase.config}
+      onReplaceConfig={next => setPhase({ kind: 'ready', config: next })}
+    />
   )
 }
 
-function runDefault(): Promise<number> {
-  return new Promise(resolve => {
-    const instance = render(<AppRoot onExit={code => {
-      instance.unmount()
-      resolve(code)
-    }} />)
-  })
+async function runDefault(): Promise<number> {
+  let exitCode = 0
+  const instance = render(
+    <KeybindingProvider>
+      <AppRoot setExitCode={code => { exitCode = code }} />
+    </KeybindingProvider>,
+    {
+      exitOnCtrlC: false,
+      kittyKeyboard: { mode: 'auto' },
+    },
+  )
+  try {
+    await instance.waitUntilExit()
+  } catch {
+    exitCode = 1
+  }
+  return exitCode
 }
 
 async function runPreviewCommand(variant: string | undefined): Promise<number> {
@@ -173,23 +170,8 @@ async function main(): Promise<number> {
   }
 
   switch (cmd) {
-    case 'config':
-      return runConfigCommand()
     case 'reset':
       return runResetCommand()
-    case 'doctor':
-      return notImplemented('doctor')
-    case 'model':
-      switch (rest[0]) {
-        case 'list': return runModelList()
-        case 'pull': return runModelPull(rest[1])
-        case 'use':  return runModelUse(rest[1])
-        default:
-          process.stderr.write('usage: ethagent model list | pull <name> | use <name>\n')
-          return 2
-      }
-    case 'key':
-      return notImplemented(`key ${rest[0] ?? ''}`.trim())
     case 'preview':
       return runPreviewCommand(rest[0])
     default:

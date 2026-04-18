@@ -1,4 +1,4 @@
-import type { SpecSnapshot } from './detectSpec.js'
+import type { SpecSnapshot } from './runtimeDetection.js'
 
 const GB = 1024 * 1024 * 1024
 
