@@ -11,8 +11,8 @@ import {
   installOllama,
   pullModel,
 } from './ollama.js'
-import { qwenLadder, recommendModel } from './recommend.js'
-import type { SpecSnapshot } from './detectSpec.js'
+import { qwenLadder, recommendModel } from './modelRecommendation.js'
+import type { SpecSnapshot } from './runtimeDetection.js'
 
 type ModelChoice = {
   name: string

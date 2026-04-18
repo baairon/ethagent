@@ -2,7 +2,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import os from 'node:os'
 import crypto from 'node:crypto'
-import { getConfigDir, ensureConfigDir, type ProviderId } from '../config/store.js'
+import { getConfigDir, ensureConfigDir, type ProviderId } from './config.js'
 
 const KEYTAR_SERVICE = 'ethagent'
 

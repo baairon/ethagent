@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react'
 import { Box, Text } from 'ink'
-import { Splash } from '../ui/Splash.js'
+import { BrandSplash as Splash } from '../ui/BrandSplash.js'
 import { Select } from '../ui/Select.js'
 import { TextInput } from '../ui/TextInput.js'
 import { theme } from '../ui/theme.js'
-import { detectSpec, type SpecSnapshot } from './detectSpec.js'
-import { recommendModel } from './recommend.js'
+import { detectSpec, type SpecSnapshot } from './runtimeDetection.js'
+import { recommendModel } from './modelRecommendation.js'
 import { OllamaBootstrap } from './OllamaBootstrap.js'
 import {
   saveConfig,
@@ -13,8 +13,8 @@ import {
   defaultBaseUrlFor,
   type EthagentConfig,
   type ProviderId,
-} from '../config/store.js'
-import { setKey } from '../keys/store.js'
+} from '../storage/config.js'
+import { setKey } from '../storage/secrets.js'
 
 type Step =
   | { kind: 'detecting' }
@@ -111,7 +111,7 @@ export const FirstRun: React.FC<FirstRunProps> = ({ onComplete, onCancel }) => {
   if (step.kind === 'detecting') {
     return (
       <Box flexDirection="column" padding={1}>
-        <Splash statusLine={STATUS['detecting']} />
+        <Splash tipLine={STATUS['detecting']} />
         <Text color={theme.dim}>inspecting machine…</Text>
       </Box>
     )
@@ -120,7 +120,7 @@ export const FirstRun: React.FC<FirstRunProps> = ({ onComplete, onCancel }) => {
   if (step.kind === 'detect-error') {
     return (
       <Box flexDirection="column" padding={1}>
-        <Splash statusLine={STATUS['detect-error']} />
+        <Splash tipLine={STATUS['detect-error']} />
         <Text color="#e87070">could not inspect machine: {step.message}</Text>
         <Box marginTop={1}>
           <Select<'quit'>
@@ -138,7 +138,7 @@ export const FirstRun: React.FC<FirstRunProps> = ({ onComplete, onCancel }) => {
     const recommended = recommendModel(spec)
     return (
       <Box flexDirection="column" padding={1}>
-        <Splash statusLine={STATUS['choose-path']} />
+        <Splash tipLine={STATUS['choose-path']} />
         <Box flexDirection="column" marginBottom={1}>
           <Text color={theme.dim}>
             detected {formatGB(spec.effectiveRamBytes)} RAM
@@ -172,7 +172,7 @@ export const FirstRun: React.FC<FirstRunProps> = ({ onComplete, onCancel }) => {
   if (step.kind === 'ollama-setup') {
     return (
       <Box flexDirection="column" padding={1}>
-        <Splash statusLine={STATUS['ollama-setup']} />
+        <Splash tipLine={STATUS['ollama-setup']} />
         <OllamaBootstrap
           spec={step.spec}
           onDone={model => setStep({
@@ -196,7 +196,7 @@ export const FirstRun: React.FC<FirstRunProps> = ({ onComplete, onCancel }) => {
     const recModel = recommendModel(step.spec).model
     return (
       <Box flexDirection="column" padding={1}>
-        <Splash statusLine={STATUS['ollama-manual']} />
+        <Splash tipLine={STATUS['ollama-manual']} />
         <Text color={theme.accentPrimary}>set ollama up yourself:</Text>
         <Box flexDirection="column" marginTop={1} marginBottom={1}>
           <Text color={theme.dim}>  1. install from https://ollama.com/download</Text>
@@ -226,7 +226,7 @@ export const FirstRun: React.FC<FirstRunProps> = ({ onComplete, onCancel }) => {
   if (step.kind === 'cloud-provider') {
     return (
       <Box flexDirection="column" padding={1}>
-        <Splash statusLine={STATUS['cloud-provider']} />
+        <Splash tipLine={STATUS['cloud-provider']} />
         <Text color={theme.accentSecondary} bold>pick a cloud provider</Text>
         <Box marginTop={1}>
           <Select<ProviderId>
@@ -250,7 +250,7 @@ export const FirstRun: React.FC<FirstRunProps> = ({ onComplete, onCancel }) => {
     const error = step.kind === 'cloud-key' ? step.error : undefined
     return (
       <Box flexDirection="column" padding={1}>
-        <Splash statusLine={saving ? STATUS['cloud-key-saving'] : STATUS['cloud-key']} />
+        <Splash tipLine={saving ? STATUS['cloud-key-saving'] : STATUS['cloud-key']} />
         <Text color={theme.accentSecondary} bold>paste your {provider} API key</Text>
         <Text color={theme.dim}>stored in your OS keyring when available; never written to config.json</Text>
         {error ? <Text color="#e87070">{error}</Text> : null}
@@ -288,7 +288,7 @@ export const FirstRun: React.FC<FirstRunProps> = ({ onComplete, onCancel }) => {
     const defaultModel = defaultModelFor(provider)
     return (
       <Box flexDirection="column" padding={1}>
-        <Splash statusLine={STATUS['cloud-model']} />
+        <Splash tipLine={STATUS['cloud-model']} />
         <Text color={theme.accentSecondary} bold>which model?</Text>
         <Text color={theme.dim}>press enter to accept default: {defaultModel}</Text>
         <Box marginTop={1}>
@@ -315,7 +315,7 @@ export const FirstRun: React.FC<FirstRunProps> = ({ onComplete, onCancel }) => {
   if (step.kind === 'saving') {
     return (
       <Box flexDirection="column" padding={1}>
-        <Splash statusLine={STATUS['saving']} />
+        <Splash tipLine={STATUS['saving']} />
         <Text color={theme.dim}>saving config…</Text>
       </Box>
     )
@@ -324,7 +324,7 @@ export const FirstRun: React.FC<FirstRunProps> = ({ onComplete, onCancel }) => {
   if (step.kind === 'save-error') {
     return (
       <Box flexDirection="column" padding={1}>
-        <Splash statusLine={STATUS['save-error']} />
+        <Splash tipLine={STATUS['save-error']} />
         <Text color="#e87070">{step.message}</Text>
         <Box marginTop={1}>
           <Select<'retry' | 'back' | 'quit'>
@@ -349,7 +349,7 @@ export const FirstRun: React.FC<FirstRunProps> = ({ onComplete, onCancel }) => {
   if (step.kind === 'done') {
     return (
       <Box flexDirection="column" padding={1}>
-        <Splash statusLine={`ready · ${step.config.provider} · ${step.config.model}`} />
+        <Splash tipLine={`ready · ${step.config.provider} · ${step.config.model}`} />
         <Text color={theme.accentSecondary}>all set.</Text>
       </Box>
     )

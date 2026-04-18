@@ -88,13 +88,14 @@ const Eyes = () => {
 }
 
 type SplashProps = {
-  statusLine?: string
+  contextLine?: string
+  tipLine?: string
   compact?: boolean
 }
 
 const TAGLINE = ' privacy-first AI agent with a portable Ethereum identity '
 
-export const Splash: React.FC<SplashProps> = ({ statusLine, compact }) => {
+export const BrandSplash: React.FC<SplashProps> = ({ contextLine, tipLine, compact }) => {
   const width = process.stdout.columns ?? 80
   const renderCompact = compact ?? width < 72
 
@@ -104,7 +105,8 @@ export const Splash: React.FC<SplashProps> = ({ statusLine, compact }) => {
         <Eyes />
         <Text bold color={theme.accentPrimary}>ethagent</Text>
         <Text color={theme.dim}>{TAGLINE.trim()}</Text>
-        {statusLine ? <Text color={theme.accentSecondary}>{statusLine}</Text> : null}
+        {contextLine ? <Text color={theme.dim}>{contextLine}</Text> : null}
+        {tipLine ? <Text color={theme.dim}>{tipLine}</Text> : null}
       </Box>
     )
   }
@@ -117,7 +119,10 @@ export const Splash: React.FC<SplashProps> = ({ statusLine, compact }) => {
   const tLines = T.split('\n')
 
   const w = 69
-  const pad = Math.max(0, w - TAGLINE.length - 1)
+  const topPad = Math.max(0, w - TAGLINE.length - 1)
+
+  const bottomInline = contextLine ? ` ${truncateToFit(contextLine, w - 4)} ` : ''
+  const bottomPad = Math.max(0, w - bottomInline.length - 1)
 
   return (
     <Box flexDirection="column" alignSelf="flex-start" padding={1}>
@@ -125,7 +130,7 @@ export const Splash: React.FC<SplashProps> = ({ statusLine, compact }) => {
       <Text>
         <Text color={theme.border}>╔═</Text>
         <Text color={theme.dim}>{TAGLINE}</Text>
-        <Text color={theme.border}>{'═'.repeat(pad)}╗</Text>
+        <Text color={theme.border}>{'═'.repeat(topPad)}╗</Text>
       </Text>
       {ethLines.map((_line, i) => (
         <Box key={i}>
@@ -139,10 +144,28 @@ export const Splash: React.FC<SplashProps> = ({ statusLine, compact }) => {
           <Text color={theme.border}>║</Text>
         </Box>
       ))}
-      <Text color={theme.border}>{'╚' + '═'.repeat(w) + '╝'}</Text>
-      {statusLine ? <Text color={theme.accentSecondary}>{statusLine}</Text> : null}
+      {bottomInline ? (
+        <Text>
+          <Text color={theme.border}>╚═</Text>
+          <Text color={theme.accentMint}>{bottomInline}</Text>
+          <Text color={theme.border}>{'═'.repeat(bottomPad)}╝</Text>
+        </Text>
+      ) : (
+        <Text color={theme.border}>{'╚' + '═'.repeat(w) + '╝'}</Text>
+      )}
+      {tipLine ? (
+        <Box marginTop={1}>
+          <Text color={theme.dim}>{tipLine}</Text>
+        </Box>
+      ) : null}
     </Box>
   )
 }
 
-export default Splash
+function truncateToFit(text: string, max: number): string {
+  if (text.length <= max) return text
+  if (max <= 1) return text.slice(0, Math.max(0, max))
+  return text.slice(0, max - 1) + '…'
+}
+
+export default BrandSplash
