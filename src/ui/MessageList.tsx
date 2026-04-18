@@ -389,4 +389,4 @@ function summarizeThinking(text: string): string {
   return `${normalized.slice(0, 117)}...`
 }
 
-export default MessageList
+

@@ -112,7 +112,7 @@ export const ChatInput: React.FC<PromptInputProps> = ({
   useInput((input, key) => {
     if (disabled) return
 
-    const wantsSoftBreak = isSoftBreak(input, key)
+    const wantsSoftBreak = isSoftBreak(key)
 
     if (showingSlash && filteredSuggestions.length > 0) {
       if (key.tab || (key.return && filteredSuggestions.length > 0 && !wantsSoftBreak)) {
@@ -137,7 +137,7 @@ export const ChatInput: React.FC<PromptInputProps> = ({
       insertText('\n')
       return
     }
-    if (key.return || input === '\r') {
+    if (key.return) {
       submit()
       return
     }
@@ -309,10 +309,7 @@ export const ChatInput: React.FC<PromptInputProps> = ({
   )
 }
 
-function isSoftBreak(_input: string, key: {
-  return: boolean
-  meta: boolean
-}): boolean {
+function isSoftBreak(key: { return: boolean; meta: boolean }): boolean {
   return key.return && key.meta
 }
 
@@ -364,4 +361,3 @@ function renderWithCursor(value: string, cursor: number, showCursor: boolean): R
   })
 }
 
-export default ChatInput

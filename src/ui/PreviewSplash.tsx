@@ -12,4 +12,4 @@ export const PreviewSplash: React.FC = () => (
   </Box>
 )
 
-export default PreviewSplash
+

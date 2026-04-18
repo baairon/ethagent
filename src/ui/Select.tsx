@@ -66,4 +66,4 @@ export function Select<T>({ label, options, initialIndex = 0, onSubmit, onCancel
   )
 }
 
-export default Select
+

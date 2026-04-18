@@ -4,11 +4,8 @@ export const ACTIONS = [
   'app:interrupt',
   'app:redraw',
   'chat:cancel',
-  'chat:submit',
   'chat:modelPicker',
   'chat:cycleMode',
-  'history:previous',
-  'history:next',
 ] as const
 
 export type Action = (typeof ACTIONS)[number]
