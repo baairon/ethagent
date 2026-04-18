@@ -3,10 +3,6 @@ import { Text } from 'ink'
 import { theme } from './theme.js'
 import { pickVerb } from '../constants/spinnerVerbs.js'
 
-const FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
-const INTERVAL_MS = 80
-const ELAPSED_MIN_MS = 2000
-
 type SpinnerProps = {
   active?: boolean
   hint?: string
@@ -15,49 +11,48 @@ type SpinnerProps = {
   color?: string
 }
 
+const FRAMES = ['.', 'o', 'O', 'o']
+
 export const Spinner: React.FC<SpinnerProps> = ({
   active = true,
   hint,
   label,
   verb,
-  color = theme.accentPrimary,
+  color = theme.accentSecondary,
 }) => {
-  const [frame, setFrame] = useState(0)
-  const [elapsedMs, setElapsedMs] = useState(0)
   const stickyVerbRef = useRef<string | null>(null)
-  const startRef = useRef<number | null>(null)
+  const [frame, setFrame] = useState(0)
 
   useEffect(() => {
     if (!active) {
       stickyVerbRef.current = null
-      startRef.current = null
-      setElapsedMs(0)
       return
     }
+
     if (label === undefined && stickyVerbRef.current === null) {
       stickyVerbRef.current = verb ?? pickVerb()
     }
-    if (startRef.current === null) startRef.current = Date.now()
-    const timer = setInterval(() => {
-      setFrame(f => (f + 1) % FRAMES.length)
-      if (startRef.current !== null) setElapsedMs(Date.now() - startRef.current)
-    }, INTERVAL_MS)
-    return () => clearInterval(timer)
   }, [active, verb, label])
+
+  useEffect(() => {
+    if (!active) return
+    const timer = setInterval(() => {
+      setFrame(prev => (prev + 1) % FRAMES.length)
+    }, 120)
+    return () => clearInterval(timer)
+  }, [active])
 
   if (!active) return null
 
   const autoLabel = stickyVerbRef.current ?? verb ?? 'thinking'
-  const showElapsed = label === undefined && elapsedMs >= ELAPSED_MIN_MS
-  const seconds = Math.floor(elapsedMs / 1000)
-  const text = label ?? `${autoLabel}…`
+  const text = label ?? `${autoLabel}...`
+  const glyph = FRAMES[frame] ?? 'o'
 
   return (
     <Text>
-      <Text color={color}>{FRAMES[frame]}</Text>
-      <Text color={theme.dim}> {text}</Text>
-      {showElapsed ? <Text color={theme.dim}> {seconds}s</Text> : null}
-      {hint ? <Text color={theme.dim}> · {hint}</Text> : null}
+      <Text color={color}>{glyph}</Text>
+      <Text color={theme.textSubtle}> {text}</Text>
+      {hint ? <Text color={theme.dim}> / {hint}</Text> : null}
     </Text>
   )
 }

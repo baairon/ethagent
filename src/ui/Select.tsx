@@ -28,7 +28,10 @@ export function Select<T>({ label, options, initialIndex = 0, onSubmit, onCancel
     for (let i = 0; i < options.length; i++) {
       next = (next + delta + options.length) % options.length
       const candidate = options[next]
-      if (candidate && !candidate.disabled) { setIndex(next); return }
+      if (candidate && !candidate.disabled) {
+        setIndex(next)
+        return
+      }
     }
   }
 
@@ -48,12 +51,13 @@ export function Select<T>({ label, options, initialIndex = 0, onSubmit, onCancel
       {label ? <Text color={theme.dim}>{label}</Text> : null}
       {options.map((option, i) => {
         const isActive = i === index
-        const prefix = isActive ? '›' : ' '
+        const prefix = option.disabled ? '-' : isActive ? '>' : ' '
+        const prefixColor = option.disabled ? theme.border : isActive ? theme.accentPrimary : theme.dim
         const labelColor = option.disabled ? theme.dim : isActive ? theme.accentPrimary : theme.text
         return (
           <Box key={i} flexDirection="row">
-            <Text color={isActive ? theme.accentPrimary : theme.dim}>{prefix} </Text>
-            <Text color={labelColor} bold={isActive}>{option.label}</Text>
+            <Text color={prefixColor}>{prefix} </Text>
+            <Text color={labelColor} bold={isActive && !option.disabled}>{option.label}</Text>
             {option.hint ? <Text color={theme.dim}>  {option.hint}</Text> : null}
           </Box>
         )
@@ -61,3 +65,5 @@ export function Select<T>({ label, options, initialIndex = 0, onSubmit, onCancel
     </Box>
   )
 }
+
+export default Select

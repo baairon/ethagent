@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react'
-import { Box, Text } from 'ink'
+import { Text } from 'ink'
 import { theme } from './theme.js'
 import { Select, type SelectOption } from './Select.js'
 import { Spinner } from './Spinner.js'
+import { Surface } from './Surface.js'
 import { listSessions, type SessionSummary } from '../storage/sessions.js'
 
 type ResumeViewProps = {
@@ -36,30 +37,36 @@ export const ResumeView: React.FC<ResumeViewProps> = ({ currentSessionId, onResu
 
   if (state.kind === 'loading') {
     return (
-      <Box flexDirection="column" borderStyle="round" borderColor={theme.accentPrimary} paddingX={1}>
-        <Text color={theme.dim}>resume session</Text>
-        <Spinner label="loading sessions…" />
-      </Box>
+      <Surface
+        title="Resume Session"
+        subtitle="Pick a previous thread to reopen."
+      >
+        <Spinner label="loading sessions..." />
+      </Surface>
     )
   }
 
   if (state.kind === 'error') {
     return (
-      <Box flexDirection="column" borderStyle="round" borderColor={theme.border} paddingX={1}>
-        <Text color={theme.accentSecondary}>resume session</Text>
+      <Surface
+        title="Resume Session"
+        tone="muted"
+        footer="Press Esc to close."
+      >
         <Text color={theme.dim}>{state.message}</Text>
-        <Text color={theme.dim}>press esc to close</Text>
-      </Box>
+      </Surface>
     )
   }
 
   if (state.sessions.length === 0) {
     return (
-      <Box flexDirection="column" borderStyle="round" borderColor={theme.border} paddingX={1}>
-        <Text color={theme.accentSecondary}>resume session</Text>
-        <Text color={theme.dim}>no prior sessions to resume.</Text>
-        <Text color={theme.dim}>press esc to close</Text>
-      </Box>
+      <Surface
+        title="Resume Session"
+        tone="muted"
+        footer="Press Esc to close."
+      >
+        <Text color={theme.dim}>No prior sessions to resume.</Text>
+      </Surface>
     )
   }
 
@@ -70,28 +77,30 @@ export const ResumeView: React.FC<ResumeViewProps> = ({ currentSessionId, onResu
     return {
       value: s.id,
       label,
-      hint: `${s.turnCount} turn${s.turnCount === 1 ? '' : 's'} · ${formatRelative(s.mtimeMs)}`,
+      hint: `${s.turnCount} turn${s.turnCount === 1 ? '' : 's'} / ${formatRelative(s.mtimeMs)}`,
     }
   })
 
   return (
-    <Box flexDirection="column" borderStyle="round" borderColor={theme.accentPrimary} paddingX={1}>
-      <Text color={theme.accentPrimary}>resume session</Text>
+    <Surface
+      title="Resume Session"
+      subtitle="Recent sessions from local history."
+      footer="Enter resumes. Esc closes."
+    >
       <Select
         options={options}
         initialIndex={0}
         onSubmit={onResume}
         onCancel={onCancel}
       />
-      <Text color={theme.dim}>enter to resume · esc to close</Text>
-    </Box>
+    </Surface>
   )
 }
 
 function formatFirstLine(text: string): string {
   const firstLine = text.split('\n', 1)[0] ?? ''
   if (firstLine.length <= 60) return firstLine
-  return firstLine.slice(0, 57) + '…'
+  return firstLine.slice(0, 57) + '...'
 }
 
 function formatRelative(ms: number): string {

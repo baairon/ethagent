@@ -7,27 +7,28 @@ type StatusBarProps = {
   model: string
   turns: number
   approxTokens: number
-  elapsedMs: number
+  startedAt: number
   streaming?: boolean
 }
 
-export const SessionStatus: React.FC<StatusBarProps> = ({
+const SessionStatusInner: React.FC<StatusBarProps> = ({
   provider,
   model,
   turns,
   approxTokens,
-  elapsedMs,
-  streaming,
+  startedAt,
+  streaming: _streaming,
 }) => {
   return (
     <Box flexDirection="row">
       <Text color={theme.dim}>
-        {provider} · {model} · {turns} {turns === 1 ? 'turn' : 'turns'} · ~{formatTokens(approxTokens)} tokens · {formatElapsed(elapsedMs)}
+        {provider} · {model} · {turns} {turns === 1 ? 'turn' : 'turns'} · ~{formatTokens(approxTokens)} tokens · {formatElapsed(Date.now() - startedAt)}
       </Text>
-      {streaming ? <Text color={theme.accentPrimary}> · streaming</Text> : null}
     </Box>
   )
 }
+
+export const SessionStatus = React.memo(SessionStatusInner)
 
 export function formatTokens(count: number): string {
   if (count < 1000) return String(count)

@@ -69,20 +69,22 @@ export function TextInput({
     }
   })
 
-  const display = isSecret ? '•'.repeat(value.length) : value
+  const display = isSecret ? '*'.repeat(value.length) : value
   const showPlaceholder = value.length === 0 && placeholder
 
   return (
     <Box flexDirection="column">
       {label ? <Text color={theme.dim}>{label}</Text> : null}
       <Box flexDirection="row">
-        <Text color={theme.accentPrimary}>› </Text>
+        <Text color={theme.accentPrimary}>{'> '}</Text>
         {showPlaceholder
           ? <Text color={theme.dim}>{placeholder}</Text>
           : <Text color={theme.text}>{display}</Text>}
-        <Text color={theme.accentPrimary}>▎</Text>
+        <Text color={theme.accentPrimary}>|</Text>
       </Box>
       {error ? <Text color="#e87070">{error}</Text> : null}
     </Box>
   )
 }
+
+export default TextInput

@@ -134,7 +134,7 @@ async function runDefault(): Promise<number> {
     </KeybindingProvider>,
     {
       exitOnCtrlC: false,
-      kittyKeyboard: { mode: 'auto' },
+      kittyKeyboard: { mode: 'enabled' },
     },
   )
   try {

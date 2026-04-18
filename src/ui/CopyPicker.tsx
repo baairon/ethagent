@@ -1,6 +1,5 @@
 import React from 'react'
-import { Box, Text } from 'ink'
-import { theme } from './theme.js'
+import { Surface } from './Surface.js'
 import { Select } from './Select.js'
 import { parseSegments, type Segment } from '../utils/markdownSegments.js'
 import { copyToClipboard, type CopyResult } from '../utils/clipboard.js'
@@ -35,18 +34,18 @@ export const CopyPicker: React.FC<CopyPickerProps> = ({ turnText, turnLabel, onD
   }
 
   return (
-    <Box flexDirection="column" marginTop={1}>
-      <Text color={theme.accentSecondary} bold>copy from {turnLabel}</Text>
-      <Text color={theme.dim}>arrows to move · enter to copy · esc cancels</Text>
-      <Box marginTop={1}>
-        <Select<number>
-          options={options}
-          initialIndex={0}
-          onSubmit={handleSubmit}
-          onCancel={onCancel}
-        />
-      </Box>
-    </Box>
+    <Surface
+      title={`Copy From ${turnLabel}`}
+      subtitle="Choose the full reply or an extracted segment."
+      footer="Enter copies. Esc closes."
+    >
+      <Select<number>
+        options={options}
+        initialIndex={0}
+        onSubmit={handleSubmit}
+        onCancel={onCancel}
+      />
+    </Surface>
   )
 }
 
