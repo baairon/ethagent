@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Box, Text, useApp } from 'ink'
+import { Box, Text, Static, useApp } from 'ink'
 import { compressHome } from '../utils/path.js'
 import type { EthagentConfig } from '../storage/config.js'
 import type { Provider, Message } from '../providers/contracts.js'
@@ -19,7 +19,6 @@ import { BrandSplash } from './BrandSplash.js'
 import { SessionStatus } from './SessionStatus.js'
 import { ChatInput } from './ChatInput.js'
 import { MessageList, type MessageRow } from './MessageList.js'
-import { Spinner } from './Spinner.js'
 import { ModelPicker, type ModelPickerSelection } from './ModelPicker.js'
 import { ResumeView } from './ResumeView.js'
 import { CopyPicker } from './CopyPicker.js'
@@ -54,6 +53,7 @@ type CopyPickerState = { turnText: string; turnLabel: string } | null
 let rowIdSeq = 0
 const nextRowId = (): string => `row-${++rowIdSeq}`
 const nowIso = (): string => new Date().toISOString()
+const STREAM_FLUSH_MS = 120
 
 export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, onReplaceConfig }) => {
   useRegisterKeybindingContext('Chat')
@@ -69,7 +69,6 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
   const [mode, setMode] = useState<SessionMode>('chat')
   const [sessionId, setSessionId] = useState<string>(() => newSessionId())
   const [sessionKey, setSessionKey] = useState<number>(0)
-  const [, setTick] = useState(0)
   const startedAt = useRef(Date.now()).current
 
   const rowsRef = useRef<MessageRow[]>([])
@@ -81,6 +80,9 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
   const configRef = useRef<EthagentConfig>(initialConfig)
   const prevConfigRef = useRef<EthagentConfig>(initialConfig)
   const compactingRef = useRef<boolean>(false)
+  const pendingAssistantTextRef = useRef<string | null>(null)
+  const pendingThinkingTextRef = useRef<string | null>(null)
+  const streamFlushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => { rowsRef.current = rows }, [rows])
   useEffect(() => { sessionIdRef.current = sessionId }, [sessionId])
@@ -100,15 +102,11 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
   }, [])
 
   useEffect(() => {
-    const timer = setInterval(() => setTick(t => t + 1), 1000)
-    return () => clearInterval(timer)
-  }, [])
-
-  useEffect(() => {
     return () => {
       streamAbortRef.current?.abort()
       for (const controller of pullsRef.current.values()) controller.abort()
       pullsRef.current.clear()
+      if (streamFlushTimerRef.current) clearTimeout(streamFlushTimerRef.current)
     }
   }, [])
 
@@ -322,7 +320,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
       setRows(prev => [
         ...prev,
         { role: 'user', id: userId, content: userText },
-        { role: 'assistant', id: assistantId, content: '', streaming: true },
+        { role: 'assistant', id: assistantId, content: '', liveTail: '', streaming: true },
       ])
 
       const priorMessages: Message[] = [systemMessage(buildSystemPrompt({
@@ -345,15 +343,47 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
       let thinkingContent = ''
       let thinkingRowId: string | null = null
       let errored = false
+      const flushStreamRows = (immediate = false) => {
+        const commit = () => {
+          streamFlushTimerRef.current = null
+          const nextAssistant = pendingAssistantTextRef.current
+          const nextThinking = pendingThinkingTextRef.current
+          if (nextAssistant === null && nextThinking === null) return
+          setRows(prev =>
+            prev.map(r => {
+              if (nextAssistant !== null && r.id === assistantId && r.role === 'assistant') {
+                const next = splitStreamingContent(nextAssistant)
+                return { ...r, content: next.committed, liveTail: next.liveTail }
+              }
+              if (nextThinking !== null && thinkingRowId && r.id === thinkingRowId && r.role === 'thinking') {
+                const next = splitStreamingContent(nextThinking)
+                return { ...r, content: next.committed, liveTail: next.liveTail }
+              }
+              return r
+            }),
+          )
+          pendingAssistantTextRef.current = null
+          pendingThinkingTextRef.current = null
+        }
+
+        if (immediate) {
+          if (streamFlushTimerRef.current) {
+            clearTimeout(streamFlushTimerRef.current)
+            streamFlushTimerRef.current = null
+          }
+          commit()
+          return
+        }
+
+        if (streamFlushTimerRef.current) return
+        streamFlushTimerRef.current = setTimeout(commit, STREAM_FLUSH_MS)
+      }
       try {
         for await (const ev of runTurn(providerRef.current, priorMessages, controller.signal)) {
           if (ev.type === 'text') {
             accumulated += ev.delta
-            setRows(prev =>
-              prev.map(r =>
-                r.id === assistantId && r.role === 'assistant' ? { ...r, content: accumulated } : r,
-              ),
-            )
+            pendingAssistantTextRef.current = accumulated
+            flushStreamRows()
           } else if (ev.type === 'thinking') {
             thinkingContent += ev.delta
             if (thinkingRowId === null) {
@@ -361,19 +391,13 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
               thinkingRowId = newId
               setRows(prev => {
                 const idx = prev.findIndex(r => r.id === assistantId)
-                const row: MessageRow = { role: 'thinking', id: newId, content: thinkingContent, streaming: true }
+                const row: MessageRow = { role: 'thinking', id: newId, content: '', liveTail: thinkingContent, streaming: true }
                 if (idx === -1) return [...prev, row]
                 return [...prev.slice(0, idx), row, ...prev.slice(idx)]
               })
             } else {
-              const captured = thinkingRowId
-              setRows(prev =>
-                prev.map(r =>
-                  r.id === captured && r.role === 'thinking'
-                    ? { ...r, content: thinkingContent }
-                    : r,
-                ),
-              )
+              pendingThinkingTextRef.current = thinkingContent
+              flushStreamRows()
             }
           } else if (ev.type === 'error') {
             errored = true
@@ -391,13 +415,14 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
       }
 
       const cancelled = controller.signal.aborted
+      flushStreamRows(true)
       setRows(prev =>
         prev.map(r => {
           if (r.id === assistantId && r.role === 'assistant') {
-            return { ...r, content: accumulated || r.content, streaming: false }
+            return { ...r, content: accumulated || r.content, liveTail: undefined, streaming: false }
           }
           if (thinkingRowId && r.id === thinkingRowId && r.role === 'thinking') {
-            return { ...r, streaming: false }
+            return { ...r, content: thinkingContent || r.content, liveTail: undefined, streaming: false }
           }
           return r
         }),
@@ -490,7 +515,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
 
   useKeybinding(
     'app:redraw',
-    () => setTick(t => t + 1),
+    () => setSessionKey(k => k + 1),
     { context: 'Global' },
   )
 
@@ -591,7 +616,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
   const slashSuggestions = useMemo(getSlashSuggestions, [])
 
   const contextLine = `${config.provider} · ${config.model} · ${compressHome(process.cwd())}`
-  const tipLine = '/help for commands · ctrl+j for newline'
+  const tipLine = '/help for commands · shift+enter for newline'
 
   const placeholderHints = useMemo(() => {
     if (streaming) return ['streaming… esc to cancel']
@@ -630,13 +655,12 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
 
   return (
     <Box flexDirection="column" padding={1}>
-      <BrandSplash key={`splash-${sessionKey}`} contextLine={contextLine} tipLine={tipLine} />
+      <Static items={[{ key: `splash-${sessionKey}`, contextLine, tipLine }]}>
+        {(item) => (
+          <BrandSplash key={item.key} contextLine={item.contextLine} tipLine={item.tipLine} />
+        )}
+      </Static>
       <MessageList rows={rows} />
-      {streaming ? (
-        <Box marginTop={1}>
-          <Spinner active hint={`${config.provider} · ${config.model}`} />
-        </Box>
-      ) : null}
       <Box marginTop={1}>
         {overlay === 'modelPicker' ? (
           <ModelPicker
@@ -675,12 +699,67 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
           model={config.model}
           turns={turns}
           approxTokens={approxTokens}
-          elapsedMs={Date.now() - startedAt}
+          startedAt={startedAt}
           streaming={streaming}
         />
       </Box>
     </Box>
   )
+}
+
+function splitStreamingContent(text: string): { committed: string; liveTail: string } {
+  if (!text) return { committed: '', liveTail: '' }
+  const boundary = findStableBoundary(text)
+  if (boundary <= 0 || boundary >= text.length) {
+    return { committed: boundary >= text.length ? text : '', liveTail: boundary >= text.length ? '' : text }
+  }
+  return { committed: text.slice(0, boundary), liveTail: text.slice(boundary) }
+}
+
+function findStableBoundary(text: string): number {
+  let lastStructural = 0
+  let lastSentence = 0
+  let inFence = false
+  let offset = 0
+  const lines = text.match(/[^\n]*\n?|$/g)?.filter(Boolean) ?? []
+
+  for (const lineWithEnding of lines) {
+    const line = lineWithEnding.endsWith('\n') ? lineWithEnding.slice(0, -1) : lineWithEnding
+    const trimmed = line.trim()
+    const nextOffset = offset + lineWithEnding.length
+
+    if (/^```/.test(trimmed)) {
+      inFence = !inFence
+      if (!inFence) lastStructural = nextOffset
+      offset = nextOffset
+      continue
+    }
+
+    if (!inFence) {
+      if (!trimmed) {
+        lastStructural = nextOffset
+      } else if (/^(#{1,3}\s|>\s?|[-*+]\s|\d+\.\s)/.test(trimmed)) {
+        lastStructural = nextOffset
+      }
+
+      let match: RegExpExecArray | null
+      const sentencePattern = /[.!?]["')\]]?(?=\s|$)/g
+      while ((match = sentencePattern.exec(line)) !== null) {
+        lastSentence = offset + match.index + match[0].length
+      }
+    }
+
+    offset = nextOffset
+  }
+
+  if (inFence) return lastStructural
+  if (lastStructural > 0) return lastStructural
+  if (text.length > 220 && lastSentence > 0) return lastSentence
+  if (text.length > 320) {
+    const fallbackSpace = text.lastIndexOf(' ', Math.max(160, text.length - 80))
+    if (fallbackSpace > 80) return fallbackSpace + 1
+  }
+  return 0
 }
 
 function formatBytes(bytes: number): string {

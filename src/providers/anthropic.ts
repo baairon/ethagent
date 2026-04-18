@@ -106,6 +106,8 @@ export class AnthropicProvider implements Provider {
         if (type === 'content_block_delta') {
           if (parsed.delta?.type === 'text_delta' && parsed.delta.text) {
             yield { type: 'text', delta: parsed.delta.text }
+          } else if (parsed.delta?.type === 'thinking_delta' && parsed.delta.thinking) {
+            yield { type: 'thinking', delta: parsed.delta.thinking }
           }
           continue
         }

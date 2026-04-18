@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react'
-import { Box, Text } from 'ink'
+import { Text } from 'ink'
 import { theme } from './theme.js'
 import { Select, type SelectOption } from './Select.js'
 import { Spinner } from './Spinner.js'
 import { TextInput } from './TextInput.js'
+import { Surface } from './Surface.js'
 import { listInstalled, isDaemonUp } from '../bootstrap/ollama.js'
 import { hasKey, setKey } from '../storage/secrets.js'
 import type { ProviderId } from '../storage/config.js'
@@ -64,21 +65,25 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
 
   if (state.kind === 'loading') {
     return (
-      <Box flexDirection="column" borderStyle="round" borderColor={theme.accentPrimary} paddingX={1}>
-        <Text color={theme.accentPrimary}>switch provider / model</Text>
-        <Spinner label="loading providers…" />
-      </Box>
+      <Surface
+        title="Switch Provider / Model"
+        subtitle="Choose a local model or configure a cloud provider."
+      >
+        <Spinner label="loading providers..." />
+      </Surface>
     )
   }
 
   if (state.kind === 'keyEntry') {
     const { provider, submitting, error } = state
     return (
-      <Box flexDirection="column" borderStyle="round" borderColor={theme.accentPrimary} paddingX={1}>
-        <Text color={theme.accentPrimary}>set up {provider} api key</Text>
-        <Text color={theme.dim}>stored in your OS keyring (or encrypted file fallback). never written to disk in plaintext.</Text>
+      <Surface
+        title={`Set Up ${provider}`}
+        subtitle="Stored in your OS keyring when available. Never written to config in plaintext."
+        footer="Enter saves. Esc returns to the picker."
+      >
         {submitting ? (
-          <Spinner label={`saving ${provider} key…`} />
+          <Spinner label={`saving ${provider} key...`} />
         ) : (
           <TextInput
             label={`${provider} key`}
@@ -89,8 +94,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
           />
         )}
         {error ? <Text color="#e87070">{error}</Text> : null}
-        <Text color={theme.dim}>enter saves · esc returns to picker</Text>
-      </Box>
+      </Surface>
     )
   }
 
@@ -102,16 +106,18 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
   ))
 
   return (
-    <Box flexDirection="column" borderStyle="round" borderColor={theme.accentPrimary} paddingX={1}>
-      <Text color={theme.accentPrimary}>switch provider / model</Text>
+    <Surface
+      title="Switch Provider / Model"
+      subtitle="Select a local Ollama model or a configured cloud provider."
+      footer="Enter selects. Esc closes."
+    >
       <Select
         options={options}
         initialIndex={initialIndex === -1 ? 0 : initialIndex}
         onSubmit={(value) => handleSubmit(value, state, setState, onPick)}
         onCancel={onCancel}
       />
-      <Text color={theme.dim}>enter selects · esc closes</Text>
-    </Box>
+    </Surface>
   )
 }
 
@@ -122,7 +128,7 @@ function buildOptions(
 ): SelectOption<string>[] {
   const options: SelectOption<string>[] = []
 
-  options.push({ value: 'hdr:local', label: '── local · ollama ──', disabled: true })
+  options.push({ value: 'hdr:local', label: 'Local / Ollama', disabled: true })
   if (!data.daemonUp) {
     options.push({
       value: 'hdr:local-off',
@@ -132,7 +138,7 @@ function buildOptions(
   } else if (data.models.length === 0) {
     options.push({
       value: 'hdr:no-models',
-      label: '  no models installed — pull one with /pull <name>',
+      label: '  no models installed - pull one with /pull <name>',
       disabled: true,
     })
   } else {
@@ -146,12 +152,12 @@ function buildOptions(
     }
   }
 
-  options.push({ value: 'hdr:cloud', label: '── cloud ──', disabled: true })
+  options.push({ value: 'hdr:cloud', label: 'Cloud', disabled: true })
   for (const p of CLOUD_PROVIDERS) {
     const active = currentProvider === p
     const keySet = data.cloudKeys[p]
     const label = active ? `${p}  *` : p
-    const hint = keySet ? 'key set · enter to switch' : 'no key · enter to configure'
+    const hint = keySet ? 'key set / enter to switch' : 'no key / enter to configure'
     options.push({ value: `c:${p}`, label, hint })
   }
 

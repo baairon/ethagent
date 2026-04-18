@@ -112,8 +112,10 @@ export const ChatInput: React.FC<PromptInputProps> = ({
   useInput((input, key) => {
     if (disabled) return
 
+    const wantsSoftBreak = isSoftBreak(input, key)
+
     if (showingSlash && filteredSuggestions.length > 0) {
-      if (key.tab || (key.return && filteredSuggestions.length > 0 && !key.shift)) {
+      if (key.tab || (key.return && filteredSuggestions.length > 0 && !wantsSoftBreak)) {
         const picked = filteredSuggestions[suggestionIdx]
         if (picked && key.tab) {
           const next = `/${picked.name} `
@@ -131,11 +133,11 @@ export const ChatInput: React.FC<PromptInputProps> = ({
       }
     }
 
-    if (key.return && key.shift) {
+    if (wantsSoftBreak) {
       insertText('\n')
       return
     }
-    if (key.return && !key.shift) {
+    if (key.return || input === '\r') {
       submit()
       return
     }
@@ -147,11 +149,6 @@ export const ChatInput: React.FC<PromptInputProps> = ({
       onModeChange('bash')
       return
     }
-    if (key.ctrl && input === 'j') {
-      insertText('\n')
-      return
-    }
-
     if (key.ctrl && input === 'u') {
       resetBuffer()
       return
@@ -310,6 +307,33 @@ export const ChatInput: React.FC<PromptInputProps> = ({
       ) : null}
     </Box>
   )
+}
+
+function isSoftBreak(input: string, key: {
+  return: boolean
+  shift: boolean
+  ctrl: boolean
+  meta: boolean
+}): boolean {
+  if (key.return && key.shift) return true
+
+  const modifiedReturn = parseModifiedReturn(input)
+  if (!modifiedReturn) return false
+
+  return modifiedReturn.shift
+}
+
+function parseModifiedReturn(input: string): { shift: boolean } | null {
+  const match = /^\x1b\[13;(\d+)(?::\d+)?(?:;[\d:]+)?u$/.exec(input)
+  if (!match) return null
+
+  const encoded = Number(match[1] ?? '')
+  if (!Number.isFinite(encoded) || encoded <= 1) return { shift: false }
+
+  const modifiers = encoded - 1
+  return {
+    shift: Boolean(modifiers & 1),
+  }
 }
 
 function moveVertical(text: string, cursor: number, direction: 1 | -1): number {
