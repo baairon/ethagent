@@ -616,7 +616,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
   const slashSuggestions = useMemo(getSlashSuggestions, [])
 
   const contextLine = `${config.provider} · ${config.model} · ${compressHome(process.cwd())}`
-  const tipLine = '/help for commands · shift+enter for newline'
+  const tipLine = '/help for commands · alt+enter for newline'
 
   const placeholderHints = useMemo(() => {
     if (streaming) return ['streaming… esc to cancel']

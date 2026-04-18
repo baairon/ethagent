@@ -309,31 +309,11 @@ export const ChatInput: React.FC<PromptInputProps> = ({
   )
 }
 
-function isSoftBreak(input: string, key: {
+function isSoftBreak(_input: string, key: {
   return: boolean
-  shift: boolean
-  ctrl: boolean
   meta: boolean
 }): boolean {
-  if (key.return && key.shift) return true
-
-  const modifiedReturn = parseModifiedReturn(input)
-  if (!modifiedReturn) return false
-
-  return modifiedReturn.shift
-}
-
-function parseModifiedReturn(input: string): { shift: boolean } | null {
-  const match = /^\x1b\[13;(\d+)(?::\d+)?(?:;[\d:]+)?u$/.exec(input)
-  if (!match) return null
-
-  const encoded = Number(match[1] ?? '')
-  if (!Number.isFinite(encoded) || encoded <= 1) return { shift: false }
-
-  const modifiers = encoded - 1
-  return {
-    shift: Boolean(modifiers & 1),
-  }
+  return key.return && key.meta
 }
 
 function moveVertical(text: string, cursor: number, direction: 1 | -1): number {
