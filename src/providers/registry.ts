@@ -1,6 +1,9 @@
 import type { EthagentConfig } from '../storage/config.js'
 import { defaultBaseUrlFor } from '../storage/config.js'
+import { getKey } from '../storage/secrets.js'
 import type { Provider } from './contracts.js'
+import { AnthropicProvider } from './anthropic.js'
+import { GeminiProvider } from './gemini.js'
 import { OpenAIChatProvider } from './openai-chat.js'
 
 export function createProvider(config: EthagentConfig): Provider {
@@ -13,8 +16,15 @@ export function createProvider(config: EthagentConfig): Provider {
         apiKey: 'ollama',
       })
     case 'openai':
+      return new OpenAIChatProvider({
+        id: 'openai',
+        model: config.model,
+        baseUrl: 'https://api.openai.com/v1',
+        loadApiKey: () => getKey('openai'),
+      })
     case 'anthropic':
+      return new AnthropicProvider({ model: config.model })
     case 'gemini':
-      throw new Error(`cloud provider '${config.provider}' lands in the next release.`)
+      return new GeminiProvider({ model: config.model })
   }
 }

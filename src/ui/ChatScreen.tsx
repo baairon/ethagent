@@ -39,7 +39,7 @@ import {
   shouldAutoCompact,
   truncateFallback,
 } from '../core/compaction.js'
-import { defaultBaseUrlFor, saveConfig } from '../storage/config.js'
+import { defaultBaseUrlFor, defaultModelFor, saveConfig } from '../storage/config.js'
 
 type ChatScreenProps = {
   config: EthagentConfig
@@ -514,9 +514,23 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
         }
         return
       }
-      const stayingOn = `${configRef.current.provider} · ${configRef.current.model}`
-      const prefix = sel.keyJustSet ? `${sel.provider} key saved` : `${sel.provider} key ready`
-      pushNote(`${prefix}. cloud provider support lands in the next release - staying on ${stayingOn}.`, 'dim')
+      const next: EthagentConfig = {
+        ...configRef.current,
+        provider: sel.provider,
+        model:
+          configRef.current.provider === sel.provider
+            ? configRef.current.model
+            : defaultModelFor(sel.provider),
+        baseUrl: defaultBaseUrlFor(sel.provider),
+      }
+      try {
+        await saveConfig(next)
+        replaceConfig(next)
+        const prefix = sel.keyJustSet ? `${sel.provider} key saved.` : `${sel.provider} ready.`
+        pushNote(`${prefix} now using ${next.provider} · ${next.model}.`, 'dim')
+      } catch (err: unknown) {
+        pushNote(`provider switch failed: ${(err as Error).message}`, 'error')
+      }
     },
     [replaceConfig, pushNote],
   )
