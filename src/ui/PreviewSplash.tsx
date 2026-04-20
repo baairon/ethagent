@@ -11,5 +11,3 @@ export const PreviewSplash: React.FC = () => (
     </Box>
   </Box>
 )
-
-
