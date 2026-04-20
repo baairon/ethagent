@@ -10,6 +10,7 @@ type PromptInputProps = {
   history: string[]
   disabled?: boolean
   placeholderHints?: string[]
+  queuedMessages?: string[]
   prefix?: string
   slashSuggestions?: Suggestion[]
   mode?: 'prompt' | 'bash'
@@ -21,13 +22,14 @@ const MAX_LENGTH = 32_768
 const PASTE_THRESHOLD_LINES = 2
 const PLACEHOLDER_ROTATE_MS = 8000
 
-type PasteRef = { id: number; lines: string[]; preview: string }
+type PasteRef = { id: number; lines: string[] }
 
 export const ChatInput: React.FC<PromptInputProps> = ({
   onSubmit,
   history,
   disabled,
   placeholderHints,
+  queuedMessages = [],
   prefix = '\u203a',
   slashSuggestions = [],
   mode = 'prompt',
@@ -88,7 +90,7 @@ export const ChatInput: React.FC<PromptInputProps> = ({
     }
     const id = nextPasteIdRef.current++
     const preview = `[Pasted text #${id} +${lines.length - 1} lines]`
-    pasteRefsRef.current.set(id, { id, lines, preview })
+    pasteRefsRef.current.set(id, { id, lines })
     insertText(preview)
   }, [insertText])
 
@@ -191,7 +193,7 @@ export const ChatInput: React.FC<PromptInputProps> = ({
       return
     }
     if (key.upArrow) {
-      if (value.includes('\n')) {
+      if (historyIndex === null && value.includes('\n')) {
         setBuffer(prev => ({ value: prev.value, cursor: moveVertical(prev.value, prev.cursor, -1) }))
         return
       }
@@ -211,7 +213,7 @@ export const ChatInput: React.FC<PromptInputProps> = ({
       return
     }
     if (key.downArrow) {
-      if (value.includes('\n')) {
+      if (historyIndex === null && value.includes('\n')) {
         setBuffer(prev => ({ value: prev.value, cursor: moveVertical(prev.value, prev.cursor, 1) }))
         return
       }
@@ -300,6 +302,22 @@ export const ChatInput: React.FC<PromptInputProps> = ({
           ))}
         </Box>
       ) : null}
+      {queuedMessages.length > 0 ? (
+        <Box marginLeft={2} flexDirection="column">
+          <Text color={theme.dim}>
+            {queuedMessages.length === 1 ? '1 message queued for next turn' : `${queuedMessages.length} messages queued for next turns`}
+          </Text>
+          {queuedMessages.slice(0, 3).map((message, i) => (
+            <Text key={`${i}-${message.slice(0, 24)}`}>
+              <Text color={theme.accentMint}>{i === 0 ? '» ' : '  '}</Text>
+              <Text color={theme.textSubtle}>{summarizeQueuedMessage(message)}</Text>
+            </Text>
+          ))}
+          {queuedMessages.length > 3 ? (
+            <Text color={theme.dim}>+{queuedMessages.length - 3} more</Text>
+          ) : null}
+        </Box>
+      ) : null}
       {footerRight ? (
         <Box marginLeft={2}>
           {footerRight}
@@ -309,8 +327,8 @@ export const ChatInput: React.FC<PromptInputProps> = ({
   )
 }
 
-function isSoftBreak(key: { return: boolean; meta: boolean }): boolean {
-  return key.return && key.meta
+function isSoftBreak(key: { return: boolean; meta?: boolean; shift?: boolean }): boolean {
+  return key.return && Boolean(key.meta || key.shift)
 }
 
 function moveVertical(text: string, cursor: number, direction: 1 | -1): number {
@@ -361,3 +379,9 @@ function renderWithCursor(value: string, cursor: number, showCursor: boolean): R
   })
 }
 
+function summarizeQueuedMessage(text: string): string {
+  const normalized = text.replace(/\s+/g, ' ').trim()
+  if (!normalized) return ''
+  if (normalized.length <= 72) return normalized
+  return `${normalized.slice(0, 69)}...`
+}

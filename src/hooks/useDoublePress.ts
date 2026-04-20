@@ -6,7 +6,6 @@ export const DOUBLE_PRESS_TIMEOUT_MS = 800
 export function useDoublePress(
   setPending: (pending: boolean) => void,
   onDoublePress: () => void,
-  onFirstPress?: () => void,
 ): () => void {
   const lastPressRef = useRef<number>(0)
   const timeoutRef = useRef<NodeJS.Timeout | undefined>(undefined)
@@ -34,7 +33,6 @@ export function useDoublePress(
       setPending(false)
       onDoublePress()
     } else {
-      onFirstPress?.()
       setPending(true)
       clearPendingTimeout()
       timeoutRef.current = setTimeout(() => {
@@ -44,5 +42,5 @@ export function useDoublePress(
     }
 
     lastPressRef.current = now
-  }, [setPending, onDoublePress, onFirstPress, clearPendingTimeout])
+  }, [setPending, onDoublePress, clearPendingTimeout])
 }

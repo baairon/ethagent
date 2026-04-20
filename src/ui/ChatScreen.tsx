@@ -62,6 +62,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
   const [rows, setRows] = useState<MessageRow[]>([])
   const [history, setHistory] = useState<string[]>([])
   const [streaming, setStreaming] = useState(false)
+  const [queuedInputs, setQueuedInputs] = useState<string[]>([])
   const [turns, setTurns] = useState(0)
   const [approxTokens, setApproxTokens] = useState(0)
   const [overlay, setOverlay] = useState<Overlay>('none')
@@ -83,6 +84,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
   const pendingAssistantTextRef = useRef<string | null>(null)
   const pendingThinkingTextRef = useRef<string | null>(null)
   const streamFlushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const drainingQueueRef = useRef<boolean>(false)
 
   useEffect(() => { rowsRef.current = rows }, [rows])
   useEffect(() => { sessionIdRef.current = sessionId }, [sessionId])
@@ -129,6 +131,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
     setRows([])
     setTurns(0)
     setApproxTokens(0)
+    setQueuedInputs([])
     sessionMessagesRef.current = []
     setSessionId(newSessionId())
     setSessionKey(k => k + 1)
@@ -451,6 +454,8 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
     [mode, pushNote, persistSessionMessage, runCompaction],
   )
 
+  const pullInFlight = pullsRef.current.size > 0
+
   const handleSubmit = useCallback(
     async (value: string) => {
       const trimmed = value.trim()
@@ -458,6 +463,15 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
 
       setHistory(h => (h[h.length - 1] === value ? h : [...h, value]))
       void appendHistory(value)
+
+      if (streaming || pullInFlight) {
+        if (parseSlash(value)) {
+          pushNote('slash commands cannot be queued. wait for the current task to finish.', 'dim')
+          return
+        }
+        setQueuedInputs(prev => [...prev, value])
+        return
+      }
 
       if (parseSlash(value)) {
         const ctx = buildSlashContext()
@@ -470,7 +484,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
 
       await runStream(value)
     },
-    [buildSlashContext, pushNote, runStream],
+    [buildSlashContext, pullInFlight, pushNote, runStream, streaming],
   )
 
   const handleCancelStream = useCallback(() => {
@@ -611,12 +625,23 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
     pushNote('copy cancelled.', 'dim')
   }, [pushNote])
 
-  const pullInFlight = pullsRef.current.size > 0
-  const busy = streaming || pullInFlight
+  const busy = pullInFlight
   const slashSuggestions = useMemo(getSlashSuggestions, [])
 
+  useEffect(() => {
+    if (streaming || pullInFlight || queuedInputs.length === 0 || drainingQueueRef.current) return
+    drainingQueueRef.current = true
+    const next = queuedInputs[0]
+    setQueuedInputs(prev => prev.slice(1))
+    void runStream(next!).finally(() => {
+      drainingQueueRef.current = false
+    })
+  }, [pullInFlight, queuedInputs, runStream, streaming])
+
   const contextLine = `${config.provider} · ${config.model} · ${compressHome(process.cwd())}`
-  const tipLine = 'tip: type /help to get started · alt+enter for newline'
+  const tipLine = streaming
+    ? 'tip: you can keep typing and press enter to queue the next message · shift+enter for newline'
+    : 'tip: type /help to get started · shift+enter for newline'
 
   const placeholderHints = useMemo(() => {
     if (streaming) return ['streaming… esc to cancel']
@@ -688,6 +713,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
             history={history}
             disabled={busy}
             placeholderHints={placeholderHints}
+            queuedMessages={queuedInputs}
             slashSuggestions={slashSuggestions}
             footerRight={footerRight}
           />
@@ -770,4 +796,3 @@ function formatBytes(bytes: number): string {
   const kb = bytes / 1024
   return `${kb.toFixed(0)}KB`
 }
-

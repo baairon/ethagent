@@ -1,18 +1,18 @@
 export const palette: Array<[number, number, number]> = [
   [0xff, 0xff, 0xff],
-  [0xf2, 0xfa, 0xf4],
-  [0xe2, 0xf1, 0xe6],
-  [0xcf, 0xe5, 0xbd],
-  [0xe2, 0xf1, 0xe6],
+  [0xf2, 0xf9, 0xf4],
+  [0xe7, 0xf4, 0xec],
+  [0xd4, 0xee, 0xdd],
+  [0xe7, 0xf4, 0xec],
   [0xff, 0xff, 0xff],
 ]
 
 export const theme = {
-  accentPrimary: '#cfe5bd',
+  accentPrimary: '#d4eedd',
   accentWarm: '#d8cda8',
   accentNeutral: '#e4e3b5',
-  accentSecondary: '#9fd0bb',
-  accentMint: '#bcd9c9',
+  accentSecondary: '#c0e3cb',
+  accentMint: '#e7f4ec',
   accentPeach: '#e7cdb7',
   accentLavender: '#d9cae8',
   accentInfo: '#90b8e8',
