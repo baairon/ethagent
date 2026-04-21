@@ -2,8 +2,16 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Box, Text, useInput } from 'ink'
 import { theme } from './theme.js'
 import { readClipboardImage } from '../utils/clipboard.js'
-
-type Suggestion = { name: string; summary: string }
+import type { SlashSuggestion } from '../core/commands.js'
+import {
+  beginHistoryPreview,
+  canNavigateHistory as canNavigateHistoryState,
+  emptyBuffer,
+  exitHistoryPreview,
+  moveThroughHistory,
+  moveVertical,
+  type ChatBuffer,
+} from './chatInputState.js'
 
 type PromptInputProps = {
   onSubmit: (value: string) => void
@@ -12,7 +20,7 @@ type PromptInputProps = {
   placeholderHints?: string[]
   queuedMessages?: string[]
   prefix?: string
-  slashSuggestions?: Suggestion[]
+  slashSuggestions?: SlashSuggestion[]
   mode?: 'prompt' | 'bash'
   onModeChange?: (mode: 'prompt' | 'bash') => void
   footerRight?: React.ReactNode
@@ -36,14 +44,48 @@ export const ChatInput: React.FC<PromptInputProps> = ({
   onModeChange,
   footerRight,
 }) => {
-  const [buffer, setBuffer] = useState<{ value: string; cursor: number }>({ value: '', cursor: 0 })
+  const [buffer, setBuffer] = useState<ChatBuffer>(emptyBuffer)
   const { value, cursor } = buffer
   const [historyIndex, setHistoryIndex] = useState<number | null>(null)
-  const [draft, setDraft] = useState('')
+  const [draftBuffer, setDraftBuffer] = useState<ChatBuffer>(emptyBuffer)
+  const [historyPreviewActive, setHistoryPreviewActive] = useState(false)
+  const [preferredColumn, setPreferredColumn] = useState<number | null>(null)
   const [placeholderIdx, setPlaceholderIdx] = useState(0)
   const [suggestionIdx, setSuggestionIdx] = useState(0)
   const pasteRefsRef = useRef<Map<number, PasteRef>>(new Map())
   const nextPasteIdRef = useRef(1)
+  const bufferRef = useRef<ChatBuffer>(buffer)
+  const historyIndexRef = useRef<number | null>(historyIndex)
+  const draftBufferRef = useRef<ChatBuffer>(draftBuffer)
+  const historyPreviewActiveRef = useRef(historyPreviewActive)
+  const preferredColumnRef = useRef<number | null>(preferredColumn)
+
+  useEffect(() => { bufferRef.current = buffer }, [buffer])
+  useEffect(() => { historyIndexRef.current = historyIndex }, [historyIndex])
+  useEffect(() => { draftBufferRef.current = draftBuffer }, [draftBuffer])
+  useEffect(() => { historyPreviewActiveRef.current = historyPreviewActive }, [historyPreviewActive])
+  useEffect(() => { preferredColumnRef.current = preferredColumn }, [preferredColumn])
+
+  const applyBuffer = useCallback((next: ChatBuffer) => {
+    bufferRef.current = next
+    setBuffer(next)
+  }, [])
+
+  const applyHistoryState = useCallback((next: {
+    historyIndex: number | null
+    historyPreviewActive: boolean
+    draftBuffer: ChatBuffer
+    preferredColumn: number | null
+  }) => {
+    historyIndexRef.current = next.historyIndex
+    draftBufferRef.current = next.draftBuffer
+    historyPreviewActiveRef.current = next.historyPreviewActive
+    preferredColumnRef.current = next.preferredColumn
+    setHistoryIndex(next.historyIndex)
+    setDraftBuffer(next.draftBuffer)
+    setHistoryPreviewActive(next.historyPreviewActive)
+    setPreferredColumn(next.preferredColumn)
+  }, [])
 
   useEffect(() => {
     if (!placeholderHints || placeholderHints.length < 2) return
@@ -65,21 +107,24 @@ export const ChatInput: React.FC<PromptInputProps> = ({
   }, [filteredSuggestions.length, suggestionIdx])
 
   const insertText = useCallback((text: string) => {
-    setBuffer(prev => {
-      const next = (prev.value.slice(0, prev.cursor) + text + prev.value.slice(prev.cursor)).slice(0, MAX_LENGTH)
-      const nextCursor = Math.min(prev.cursor + text.length, next.length)
-      return { value: next, cursor: nextCursor }
-    })
-    setHistoryIndex(h => (h === null ? h : null))
-  }, [])
+    const prev = bufferRef.current
+    const nextValue = (prev.value.slice(0, prev.cursor) + text + prev.value.slice(prev.cursor)).slice(0, MAX_LENGTH)
+    const nextCursor = Math.min(prev.cursor + text.length, nextValue.length)
+    applyBuffer({ value: nextValue, cursor: nextCursor })
+    applyHistoryState(exitHistoryPreview({ value: nextValue, cursor: nextCursor }))
+  }, [applyBuffer, applyHistoryState])
 
   const resetBuffer = useCallback(() => {
-    setBuffer({ value: '', cursor: 0 })
-    setDraft('')
-    setHistoryIndex(null)
+    applyBuffer(emptyBuffer())
+    applyHistoryState({
+      historyIndex: null,
+      historyPreviewActive: false,
+      draftBuffer: emptyBuffer(),
+      preferredColumn: null,
+    })
     pasteRefsRef.current.clear()
     nextPasteIdRef.current = 1
-  }, [])
+  }, [applyBuffer, applyHistoryState])
 
   const handlePaste = useCallback((text: string) => {
     const normalized = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
@@ -111,6 +156,49 @@ export const ChatInput: React.FC<PromptInputProps> = ({
     resetBuffer()
   }, [value, onSubmit, expandPasteRefs, resetBuffer])
 
+  const canNavigateHistory = useCallback(() => {
+    return canNavigateHistoryState(
+      bufferRef.current,
+      history.length,
+      historyIndexRef.current,
+      historyPreviewActiveRef.current,
+    )
+  }, [history.length])
+
+  const showPreviousHistory = useCallback((force = false) => {
+    if (!force && !canNavigateHistory()) return
+    if (history.length === 0) return
+    const currentBuffer = bufferRef.current
+    const currentHistoryIndex = historyIndexRef.current
+    const currentDraftBuffer = draftBufferRef.current
+    const currentPreferredColumn = preferredColumnRef.current
+    if (currentHistoryIndex === null) {
+      const next = beginHistoryPreview(currentBuffer, history, -1, currentPreferredColumn)
+      if (!next) return
+      applyHistoryState(next.preview)
+      applyBuffer(next.buffer)
+      return
+    }
+    const next = moveThroughHistory(history, currentHistoryIndex, -1, currentDraftBuffer, currentPreferredColumn)
+    applyHistoryState(next.preview)
+    applyBuffer(next.buffer)
+  }, [applyBuffer, applyHistoryState, canNavigateHistory, history])
+
+  const showNextHistory = useCallback((force = false) => {
+    const currentHistoryIndex = historyIndexRef.current
+    if (!force && currentHistoryIndex === null) return
+    if (currentHistoryIndex === null) return
+    const next = moveThroughHistory(
+      history,
+      currentHistoryIndex,
+      1,
+      draftBufferRef.current,
+      preferredColumnRef.current,
+    )
+    applyHistoryState(next.preview)
+    applyBuffer(next.buffer)
+  }, [applyBuffer, applyHistoryState, history])
+
   useInput((input, key) => {
     if (disabled) return
 
@@ -120,8 +208,20 @@ export const ChatInput: React.FC<PromptInputProps> = ({
       if (key.tab || (key.return && filteredSuggestions.length > 0 && !wantsSoftBreak)) {
         const picked = filteredSuggestions[suggestionIdx]
         if (picked && key.tab) {
-          const next = `/${picked.name} `
+          const next = picked.completion
           setBuffer({ value: next, cursor: next.length })
+          setPreferredColumn(null)
+          return
+        }
+        if (picked && key.return && !wantsSoftBreak) {
+          const next = picked.completion
+          if (picked.executeOnEnter) {
+            onSubmit(next)
+            resetBuffer()
+          } else {
+            setBuffer({ value: next, cursor: next.length })
+            setPreferredColumn(null)
+          }
           return
         }
       }
@@ -164,14 +264,17 @@ export const ChatInput: React.FC<PromptInputProps> = ({
     }
     if (key.ctrl && input === 'a') {
       setBuffer(prev => ({ value: prev.value, cursor: 0 }))
+      setPreferredColumn(null)
       return
     }
     if (key.ctrl && input === 'e') {
       setBuffer(prev => ({ value: prev.value, cursor: prev.value.length }))
+      setPreferredColumn(null)
       return
     }
     if (key.ctrl && input === 'k') {
       setBuffer(prev => ({ value: prev.value.slice(0, prev.cursor), cursor: prev.cursor }))
+      setPreferredColumn(null)
       return
     }
     if (key.ctrl && input === 'w') {
@@ -181,61 +284,92 @@ export const ChatInput: React.FC<PromptInputProps> = ({
         const newLeft = left.replace(/\S+\s*$/, '')
         return { value: newLeft + right, cursor: newLeft.length }
       })
+      setPreferredColumn(null)
+      return
+    }
+    if (key.ctrl && input === 'p') {
+      showPreviousHistory()
+      return
+    }
+    if (key.ctrl && input === 'n') {
+      showNextHistory()
       return
     }
 
     if (key.leftArrow) {
-      setBuffer(prev => ({ value: prev.value, cursor: Math.max(0, prev.cursor - 1) }))
+      const currentBuffer = bufferRef.current
+      applyHistoryState(exitHistoryPreview(currentBuffer))
+      applyBuffer({ value: currentBuffer.value, cursor: Math.max(0, currentBuffer.cursor - 1) })
       return
     }
     if (key.rightArrow) {
-      setBuffer(prev => ({ value: prev.value, cursor: Math.min(prev.value.length, prev.cursor + 1) }))
+      const currentBuffer = bufferRef.current
+      applyHistoryState(exitHistoryPreview(currentBuffer))
+      applyBuffer({
+        value: currentBuffer.value,
+        cursor: Math.min(currentBuffer.value.length, currentBuffer.cursor + 1),
+      })
       return
     }
     if (key.upArrow) {
-      if (historyIndex === null && value.includes('\n')) {
-        setBuffer(prev => ({ value: prev.value, cursor: moveVertical(prev.value, prev.cursor, -1) }))
-        return
+      const currentBuffer = bufferRef.current
+      if (currentBuffer.value.includes('\n')) {
+        const nextMove = moveVertical(
+          currentBuffer.value,
+          currentBuffer.cursor,
+          -1,
+          preferredColumnRef.current,
+        )
+        preferredColumnRef.current = nextMove.preferredColumn
+        setPreferredColumn(nextMove.preferredColumn)
+        if (nextMove.kind === 'moved') {
+          applyHistoryState(exitHistoryPreview(currentBuffer))
+          applyBuffer({ value: currentBuffer.value, cursor: nextMove.cursor })
+          return
+        }
+        if (nextMove.kind === 'boundary-top') {
+          if (historyPreviewActiveRef.current || historyIndexRef.current !== null || canNavigateHistory()) {
+            showPreviousHistory(true)
+          }
+          return
+        }
       }
-      if (history.length === 0) return
-      if (historyIndex === null) {
-        setDraft(value)
-        const lastIdx = history.length - 1
-        setHistoryIndex(lastIdx)
-        const chosen = history[lastIdx] ?? ''
-        setBuffer({ value: chosen, cursor: chosen.length })
-      } else if (historyIndex > 0) {
-        const next = historyIndex - 1
-        setHistoryIndex(next)
-        const chosen = history[next] ?? ''
-        setBuffer({ value: chosen, cursor: chosen.length })
-      }
+      showPreviousHistory()
       return
     }
     if (key.downArrow) {
-      if (historyIndex === null && value.includes('\n')) {
-        setBuffer(prev => ({ value: prev.value, cursor: moveVertical(prev.value, prev.cursor, 1) }))
-        return
+      const currentBuffer = bufferRef.current
+      if (currentBuffer.value.includes('\n')) {
+        const nextMove = moveVertical(
+          currentBuffer.value,
+          currentBuffer.cursor,
+          1,
+          preferredColumnRef.current,
+        )
+        preferredColumnRef.current = nextMove.preferredColumn
+        setPreferredColumn(nextMove.preferredColumn)
+        if (nextMove.kind === 'moved') {
+          applyHistoryState(exitHistoryPreview(currentBuffer))
+          applyBuffer({ value: currentBuffer.value, cursor: nextMove.cursor })
+          return
+        }
+        if (nextMove.kind === 'boundary-bottom') {
+          if (historyPreviewActiveRef.current || historyIndexRef.current !== null) {
+            showNextHistory(true)
+          }
+          return
+        }
       }
-      if (historyIndex === null) return
-      const next = historyIndex + 1
-      if (next >= history.length) {
-        setHistoryIndex(null)
-        setBuffer({ value: draft, cursor: draft.length })
-      } else {
-        setHistoryIndex(next)
-        const chosen = history[next] ?? ''
-        setBuffer({ value: chosen, cursor: chosen.length })
-      }
+      showNextHistory(historyIndex !== null || historyPreviewActive)
       return
     }
     if (key.backspace || key.delete) {
-      setBuffer(prev => {
-        if (prev.cursor === 0) return prev
-        return {
-          value: prev.value.slice(0, prev.cursor - 1) + prev.value.slice(prev.cursor),
-          cursor: Math.max(0, prev.cursor - 1),
-        }
+      const currentBuffer = bufferRef.current
+      applyHistoryState(exitHistoryPreview(currentBuffer))
+      if (currentBuffer.cursor === 0) return
+      applyBuffer({
+        value: currentBuffer.value.slice(0, currentBuffer.cursor - 1) + currentBuffer.value.slice(currentBuffer.cursor),
+        cursor: Math.max(0, currentBuffer.cursor - 1),
       })
       return
     }
@@ -248,6 +382,7 @@ export const ChatInput: React.FC<PromptInputProps> = ({
         return
       }
       insertText(input)
+      setPreferredColumn(null)
     }
   })
 
@@ -297,7 +432,7 @@ export const ChatInput: React.FC<PromptInputProps> = ({
           {filteredSuggestions.map((s, i) => (
             <Text key={s.name} color={i === suggestionIdx ? theme.accentPrimary : theme.dim}>
               {i === suggestionIdx ? '\u203a ' : '  '}/{s.name}
-              <Text color={theme.dim}>  {s.summary}</Text>
+              <Text color={theme.dim}>  {s.summary}{i === suggestionIdx ? (s.executeOnEnter ? ' · enter runs' : ' · enter fills') : ''}</Text>
             </Text>
           ))}
         </Box>
@@ -329,26 +464,6 @@ export const ChatInput: React.FC<PromptInputProps> = ({
 
 function isSoftBreak(key: { return: boolean; meta?: boolean; shift?: boolean }): boolean {
   return key.return && Boolean(key.meta || key.shift)
-}
-
-function moveVertical(text: string, cursor: number, direction: 1 | -1): number {
-  const before = text.slice(0, cursor)
-  const lineStart = before.lastIndexOf('\n') + 1
-  const col = cursor - lineStart
-  if (direction === -1) {
-    if (lineStart === 0) return cursor
-    const prevLineEnd = lineStart - 1
-    const prevLineStart = text.lastIndexOf('\n', prevLineEnd - 1) + 1
-    const prevLineLen = prevLineEnd - prevLineStart
-    return prevLineStart + Math.min(col, prevLineLen)
-  }
-  const nextNewline = text.indexOf('\n', cursor)
-  if (nextNewline === -1) return cursor
-  const nextLineStart = nextNewline + 1
-  const nextNextNewline = text.indexOf('\n', nextLineStart)
-  const nextLineEnd = nextNextNewline === -1 ? text.length : nextNextNewline
-  const nextLineLen = nextLineEnd - nextLineStart
-  return nextLineStart + Math.min(col, nextLineLen)
 }
 
 function renderWithCursor(value: string, cursor: number, showCursor: boolean): React.ReactNode[] {

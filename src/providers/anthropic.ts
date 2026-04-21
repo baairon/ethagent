@@ -1,8 +1,18 @@
 import { getKey } from '../storage/secrets.js'
-import type { Message, Provider, StreamEvent } from './contracts.js'
+import type { Message, MessageContentBlock, Provider, StreamEvent } from './contracts.js'
 import { ProviderError } from './contracts.js'
 import { providerErrorFromResponse } from './errors.js'
 import { iterSseEvents } from './sse.js'
+
+export type AnthropicToolDefinition = {
+  name: string
+  description: string
+  input_schema: {
+    type: 'object'
+    properties?: Record<string, unknown>
+    required?: string[]
+  }
+}
 
 type AnthropicStreamMessage = {
   type?: string
@@ -20,7 +30,16 @@ type AnthropicStreamMessage = {
     type?: string
     text?: string
     thinking?: string
+    stop_reason?: string
+    partial_json?: string
   }
+  content_block?: {
+    type?: string
+    id?: string
+    name?: string
+    input?: Record<string, unknown>
+  }
+  index?: number
   error?: {
     type?: string
     message?: string
@@ -34,9 +53,12 @@ const DEFAULT_MAX_TOKENS = 4096
 export class AnthropicProvider implements Provider {
   readonly id = 'anthropic' as const
   readonly model: string
+  readonly supportsTools = true
+  private readonly tools: AnthropicToolDefinition[]
 
-  constructor(opts: { model: string }) {
+  constructor(opts: { model: string; tools?: AnthropicToolDefinition[] }) {
     this.model = opts.model
+    this.tools = opts.tools ?? []
   }
 
   async *complete(messages: Message[], signal: AbortSignal): AsyncIterable<StreamEvent> {
@@ -65,6 +87,7 @@ export class AnthropicProvider implements Provider {
           stream: true,
           system,
           messages: conversation,
+          tools: this.tools.length > 0 ? this.tools : undefined,
         }),
         signal,
       })
@@ -86,6 +109,8 @@ export class AnthropicProvider implements Provider {
 
     let inputTokens: number | undefined
     let outputTokens: number | undefined
+    let stopReason: 'end_turn' | 'tool_use' | 'max_tokens' | 'stop_sequence' | 'unknown' = 'unknown'
+    const toolBuffers = new Map<number, { id: string; name: string; json: string }>()
 
     try {
       for await (const frame of iterSseEvents(response.body, signal, READ_TIMEOUT_MS)) {
@@ -103,17 +128,46 @@ export class AnthropicProvider implements Provider {
           outputTokens = parsed.message?.usage?.output_tokens ?? outputTokens
           continue
         }
+        if (type === 'content_block_start' && parsed.content_block?.type === 'tool_use') {
+          const id = parsed.content_block.id ?? `tool-${parsed.index ?? 0}`
+          const name = parsed.content_block.name ?? 'unknown'
+          const json = parsed.content_block.input ? JSON.stringify(parsed.content_block.input) : ''
+          toolBuffers.set(parsed.index ?? 0, { id, name, json })
+          yield { type: 'tool_use_start', id, name }
+          continue
+        }
         if (type === 'content_block_delta') {
           if (parsed.delta?.type === 'text_delta' && parsed.delta.text) {
             yield { type: 'text', delta: parsed.delta.text }
           } else if (parsed.delta?.type === 'thinking_delta' && parsed.delta.thinking) {
             yield { type: 'thinking', delta: parsed.delta.thinking }
+          } else if (parsed.delta?.type === 'input_json_delta' && typeof parsed.delta.partial_json === 'string') {
+            const buffer = toolBuffers.get(parsed.index ?? 0)
+            if (buffer) {
+              buffer.json += parsed.delta.partial_json
+              yield { type: 'tool_use_delta', id: buffer.id, delta: parsed.delta.partial_json }
+            }
+          }
+          continue
+        }
+        if (type === 'content_block_stop') {
+          const buffer = toolBuffers.get(parsed.index ?? 0)
+          if (buffer) {
+            let input: Record<string, unknown> = {}
+            try {
+              input = buffer.json.trim() ? JSON.parse(buffer.json) as Record<string, unknown> : {}
+            } catch {
+              input = {}
+            }
+            yield { type: 'tool_use_stop', id: buffer.id, name: buffer.name, input }
+            toolBuffers.delete(parsed.index ?? 0)
           }
           continue
         }
         if (type === 'message_delta') {
           inputTokens = parsed.usage?.input_tokens ?? inputTokens
           outputTokens = parsed.usage?.output_tokens ?? outputTokens
+          stopReason = normalizeStopReason(parsed.delta?.stop_reason)
           continue
         }
         if (type === 'error') {
@@ -132,7 +186,7 @@ export class AnthropicProvider implements Provider {
     }
 
     if (signal.aborted) return
-    yield { type: 'done', inputTokens, outputTokens }
+    yield { type: 'done', inputTokens, outputTokens, stopReason }
   }
 }
 
@@ -140,24 +194,38 @@ function splitMessages(messages: Message[]): {
   system?: string
   conversation: Array<{
     role: 'user' | 'assistant'
-    content: Array<{ type: 'text'; text: string }>
+    content: Array<
+      | { type: 'text'; text: string }
+      | { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> }
+      | { type: 'tool_result'; tool_use_id: string; content: string; is_error?: boolean }
+    >
   }>
 } {
   const systemParts: string[] = []
   const conversation: Array<{
     role: 'user' | 'assistant'
-    content: Array<{ type: 'text'; text: string }>
+    content: Array<
+      | { type: 'text'; text: string }
+      | { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> }
+      | { type: 'tool_result'; tool_use_id: string; content: string; is_error?: boolean }
+    >
   }> = []
 
   for (const message of messages) {
-    if (!message.content.trim()) continue
+    const blocks = normalizeBlocks(message.content)
+    if (blocks.length === 0) continue
     if (message.role === 'system') {
-      systemParts.push(message.content)
+      const systemText = blocks.filter(block => block.type === 'text').map(block => block.text).join('\n\n').trim()
+      if (systemText) systemParts.push(systemText)
       continue
     }
     conversation.push({
       role: message.role,
-      content: [{ type: 'text', text: message.content }],
+      content: blocks.map(block => {
+        if (block.type === 'text') return { type: 'text', text: block.text }
+        if (block.type === 'tool_use') return { type: 'tool_use', id: block.id, name: block.name, input: block.input }
+        return { type: 'tool_result', tool_use_id: block.toolUseId, content: block.content, is_error: block.isError }
+      }),
     })
   }
 
@@ -165,4 +233,22 @@ function splitMessages(messages: Message[]): {
     system: systemParts.length > 0 ? systemParts.join('\n\n') : undefined,
     conversation,
   }
+}
+
+function normalizeBlocks(content: Message['content']): MessageContentBlock[] {
+  if (typeof content === 'string') {
+    const text = content.trim()
+    return text ? [{ type: 'text', text }] : []
+  }
+  return content.filter(block => {
+    if (block.type === 'text') return block.text.trim().length > 0
+    return true
+  })
+}
+
+function normalizeStopReason(value?: string): 'end_turn' | 'tool_use' | 'max_tokens' | 'stop_sequence' | 'unknown' {
+  if (value === 'end_turn' || value === 'tool_use' || value === 'max_tokens' || value === 'stop_sequence') {
+    return value
+  }
+  return 'unknown'
 }

@@ -7,6 +7,8 @@ export type MessageRow =
   | { role: 'user'; id: string; content: string }
   | { role: 'assistant'; id: string; content: string; liveTail?: string; streaming?: boolean }
   | { role: 'thinking'; id: string; content: string; liveTail?: string; streaming?: boolean }
+  | { role: 'tool_use'; id: string; name: string; summary: string; input?: string }
+  | { role: 'tool_result'; id: string; name: string; summary: string; content: string; isError?: boolean }
   | { role: 'note'; id: string; kind: 'info' | 'error' | 'dim'; content: string }
   | {
       role: 'progress'
@@ -35,13 +37,11 @@ type InlineToken =
   | { kind: 'italic'; text: string }
   | { kind: 'code'; text: string }
 
-const MessageListInner: React.FC<MessageListProps> = ({ rows }) => {
-  return (
-    <Box flexDirection="column">
-      {rows.map(row => <RowView key={row.id} row={row} />)}
-    </Box>
-  )
-}
+const MessageListInner: React.FC<MessageListProps> = ({ rows }) => (
+  <Box flexDirection="column">
+    {rows.map(row => <RowView key={row.id} row={row} />)}
+  </Box>
+)
 
 export const MessageList = React.memo(MessageListInner)
 
@@ -77,6 +77,36 @@ const RowViewInner: React.FC<{ row: MessageRow }> = ({ row }) => {
           {preview ? <Text color={theme.dim}>{preview}</Text> : null}
           {row.streaming ? <ThinkingCursor active hasPreview={Boolean(preview)} /> : null}
         </Text>
+      </Box>
+    )
+  }
+
+  if (row.role === 'tool_use') {
+    return (
+      <Box flexDirection="column" marginTop={1} borderStyle="round" borderColor={theme.border} paddingX={1}>
+        <Text color={theme.accentNeutral} bold>{`tool · ${row.name}`}</Text>
+        <Text color={theme.dim}>{row.summary}</Text>
+        {row.input ? <Text color={theme.textSubtle}>{row.input}</Text> : null}
+      </Box>
+    )
+  }
+
+  if (row.role === 'tool_result') {
+    return (
+      <Box
+        flexDirection="column"
+        marginTop={1}
+        borderStyle="round"
+        borderColor={row.isError ? '#a84c4c' : theme.border}
+        paddingX={1}
+      >
+        <Text color={row.isError ? '#e87070' : theme.accentSecondary} bold>{`result · ${row.name}`}</Text>
+        <Text color={theme.dim}>{row.summary}</Text>
+        {row.isError ? (
+          <Text color="#f1b0b0">{row.content}</Text>
+        ) : (
+          <AssistantBody content={row.content} />
+        )}
       </Box>
     )
   }
@@ -169,18 +199,21 @@ const MarkdownBlockView: React.FC<{ block: MarkdownBlock; streaming?: boolean }>
 
   if (block.kind === 'code') {
     const lines = block.code.length === 0 ? [''] : block.code.split('\n')
+    const accent = codeAccent(block.lang)
     return (
-      <Box
-        flexDirection="column"
-        marginTop={1}
-        borderStyle="round"
-        borderColor={theme.border}
-        paddingX={1}
-      >
-        <Text color={theme.dim}>{block.lang ? `${block.lang}` : 'code'}{block.open ? ' (continuing...)' : ''}</Text>
-        {lines.map((line, index) => (
-          <Text key={index} color={theme.textSubtle}>{line || ' '}</Text>
-        ))}
+      <Box flexDirection="column" marginTop={1} borderStyle="round" borderColor={accent}>
+        <Box paddingX={1}>
+          <Text color={accent} bold>{block.lang ? block.lang : 'code'}</Text>
+          <Text color={theme.dim}>{block.open ? '  · streaming' : '  · block'}</Text>
+        </Box>
+        <Box flexDirection="column" paddingX={1}>
+          {lines.map((line, index) => (
+            <Text key={index}>
+              <Text color={theme.dim}>{`${String(index + 1).padStart(2, '0')} `}</Text>
+              <Text color={codeLineColor(block.lang, line)}>{line || ' '}</Text>
+            </Text>
+          ))}
+        </Box>
       </Box>
     )
   }
@@ -352,6 +385,42 @@ function parseMarkdownBlocks(markdown: string): MarkdownBlock[] {
   return blocks
 }
 
+function codeAccent(lang: string | null): string {
+  switch ((lang ?? '').toLowerCase()) {
+    case 'ts':
+    case 'tsx':
+    case 'js':
+    case 'jsx':
+      return theme.accentInfo
+    case 'json':
+      return theme.accentPeach
+    case 'html':
+    case 'xml':
+      return theme.accentPrimary
+    case 'css':
+    case 'scss':
+      return theme.accentLavender
+    case 'bash':
+    case 'sh':
+    case 'zsh':
+    case 'powershell':
+      return theme.accentMint
+    default:
+      return theme.border
+  }
+}
+
+function codeLineColor(lang: string | null, line: string): string {
+  const trimmed = line.trim()
+  if (!trimmed) return theme.textSubtle
+  if ((lang === 'json' || lang === 'jsonc') && /^["[{]/.test(trimmed)) return theme.accentPeach
+  if (/^(\/\/|#|\/\*|\*)/.test(trimmed)) return theme.dim
+  if (/\b(function|const|let|return|if|else|class|export|import)\b/.test(trimmed)) return theme.text
+  if (/<\/?[A-Za-z]/.test(trimmed)) return theme.accentPrimary
+  if (/^[.#@]/.test(trimmed)) return theme.accentLavender
+  return theme.textSubtle
+}
+
 function parseInlineTokens(text: string): InlineToken[] {
   const tokens: InlineToken[] = []
   const pattern = /(`[^`\n]+`|\*\*[^*\n]+?\*\*|__[^_\n]+?__|\*[^*\n]+?\*|_[^_\n]+?_)/g
@@ -388,5 +457,3 @@ function summarizeThinking(text: string): string {
   if (normalized.length <= 120) return normalized
   return `${normalized.slice(0, 117)}...`
 }
-
-

@@ -28,13 +28,18 @@ export const Surface: React.FC<SurfaceProps> = ({
   const color = toneColor[tone]
 
   return (
-    <Box flexDirection="column" borderStyle="round" borderColor={color} paddingX={1}>
-      <Text color={color} bold>{title}</Text>
-      {subtitle ? <Text color={theme.dim}>{subtitle}</Text> : null}
+    <Box flexDirection="column" borderStyle="round" borderColor={color} paddingX={1} paddingY={0}>
+      <Box flexDirection="column">
+        <Text color={color} bold>{title}</Text>
+        {subtitle ? <Text color={theme.dim}>{subtitle}</Text> : null}
+      </Box>
       {children ? <Box flexDirection="column" marginTop={1}>{children}</Box> : null}
-      {footer ? <Box marginTop={1}><Text color={theme.dim}>{footer}</Text></Box> : null}
+      {footer ? (
+        <Box marginTop={1} borderTop={false}>
+          <Text color={theme.dim}>{footer}</Text>
+        </Box>
+      ) : null}
     </Box>
   )
 }
-
 

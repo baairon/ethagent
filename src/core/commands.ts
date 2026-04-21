@@ -6,7 +6,11 @@ import { hasKey } from '../storage/secrets.js'
 import { copyToClipboard } from '../utils/clipboard.js'
 import { parseSegments } from '../utils/markdownSegments.js'
 import { exportSessionMarkdown } from '../storage/sessionExport.js'
+import { rewindWorkspaceEdits } from '../storage/rewind.js'
 import type { SessionMessage } from '../storage/sessions.js'
+import path from 'node:path'
+import { setCwd } from '../runtime/cwd.js'
+import type { SessionMode } from '../runtime/sessionMode.js'
 
 export type SlashContext = {
   config: EthagentConfig
@@ -14,12 +18,17 @@ export type SlashContext = {
   approxTokens: number
   startedAt: number
   sessionId: string
+  cwd: string
+  mode: SessionMode
   sessionMessages: () => SessionMessage[]
   assistantTurns: () => string[]
   onReplaceConfig: (next: EthagentConfig) => void
+  onChangeCwd: (next: string) => void
   onClear: () => void
   onExit: () => void
   onResumeRequest: () => void
+  onRewindRequest: () => void
+  onPermissionsRequest: () => void
   onCompactRequest: () => void
   onCopyPickerRequest: (turnText: string, turnLabel: string) => void
   onPullStart: (name: string) => { progressId: string; signal: AbortSignal }
@@ -35,7 +44,17 @@ type CommandSpec = {
   name: string
   aliases?: string[]
   summary: string
+  requiresArgs?: boolean
+  blockedInPlan?: boolean
+  enterBehavior?: 'execute' | 'fill'
   run: (args: string, ctx: SlashContext) => Promise<SlashResult> | SlashResult
+}
+
+export type SlashSuggestion = {
+  name: string
+  summary: string
+  completion: string
+  executeOnEnter: boolean
 }
 
 export function parseSlash(input: string): { name: string; args: string } | null {
@@ -71,13 +90,30 @@ const COMMANDS: CommandSpec[] = [
     summary: 'clear the transcript and start a new session',
     run: (_args, ctx) => {
       ctx.onClear()
-      return { kind: 'note', text: 'transcript cleared.', variant: 'dim' }
+      return { kind: 'handled' }
     },
   },
   {
     name: 'status',
     summary: 'provider, model, session id, turns, tokens, elapsed',
     run: (_args, ctx) => ({ kind: 'note', text: renderStatus(ctx) }),
+  },
+  {
+    name: 'cd',
+    requiresArgs: true,
+    enterBehavior: 'fill',
+    summary: 'change working directory Â· /cd <path>',
+    run: async (args, ctx) => {
+      const target = args.trim()
+      if (!target) return { kind: 'note', variant: 'error', text: 'usage: /cd <path>' }
+      try {
+        const next = setCwd(target, ctx.cwd)
+        ctx.onChangeCwd(next)
+        return { kind: 'note', text: `cwd: ${next}`, variant: 'dim' }
+      } catch (err: unknown) {
+        return { kind: 'note', variant: 'error', text: `cd failed: ${(err as Error).message}` }
+      }
+    },
   },
   {
     name: 'config',
@@ -107,6 +143,8 @@ const COMMANDS: CommandSpec[] = [
   },
   {
     name: 'model',
+    requiresArgs: true,
+    enterBehavior: 'fill',
     summary: 'switch to an installed model · /model <name>',
     run: async (args, ctx) => {
       const name = args.trim()
@@ -135,6 +173,8 @@ const COMMANDS: CommandSpec[] = [
   },
   {
     name: 'pull',
+    requiresArgs: true,
+    enterBehavior: 'fill',
     summary: 'download an ollama model · /pull <name>',
     run: async (args, ctx) => {
       const name = args.trim()
@@ -156,10 +196,44 @@ const COMMANDS: CommandSpec[] = [
     },
   },
   {
+    name: 'rewind',
+    aliases: ['checkpoint'],
+    summary: 'restore recent managed file edits · /rewind [n]',
+    run: async (args, ctx) => {
+      const trimmed = args.trim()
+      if (!trimmed) {
+        ctx.onRewindRequest()
+        return { kind: 'handled' }
+      }
+      const steps = trimmed ? Number.parseInt(trimmed, 10) : 1
+      if (!Number.isFinite(steps) || steps < 1) {
+        return { kind: 'note', variant: 'error', text: 'usage: /rewind [n]' }
+      }
+      const result = await rewindWorkspaceEdits(ctx.cwd, steps)
+      if (result.reverted === 0) {
+        return { kind: 'note', variant: 'error', text: 'no managed edits available to rewind in this directory.' }
+      }
+      const files = result.files.map(file => path.relative(ctx.cwd, file) || path.basename(file))
+      return {
+        kind: 'note',
+        text: `rewound ${result.reverted} edit${result.reverted === 1 ? '' : 's'}.\n${files.join('\n')}`,
+        variant: 'dim',
+      }
+    },
+  },
+  {
     name: 'compact',
     summary: 'summarize older turns to free up context',
     run: (_args, ctx) => {
       ctx.onCompactRequest()
+      return { kind: 'handled' }
+    },
+  },
+  {
+    name: 'permissions',
+    summary: 'review or remove saved permission rules for this project',
+    run: (_args, ctx) => {
+      ctx.onPermissionsRequest()
       return { kind: 'handled' }
     },
   },
@@ -200,6 +274,7 @@ const COMMANDS: CommandSpec[] = [
   },
   {
     name: 'export',
+    blockedInPlan: true,
     summary: 'write the transcript to a markdown file',
     run: async (_args, ctx) => {
       const messages = ctx.sessionMessages()
@@ -294,6 +369,7 @@ function renderStatus(ctx: SlashContext): string {
   return [
     `provider   ${ctx.config.provider}`,
     `model      ${ctx.config.model}`,
+    `cwd        ${ctx.cwd}`,
     `session    ${ctx.sessionId.slice(0, 8)}`,
     `turns      ${ctx.turns}`,
     `tokens     ~${ctx.approxTokens}`,
@@ -347,9 +423,17 @@ export async function dispatchSlash(input: string, ctx: SlashContext): Promise<S
   if (!cmd) {
     return { kind: 'note', variant: 'error', text: `unknown command: /${parsed.name}. try /help` }
   }
+  if (ctx.mode === 'plan' && cmd.blockedInPlan) {
+    return { kind: 'note', variant: 'error', text: `/${cmd.name} is blocked in plan mode.` }
+  }
   return cmd.run(parsed.args, ctx)
 }
 
-export function getSlashSuggestions(): Array<{ name: string; summary: string }> {
-  return COMMANDS.map(c => ({ name: c.name, summary: c.summary }))
+export function getSlashSuggestions(): SlashSuggestion[] {
+  return COMMANDS.map(c => ({
+    name: c.name,
+    summary: c.summary,
+    completion: c.requiresArgs || c.enterBehavior === 'fill' ? `/${c.name} ` : `/${c.name}`,
+    executeOnEnter: !c.requiresArgs && c.enterBehavior !== 'fill',
+  }))
 }

@@ -12,7 +12,8 @@
   ],
   "scripts": {
     "start": "node bin/ethagent.js",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node test/run-tests.mjs"
   },
   "engines": {
     "node": ">=20.0.0"

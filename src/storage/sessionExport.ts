@@ -27,10 +27,21 @@ export async function exportSessionMarkdown(
   lines.push('')
   for (const m of messages) {
     if (m.role === 'system') continue
-    const header = m.role === 'user' ? '## user' : '## assistant'
+    const header =
+      m.role === 'user'
+        ? '## user'
+        : m.role === 'assistant'
+          ? '## assistant'
+          : m.role === 'tool_use'
+            ? `## tool use · ${m.name}`
+            : `## tool result · ${m.name}`
     lines.push(`${header}  <sub>${m.createdAt}</sub>`)
     lines.push('')
-    lines.push(m.content)
+    if (m.role === 'tool_use') {
+      lines.push(JSON.stringify(m.input, null, 2))
+    } else {
+      lines.push(m.content)
+    }
     lines.push('')
   }
   await fs.writeFile(file, lines.join('\n'), { mode: 0o600 })

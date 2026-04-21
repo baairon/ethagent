@@ -5,6 +5,7 @@ import type { Provider } from './contracts.js'
 import { AnthropicProvider } from './anthropic.js'
 import { GeminiProvider } from './gemini.js'
 import { OpenAIChatProvider } from './openai-chat.js'
+import { anthropicTools, openAITools } from '../tools/registry.js'
 
 export function createProvider(config: EthagentConfig): Provider {
   switch (config.provider) {
@@ -14,6 +15,7 @@ export function createProvider(config: EthagentConfig): Provider {
         model: config.model,
         baseUrl: config.baseUrl ?? defaultBaseUrlFor('ollama') ?? 'http://localhost:11434/v1',
         apiKey: 'ollama',
+        tools: openAITools(),
       })
     case 'openai':
       return new OpenAIChatProvider({
@@ -21,9 +23,10 @@ export function createProvider(config: EthagentConfig): Provider {
         model: config.model,
         baseUrl: 'https://api.openai.com/v1',
         loadApiKey: () => getKey('openai'),
+        tools: openAITools(),
       })
     case 'anthropic':
-      return new AnthropicProvider({ model: config.model })
+      return new AnthropicProvider({ model: config.model, tools: anthropicTools() })
     case 'gemini':
       return new GeminiProvider({ model: config.model })
   }
