@@ -1,5 +1,5 @@
 import type { Message, Provider } from '../providers/contracts.js'
-import { approximateTokens } from './messages.js'
+import { approximateTokens, messageTextContent } from './messages.js'
 
 const COMPACT_SYSTEM = `You compress prior chat turns into a short, faithful summary. Output format:
 - One paragraph (<=120 words) covering facts, decisions, goals, and pending threads.
@@ -34,7 +34,7 @@ export async function compactTranscript(
   const headCount = nonSystem.length - KEEP_TAIL_TURNS * 2
   const head = nonSystem.slice(0, headCount)
   const tail = nonSystem.slice(headCount)
-  const serialized = head.map(m => `${m.role}: ${m.content}`).join('\n\n')
+  const serialized = head.map(m => `${m.role}: ${messageTextContent(m)}`).join('\n\n')
 
   const prompt: Message[] = [
     { role: 'system', content: COMPACT_SYSTEM },

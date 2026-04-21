@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { Text, Box } from 'ink'
 import { theme } from './theme.js'
 const eyePalette: Array<[number, number, number]> = [
@@ -94,16 +94,29 @@ const eyes = `
 
 const Eyes = () => {
   const lines = eyes.split('\n')
-  const maxLen = Math.max(...lines.map(l => l.trimEnd().length))
   return (
     <Box flexDirection="column">
-      {lines.map((line, li) => (
-        <Text key={li}>
-          {line.split('').map((char, ci) => (
-            <Text key={ci} color={eyeGradientColor(ci / Math.max(maxLen - 1, 1))}>{char}</Text>
-          ))}
-        </Text>
-      ))}
+      {lines.map((line, li) => {
+        const glyphPositions = [...line]
+          .map((char, index) => ({ char, index }))
+          .filter(entry => entry.char.trim().length > 0)
+          .map(entry => entry.index)
+        const firstGlyph = glyphPositions[0] ?? 0
+        const lastGlyph = glyphPositions[glyphPositions.length - 1] ?? firstGlyph
+        const span = Math.max(lastGlyph - firstGlyph, 1)
+
+        return (
+          <Text key={li}>
+            {[...line].map((char, ci) => {
+              if (!char.trim()) {
+                return <Text key={ci}>{char}</Text>
+              }
+              const t = (ci - firstGlyph) / span
+              return <Text key={ci} color={eyeGradientColor(t)}>{char}</Text>
+            })}
+          </Text>
+        )
+      })}
     </Box>
   )
 }
@@ -117,7 +130,17 @@ type SplashProps = {
 const TAGLINE = ' privacy-first AI agent with a portable Ethereum identity '
 
 export const BrandSplash: React.FC<SplashProps> = ({ contextLine, tipLine, compact }) => {
-  const width = process.stdout.columns ?? 80
+  const [width, setWidth] = useState<number>(() => process.stdout.columns ?? 80)
+
+  useEffect(() => {
+    const stdout = process.stdout
+    const handleResize = () => setWidth(stdout.columns ?? 80)
+    stdout.on('resize', handleResize)
+    return () => {
+      stdout.off('resize', handleResize)
+    }
+  }, [])
+
   const renderCompact = compact ?? width < 72
 
   if (renderCompact) {

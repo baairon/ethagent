@@ -2,6 +2,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import os from 'node:os'
 import { z } from 'zod'
+import { atomicWriteText } from './atomicWrite.js'
 
 export const PROVIDERS = ['ollama', 'openai', 'anthropic', 'gemini'] as const
 export type ProviderId = (typeof PROVIDERS)[number]
@@ -49,9 +50,7 @@ export async function saveConfig(config: EthagentConfig): Promise<void> {
   await ensureConfigDir()
   const validated = ConfigSchema.parse(config)
   const file = getConfigPath()
-  const tmp = `${file}.${process.pid}.${Date.now()}.tmp`
-  await fs.writeFile(tmp, JSON.stringify(validated, null, 2) + '\n', { encoding: 'utf8', mode: 0o600 })
-  await fs.rename(tmp, file)
+  await atomicWriteText(file, JSON.stringify(validated, null, 2) + '\n')
 }
 
 export async function deleteConfig(): Promise<void> {

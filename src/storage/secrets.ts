@@ -3,6 +3,7 @@ import path from 'node:path'
 import os from 'node:os'
 import crypto from 'node:crypto'
 import { getConfigDir, ensureConfigDir, type ProviderId } from './config.js'
+import { atomicWriteText } from './atomicWrite.js'
 
 const KEYTAR_SERVICE = 'ethagent'
 
@@ -38,9 +39,7 @@ function saltPath(): string { return path.join(getConfigDir(), '.salt') }
 function keysPath(): string { return path.join(getConfigDir(), 'keys.enc') }
 
 async function atomicWrite(file: string, data: string, mode = 0o600): Promise<void> {
-  const tmp = `${file}.${process.pid}.${Date.now()}.tmp`
-  await fs.writeFile(tmp, data, { encoding: 'utf8', mode })
-  await fs.rename(tmp, file)
+  await atomicWriteText(file, data, { mode })
 }
 
 async function loadSalt(): Promise<Buffer> {

@@ -3,6 +3,7 @@ import type { Message, Provider, StreamEvent } from './contracts.js'
 import { ProviderError } from './contracts.js'
 import { providerErrorFromResponse } from './errors.js'
 import { iterSseFrames } from './sse.js'
+import { messageTextContent } from '../core/messages.js'
 
 type GeminiChunk = {
   candidates?: Array<{
@@ -27,6 +28,7 @@ const READ_TIMEOUT_MS = 45_000
 export class GeminiProvider implements Provider {
   readonly id = 'gemini' as const
   readonly model: string
+  readonly supportsTools = false
 
   constructor(opts: { model: string }) {
     this.model = opts.model
@@ -123,14 +125,15 @@ function buildGeminiPayload(messages: Message[]): {
   }> = []
 
   for (const message of messages) {
-    if (!message.content.trim()) continue
+    const text = messageTextContent(message).trim()
+    if (!text) continue
     if (message.role === 'system') {
-      systemParts.push(message.content)
+      systemParts.push(text)
       continue
     }
     contents.push({
       role: message.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: message.content }],
+      parts: [{ text }],
     })
   }
 
