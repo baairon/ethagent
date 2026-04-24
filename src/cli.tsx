@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import React, { useEffect, useState } from 'react'
-import { render, Box, Text, useApp, useInput } from 'ink'
+import { render, Box, Text, useApp } from 'ink'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -9,6 +9,7 @@ import { theme } from './ui/theme.js'
 import { FirstRun } from './bootstrap/FirstRun.js'
 import { ChatScreen } from './ui/ChatScreen.js'
 import { KeybindingProvider } from './keybindings/KeybindingProvider.js'
+import { AppInputProvider, useAppInput } from './input/AppInputProvider.js'
 import { loadConfig, deleteConfig, getConfigPath, type EthagentConfig } from './storage/config.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -84,7 +85,7 @@ const AppRoot: React.FC<{ setExitCode: (code: number) => void }> = ({ setExitCod
     return undefined
   }, [phase, exit, setExitCode])
 
-  useInput((input, key) => {
+  useAppInput((input, key) => {
     if (phase.kind === 'ready') return
     if (key.ctrl && (input === 'c' || input === 'd')) exit()
   })
@@ -129,9 +130,11 @@ const AppRoot: React.FC<{ setExitCode: (code: number) => void }> = ({ setExitCod
 async function runDefault(): Promise<number> {
   let exitCode = 0
   const instance = render(
-    <KeybindingProvider>
-      <AppRoot setExitCode={code => { exitCode = code }} />
-    </KeybindingProvider>,
+    <AppInputProvider>
+      <KeybindingProvider>
+        <AppRoot setExitCode={code => { exitCode = code }} />
+      </KeybindingProvider>
+    </AppInputProvider>,
     {
       exitOnCtrlC: false,
     },

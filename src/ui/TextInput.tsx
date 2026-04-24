@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
-import { Box, Text, useInput } from 'ink'
+import { Box, Text } from 'ink'
 import { theme } from './theme.js'
+import { useAppInput } from '../input/AppInputProvider.js'
 
 type TextInputProps = {
   label?: string
@@ -28,7 +29,7 @@ export function TextInput({
   const [value, setValue] = useState(initialValue)
   const [error, setError] = useState<string | null>(null)
 
-  useInput((input, key) => {
+  useAppInput((input, key) => {
     if (key.return) {
       if (!allowEmpty && value.trim().length === 0) {
         setError('value cannot be empty')
@@ -86,5 +87,4 @@ export function TextInput({
     </Box>
   )
 }
-
 

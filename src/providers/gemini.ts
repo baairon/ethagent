@@ -3,7 +3,7 @@ import type { Message, Provider, StreamEvent } from './contracts.js'
 import { ProviderError } from './contracts.js'
 import { providerErrorFromResponse } from './errors.js'
 import { iterSseFrames } from './sse.js'
-import { messageTextContent } from '../core/messages.js'
+import { messageTextContent } from '../utils/messages.js'
 
 type GeminiChunk = {
   candidates?: Array<{

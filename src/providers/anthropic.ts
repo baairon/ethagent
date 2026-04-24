@@ -3,6 +3,7 @@ import type { Message, MessageContentBlock, Provider, StreamEvent } from './cont
 import { ProviderError } from './contracts.js'
 import { providerErrorFromResponse } from './errors.js'
 import { iterSseEvents } from './sse.js'
+import { fetchWithRetry } from '../utils/withRetry.js'
 
 export type AnthropicToolDefinition = {
   name: string
@@ -53,12 +54,13 @@ const DEFAULT_MAX_TOKENS = 4096
 export class AnthropicProvider implements Provider {
   readonly id = 'anthropic' as const
   readonly model: string
-  readonly supportsTools = true
+  readonly supportsTools: boolean
   private readonly tools: AnthropicToolDefinition[]
 
   constructor(opts: { model: string; tools?: AnthropicToolDefinition[] }) {
     this.model = opts.model
     this.tools = opts.tools ?? []
+    this.supportsTools = this.tools.length > 0
   }
 
   async *complete(messages: Message[], signal: AbortSignal): AsyncIterable<StreamEvent> {
@@ -73,7 +75,7 @@ export class AnthropicProvider implements Provider {
 
     let response: Response
     try {
-      response = await fetch('https://api.anthropic.com/v1/messages', {
+      response = await fetchWithRetry('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
@@ -89,8 +91,7 @@ export class AnthropicProvider implements Provider {
           messages: conversation,
           tools: this.tools.length > 0 ? this.tools : undefined,
         }),
-        signal,
-      })
+      }, { signal })
     } catch (err: unknown) {
       if (signal.aborted) return
       yield { type: 'error', message: (err as Error).message || 'network error' }

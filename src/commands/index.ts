@@ -44,6 +44,7 @@ type CommandSpec = {
   name: string
   aliases?: string[]
   summary: string
+  hidden?: boolean
   requiresArgs?: boolean
   blockedInPlan?: boolean
   enterBehavior?: 'execute' | 'fill'
@@ -343,8 +344,9 @@ async function runPull(
 }
 
 function renderHelp(): string {
-  const maxName = Math.max(...COMMANDS.map(c => commandLabel(c).length))
-  const lines = COMMANDS.map(c => {
+  const visibleCommands = COMMANDS.filter(c => !c.hidden)
+  const maxName = Math.max(...visibleCommands.map(c => commandLabel(c).length))
+  const lines = visibleCommands.map(c => {
     const label = commandLabel(c)
     return `  ${label.padEnd(maxName)}   ${c.summary}`
   })
@@ -430,7 +432,7 @@ export async function dispatchSlash(input: string, ctx: SlashContext): Promise<S
 }
 
 export function getSlashSuggestions(): SlashSuggestion[] {
-  return COMMANDS.map(c => ({
+  return COMMANDS.filter(c => !c.hidden).map(c => ({
     name: c.name,
     summary: c.summary,
     completion: c.requiresArgs || c.enterBehavior === 'fill' ? `/${c.name} ` : `/${c.name}`,

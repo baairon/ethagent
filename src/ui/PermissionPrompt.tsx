@@ -21,7 +21,7 @@ export const PermissionPrompt: React.FC<PermissionPromptProps> = ({ request, onD
       tone={request.kind === 'bash' && request.warning ? 'error' : 'primary'}
       footer="Enter confirms. Esc denies."
     >
-      {request.kind === 'edit' ? (
+      {request.kind === 'edit' || request.kind === 'write' || request.kind === 'delete' ? (
         <Box flexDirection="column" marginBottom={1}>
           <Text color={theme.accentPeach}>{request.changeSummary}</Text>
           <Box marginTop={1}>
@@ -64,6 +64,13 @@ function buildOptions(request: PermissionRequest): Array<{ value: PermissionDeci
     ]
   }
 
+  if (request.kind === 'delete') {
+    return [
+      { value: 'allow-once', label: 'delete this file', hint: 'approve this deletion only' },
+      { value: 'deny', label: 'deny', hint: 'keep the file unchanged' },
+    ]
+  }
+
   return [
     { value: 'allow-once', label: 'allow once', hint: 'approve only this action' },
     { value: 'allow-path-project', label: 'always allow this file', hint: request.relativePath },
@@ -73,6 +80,8 @@ function buildOptions(request: PermissionRequest): Array<{ value: PermissionDeci
       label:
         request.kind === 'edit'
           ? 'always allow edits'
+          : request.kind === 'write'
+            ? 'always allow writes'
           : request.kind === 'cd'
             ? 'always allow directory changes'
             : 'always allow reads',

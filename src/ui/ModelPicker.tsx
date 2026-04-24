@@ -67,7 +67,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
     return (
       <Surface
         title="Switch Provider / Model"
-        subtitle="Choose a local model or configure a cloud provider."
+        subtitle="Choose a provider and model."
       >
         <Spinner label="loading providers..." />
       </Surface>

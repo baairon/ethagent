@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-export type ToolKind = 'read' | 'edit' | 'bash' | 'cd'
+export type ToolKind = 'read' | 'write' | 'edit' | 'delete' | 'bash' | 'cd'
 
 export type PermissionRequest =
   | {
@@ -12,7 +12,29 @@ export type PermissionRequest =
       subtitle: string
     }
   | {
+      kind: 'write'
+      path: string
+      relativePath: string
+      directoryPath: string
+      title: string
+      subtitle: string
+      before: string
+      after: string
+      changeSummary: string
+    }
+  | {
       kind: 'edit'
+      path: string
+      relativePath: string
+      directoryPath: string
+      title: string
+      subtitle: string
+      before: string
+      after: string
+      changeSummary: string
+    }
+  | {
+      kind: 'delete'
       path: string
       relativePath: string
       directoryPath: string
@@ -51,6 +73,12 @@ export const SessionPermissionRuleSchema = z.union([
   z.object({ kind: z.literal('edit'), scope: z.literal('kind') }),
   z.object({ kind: z.literal('edit'), scope: z.literal('path'), path: z.string().min(1) }),
   z.object({ kind: z.literal('edit'), scope: z.literal('directory'), path: z.string().min(1) }),
+  z.object({ kind: z.literal('write'), scope: z.literal('kind') }),
+  z.object({ kind: z.literal('write'), scope: z.literal('path'), path: z.string().min(1) }),
+  z.object({ kind: z.literal('write'), scope: z.literal('directory'), path: z.string().min(1) }),
+  z.object({ kind: z.literal('delete'), scope: z.literal('kind') }),
+  z.object({ kind: z.literal('delete'), scope: z.literal('path'), path: z.string().min(1) }),
+  z.object({ kind: z.literal('delete'), scope: z.literal('directory'), path: z.string().min(1) }),
   z.object({ kind: z.literal('cd'), scope: z.literal('kind') }),
   z.object({ kind: z.literal('cd'), scope: z.literal('path'), path: z.string().min(1) }),
   z.object({ kind: z.literal('cd'), scope: z.literal('directory'), path: z.string().min(1) }),

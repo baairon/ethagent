@@ -7,11 +7,14 @@ import { RewindView } from './RewindView.js'
 import { PermissionsView } from './PermissionsView.js'
 import { CopyPicker } from './CopyPicker.js'
 import { PermissionPrompt } from './PermissionPrompt.js'
+import { PlanApprovalView, type PlanApprovalAction } from './PlanApprovalView.js'
 import { ChatInput } from './ChatInput.js'
 import type { CopyResult } from '../utils/clipboard.js'
-import { getSlashSuggestions } from '../core/commands.js'
+import { getSlashSuggestions } from '../commands/index.js'
+import { Box, Text } from 'ink'
+import { theme } from './theme.js'
 
-export type Overlay = 'none' | 'modelPicker' | 'resume' | 'rewind' | 'copyPicker' | 'permission' | 'permissions'
+export type Overlay = 'none' | 'modelPicker' | 'resume' | 'rewind' | 'copyPicker' | 'permission' | 'permissions' | 'planApproval'
 export type CopyPickerState = { turnText: string; turnLabel: string } | null
 
 type ChatBottomPaneProps = {
@@ -27,6 +30,7 @@ type ChatBottomPaneProps = {
   placeholderHints: string[]
   queuedInputs: string[]
   slashSuggestions: ReturnType<typeof getSlashSuggestions>
+  planApprovalContextLabel: string
   footerRight: React.ReactNode
   handleModelPick: (sel: ModelPickerSelection) => void | Promise<void>
   handleResumePick: (id: string) => void | Promise<void>
@@ -34,6 +38,8 @@ type ChatBottomPaneProps = {
   handleCopyDone: (result: CopyResult, label: string) => void
   handleCopyCancel: () => void
   resolvePermission: (decision: PermissionDecision) => void
+  handlePlanApproval: (action: PlanApprovalAction) => void | Promise<void>
+  handlePlanApprovalCancel: () => void
   onPermissionRulesChanged: (rules: SessionPermissionRule[]) => void
   handleSubmit: (value: string) => void | Promise<void>
   setOverlay: React.Dispatch<React.SetStateAction<Overlay>>
@@ -53,6 +59,7 @@ export function ChatBottomPane({
   placeholderHints,
   queuedInputs,
   slashSuggestions,
+  planApprovalContextLabel,
   footerRight,
   handleModelPick,
   handleResumePick,
@@ -60,6 +67,8 @@ export function ChatBottomPane({
   handleCopyDone,
   handleCopyCancel,
   resolvePermission,
+  handlePlanApproval,
+  handlePlanApprovalCancel,
   onPermissionRulesChanged,
   handleSubmit,
   setOverlay,
@@ -135,15 +144,34 @@ export function ChatBottomPane({
     )
   }
 
+  if (overlay === 'planApproval') {
+    return (
+      <PlanApprovalView
+        contextLabel={planApprovalContextLabel}
+        onSelect={handlePlanApproval}
+        onCancel={handlePlanApprovalCancel}
+      />
+    )
+  }
+
   return (
-    <ChatInput
-      onSubmit={handleSubmit}
-      history={history}
-      disabled={busy}
-      placeholderHints={placeholderHints}
-      queuedMessages={queuedInputs}
-      slashSuggestions={slashSuggestions}
-      footerRight={footerRight}
-    />
+    <Box flexDirection="column" width="100%">
+      <ChatInput
+        onSubmit={handleSubmit}
+        history={history}
+        disabled={busy}
+        placeholderHints={placeholderHints}
+        queuedMessages={queuedInputs}
+        slashSuggestions={slashSuggestions}
+        footerRight={footerRight}
+        cwd={cwd}
+      />
+      <Box marginLeft={2} marginTop={0}>
+        <Text>
+          <Text color={theme.dim}>workspace · </Text>
+          <Text color={theme.textSubtle}>{cwd}</Text>
+        </Text>
+      </Box>
+    </Box>
   )
 }

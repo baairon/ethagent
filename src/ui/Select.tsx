@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
-import { Box, Text, useInput } from 'ink'
+import { Box, Text } from 'ink'
 import { theme } from './theme.js'
+import { useAppInput } from '../input/AppInputProvider.js'
 
 export type SelectOption<T> = {
   value: T
@@ -55,7 +56,7 @@ export function Select<T>({
     }
   }
 
-  useInput((input, key) => {
+  useAppInput((input, key) => {
     if (key.upArrow || input === 'k') moveBy(-1)
     else if (key.downArrow || input === 'j') moveBy(1)
     else if (key.return) {

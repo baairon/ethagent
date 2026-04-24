@@ -24,7 +24,7 @@ export const ConversationStack: React.FC<ConversationStackProps> = ({
     <Box flexDirection="column" padding={1}>
       {header}
       <TranscriptView rows={rows} active={transcriptActive} bottomVariant={bottomVariant} />
-      <Box marginTop={1}>
+      <Box marginTop={1} width="100%">
         {bottom}
       </Box>
       {status ? (
