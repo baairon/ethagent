@@ -7,6 +7,7 @@ import { AnthropicProvider } from './anthropic.js'
 import { GeminiProvider } from './gemini.js'
 import { OpenAIChatProvider } from './openai-chat.js'
 import { anthropicTools, openAITools } from '../tools/registry.js'
+import { openAIBaseUrlFor } from '../models/catalog.js'
 
 export function isLocalProvider(provider: string): boolean {
   return provider === 'ollama'
@@ -27,7 +28,7 @@ export function createProvider(config: EthagentConfig, options: { mode?: Session
       return new OpenAIChatProvider({
         id: 'openai',
         model: config.model,
-        baseUrl: 'https://api.openai.com/v1',
+        baseUrl: openAIBaseUrlFor(config),
         loadApiKey: () => getKey('openai'),
         tools: openAITools(mode),
       })

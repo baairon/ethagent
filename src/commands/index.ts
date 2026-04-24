@@ -3,6 +3,7 @@ import { defaultBaseUrlFor, getConfigPath, saveConfig } from '../storage/config.
 import { isDaemonUp, listInstalled, pullModel, type PullProgress } from '../bootstrap/ollama.js'
 import { detectSpec } from '../bootstrap/runtimeDetection.js'
 import { hasKey } from '../storage/secrets.js'
+import { discoverProviderModels, type ModelCatalogResult } from '../models/catalog.js'
 import { copyToClipboard } from '../utils/clipboard.js'
 import { parseSegments } from '../utils/markdownSegments.js'
 import { exportSessionMarkdown } from '../storage/sessionExport.js'
@@ -27,6 +28,7 @@ export type SlashContext = {
   onClear: () => void
   onExit: () => void
   onResumeRequest: () => void
+  onModelPickerRequest: () => void
   onRewindRequest: () => void
   onPermissionsRequest: () => void
   onCompactRequest: () => void
@@ -126,50 +128,71 @@ const COMMANDS: CommandSpec[] = [
   },
   {
     name: 'models',
-    summary: 'list installed ollama models',
+    summary: 'list models for the current provider',
     run: async (_args, ctx) => {
-      if (!(await isDaemonUp())) {
-        return { kind: 'note', variant: 'error', text: "ollama daemon isn't running." }
+      if (ctx.config.provider === 'ollama') {
+        if (!(await isDaemonUp())) {
+          return { kind: 'note', variant: 'error', text: "ollama daemon isn't running." }
+        }
+        const installed = await listInstalled()
+        if (installed.length === 0) {
+          return { kind: 'note', text: 'no models installed. pull one with: /pull <name>' }
+        }
+        const lines = installed.map(m => {
+          const marker = m.name === ctx.config.model ? '*' : ' '
+          return `${marker} ${m.name}  ${formatBytes(m.sizeBytes)}`
+        })
+        return { kind: 'note', text: ['installed models:', ...lines].join('\n') }
       }
-      const installed = await listInstalled()
-      if (installed.length === 0) {
-        return { kind: 'note', text: 'no models installed. pull one with: /pull <name>' }
+
+      const catalog = await discoverProviderModels(ctx.config)
+      return {
+        kind: 'note',
+        text: renderModelCatalog(catalog, ctx.config.model),
+        variant: catalog.status === 'fallback' ? 'dim' : 'info',
       }
-      const lines = installed.map(m => {
-        const marker = m.name === ctx.config.model ? '*' : ' '
-        return `${marker} ${m.name}  ${formatBytes(m.sizeBytes)}`
-      })
-      return { kind: 'note', text: ['installed models:', ...lines].join('\n') }
     },
   },
   {
     name: 'model',
-    requiresArgs: true,
     enterBehavior: 'fill',
-    summary: 'switch to an installed model · /model <name>',
+    summary: 'open picker or switch model · /model [name]',
     run: async (args, ctx) => {
       const name = args.trim()
-      if (!name) return { kind: 'note', variant: 'error', text: 'usage: /model <name>' }
-      if (!(await isDaemonUp())) {
-        return { kind: 'note', variant: 'error', text: "ollama daemon isn't running." }
+      if (!name) {
+        ctx.onModelPickerRequest()
+        return { kind: 'handled' }
       }
-      const installed = await listInstalled()
-      if (!installed.some(m => m.name === name)) {
-        return {
-          kind: 'note',
-          variant: 'error',
-          text: `'${name}' isn't installed. try /pull ${name} first.`,
+      if (ctx.config.provider === 'ollama') {
+        if (!(await isDaemonUp())) {
+          return { kind: 'note', variant: 'error', text: "ollama daemon isn't running." }
+        }
+        const installed = await listInstalled()
+        if (!installed.some(m => m.name === name)) {
+          return {
+            kind: 'note',
+            variant: 'error',
+            text: `'${name}' isn't installed. try /pull ${name} first.`,
+          }
+        }
+      } else {
+        const catalog = await discoverProviderModels(ctx.config)
+        if (catalog.status === 'ok' && !catalog.entries.some(entry => entry.id === name)) {
+          return {
+            kind: 'note',
+            variant: 'error',
+            text: `'${name}' was not found for ${ctx.config.provider}. use /models to inspect available models.`,
+          }
         }
       }
       const next: EthagentConfig = {
         ...ctx.config,
-        provider: 'ollama',
         model: name,
-        baseUrl: ctx.config.baseUrl ?? defaultBaseUrlFor('ollama'),
+        baseUrl: baseUrlForModelSwitch(ctx.config),
       }
       await saveConfig(next)
       ctx.onReplaceConfig(next)
-      return { kind: 'note', text: `now using ${name}.` }
+      return { kind: 'note', text: `now using ${next.provider} · ${name}.` }
     },
   },
   {
@@ -402,6 +425,24 @@ function renderDoctor(
     lines.push(`  ${provider.padEnd(9)}  ${present ? 'set' : 'not set'}`)
   }
   return lines.join('\n')
+}
+
+function renderModelCatalog(catalog: ModelCatalogResult, currentModel: string): string {
+  const title = catalog.status === 'fallback'
+    ? `${catalog.provider} models (fallback${catalog.error ? `: ${catalog.error}` : ''}):`
+    : `${catalog.provider} models:`
+  const lines = catalog.entries.map(entry => {
+    const marker = entry.id === currentModel ? '*' : ' '
+    const suffix = entry.source === 'fallback' ? '  fallback' : ''
+    return `${marker} ${entry.id}${suffix}`
+  })
+  return [title, ...lines].join('\n')
+}
+
+function baseUrlForModelSwitch(config: EthagentConfig): string | undefined {
+  if (config.provider === 'ollama') return config.baseUrl ?? defaultBaseUrlFor('ollama')
+  if (config.provider === 'openai') return config.baseUrl
+  return undefined
 }
 
 function formatBytes(bytes: number): string {

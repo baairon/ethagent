@@ -77,6 +77,7 @@ export function ChatBottomPane({
   if (overlay === 'modelPicker') {
     return (
       <ModelPicker
+        currentConfig={config}
         currentProvider={config.provider}
         currentModel={config.model}
         onPick={handleModelPick}
