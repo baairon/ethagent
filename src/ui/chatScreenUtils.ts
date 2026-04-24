@@ -1,7 +1,8 @@
-import { detectDirectoryChangeIntent } from '../core/fallbackToolUse.js'
-import { systemMessage } from '../core/messages.js'
-import { buildSystemPrompt } from '../core/systemPrompt.js'
+import { systemMessage } from '../utils/messages.js'
+import { buildSystemPrompt } from '../prompts/systemPrompt.js'
 import type { Message } from '../providers/contracts.js'
+import { isLocalProvider } from '../providers/registry.js'
+import type { SessionMode } from '../runtime/sessionMode.js'
 import type { EthagentConfig } from '../storage/config.js'
 import { sessionMessagesToProviderMessages, type SessionMessage } from '../storage/sessions.js'
 import type { MessageRow } from './MessageList.js'
@@ -19,15 +20,22 @@ export function buildBaseMessages(
   config: EthagentConfig,
   hasTools: boolean,
   cwd: string,
+  mode: SessionMode = 'chat',
+  options: { preserveTurnId?: string; compactToolHistory?: boolean } = {},
 ): Message[] {
+  const compactToolHistory = options.compactToolHistory ?? isLocalProvider(config.provider)
   return [
     systemMessage(buildSystemPrompt({
       cwd,
       model: config.model,
       provider: config.provider,
       hasTools,
+      mode,
     })),
-    ...sessionMessagesToProviderMessages(sessionMessages),
+    ...sessionMessagesToProviderMessages(sessionMessages, {
+      compactToolHistory,
+      preserveTurnId: options.preserveTurnId,
+    }),
   ]
 }
 
@@ -161,14 +169,4 @@ export function buildDeleteCommand(targetPath: string): string {
     return `del /f /q "${escaped}"`
   }
   return `rm -f -- "${targetPath.replace(/"/g, '\\"')}"`
-}
-
-export function shouldPrimeToolPlanning(userText: string): boolean {
-  const trimmed = userText.trim()
-  if (!trimmed) return false
-  if (detectDirectoryChangeIntent(trimmed)) return false
-  return (
-    /\b(create|write|edit|update|modify|save|refactor|fix|build|generate|implement|read|inspect|open|analyze)\b/i.test(trimmed) &&
-    /\b(file|files|folder|directory|project|repo|repository|workspace|html|css|javascript|js|typescript|ts|component|page|game|app|code)\b/i.test(trimmed)
-  )
 }

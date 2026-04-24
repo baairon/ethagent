@@ -11,19 +11,20 @@ const schema = z.object({
   oldText: z.string().optional(),
   newText: z.string(),
   replaceAll: z.boolean().optional(),
+  replaceWholeFile: z.boolean().optional(),
 })
 
 export const editTool: Tool<typeof schema> = {
   name: 'edit_file',
   kind: 'edit',
-  description: 'Edit a text file in the current workspace. Prefer replacing a specific oldText snippet with newText. If oldText is omitted, the file is fully replaced.',
+  description: 'Edit a text file. Provide oldText and newText for a targeted replacement, or just newText to write the entire file contents.',
   inputSchema: schema,
   inputSchemaJson: {
     type: 'object',
     properties: {
       path: { type: 'string', description: 'Path to the file to edit.' },
-      oldText: { type: 'string', description: 'Existing text to replace. Omit to replace the entire file.' },
-      newText: { type: 'string', description: 'Replacement text.' },
+      oldText: { type: 'string', description: 'Exact text to find and replace. Omit to write the entire file.' },
+      newText: { type: 'string', description: 'Replacement text, or entire file contents if oldText is omitted.' },
       replaceAll: { type: 'boolean', description: 'Replace every exact oldText match. Prefer false unless you are certain.' },
     },
     required: ['path', 'newText'],
@@ -47,7 +48,7 @@ export const editTool: Tool<typeof schema> = {
   },
   async execute(input, context) {
     const { fullPath, applied, existedBefore, before } = await prepareEdit(input, context)
-    await recordRewindSnapshot({
+    const rewindWarning = await tryRecordRewindSnapshot({
       workspaceRoot: context.workspaceRoot,
       filePath: fullPath,
       relativePath: path.relative(context.workspaceRoot, fullPath) || path.basename(fullPath),
@@ -66,21 +67,71 @@ export const editTool: Tool<typeof schema> = {
     return {
       ok: true,
       summary: applied.summary,
-      content: `updated ${fullPath}`,
+      content: rewindWarning
+        ? `updated ${fullPath}\nwarning: ${rewindWarning}`
+        : `updated ${fullPath}`,
     }
   },
 }
 
+async function tryRecordRewindSnapshot(
+  snapshot: Parameters<typeof recordRewindSnapshot>[0],
+): Promise<string | undefined> {
+  try {
+    await recordRewindSnapshot(snapshot)
+    return undefined
+  } catch (error: unknown) {
+    const message = (error as Error).message || 'rewind checkpoint could not be recorded'
+    return `rewind checkpoint was not recorded (${message})`
+  }
+}
+
 async function prepareEdit(input: z.infer<typeof schema>, context: { workspaceRoot: string }) {
+  assertSafeEditPath(input.path)
   const fullPath = resolveWorkspacePath(context.workspaceRoot, input.path)
+  await assertEditableFileTarget(fullPath)
   const { content: before, existed } = await readOptionalTextFile(fullPath)
-  const applied = applyRequestedEdit(input.path, before, input.oldText, input.newText, input.replaceAll ?? false)
+  const applied = applyRequestedEdit(
+    input.path,
+    before,
+    input.oldText,
+    input.newText,
+    input.replaceAll ?? false,
+    input.replaceWholeFile ?? false,
+  )
   return {
     fullPath,
     relativePath: path.relative(context.workspaceRoot, fullPath) || path.basename(fullPath),
     existedBefore: existed,
     before,
     applied,
+  }
+}
+
+async function assertEditableFileTarget(fullPath: string): Promise<void> {
+  try {
+    const stats = await fs.stat(fullPath)
+    if (stats.isDirectory()) {
+      throw new Error('edit_file path points to a directory; provide a file path')
+    }
+  } catch (error: unknown) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return
+    throw error
+  }
+}
+
+function assertSafeEditPath(requestedPath: string): void {
+  const trimmed = requestedPath.trim()
+  if (trimmed !== requestedPath || trimmed.length === 0) {
+    throw new Error('edit_file path must be a clean workspace-relative file path')
+  }
+
+  if (/[|;&<>`]/.test(trimmed)) {
+    throw new Error('edit_file path must not contain shell operators')
+  }
+
+  if (/^(?:rm|del|erase|rmdir|remove-item|mkdir|type|cat|echo|copy|move|mv|cp)\b/i.test(trimmed)) {
+    throw new Error('edit_file path looks like a shell command; pass only the file path')
   }
 }
 

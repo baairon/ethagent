@@ -152,15 +152,15 @@ export const FirstRun: React.FC<FirstRunProps> = ({ onComplete, onCancel }) => {
           </Text>
           <Text color={theme.dim}>recommended: {recommended.model}</Text>
         </Box>
-        <Select<'ollama' | 'cloud'>
+        <Select<'cloud' | 'ollama'>
           label="how do you want to run?"
           options={[
-            { value: 'ollama', label: 'local ollama (private, offline-capable)' },
-            { value: 'cloud',  label: 'cloud API', hint: 'requires a key' },
+            { value: 'cloud',  label: 'cloud API', hint: 'anthropic, openai, or gemini' },
+            { value: 'ollama', label: 'local ollama', hint: 'offline, runs on your machine' },
           ]}
           onSubmit={choice => {
-            if (choice === 'ollama') goTo({ kind: 'ollama-setup', spec })
-            else goTo({ kind: 'cloud-provider' })
+            if (choice === 'cloud') goTo({ kind: 'cloud-provider' })
+            else goTo({ kind: 'ollama-setup', spec })
           }}
           onCancel={onCancel}
         />

@@ -7,15 +7,15 @@ export function buildPermissionRule(
 ): SessionPermissionRule | undefined {
   switch (decision) {
     case 'allow-kind-project':
-      if (request.kind === 'read' || request.kind === 'edit' || request.kind === 'cd') return { kind: request.kind, scope: 'kind' }
+      if (request.kind === 'read' || request.kind === 'edit' || request.kind === 'write' || request.kind === 'cd') return { kind: request.kind, scope: 'kind' }
       return undefined
     case 'allow-path-project':
-      if (request.kind === 'read' || request.kind === 'edit' || request.kind === 'cd') {
+      if (request.kind === 'read' || request.kind === 'edit' || request.kind === 'write' || request.kind === 'cd') {
         return { kind: request.kind, scope: 'path', path: request.path }
       }
       return undefined
     case 'allow-directory-project':
-      if (request.kind === 'read' || request.kind === 'edit' || request.kind === 'cd') {
+      if (request.kind === 'read' || request.kind === 'edit' || request.kind === 'write' || request.kind === 'cd') {
         return { kind: request.kind, scope: 'directory', path: request.directoryPath }
       }
       return undefined
@@ -48,7 +48,8 @@ export function shouldPersistPermissionDecision(decision: PermissionDecision): b
 function matchesPermissionRule(rule: SessionPermissionRule, request: PermissionRequest): boolean {
   if (rule.kind !== request.kind) return false
 
-  if (request.kind === 'read' || request.kind === 'edit' || request.kind === 'cd') {
+  if (request.kind === 'read' || request.kind === 'edit' || request.kind === 'write' || request.kind === 'delete' || request.kind === 'cd') {
+    if (request.kind === 'delete') return false
     if (rule.scope === 'kind') return true
     if (rule.scope === 'path') return rule.path === request.path
     if (rule.scope === 'directory') {

@@ -3,7 +3,10 @@ import type { Message, MessageContentBlock, Provider, StreamEvent } from './cont
 import { ProviderError } from './contracts.js'
 import { providerErrorFromResponse } from './errors.js'
 import { iterSseFrames } from './sse.js'
-import { messageTextContent } from '../core/messages.js'
+import { fetchWithRetry } from '../utils/withRetry.js'
+import { messageTextContent } from '../utils/messages.js'
+
+const DEBUG_STREAM = process.env.ETHAGENT_DEBUG_STREAM === '1'
 
 export type OpenAIToolDefinition = {
   type: 'function'
@@ -98,7 +101,7 @@ export class OpenAIChatProvider implements Provider {
 
     let response: Response
     try {
-      response = await fetch(`${this.baseUrl}/chat/completions`, {
+      response = await fetchWithRetry(`${this.baseUrl}/chat/completions`, {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -109,8 +112,7 @@ export class OpenAIChatProvider implements Provider {
           stream: true,
           stream_options: { include_usage: true },
         }),
-        signal,
-      })
+      }, { signal })
     } catch (err: unknown) {
       if (signal.aborted) return
       const message = (err as Error).message || 'network error'
@@ -156,6 +158,15 @@ export class OpenAIChatProvider implements Provider {
         if (reasoning.length > 0) yield { type: 'thinking', delta: reasoning }
         if (text.length > 0) yield { type: 'text', delta: text }
 
+        if (DEBUG_STREAM && delta?.tool_calls?.length) {
+          const summary = delta.tool_calls.map(tc => ({
+            index: tc.index,
+            name: tc.function?.name ?? undefined,
+            argsLen: tc.function?.arguments?.length ?? 0,
+          }))
+          process.stderr.write(`[ethagent] stream tool_calls delta: ${JSON.stringify(summary)}\n`)
+        }
+
         for (const event of applyStreamingToolCallDelta(toolCalls, delta?.tool_calls ?? [])) {
           yield event
         }
@@ -176,8 +187,11 @@ export class OpenAIChatProvider implements Provider {
 
     if (signal.aborted) return
 
-    if (stopReason === 'tool_use') {
+    let streamEmittedToolUses = 0
+    if (stopReason === 'tool_use' || toolCalls.size > 0) {
       for (const [, toolCall] of [...toolCalls.entries()].sort((a, b) => a[0] - b[0])) {
+        if (!toolCall.name) continue
+        streamEmittedToolUses += 1
         yield {
           type: 'tool_use_stop',
           id: toolCall.id,
@@ -185,6 +199,12 @@ export class OpenAIChatProvider implements Provider {
           input: parseToolArguments(toolCall.inputJson),
         }
       }
+    }
+
+    if (DEBUG_STREAM) {
+      process.stderr.write(
+        `[ethagent] stream done ${this.id}: ${streamEmittedToolUses} tool_uses, stopReason=${stopReason}\n`,
+      )
     }
 
     yield { type: 'done', inputTokens, outputTokens, stopReason }
@@ -195,6 +215,7 @@ export class OpenAIChatProvider implements Provider {
     if (!this.loadApiKey) return ''
     return (await this.loadApiKey()) ?? ''
   }
+
 }
 
 function toWireMessages(messages: Message[]): Array<Record<string, unknown>> {

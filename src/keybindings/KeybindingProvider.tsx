@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import { useInput, type Key } from 'ink'
+import type { Key } from 'ink'
+import { useAppInput } from '../input/AppInputProvider.js'
 import type { Action, Binding, KeybindingContextName } from './types.js'
 import { DEFAULT_BINDINGS } from './defaultBindings.js'
 import { resolveKey } from './resolver.js'
@@ -62,7 +63,7 @@ export const KeybindingProvider: React.FC<ProviderProps> = ({ bindings = DEFAULT
 
   const value = useMemo<KeybindingContextValue>(() => ({ register, activateContext }), [register, activateContext])
 
-  useInput((input, key) => {
+  useAppInput((input, key) => {
     const action = resolveKey(input, key as Key, Array.from(activeContexts), bindings)
     if (!action) return
     const bucket = registryRef.current.get(action)

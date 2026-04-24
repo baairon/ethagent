@@ -173,7 +173,15 @@ export async function listSessions(limit = 50): Promise<SessionSummary[]> {
     .slice(0, limit)
 }
 
-export function sessionMessagesToProviderMessages(messages: SessionMessage[]): Message[] {
+export type ProviderMessageProjectionOptions = {
+  compactToolHistory?: boolean
+  preserveTurnId?: string
+}
+
+export function sessionMessagesToProviderMessages(
+  messages: SessionMessage[],
+  options: ProviderMessageProjectionOptions = {},
+): Message[] {
   const out: Message[] = []
   const pendingToolUses = new Map<string, { name: string; input: Record<string, unknown> }>()
 
@@ -183,13 +191,25 @@ export function sessionMessagesToProviderMessages(messages: SessionMessage[]): M
       continue
     }
     if (message.role === 'tool_use') {
+      if (shouldCompactToolMessage(message, options)) continue
       pendingToolUses.set(message.toolUseId, { name: message.name, input: message.input })
-      out.push({
-        role: 'assistant',
-        content: [{ type: 'tool_use', id: message.toolUseId, name: message.name, input: message.input }],
-      })
       continue
     }
+    if (shouldCompactToolMessage(message, options)) {
+      pendingToolUses.delete(message.toolUseId)
+      continue
+    }
+    const pendingToolUse = pendingToolUses.get(message.toolUseId)
+    if (!pendingToolUse) continue
+    out.push({
+      role: 'assistant',
+      content: [{
+        type: 'tool_use',
+        id: message.toolUseId,
+        name: pendingToolUse.name,
+        input: pendingToolUse.input,
+      }],
+    })
     out.push({
       role: 'user',
       content: [{
@@ -203,6 +223,14 @@ export function sessionMessagesToProviderMessages(messages: SessionMessage[]): M
   }
 
   return out
+}
+
+function shouldCompactToolMessage(
+  message: Extract<SessionMessage, { role: 'tool_use' | 'tool_result' }>,
+  options: ProviderMessageProjectionOptions,
+): boolean {
+  if (!options.compactToolHistory) return false
+  return !message.turnId || message.turnId !== options.preserveTurnId
 }
 
 function normalizeSessionMessage(message: SessionMessage): SessionMessage {

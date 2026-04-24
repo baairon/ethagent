@@ -14,6 +14,19 @@ import type {
   ToolResult,
 } from '../tools/contracts.js'
 import { setCwd as setRuntimeCwd } from './cwd.js'
+import { modePolicy } from './modePolicy.js'
+import type { EthagentConfig } from '../storage/config.js'
+import type { SessionMessage } from '../storage/sessions.js'
+import {
+  summarizeToolInput,
+  truncateForRow,
+} from '../ui/chatScreenUtils.js'
+import type { MessageRow } from '../ui/MessageList.js'
+import { toPermissionMode, type SessionMode } from './sessionMode.js'
+
+// ---------------------------------------------------------------------------
+// Tool execution with permission gating
+// ---------------------------------------------------------------------------
 
 export type ToolExecutorOptions = {
   name: string
@@ -95,7 +108,7 @@ export async function executeToolWithPermissions(
 
   const matchedRule = matchPermissionRule(options.getPermissionRules(), request)
   const decision: PermissionDecision =
-    options.permissionMode === 'accept-edits' && (request.kind === 'read' || request.kind === 'edit')
+    modePolicy(options.permissionMode).autoAllowToolKind(request.kind)
       ? 'allow-once'
       : matchedRule
         ? 'allow-once'
@@ -151,4 +164,119 @@ function formatToolParseError(err: unknown): string {
   }
 
   return (err as Error).message || 'tool input did not match the required schema'
+}
+
+// ---------------------------------------------------------------------------
+// Pending tool-use runner (per turn)
+// ---------------------------------------------------------------------------
+
+export type PendingToolUse = {
+  id: string
+  name: string
+  input: Record<string, unknown>
+}
+
+export type CompletedToolUse = {
+  id: string
+  name: string
+  input: Record<string, unknown>
+  result: ToolResult
+  cwd: string
+}
+
+type ExecuteToolResult = {
+  result: ToolResult
+  sessionRule?: SessionPermissionRule
+  persistRule?: boolean
+}
+
+export type ToolUseRunnerResult = {
+  cancelled: boolean
+  completedTools: CompletedToolUse[]
+}
+
+export async function runPendingToolUses(args: {
+  pendingToolUses: PendingToolUse[]
+  nextRowId: () => string
+  nowIso: () => string
+  mode: SessionMode
+  getCwd: () => string
+  getConfig: () => EthagentConfig
+  turnId?: string
+  controller: AbortController
+  updateRows: (updater: (prev: MessageRow[]) => MessageRow[]) => void
+  pushNote: (text: string, kind?: 'info' | 'error' | 'dim') => void
+  persistTurnMessage: (message: SessionMessage) => Promise<void>
+  executeTool: (
+    name: string,
+    input: Record<string, unknown>,
+    mode: ReturnType<typeof toPermissionMode>,
+  ) => Promise<ExecuteToolResult>
+  applySessionRule: (rule?: SessionPermissionRule, persistRule?: boolean) => Promise<void>
+}): Promise<ToolUseRunnerResult> {
+  const completedTools: CompletedToolUse[] = []
+
+  for (const toolUse of args.pendingToolUses) {
+    args.updateRows(prev => [
+      ...prev,
+      { role: 'tool_use', id: args.nextRowId(), name: toolUse.name, summary: toolUse.name, input: summarizeToolInput(toolUse.input) },
+    ])
+    await args.persistTurnMessage({
+      version: 2,
+      role: 'tool_use',
+      toolUseId: toolUse.id,
+      name: toolUse.name,
+      input: toolUse.input,
+      createdAt: args.nowIso(),
+      turnId: args.turnId,
+    })
+
+    const cwd = args.getCwd()
+    const { result, sessionRule, persistRule } = await args.executeTool(
+      toolUse.name,
+      toolUse.input,
+      toPermissionMode(args.mode),
+    )
+    completedTools.push({ ...toolUse, result, cwd })
+
+    if (args.controller.signal.aborted) {
+      return { cancelled: true, completedTools }
+    }
+
+    await args.applySessionRule(sessionRule, persistRule)
+    await recordToolResult(args, toolUse, result)
+  }
+
+  return { cancelled: false, completedTools }
+}
+
+async function recordToolResult(
+  args: Pick<
+    Parameters<typeof runPendingToolUses>[0],
+    'nextRowId' | 'nowIso' | 'turnId' | 'updateRows' | 'persistTurnMessage'
+  >,
+  toolUse: PendingToolUse,
+  result: ToolResult,
+): Promise<void> {
+  args.updateRows(prev => [
+    ...prev,
+    {
+      role: 'tool_result',
+      id: args.nextRowId(),
+      name: toolUse.name,
+      summary: result.summary,
+      content: truncateForRow(result.content),
+      isError: !result.ok,
+    },
+  ])
+  await args.persistTurnMessage({
+    version: 2,
+    role: 'tool_result',
+    toolUseId: toolUse.id,
+    name: toolUse.name,
+    content: result.content,
+    isError: !result.ok,
+    createdAt: args.nowIso(),
+    turnId: args.turnId,
+  })
 }

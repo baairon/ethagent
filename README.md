@@ -1,6 +1,6 @@
 <img src="https://raw.githubusercontent.com/baairon/ethagent/master/preview/image.png" alt="ethagent" />
 
-A privacy-first AI agent with a portable Ethereum identity. Your knowledge base lives on IPFS. Your agent's identity is registered onchain, tied to your wallet. Your inference never leaves your machine.
+A privacy-first AI agent with a portable Ethereum identity. Your identity lives on Ethereum. Your memory lives on IPFS. The model is whatever you plug in.
 
 ```bash
 npm install -g ethagent
@@ -9,7 +9,7 @@ ethagent
 
 ## What It Is
 
-`ethagent` is a local-first terminal agent built around one idea: your agent should belong to you, not to the platform you happened to use first.
+`ethagent` is a terminal agent built around one idea: your agent should belong to you, not the platform you happened to use first.
 
 The model is replaceable. The memory is portable. The identity is durable.
 
@@ -44,7 +44,7 @@ Your agent's identity is registered onchain using ERC-8004, the token standard f
 
 | Layer | Where | What it does |
 |---|---|---|
-| Inference | Your machine or cloud | Hotswappable model, local-first by default |
+| Inference | Your machine or cloud | Hotswappable model; cloud by default, local supported |
 | Knowledge | IPFS | Content-addressed, verifiable, portable across any machine |
 | Identity | Ethereum | Permanent agent registration via ERC-8004, restorable from address or ENS |
 

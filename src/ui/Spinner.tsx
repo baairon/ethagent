@@ -1,7 +1,22 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Text } from 'ink'
 import { theme } from './theme.js'
-import { pickVerb } from '../constants/spinnerVerbs.js'
+
+const SPINNER_VERBS: string[] = [
+  'thinking', 'reasoning', 'pondering', 'working', 'cooking',
+  'sketching', 'crafting', 'chewing', 'dreaming', 'wondering',
+  'assembling', 'brewing', 'compiling', 'puzzling', 'tracing',
+  'weighing', 'charting', 'mulling', 'divining', 'stewing',
+  'reaching', 'focusing', 'carving', 'knitting', 'forging',
+  'tuning', 'scanning', 'sifting', 'synthesizing', 'noodling',
+  'orienting', 'hunching', 'pacing', 'scheming', 'plotting',
+  'spinning', 'tracking', 'unfolding', 'deliberating', 'turning',
+]
+
+function pickVerb(): string {
+  const idx = Math.floor(Math.random() * SPINNER_VERBS.length)
+  return SPINNER_VERBS[idx] ?? 'thinking'
+}
 
 type SpinnerProps = {
   active?: boolean

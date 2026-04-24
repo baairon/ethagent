@@ -1,28 +1,18 @@
+import fs from 'node:fs/promises'
+import path from 'node:path'
 import type { Message, Provider } from '../providers/contracts.js'
-import { runTurn } from '../core/chatLoop.js'
-import { detectDeleteFileIntent, detectDirectoryChangeIntent } from '../core/fallbackToolUse.js'
-import {
-  buildPreToolPlanningPrompt,
-  buildToolInputRepairPrompt,
-  buildToolRetryPrompt,
-  normalizeToolWorkFromAssistant,
-  shouldForceToolRetry,
-  shouldRetryRejectedToolInput,
-} from '../runtime/turnPolicy.js'
-import { shouldAutoCompact } from '../core/compaction.js'
+import { microCompactSessionMessages, shouldAutoCompact } from '../runtime/compaction.js'
 import { toPermissionMode, type SessionMode } from '../runtime/sessionMode.js'
+import { runPendingToolUses } from '../runtime/toolExecution.js'
+import { runRuntimeTurn, type TurnEvent } from '../runtime/turn.js'
 import type { EthagentConfig } from '../storage/config.js'
 import type { SessionMessage } from '../storage/sessions.js'
 import type { SessionPermissionRule, ToolResult } from '../tools/contracts.js'
 import type { MessageRow } from './MessageList.js'
 import {
   buildBaseMessages,
-  buildDeleteCommand,
   createTurnCheckpoint,
-  shouldPrimeToolPlanning,
   splitStreamingContent,
-  summarizeToolInput,
-  truncateForRow,
   type TurnCheckpoint,
 } from './chatScreenUtils.js'
 
@@ -58,6 +48,7 @@ export type TurnOrchestratorContext = {
     mode: ReturnType<typeof toPermissionMode>,
   ) => Promise<ExecuteToolResult>
   applySessionRule: (rule?: SessionPermissionRule, persistRule?: boolean) => Promise<void>
+  onPlanReady?: (plan: string) => void
   pendingAssistantTextRef: MutableRef<string | null>
   pendingThinkingTextRef: MutableRef<string | null>
   streamFlushTimerRef: MutableRef<ReturnType<typeof setTimeout> | null>
@@ -69,7 +60,21 @@ export type StreamingTurnResult = {
   shouldCompact: boolean
 }
 
-export async function runStreamingTurn(context: TurnOrchestratorContext): Promise<StreamingTurnResult> {
+/**
+ * runStreamingTurn — the UI adapter over runRuntimeTurn.
+ *
+ * Responsibilities (UI-only; logic lives in runtime/turn.ts):
+ *   - translate runtime events into Ink MessageRow updates,
+ *   - flush streaming text to rows on a debounce,
+ *   - persist SessionMessages on commit boundaries,
+ *   - drive the tool batch (permission prompts, row pushes, persistence),
+ *   - surface plan-mode output to the caller,
+ *   - return a summary of what happened (finishedNormally / cancelled /
+ *     shouldCompact) for the caller to act on.
+ */
+export async function runStreamingTurn(
+  context: TurnOrchestratorContext,
+): Promise<StreamingTurnResult> {
   const {
     provider,
     mode,
@@ -81,7 +86,6 @@ export async function runStreamingTurn(context: TurnOrchestratorContext): Promis
     nowIso,
     getConfig,
     getCwd,
-    getDisplayCwd,
     getSessionMessages,
     setActiveCheckpoint,
     setStreaming,
@@ -90,14 +94,13 @@ export async function runStreamingTurn(context: TurnOrchestratorContext): Promis
     persistTurnMessage,
     executeTool,
     applySessionRule,
+    onPlanReady,
     pendingAssistantTextRef,
     pendingThinkingTextRef,
     streamFlushTimerRef,
   } = context
 
-  if (mode === 'plan') {
-    pushNote('plan mode: answering without touching the filesystem.', 'dim')
-  } else if (mode === 'accept-edits') {
+  if (mode === 'accept-edits') {
     pushNote(
       provider.supportsTools
         ? 'accept-edits mode: read and edit tools will auto-allow. bash still prompts.'
@@ -107,116 +110,87 @@ export async function runStreamingTurn(context: TurnOrchestratorContext): Promis
   }
 
   setStreaming(true)
-  setActiveCheckpoint(createTurnCheckpoint(sessionId, userText))
+  const activeCheckpoint = createTurnCheckpoint(sessionId, userText)
+  setActiveCheckpoint(activeCheckpoint)
 
   updateRows(prev => [...prev, { role: 'user', id: nextRowId(), content: userText }])
-  await persistTurnMessage({ role: 'user', content: userText, createdAt: nowIso() })
+  await persistTurnMessage({
+    role: 'user',
+    content: userText,
+    createdAt: nowIso(),
+    turnId: activeCheckpoint.turnId,
+  })
 
-  let workingMessages = buildWorkingMessages(context)
-  if (provider.supportsTools && shouldPrimeToolPlanning(userText)) {
-    workingMessages = [
-      ...workingMessages,
-      { role: 'user', content: buildPreToolPlanningPrompt(getDisplayCwd()) },
-    ]
+  const mentionContextMessages = await buildFileMentionContextMessages(userText, getCwd())
+
+  const buildWorking = (): Message[] => [
+    ...buildWorkingMessages(context, activeCheckpoint.turnId),
+    ...mentionContextMessages,
+  ]
+
+  // Per-iteration UI scratch. These are reset each time the runtime loop
+  // re-enters streaming (new provider call = new assistant row, new accumulator).
+  let accumulated = ''
+  let thinkingContent = ''
+  let thinkingRowId: string | null = null
+  let assistantId: string | null = null
+  let hasPendingToolUse = false
+
+  const resetIteration = () => {
+    accumulated = ''
+    thinkingContent = ''
+    thinkingRowId = null
+    assistantId = null
+    hasPendingToolUse = false
   }
 
-  let finishedNormally = false
-  let cancelled = false
-  let toolRetryCount = 0
+  const ensureAssistantRow = (): string => {
+    if (assistantId) return assistantId
+    assistantId = nextRowId()
+    updateRows(prev => [
+      ...prev,
+      { role: 'assistant', id: assistantId!, content: '', liveTail: '', streaming: true },
+    ])
+    return assistantId
+  }
 
-  while (!controller.signal.aborted) {
-    let accumulated = ''
-    let thinkingContent = ''
-    let thinkingRowId: string | null = null
-    let assistantId: string | null = null
-    const pendingToolUses: Array<{ id: string; name: string; input: Record<string, unknown> }> = []
-    let errored = false
-
-    const ensureAssistantRow = () => {
-      if (assistantId) return assistantId
-      assistantId = nextRowId()
-      updateRows(prev => [...prev, { role: 'assistant', id: assistantId!, content: '', liveTail: '', streaming: true }])
-      return assistantId
-    }
-
-    const flushStreamRows = (immediate = false) => {
-      const commit = () => {
-        streamFlushTimerRef.current = null
-        const nextAssistant = pendingAssistantTextRef.current
-        const nextThinking = pendingThinkingTextRef.current
-        if (nextAssistant === null && nextThinking === null) return
-        updateRows(prev =>
-          prev.map(r => {
-            if (nextAssistant !== null && assistantId && r.id === assistantId && r.role === 'assistant') {
-              const next = splitStreamingContent(nextAssistant)
-              return { ...r, content: next.committed, liveTail: next.liveTail }
-            }
-            if (nextThinking !== null && thinkingRowId && r.id === thinkingRowId && r.role === 'thinking') {
-              const next = splitStreamingContent(nextThinking)
-              return { ...r, content: next.committed, liveTail: next.liveTail }
-            }
-            return r
-          }),
-        )
-        pendingAssistantTextRef.current = null
-        pendingThinkingTextRef.current = null
-      }
-
-      if (immediate) {
-        if (streamFlushTimerRef.current) {
-          clearTimeout(streamFlushTimerRef.current)
-          streamFlushTimerRef.current = null
-        }
-        commit()
-        return
-      }
-
-      if (streamFlushTimerRef.current) return
-      streamFlushTimerRef.current = setTimeout(commit, streamFlushMs)
-    }
-
-    try {
-      for await (const ev of runTurn(provider, workingMessages, controller.signal)) {
-        if (ev.type === 'text') {
-          ensureAssistantRow()
-          accumulated += ev.delta
-          pendingAssistantTextRef.current = accumulated
-          flushStreamRows()
-        } else if (ev.type === 'thinking') {
-          thinkingContent += ev.delta
-          if (thinkingRowId === null) {
-            const newId = nextRowId()
-            thinkingRowId = newId
-            updateRows(prev => {
-              const idx = assistantId ? prev.findIndex(r => r.id === assistantId) : -1
-              const row: MessageRow = { role: 'thinking', id: newId, content: '', liveTail: thinkingContent, streaming: true }
-              if (idx === -1) return [...prev, row]
-              return [...prev.slice(0, idx), row, ...prev.slice(idx)]
-            })
-          } else {
-            pendingThinkingTextRef.current = thinkingContent
-            flushStreamRows()
+  const flushStreamRows = (immediate = false) => {
+    const commit = () => {
+      streamFlushTimerRef.current = null
+      const nextAssistant = pendingAssistantTextRef.current
+      const nextThinking = pendingThinkingTextRef.current
+      if (nextAssistant === null && nextThinking === null) return
+      updateRows(prev =>
+        prev.map(r => {
+          if (nextAssistant !== null && assistantId && r.id === assistantId && r.role === 'assistant') {
+            const next = splitStreamingContent(nextAssistant)
+            return { ...r, content: next.committed, liveTail: next.liveTail }
           }
-        } else if (ev.type === 'tool_use_stop') {
-          pendingToolUses.push({ id: ev.id, name: ev.name, input: ev.input })
-        } else if (ev.type === 'error') {
-          errored = true
-          pushNote(ev.message, 'error')
-          break
-        } else if (ev.type === 'cancelled') {
-          cancelled = true
-          break
-        } else if (ev.type === 'done') {
-          break
-        }
-      }
-    } catch (err: unknown) {
-      if (!controller.signal.aborted) {
-        errored = true
-        pushNote((err as Error).message || 'stream error', 'error')
-      }
+          if (nextThinking !== null && thinkingRowId && r.id === thinkingRowId && r.role === 'thinking') {
+            const next = splitStreamingContent(nextThinking)
+            return { ...r, content: next.committed, liveTail: next.liveTail }
+          }
+          return r
+        }),
+      )
+      pendingAssistantTextRef.current = null
+      pendingThinkingTextRef.current = null
     }
 
+    if (immediate) {
+      if (streamFlushTimerRef.current) {
+        clearTimeout(streamFlushTimerRef.current)
+        streamFlushTimerRef.current = null
+      }
+      commit()
+      return
+    }
+
+    if (streamFlushTimerRef.current) return
+    streamFlushTimerRef.current = setTimeout(commit, streamFlushMs)
+  }
+
+  const finalizeStreamingRows = () => {
     flushStreamRows(true)
     updateRows(prev => {
       let next = prev.map(r => {
@@ -228,298 +202,311 @@ export async function runStreamingTurn(context: TurnOrchestratorContext): Promis
         }
         return r
       })
-      if (assistantId && accumulated.length === 0) {
+      // If we emitted tool_uses, strip the empty assistant text row — tool_use
+      // rows replace it. If the assistant emitted no text at all (pure tool
+      // turn), drop the empty row.
+      if (assistantId && (hasPendingToolUse || accumulated.length === 0)) {
         next = next.filter(r => r.id !== assistantId)
       }
       return next
     })
+  }
 
-    const normalization = pendingToolUses.length > 0
-      ? { toolUses: [], repairStatus: 'none' as const }
-      : normalizeToolWorkFromAssistant(userText, accumulated)
+  let finishedNormally = false
+  let cancelled = false
 
-    if (pendingToolUses.length === 0 && normalization.toolUses.length > 0) {
-      pendingToolUses.push(...normalization.toolUses)
-    }
+  const runToolBatch = async (pendingToolUses: Array<{
+    id: string
+    name: string
+    input: Record<string, unknown>
+  }>) => {
+    // Persist the assistant tool_use blocks into the session before execution
+    // so microcompact / rebuild has them on the next provider call. The actual
+    // Message[] sent to the provider is rebuilt from session messages.
+    // (This mirrors the pre-Wave-2 behavior, just routed from the event loop.)
+    // NOTE: openclaude wraps tool_use blocks inside an AssistantMessage in the
+    // session; ethagent stores them as discrete tool_use SessionMessages via
+    // runPendingToolUses, which keeps the microcompact model simpler.
+    const step = await runPendingToolUses({
+      pendingToolUses,
+      nextRowId,
+      nowIso,
+      mode,
+      getCwd,
+      getConfig,
+      turnId: activeCheckpoint.turnId,
+      controller,
+      updateRows,
+      pushNote,
+      persistTurnMessage,
+      executeTool,
+      applySessionRule,
+    })
+    return step
+  }
 
-    const hasToolWork = pendingToolUses.length > 0
-    const shouldRetryNow =
-      !hasToolWork &&
-      toolRetryCount < 2 &&
-      (
-        normalization.repairStatus === 'failed' ||
-        shouldForceToolRetry(userText, accumulated, provider.supportsTools)
-      )
-
-    if (hasToolWork && assistantId) {
-      updateRows(prev => prev.filter(r => r.id !== assistantId))
-    } else if (normalization.repairStatus === 'failed' && assistantId && !shouldRetryNow) {
-      updateRows(prev => [
-        ...prev.filter(r => r.id !== assistantId),
-        {
-          role: 'tool_result',
-          id: nextRowId(),
-          name: 'tool_repair',
-          summary: normalization.repairMessage || 'tool repair failed',
-          content: 'raw malformed output was hidden to keep the transcript readable',
-          isError: true,
-        },
-      ])
-    } else if (accumulated && !errored && !shouldRetryNow) {
-      await persistTurnMessage({
-        role: 'assistant',
-        content: accumulated,
-        createdAt: nowIso(),
-        model: getConfig().model,
-      })
-      workingMessages.push({ role: 'assistant', content: accumulated })
-    }
-
-    if (controller.signal.aborted || cancelled) {
-      cancelled = true
-      break
-    }
-    if (errored) break
-
-    if (shouldRetryNow) {
-      toolRetryCount += 1
-      if (assistantId) {
-        updateRows(prev => prev.filter(r => r.id !== assistantId))
-      }
-      pushNote('retrying with a stricter tool directive so the model writes files directly.', 'dim')
-      workingMessages = [
-        ...workingMessages,
-        { role: 'user', content: buildToolRetryPrompt(getDisplayCwd()) },
-      ]
-      continue
-    }
-
-    if (hasToolWork) {
-      workingMessages.push({
-        role: 'assistant',
-        content: pendingToolUses.map(toolUse => ({
-          type: 'tool_use' as const,
-          id: toolUse.id,
-          name: toolUse.name,
-          input: toolUse.input,
-        })),
-      })
-
-      const toolStep = await executeToolUses({
-        pendingToolUses,
-        nextRowId,
-        nowIso,
-        mode,
-        getCwd,
-        getConfig,
-        controller,
+  try {
+    for await (const ev of runRuntimeTurn({
+      provider,
+      signal: controller.signal,
+      initialMessages: buildWorking(),
+      rebuildMessages: buildWorking,
+      runToolBatch,
+    })) {
+      cancelled = cancelled || isCancelledEvent(ev)
+      await handleEvent(ev, {
+        ensureAssistantRow,
+        flushStreamRows,
+        finalizeStreamingRows,
+        resetIteration,
+        setAccumulated: text => { accumulated = text },
+        getAccumulated: () => accumulated,
+        setThinkingContent: text => { thinkingContent = text },
+        setThinkingRowId: id => { thinkingRowId = id },
+        getThinkingRowId: () => thinkingRowId,
+        markPendingToolUse: () => { hasPendingToolUse = true },
         updateRows,
         pushNote,
+        nextRowId,
+        pendingAssistantTextRef,
+        pendingThinkingTextRef,
         persistTurnMessage,
-        executeTool,
-        applySessionRule,
+        nowIso,
+        mode,
+        onPlanReady,
+        turnId: activeCheckpoint.turnId,
+        model: getConfig().model,
+        onFinishedNormally: () => { finishedNormally = true },
       })
-
-      if (toolStep.cancelled) {
-        cancelled = true
-        break
-      }
-      if (toolStep.retryMessages) {
-        toolRetryCount += 1
-        workingMessages = [...workingMessages, ...toolStep.retryMessages]
-        continue
-      }
-
-      workingMessages = buildWorkingMessages(context)
-      continue
     }
-
-    finishedNormally = true
-    break
+  } catch (err: unknown) {
+    if (!controller.signal.aborted) {
+      pushNote((err as Error).message || 'stream error', 'error')
+    }
+    finalizeStreamingRows()
   }
 
   if (cancelled || controller.signal.aborted) pushNote('(cancelled)', 'dim')
   setStreaming(false)
   setActiveCheckpoint(undefined)
 
+  const workingMessagesForCompactCheck = buildWorking()
   return {
     finishedNormally,
     cancelled,
-    shouldCompact: finishedNormally && shouldAutoCompact(workingMessages, getConfig().model),
+    shouldCompact:
+      finishedNormally && shouldAutoCompact(workingMessagesForCompactCheck, getConfig().model),
   }
 }
 
-export async function runDirectToolIntent(context: {
-  mode: SessionMode
-  userText: string
-  sessionId: string
-  nextRowId: () => string
-  nowIso: () => string
-  updateRows: (updater: (prev: MessageRow[]) => MessageRow[]) => void
-  persistTurnMessage: (message: SessionMessage) => Promise<void>
-  executeTool: (
-    name: string,
-    input: Record<string, unknown>,
-    mode: ReturnType<typeof toPermissionMode>,
-  ) => Promise<ExecuteToolResult>
-  applySessionRule: (rule?: SessionPermissionRule, persistRule?: boolean) => Promise<void>
-  setActiveCheckpoint: (checkpoint: TurnCheckpoint | undefined) => void
-}): Promise<boolean> {
-  const directoryChange = detectDirectoryChangeIntent(context.userText)
-  const deleteIntent = detectDeleteFileIntent(context.userText)
-  if ((!directoryChange && !deleteIntent) || context.mode === 'plan') return false
+// ---------------------------------------------------------------------------
+// Event handling: per-event UI translation
+// ---------------------------------------------------------------------------
 
-  context.setActiveCheckpoint(createTurnCheckpoint(context.sessionId, context.userText))
-  context.updateRows(prev => [...prev, { role: 'user', id: context.nextRowId(), content: context.userText }])
-  await context.persistTurnMessage({ role: 'user', content: context.userText, createdAt: context.nowIso() })
-
-  const toolUseId = `direct-${Date.now()}`
-  const toolName = directoryChange ? 'change_directory' : 'run_bash'
-  const toolInput = directoryChange
-    ? { path: directoryChange.path }
-    : { command: buildDeleteCommand(deleteIntent!.path) }
-
-  context.updateRows(prev => [
-    ...prev,
-    {
-      role: 'tool_use',
-      id: context.nextRowId(),
-      name: toolName,
-      summary: toolName,
-      input: summarizeToolInput(toolInput),
-    },
-  ])
-  await context.persistTurnMessage({
-    version: 2,
-    role: 'tool_use',
-    toolUseId,
-    name: toolName,
-    input: toolInput,
-    createdAt: context.nowIso(),
-  })
-
-  const { result, sessionRule, persistRule } = await context.executeTool(
-    toolName,
-    toolInput,
-    toPermissionMode(context.mode),
-  )
-
-  await context.applySessionRule(sessionRule, persistRule)
-
-  context.updateRows(prev => [
-    ...prev,
-    {
-      role: 'tool_result',
-      id: context.nextRowId(),
-      name: toolName,
-      summary: result.summary,
-      content: truncateForRow(result.content),
-      isError: !result.ok,
-    },
-  ])
-  await context.persistTurnMessage({
-    version: 2,
-    role: 'tool_result',
-    toolUseId,
-    name: toolName,
-    content: result.content,
-    isError: !result.ok,
-    createdAt: context.nowIso(),
-  })
-
-  context.setActiveCheckpoint(undefined)
-  return true
-}
-
-function buildWorkingMessages(context: Pick<TurnOrchestratorContext, 'getSessionMessages' | 'getConfig' | 'provider' | 'getCwd'>): Message[] {
-  return buildBaseMessages(
-    [...context.getSessionMessages()],
-    context.getConfig(),
-    context.provider.supportsTools,
-    context.getCwd(),
-  )
-}
-
-async function executeToolUses(args: {
-  pendingToolUses: Array<{ id: string; name: string; input: Record<string, unknown> }>
-  nextRowId: () => string
-  nowIso: () => string
-  mode: SessionMode
-  getCwd: () => string
-  getConfig: () => EthagentConfig
-  controller: AbortController
+type EventHandlerContext = {
+  ensureAssistantRow: () => string
+  flushStreamRows: (immediate?: boolean) => void
+  finalizeStreamingRows: () => void
+  resetIteration: () => void
+  setAccumulated: (text: string) => void
+  getAccumulated: () => string
+  setThinkingContent: (text: string) => void
+  setThinkingRowId: (id: string | null) => void
+  getThinkingRowId: () => string | null
+  markPendingToolUse: () => void
   updateRows: (updater: (prev: MessageRow[]) => MessageRow[]) => void
   pushNote: (text: string, kind?: 'info' | 'error' | 'dim') => void
+  nextRowId: () => string
+  pendingAssistantTextRef: MutableRef<string | null>
+  pendingThinkingTextRef: MutableRef<string | null>
   persistTurnMessage: (message: SessionMessage) => Promise<void>
-  executeTool: (
-    name: string,
-    input: Record<string, unknown>,
-    mode: ReturnType<typeof toPermissionMode>,
-  ) => Promise<ExecuteToolResult>
-  applySessionRule: (rule?: SessionPermissionRule, persistRule?: boolean) => Promise<void>
-}): Promise<{ cancelled: boolean; retryMessages?: Message[] }> {
-  for (const toolUse of args.pendingToolUses) {
-    args.updateRows(prev => [
-      ...prev,
-      { role: 'tool_use', id: args.nextRowId(), name: toolUse.name, summary: toolUse.name, input: summarizeToolInput(toolUse.input) },
-    ])
-    await args.persistTurnMessage({
-      version: 2,
-      role: 'tool_use',
-      toolUseId: toolUse.id,
-      name: toolUse.name,
-      input: toolUse.input,
-      createdAt: args.nowIso(),
-    })
+  nowIso: () => string
+  mode: SessionMode
+  onPlanReady?: (plan: string) => void
+  turnId: string
+  model: string
+  onFinishedNormally: () => void
+}
 
-    const { result, sessionRule, persistRule } = await args.executeTool(
-      toolUse.name,
-      toolUse.input,
-      toPermissionMode(args.mode),
-    )
+function isCancelledEvent(ev: TurnEvent): boolean {
+  return ev.type === 'cancelled'
+}
 
-    if (args.controller.signal.aborted) {
-      return { cancelled: true }
+async function handleEvent(ev: TurnEvent, ctx: EventHandlerContext): Promise<void> {
+  switch (ev.type) {
+    case 'iteration_start': {
+      // Reset per-iteration scratch so each provider call gets a fresh
+      // assistant row, accumulator, and hasPendingToolUse flag. Iteration 0
+      // is the initial stream — resetting before anything runs is a no-op,
+      // which is fine.
+      ctx.resetIteration()
+      return
     }
-
-    if (shouldRetryRejectedToolInput(result)) {
-      args.pushNote(`retrying ${toolUse.name} with stricter arguments after a schema validation failure.`, 'dim')
-      return {
-        cancelled: false,
-        retryMessages: [{
-          role: 'user',
-          content: buildToolInputRepairPrompt(
-            args.getCwd(),
-            toolUse.name,
-            result.content,
-          ),
-        }],
+    case 'text': {
+      ctx.ensureAssistantRow()
+      const next = ctx.getAccumulated() + ev.delta
+      ctx.setAccumulated(next)
+      ctx.pendingAssistantTextRef.current = next
+      ctx.flushStreamRows()
+      return
+    }
+    case 'thinking': {
+      const current = ctx.pendingThinkingTextRef.current ?? ''
+      const appended = current + ev.delta
+      ctx.setThinkingContent(appended)
+      if (ctx.getThinkingRowId() === null) {
+        const id = ctx.nextRowId()
+        ctx.setThinkingRowId(id)
+        ctx.updateRows(prev => [
+          ...prev,
+          {
+            role: 'thinking',
+            id,
+            content: '',
+            liveTail: appended,
+            streaming: true,
+          },
+        ])
       }
+      ctx.pendingThinkingTextRef.current = appended
+      ctx.flushStreamRows()
+      return
     }
+    case 'tool_use_stop': {
+      ctx.markPendingToolUse()
+      return
+    }
+    case 'assistant_message_committed': {
+      // End of a streaming round with no tool_use — finalize rows, persist
+      // the assistant text, and hand it to the plan hook if in plan mode.
+      ctx.finalizeStreamingRows()
+      if (ev.text) {
+        await ctx.persistTurnMessage({
+          role: 'assistant',
+          content: ev.text,
+          createdAt: ctx.nowIso(),
+          model: ctx.model,
+          turnId: ctx.turnId,
+        })
+        if (ctx.mode === 'plan') ctx.onPlanReady?.(ev.text)
+      }
+      return
+    }
+    case 'tool_executed': {
+      // Row + session persistence happened inside runPendingToolUses; the
+      // event is informational for observers that need it (tests, future
+      // instrumentation). No UI side-effect here.
+      return
+    }
+    case 'continuation_nudge': {
+      // Clean break between provider calls: flush, persist intermediate
+      // assistant text, and reset per-iteration scratch before the next stream.
+      ctx.finalizeStreamingRows()
+      const text = ctx.getAccumulated()
+      if (text) {
+        await ctx.persistTurnMessage({
+          role: 'assistant',
+          content: text,
+          createdAt: ctx.nowIso(),
+          model: ctx.model,
+          turnId: ctx.turnId,
+        })
+      }
+      ctx.resetIteration()
+      return
+    }
+    case 'error': {
+      ctx.pushNote(ev.message, 'error')
+      ctx.finalizeStreamingRows()
+      return
+    }
+    case 'cancelled': {
+      ctx.finalizeStreamingRows()
+      return
+    }
+    case 'done': {
+      // If we ended mid-iteration (no assistant_message_committed yet) the
+      // finalize call from error/cancelled already ran. If we ended after a
+      // tool_executed batch, finalize here so the UI settles.
+      ctx.finalizeStreamingRows()
+      if (ev.finishedNormally) ctx.onFinishedNormally()
+      return
+    }
+    case 'tool_use_start':
+    case 'tool_use_delta':
+      return
+  }
+}
 
-    await args.applySessionRule(sessionRule, persistRule)
+// ---------------------------------------------------------------------------
+// File-mention context (unchanged from pre-Wave-2 — pure helper)
+// ---------------------------------------------------------------------------
 
-    args.updateRows(prev => [
-      ...prev,
-      {
-        role: 'tool_result',
-        id: args.nextRowId(),
-        name: toolUse.name,
-        summary: result.summary,
-        content: truncateForRow(result.content),
-        isError: !result.ok,
-      },
-    ])
-    await args.persistTurnMessage({
-      version: 2,
-      role: 'tool_result',
-      toolUseId: toolUse.id,
-      name: toolUse.name,
-      content: result.content,
-      isError: !result.ok,
-      createdAt: args.nowIso(),
-    })
+async function buildFileMentionContextMessages(
+  userText: string,
+  cwd: string,
+): Promise<Message[]> {
+  const mentions = extractFileMentions(userText)
+  if (mentions.length === 0) return []
+
+  const lines: string[] = []
+  for (const mention of mentions) {
+    const resolved = path.resolve(cwd, mention)
+    const rel = path.relative(cwd, resolved)
+    if (rel.startsWith('..') || path.isAbsolute(rel)) {
+      lines.push(
+        `@${mention} -> outside current workspace; do not use unless the user changes directory or names an allowed path.`,
+      )
+      continue
+    }
+    try {
+      const stats = await fs.stat(resolved)
+      lines.push(`@${mention} -> ${mention} (${stats.isDirectory() ? 'directory' : 'file'})`)
+    } catch {
+      lines.push(`@${mention} -> unresolved`)
+    }
   }
 
-  return { cancelled: false }
+  return [
+    {
+      role: 'user',
+      content: [
+        'Resolved file mentions for this request:',
+        ...lines,
+        'Treat these mentions as authoritative filenames from the user request. Read referenced context files when needed, and edit only the file requested by the user or the target file you have inspected.',
+      ].join('\n'),
+    },
+  ]
+}
+
+function extractFileMentions(text: string): string[] {
+  const mentions = new Set<string>()
+  for (const match of text.matchAll(/@([^\s]+)/g)) {
+    const raw = match[1]?.replace(/[),.;:!?]+$/g, '')
+    if (!raw || raw.length === 0) continue
+    mentions.add(raw.replace(/\\/g, '/'))
+  }
+  return [...mentions]
+}
+
+function buildWorkingMessages(
+  context: Pick<
+    TurnOrchestratorContext,
+    'getSessionMessages' | 'getConfig' | 'provider' | 'getCwd' | 'mode'
+  >,
+  preserveTurnId?: string,
+): Message[] {
+  const config = context.getConfig()
+  const { messages: compacted } = microCompactSessionMessages(
+    [...context.getSessionMessages()],
+    { activeTurnId: preserveTurnId },
+  )
+  return buildBaseMessages(
+    compacted,
+    config,
+    context.provider.supportsTools,
+    context.getCwd(),
+    context.mode,
+    { preserveTurnId },
+  )
 }

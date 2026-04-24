@@ -17,8 +17,12 @@ export function applyRequestedEdit(
   oldText: string | undefined,
   newText: string,
   replaceAll = false,
+  _replaceWholeFile = false,
 ): AppliedEdit {
   if (!oldText) {
+    if (newText.length === 0) {
+      throw new Error('edit_file newText is empty; empty whole-file writes are not valid unless replacing a specific oldText range')
+    }
     return {
       before,
       after: newText,

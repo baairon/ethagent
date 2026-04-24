@@ -5,13 +5,13 @@ import type { EthagentConfig } from '../storage/config.js'
 import type { Provider, Message } from '../providers/contracts.js'
 import type { PullProgress } from '../bootstrap/ollama.js'
 import { createProvider } from '../providers/registry.js'
-import { approximateTokens, messageTextContent } from '../core/messages.js'
+import { approximateTokens, messageTextContent } from '../utils/messages.js'
 import {
   dispatchSlash,
   parseSlash,
   getSlashSuggestions,
   type SlashContext,
-} from '../core/commands.js'
+} from '../commands/index.js'
 import { theme } from './theme.js'
 import { BrandSplash } from './BrandSplash.js'
 import { SessionStatus } from './SessionStatus.js'
@@ -36,10 +36,10 @@ import { appendHistory, readHistory } from '../storage/history.js'
 import {
   compactTranscript,
   truncateFallback,
-} from '../core/compaction.js'
+} from '../runtime/compaction.js'
 import { defaultBaseUrlFor, defaultModelFor, saveConfig } from '../storage/config.js'
 import { getCwd as getRuntimeCwd, setCwd as setRuntimeCwd, syncCwdFromProcess } from '../runtime/cwd.js'
-import { executeToolWithPermissions } from '../runtime/toolExecutor.js'
+import { executeToolWithPermissions } from '../runtime/toolExecution.js'
 import { nextSessionMode, sessionModeLabel, type PermissionMode, toPermissionMode, type SessionMode } from '../runtime/sessionMode.js'
 import type {
   PermissionDecision,
@@ -54,17 +54,29 @@ import {
 } from './chatScreenUtils.js'
 import { ChatBottomPane, type CopyPickerState, type Overlay } from './ChatBottomPane.js'
 import { buildResumedSessionState, resolveModelSelection, restoreConversationState } from './chatSessionState.js'
-import { runDirectToolIntent as runDirectToolIntentFlow, runStreamingTurn } from './chatTurnOrchestrator.js'
+import { runStreamingTurn } from './chatTurnOrchestrator.js'
+import type { PlanApprovalAction } from './PlanApprovalView.js'
 
 type ChatScreenProps = {
   config: EthagentConfig
   onReplaceConfig?: (next: EthagentConfig) => void
 }
 
+type PendingPlan = {
+  text: string
+  cwd: string
+  sessionId: string
+  provider: string
+  model: string
+  contextLabel: string
+  awaitingApproval: boolean
+}
+
 let rowIdSeq = 0
 const nextRowId = (): string => `row-${++rowIdSeq}`
 const nowIso = (): string => new Date().toISOString()
 const STREAM_FLUSH_MS = 120
+const SOFT_CONTEXT_LIMIT_TOKENS = 32_000
 
 export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, onReplaceConfig }) => {
   useRegisterKeybindingContext('Chat')
@@ -80,6 +92,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
   const [copyPickerState, setCopyPickerState] = useState<CopyPickerState>(null)
   const [permissionRequest, setPermissionRequest] = useState<PermissionRequest | null>(null)
   const [mode, setMode] = useState<SessionMode>('chat')
+  const [pendingPlan, setPendingPlan] = useState<PendingPlan | null>(null)
   const [sessionId, setSessionId] = useState<string>(() => newSessionId())
   const [sessionKey, setSessionKey] = useState<number>(0)
   const [cwd, setCwd] = useState<string>(() => syncCwdFromProcess())
@@ -89,6 +102,8 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
   const sessionMessagesRef = useRef<SessionMessage[]>([])
   const sessionIdRef = useRef<string>(sessionId)
   const cwdRef = useRef<string>(getRuntimeCwd())
+  const overlayRef = useRef<Overlay>(overlay)
+  const modeRef = useRef<SessionMode>(mode)
   const streamAbortRef = useRef<AbortController | null>(null)
   const pullsRef = useRef<Map<string, AbortController>>(new Map())
   const providerRef = useRef<Provider>(createProvider(initialConfig))
@@ -103,10 +118,14 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
   const permissionRulesRef = useRef<SessionPermissionRule[]>([])
   const activeCheckpointRef = useRef<TurnCheckpoint | undefined>(undefined)
   const statsSegmentStartRef = useRef<number>(0)
+  const pendingPlanRef = useRef<PendingPlan | null>(null)
 
   useEffect(() => { rowsRef.current = rows }, [rows])
+  useEffect(() => { overlayRef.current = overlay }, [overlay])
   useEffect(() => { sessionIdRef.current = sessionId }, [sessionId])
   useEffect(() => { cwdRef.current = cwd }, [cwd])
+  useEffect(() => { modeRef.current = mode }, [mode])
+  useEffect(() => { pendingPlanRef.current = pendingPlan }, [pendingPlan])
 
   useEffect(() => {
     if (prevConfigRef.current === config) return
@@ -174,12 +193,22 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
     [onReplaceConfig],
   )
 
+  const clearPendingPlan = useCallback(() => {
+    pendingPlanRef.current = null
+    setPendingPlan(null)
+    if (overlayRef.current === 'planApproval') {
+      overlayRef.current = 'none'
+      setOverlay('none')
+    }
+  }, [])
+
   const changeCwd = useCallback((next: string) => {
     const updated = next === getRuntimeCwd() ? next : setRuntimeCwd(next, cwdRef.current)
     cwdRef.current = updated
     setCwd(updated)
+    clearPendingPlan()
     setSessionKey(k => k + 1)
-  }, [])
+  }, [clearPendingPlan])
 
   const resetVisibleStats = useCallback(() => {
     statsSegmentStartRef.current = sessionMessagesRef.current.length
@@ -193,12 +222,13 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
     setTurns(0)
     setApproxTokens(0)
     setQueuedInputs([])
+    clearPendingPlan()
     sessionMessagesRef.current = []
     statsSegmentStartRef.current = 0
     setStatusStartedAt(Date.now())
     setSessionId(newSessionId())
     setSessionKey(k => k + 1)
-  }, [])
+  }, [clearPendingPlan])
 
   const doExit = useCallback(() => {
     streamAbortRef.current?.abort()
@@ -215,19 +245,19 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
           cwd: cwdRef.current,
           provider: configRef.current.provider,
           model: configRef.current.model,
-          mode,
+          mode: modeRef.current,
         })
       } catch {
       }
     },
-    [mode],
+    [],
   )
 
   const refreshVisibleStats = useCallback(
-    (messages: SessionMessage[], providerSupportsTools: boolean, cwdForStats: string, configForStats: EthagentConfig) => {
+    (messages: SessionMessage[], providerSupportsTools: boolean, cwdForStats: string, configForStats: EthagentConfig, modeForStats: SessionMode) => {
       const segment = messages.slice(statsSegmentStartRef.current)
       setTurns(segment.filter(message => message.role === 'user').length)
-      setApproxTokens(approximateTokens(buildBaseMessages(segment, configForStats, providerSupportsTools, cwdForStats)))
+      setApproxTokens(approximateTokens(buildBaseMessages(segment, configForStats, providerSupportsTools, cwdForStats, modeForStats)))
     },
     [],
   )
@@ -313,6 +343,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
         configRef.current,
         providerRef.current.supportsTools,
         cwd,
+        mode,
       )
       if (priorMessages.length <= 5) {
         pushNote('not enough turns to compact yet.', 'dim')
@@ -336,7 +367,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
         compactingRef.current = false
       }
     },
-    [pushNote, reinstateFromMessages],
+    [mode, pushNote, reinstateFromMessages],
   )
 
   const assistantTurns = useCallback((): string[] => {
@@ -449,12 +480,15 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
   )
 
   const runStream = useCallback(
-    async (userText: string) => {
+    async (userText: string, modeOverride?: SessionMode) => {
+      const activeMode = modeOverride ?? mode
+      const turnProvider = createProvider(configRef.current, { mode: activeMode })
       const controller = new AbortController()
       streamAbortRef.current = controller
+      let planCandidate: PendingPlan | null = null
       const result = await runStreamingTurn({
-        provider: providerRef.current,
-        mode,
+        provider: turnProvider,
+        mode: activeMode,
         sessionId: sessionIdRef.current,
         userText,
         streamFlushMs: STREAM_FLUSH_MS,
@@ -472,41 +506,45 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
         persistTurnMessage: message => persistSessionMessage(attachActiveTurn(message)),
         executeTool,
         applySessionRule,
+        onPlanReady: plan => {
+          planCandidate = {
+            text: plan,
+            cwd: cwdRef.current,
+            sessionId: sessionIdRef.current,
+            provider: configRef.current.provider,
+            model: configRef.current.model,
+            contextLabel: estimatedContextLabel(
+              approximateTokens(buildBaseMessages(sessionMessagesRef.current, configRef.current, turnProvider.supportsTools, cwdRef.current, activeMode)),
+            ),
+            awaitingApproval: true,
+          }
+          pendingPlanRef.current = planCandidate
+          setPendingPlan(planCandidate)
+        },
         pendingAssistantTextRef,
         pendingThinkingTextRef,
         streamFlushTimerRef,
       })
-      refreshVisibleStats(sessionMessagesRef.current, providerRef.current.supportsTools, cwdRef.current, configRef.current)
+      refreshVisibleStats(sessionMessagesRef.current, turnProvider.supportsTools, cwdRef.current, configRef.current, activeMode)
       streamAbortRef.current = null
       if (result.shouldCompact) {
         void runCompaction('auto')
+      }
+      if (
+        result.finishedNormally &&
+        activeMode === 'plan' &&
+        planCandidate &&
+        pendingPlanRef.current === planCandidate &&
+        overlayRef.current === 'none'
+      ) {
+        overlayRef.current = 'planApproval'
+        setOverlay('planApproval')
       }
     },
     [applySessionRule, attachActiveTurn, executeTool, mode, persistSessionMessage, pushNote, refreshVisibleStats, runCompaction],
   )
 
   const pullInFlight = pullsRef.current.size > 0
-
-  const runDirectToolIntent = useCallback(
-    async (userText: string): Promise<boolean> => {
-      const handled = await runDirectToolIntentFlow({
-        mode,
-        userText,
-        sessionId: sessionIdRef.current,
-        nextRowId,
-        nowIso,
-        updateRows: setRows,
-        persistTurnMessage: message => persistSessionMessage(attachActiveTurn(message)),
-        executeTool,
-        applySessionRule,
-        setActiveCheckpoint: checkpoint => { activeCheckpointRef.current = checkpoint },
-      })
-      if (!handled) return false
-      refreshVisibleStats(sessionMessagesRef.current, providerRef.current.supportsTools, cwdRef.current, configRef.current)
-      return true
-    },
-    [applySessionRule, attachActiveTurn, executeTool, mode, persistSessionMessage, refreshVisibleStats],
-  )
 
   const handleSubmit = useCallback(
     async (value: string) => {
@@ -534,13 +572,9 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
         return
       }
 
-      if (await runDirectToolIntent(value)) {
-        return
-      }
-
       await runStream(value)
     },
-    [buildSlashContext, pullInFlight, pushNote, runDirectToolIntent, runStream, streaming],
+    [buildSlashContext, pullInFlight, pushNote, runStream, streaming],
   )
 
   const handleCancelStream = useCallback(() => {
@@ -580,24 +614,9 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
     () => {
       if (overlay !== 'none') return
       const nextMode = nextSessionMode(mode)
+      modeRef.current = nextMode
       setMode(nextMode)
-      if (nextMode === 'plan') {
-        pushNote('plan mode enabled: inspection only. mutating tools and commands are blocked until you switch out.', 'dim')
-        return
-      }
-      if (mode === 'plan' && nextMode === 'accept-edits') {
-        pushNote('exited plan mode into accept-edits: reads and edits auto-allow. bash still prompts.', 'dim')
-        return
-      }
-      if (mode === 'plan') {
-        pushNote('exited plan mode into default chat.', 'dim')
-        return
-      }
-      if (nextMode === 'accept-edits') {
-        pushNote('accept-edits enabled: reads and edits auto-allow. bash still prompts.', 'dim')
-        return
-      }
-      pushNote('returned to default chat mode.', 'dim')
+      if (nextMode !== 'plan') clearPendingPlan()
     },
     { context: 'Chat', isActive: overlay === 'none' },
   )
@@ -674,13 +693,15 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
           }
         }
         if (resumed.config) replaceConfig(resumed.config)
+        clearPendingPlan()
+        modeRef.current = resumed.mode
         setMode(resumed.mode)
         setSessionId(id)
         sessionMessagesRef.current = loaded
         statsSegmentStartRef.current = 0
         setStatusStartedAt(resumed.statusStartedAt)
         setRows(resumed.rows)
-        refreshVisibleStats(loaded, providerRef.current.supportsTools, resumedCwd, configRef.current)
+        refreshVisibleStats(loaded, providerRef.current.supportsTools, resumedCwd, configRef.current, resumed.mode)
         setSessionKey(k => k + 1)
       } catch (err: unknown) {
         pushNote(`resume failed: ${(err as Error).message}`, 'error')
@@ -715,15 +736,83 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
     if (restored.truncated) {
       setQueuedInputs([])
       statsSegmentStartRef.current = Math.min(statsSegmentStartRef.current, restored.messages.length)
-      refreshVisibleStats(restored.messages, providerRef.current.supportsTools, cwdRef.current, configRef.current)
+      refreshVisibleStats(restored.messages, providerRef.current.supportsTools, cwdRef.current, configRef.current, mode)
       setSessionKey(key => key + 1)
       return
     }
-    refreshVisibleStats(restored.messages, providerRef.current.supportsTools, cwdRef.current, configRef.current)
-  }, [refreshVisibleStats])
+    refreshVisibleStats(restored.messages, providerRef.current.supportsTools, cwdRef.current, configRef.current, mode)
+  }, [mode, refreshVisibleStats])
+
+  const startFreshImplementationContext = useCallback(() => {
+    const nextSessionId = newSessionId()
+    sessionMessagesRef.current = []
+    statsSegmentStartRef.current = 0
+    sessionIdRef.current = nextSessionId
+    setSessionId(nextSessionId)
+    setRows([])
+    setTurns(0)
+    setApproxTokens(0)
+    setQueuedInputs([])
+    setStatusStartedAt(Date.now())
+    setSessionKey(key => key + 1)
+  }, [])
+
+  const handlePlanApprovalCancel = useCallback(() => {
+    const plan = pendingPlanRef.current
+    if (plan) {
+      const next = { ...plan, awaitingApproval: false }
+      pendingPlanRef.current = next
+      setPendingPlan(next)
+    }
+    if (overlayRef.current === 'planApproval') {
+      overlayRef.current = 'none'
+      setOverlay('none')
+    }
+  }, [])
+
+  const handlePlanApproval = useCallback(
+    async (action: PlanApprovalAction) => {
+      const plan = pendingPlanRef.current
+      if (!plan) {
+        handlePlanApprovalCancel()
+        return
+      }
+      if (plan.cwd !== cwdRef.current || plan.sessionId !== sessionIdRef.current) {
+        clearPendingPlan()
+        pushNote('dismissed stale plan approval because the workspace changed.', 'dim')
+        return
+      }
+      if (action === 'continue') {
+        handlePlanApprovalCancel()
+        return
+      }
+
+      const nextMode: SessionMode = 'accept-edits'
+      clearPendingPlan()
+      modeRef.current = nextMode
+      setMode(nextMode)
+      if (action === 'apply-fresh') {
+        startFreshImplementationContext()
+      }
+      await runStream(buildPlanImplementationPrompt(plan.text), nextMode)
+    },
+    [clearPendingPlan, handlePlanApprovalCancel, pushNote, runStream, startFreshImplementationContext],
+  )
 
   const busy = pullInFlight
   const slashSuggestions = useMemo(getSlashSuggestions, [])
+
+  useEffect(() => {
+    const plan = pendingPlanRef.current
+    if (!plan?.awaitingApproval) return
+    if (mode !== 'plan' || overlay !== 'none' || streaming || pullInFlight) return
+    if (plan.cwd !== cwdRef.current || plan.sessionId !== sessionIdRef.current) {
+      clearPendingPlan()
+      return
+    }
+    overlayRef.current = 'planApproval'
+    setOverlay('planApproval')
+  }, [clearPendingPlan, mode, overlay, pullInFlight, streaming])
 
   useEffect(() => {
     if (overlay !== 'none') return
@@ -796,6 +885,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
           placeholderHints={placeholderHints}
           queuedInputs={queuedInputs}
           slashSuggestions={slashSuggestions}
+          planApprovalContextLabel={pendingPlan?.contextLabel ?? estimatedContextLabel(approxTokens)}
           footerRight={footerRight}
           handleModelPick={handleModelPick}
           handleResumePick={handleResumePick}
@@ -803,6 +893,8 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
           handleCopyDone={handleCopyDone}
           handleCopyCancel={handleCopyCancel}
           resolvePermission={resolvePermission}
+          handlePlanApproval={handlePlanApproval}
+          handlePlanApprovalCancel={handlePlanApprovalCancel}
           onPermissionRulesChanged={rules => { permissionRulesRef.current = rules }}
           handleSubmit={handleSubmit}
           setOverlay={setOverlay}
@@ -820,4 +912,25 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
       )}
     />
   )
+}
+
+function estimatedContextLabel(tokens: number): string {
+  if (!Number.isFinite(tokens) || tokens <= 0) return 'Estimated context: empty'
+  const percent = Math.max(0, Math.min(99, Math.round((tokens / SOFT_CONTEXT_LIMIT_TOKENS) * 100)))
+  return `Estimated context: ~${percent}% used`
+}
+
+export function buildPlanImplementationPrompt(plan: string): string {
+  return [
+    'Implement the approved plan below.',
+    '',
+    'Use native ethagent tools directly. Do not translate tool names into shell commands.',
+    'For workspace inspection, call list_directory and read_file directly.',
+    'For file creation or edits, call edit_file directly.',
+    'Use run_bash only for an actual shell command that cannot be performed by a narrower native tool, such as starting a local server after files exist.',
+    'Ignore any plan wording that says to execute file work as a Bash script or directly in the terminal; the native tools above are authoritative.',
+    'Read the relevant files before editing, make the required changes, and verify the result when possible.',
+    '',
+    plan,
+  ].join('\n')
 }
