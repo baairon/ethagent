@@ -394,6 +394,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
       onClear: clearTranscript,
       onExit: doExit,
       onResumeRequest: () => setOverlay('resume'),
+      onModelPickerRequest: () => setOverlay('modelPicker'),
       onRewindRequest: () => setOverlay('rewind'),
       onPermissionsRequest: () => setOverlay('permissions'),
       onCompactRequest: () => { void runCompaction('manual') },
@@ -651,13 +652,11 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
         defaultModelFor,
       })
       if (resolution.kind === 'noop') return
-      const next = resolution.config
-      const prefix = resolution.notice.split(' now using ')[0] ?? resolution.notice
       try {
         await saveConfig(resolution.config)
         replaceConfig(resolution.config)
         resetVisibleStats()
-        pushNote(`${prefix} now using ${next.provider} · ${next.model}.`, 'dim')
+        pushNote(resolution.notice, resolution.tone)
       } catch (err: unknown) {
         pushNote(`provider switch failed: ${(err as Error).message}`, 'error')
       }

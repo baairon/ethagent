@@ -7,13 +7,15 @@ import { TextInput } from './TextInput.js'
 import { Surface } from './Surface.js'
 import { listInstalled, isDaemonUp } from '../bootstrap/ollama.js'
 import { hasKey, setKey } from '../storage/secrets.js'
-import type { ProviderId } from '../storage/config.js'
+import { defaultModelFor, type EthagentConfig, type ProviderId } from '../storage/config.js'
+import { discoverProviderModels, type ModelCatalogEntry, type ModelCatalogResult } from '../models/catalog.js'
 
 export type ModelPickerSelection =
   | { kind: 'ollama'; model: string }
-  | { kind: 'cloud'; provider: ProviderId; keyJustSet: boolean }
+  | { kind: 'cloud'; provider: ProviderId; model: string; keyJustSet: boolean }
 
 type ModelPickerProps = {
+  currentConfig: EthagentConfig
   currentProvider: ProviderId
   currentModel: string
   onPick: (selection: ModelPickerSelection) => void
@@ -26,6 +28,7 @@ type LoadedData = {
   daemonError?: string
   models: OllamaEntry[]
   cloudKeys: Record<ProviderId, boolean>
+  cloudCatalogs: Partial<Record<ProviderId, ModelCatalogResult>>
 }
 
 type State =
@@ -36,6 +39,7 @@ type State =
 const CLOUD_PROVIDERS: ProviderId[] = ['openai', 'anthropic', 'gemini']
 
 export const ModelPicker: React.FC<ModelPickerProps> = ({
+  currentConfig,
   currentProvider,
   currentModel,
   onPick,
@@ -52,16 +56,24 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
       ])
       if (cancelled) return
       const cloudKeys = Object.fromEntries(keyEntries) as Record<ProviderId, boolean>
+      const catalogEntries = await Promise.all(
+        CLOUD_PROVIDERS
+          .filter(provider => cloudKeys[provider])
+          .map(async provider => [provider, await discoverProviderModels(configForProvider(currentConfig, provider))] as const),
+      )
+      if (cancelled) return
+      const cloudCatalogs = Object.fromEntries(catalogEntries) as Partial<Record<ProviderId, ModelCatalogResult>>
       const data: LoadedData = {
         daemonUp: daemon.up,
         daemonError: daemon.error,
         models: daemon.models,
         cloudKeys,
+        cloudCatalogs,
       }
       setState({ kind: 'list', data })
     })()
     return () => { cancelled = true }
-  }, [])
+  }, [currentConfig])
 
   if (state.kind === 'loading') {
     return (
@@ -100,10 +112,12 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
 
   const { data } = state
   const options = buildOptions(data, currentProvider, currentModel)
-  const initialIndex = options.findIndex(opt => !opt.disabled && (
-    (opt.value.startsWith('ol:') && opt.value.slice(3) === currentModel && currentProvider === 'ollama') ||
-    (opt.value.startsWith('c:') && opt.value.slice(2) === currentProvider)
-  ))
+  const initialIndex = options.findIndex(opt => {
+    if (opt.disabled) return false
+    if (opt.value.startsWith('ol:')) return opt.value.slice(3) === currentModel && currentProvider === 'ollama'
+    const cloud = parseCloudValue(opt.value)
+    return cloud?.provider === currentProvider && cloud.model === currentModel
+  })
 
   return (
     <Surface
@@ -114,6 +128,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
       <Select
         options={options}
         initialIndex={initialIndex === -1 ? 0 : initialIndex}
+        maxVisible={10}
         onSubmit={(value) => handleSubmit(value, state, setState, onPick)}
         onCancel={onCancel}
       />
@@ -154,11 +169,34 @@ function buildOptions(
 
   options.push({ value: 'hdr:cloud', label: 'Cloud', disabled: true })
   for (const p of CLOUD_PROVIDERS) {
-    const active = currentProvider === p
     const keySet = data.cloudKeys[p]
-    const label = active ? `${p}  *` : p
-    const hint = keySet ? 'key set / enter to switch' : 'no key / enter to configure'
-    options.push({ value: `c:${p}`, label, hint })
+    options.push({ value: `hdr:cloud:${p}`, label: `  ${p}`, disabled: true })
+    if (!keySet) {
+      options.push({
+        value: `key:${p}`,
+        label: '    set key first',
+        hint: 'enter to configure',
+      })
+      continue
+    }
+    const catalog = data.cloudCatalogs[p]
+    const entries = catalog?.entries ?? []
+    if (entries.length === 0) {
+      options.push({
+        value: `hdr:cloud-empty:${p}`,
+        label: '    no models found',
+        disabled: true,
+      })
+      continue
+    }
+    for (const model of entries) {
+      const active = currentProvider === p && currentModel === model.id
+      options.push({
+        value: `c:${p}:${model.id}`,
+        label: `    ${active ? `${model.id}  *` : model.id}`,
+        hint: cloudModelHint(model, catalog),
+      })
+    }
   }
 
   return options
@@ -175,14 +213,29 @@ function handleSubmit(
     onPick({ kind: 'ollama', model: value.slice(3) })
     return
   }
+  if (value.startsWith('key:')) {
+    const provider = value.slice(4) as ProviderId
+    setState({ kind: 'keyEntry', provider, data: state.data, submitting: false })
+    return
+  }
   if (value.startsWith('c:')) {
-    const provider = value.slice(2) as ProviderId
-    if (state.data.cloudKeys[provider]) {
-      onPick({ kind: 'cloud', provider, keyJustSet: false })
+    const parsed = parseCloudValue(value)
+    if (parsed) {
+      onPick({ kind: 'cloud', provider: parsed.provider, model: parsed.model, keyJustSet: false })
       return
     }
-    setState({ kind: 'keyEntry', provider, data: state.data, submitting: false })
   }
+}
+
+function parseCloudValue(value: string): { provider: ProviderId; model: string } | null {
+  if (!value.startsWith('c:')) return null
+  const rest = value.slice(2)
+  const sep = rest.indexOf(':')
+  if (sep === -1) return null
+  const provider = rest.slice(0, sep) as ProviderId
+  const model = rest.slice(sep + 1)
+  if (!provider || !model) return null
+  return { provider, model }
 }
 
 async function submitKey(
@@ -203,7 +256,29 @@ async function submitKey(
     setState({ ...state, submitting: false, error: (err as Error).message })
     return
   }
-  onPick({ kind: 'cloud', provider: state.provider, keyJustSet: true })
+  onPick({
+    kind: 'cloud',
+    provider: state.provider,
+    model: defaultModelFor(state.provider),
+    keyJustSet: true,
+  })
+}
+
+function configForProvider(config: EthagentConfig, provider: ProviderId): EthagentConfig {
+  return {
+    ...config,
+    provider,
+    model: config.provider === provider ? config.model : defaultModelFor(provider),
+    baseUrl: provider === 'openai' && config.provider === 'openai' ? config.baseUrl : undefined,
+  }
+}
+
+function cloudModelHint(model: ModelCatalogEntry, catalog?: ModelCatalogResult): string {
+  if (model.source === 'fallback') {
+    const reason = catalog?.error ? ` (${catalog.error})` : ''
+    return `fallback${reason}`
+  }
+  return model.description ?? 'discovered'
 }
 
 function providerKeyPlaceholder(provider: ProviderId): string {
@@ -230,5 +305,3 @@ function formatSize(bytes: number): string {
   if (gb >= 1) return `${gb.toFixed(1)} GB`
   return `${Math.round(bytes / 1e6)} MB`
 }
-
-

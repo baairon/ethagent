@@ -48,14 +48,15 @@ export function resolveModelSelection(
   }
 
   const nextProvider = selection.provider
+  const nextBaseUrl =
+    nextProvider === 'openai' && currentConfig.provider === 'openai'
+      ? currentConfig.baseUrl
+      : undefined
   const nextConfig: EthagentConfig = {
     ...currentConfig,
     provider: nextProvider,
-    model:
-      currentConfig.provider === nextProvider
-        ? currentConfig.model
-        : defaults.defaultModelFor(nextProvider),
-    baseUrl: defaults.defaultBaseUrlFor(nextProvider),
+    model: selection.model,
+    baseUrl: nextBaseUrl,
   }
 
   return {

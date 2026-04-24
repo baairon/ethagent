@@ -25,9 +25,9 @@ test('resolveModelSelection returns noop for unchanged ollama model', () => {
   assert.deepEqual(result, { kind: 'noop' })
 })
 
-test('resolveModelSelection switches non-ollama providers with provider defaults', () => {
+test('resolveModelSelection switches non-ollama providers with the selected model', () => {
   const result = resolveModelSelection(
-    { kind: 'cloud', provider: 'anthropic', keyJustSet: true },
+    { kind: 'cloud', provider: 'anthropic', model: 'claude-opus-4-1', keyJustSet: true },
     baseConfig,
     {
       defaultBaseUrlFor: provider => provider === 'ollama' ? 'http://localhost:11434/v1' : undefined,
@@ -38,8 +38,31 @@ test('resolveModelSelection switches non-ollama providers with provider defaults
   assert.equal(result.kind, 'switch')
   if (result.kind !== 'switch') return
   assert.equal(result.config.provider, 'anthropic')
-  assert.equal(result.config.model, 'claude-sonnet-4-5')
+  assert.equal(result.config.model, 'claude-opus-4-1')
   assert.match(result.notice, /anthropic key saved/i)
+})
+
+test('resolveModelSelection preserves an explicit cloud model when provider is unchanged', () => {
+  const current: EthagentConfig = {
+    ...baseConfig,
+    provider: 'openai',
+    model: 'gpt-4o-mini',
+    baseUrl: 'https://compat.example/v1',
+  }
+  const result = resolveModelSelection(
+    { kind: 'cloud', provider: 'openai', model: 'custom-model', keyJustSet: false },
+    current,
+    {
+      defaultBaseUrlFor: provider => provider === 'ollama' ? 'http://localhost:11434/v1' : undefined,
+      defaultModelFor: () => 'unused-default',
+    },
+  )
+
+  assert.equal(result.kind, 'switch')
+  if (result.kind !== 'switch') return
+  assert.equal(result.config.provider, 'openai')
+  assert.equal(result.config.model, 'custom-model')
+  assert.equal(result.config.baseUrl, 'https://compat.example/v1')
 })
 
 test('buildResumedSessionState restores cwd, mode, config, and transcript rows', () => {
