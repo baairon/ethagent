@@ -15,13 +15,14 @@ Every model vendor wants you locked in: your chat history on their servers, your
 
 ## How it works
 
-On first run, `ethagent` helps you create or import an Ethereum identity for your agent. That address becomes the durable handle for everything the agent learns and does. The key is encrypted locally for day-to-day use, then backed up as an encrypted recovery blob that can be pinned to IPFS.
+- Create or import an identity on first run. Your agent gets an Ethereum address that becomes its durable handle.
+- Keep the key encrypted locally for daily use. A recoverable backup can be encrypted and pinned to IPFS.
+- Chat with OpenAI, Anthropic, Gemini, or a local Ollama model. Use `Alt+P` to pick a provider/model, or `/model <name>` to switch models within the current provider.
+- Keep continuity across sessions with resume, rewind, compaction, export, and diagnostics.
+- Restore on a new machine by authorizing with your wallet, fetching the encrypted IPFS backup, and bringing back the same agent identity.
+- Register the agent onchain via [ERC-8004](https://eips.ethereum.org/EIPS/eip-8004) so the same address can be used for discovery, recovery, and delegation.
 
-After setup, start a terminal session and chat with OpenAI, Anthropic, Gemini, or a local Ollama model. Use `Alt+P` to pick a provider/model, or `/model <name>` to switch models within the current provider. Resume, rewind, compact, export, and diagnose sessions without losing continuity.
-
-On a new machine, your wallet authorizes recovery, `ethagent` fetches the encrypted backup from IPFS, and the same agent identity comes back. Memory is encrypted for that identity and pinned to IPFS too, so the agent can move with you across devices.
-
-The agent is registered onchain via [ERC-8004](https://eips.ethereum.org/EIPS/eip-8004), making the same address usable for discovery, recovery, and delegation.
+Memory is encrypted for that identity and pinned to IPFS too, so the agent can move with you across devices.
 
 ## Architecture
 
