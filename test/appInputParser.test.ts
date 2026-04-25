@@ -65,6 +65,26 @@ test('parseAppInput parses arrows, alt keys, ctrl keys, and shift enter', () => 
   assert.equal(events[4]?.key.shift, true)
 })
 
+test('parseAppInput decodes tab from CSI-u and modify-other-keys', () => {
+  const { events } = parseChunks(['\x1b[Z', '\x1b[9;2u', '\x1b[27;2;9~', '\x1b[9u'])
+
+  assert.equal(events[0]?.key.tab, true)
+  assert.equal(events[0]?.key.shift, true)
+  assert.equal(events[0]?.input, '')
+
+  assert.equal(events[1]?.key.tab, true)
+  assert.equal(events[1]?.key.shift, true)
+  assert.equal(events[1]?.input, '')
+
+  assert.equal(events[2]?.key.tab, true)
+  assert.equal(events[2]?.key.shift, true)
+  assert.equal(events[2]?.input, '')
+
+  assert.equal(events[3]?.key.tab, true)
+  assert.equal(events[3]?.key.shift, false)
+  assert.equal(events[3]?.input, '')
+})
+
 test('parseAppInput parses alt enter as a soft-break fallback', () => {
   const { events } = parseChunks(['\x1b\r'])
 

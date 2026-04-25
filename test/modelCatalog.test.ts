@@ -24,6 +24,8 @@ test('OpenAI discovery dedupes models and falls back to the alternate URL', asyn
       data: [
         { id: 'gpt-a' },
         { id: 'gpt-a' },
+        { id: 'llama-compatible' },
+        { id: 'text-embedding-compatible' },
         { id: 'gpt-b' },
       ],
     }), { status: 200 })
@@ -39,11 +41,60 @@ test('OpenAI discovery dedupes models and falls back to the alternate URL', asyn
   )
 
   assert.equal(result.status, 'ok')
-  assert.deepEqual(result.entries.map(entry => entry.id), ['gpt-a', 'gpt-b'])
+  assert.deepEqual(result.entries.map(entry => entry.id), [
+    'gpt-a',
+    'llama-compatible',
+    'text-embedding-compatible',
+    'gpt-b',
+  ])
   assert.deepEqual(urls, [
     'https://compat.example/v1/models',
     'https://compat.example/models',
   ])
+})
+
+test('OpenAI discovery filters non-chat models on the default endpoint', async () => {
+  clearModelCatalogCache()
+  const fetchImpl = (async () => new Response(JSON.stringify({
+    data: [
+      { id: 'gpt-4o' },
+      { id: 'gpt-4o-mini' },
+      { id: 'gpt-4.1' },
+      { id: 'o1' },
+      { id: 'o3-mini' },
+      { id: 'o4-mini' },
+      { id: 'chatgpt-4o-latest' },
+      { id: 'gpt-3.5-turbo-instruct' },
+      { id: 'gpt-4o-realtime-preview' },
+      { id: 'gpt-4o-audio-preview' },
+      { id: 'gpt-4o-mini-transcribe' },
+      { id: 'gpt-4o-mini-tts' },
+      { id: 'gpt-4o-search-preview' },
+      { id: 'gpt-image-1' },
+      { id: 'text-embedding-3-large' },
+      { id: 'whisper-1' },
+      { id: 'tts-1' },
+      { id: 'dall-e-3' },
+      { id: 'omni-moderation-latest' },
+      { id: 'davinci' },
+      { id: 'babbage-002' },
+      { id: 'davinci-002' },
+    ],
+  }), { status: 200 })) as typeof fetch
+  const result = await discoverProviderModels(
+    baseConfig,
+    {
+      fetchImpl,
+      loadKey: async () => 'sk-test',
+      now: () => 0,
+    },
+  )
+
+  assert.equal(result.status, 'ok')
+  assert.deepEqual(
+    result.entries.map(entry => entry.id),
+    ['gpt-4o', 'gpt-4o-mini', 'gpt-4.1', 'o1', 'o3-mini', 'o4-mini', 'chatgpt-4o-latest'],
+  )
 })
 
 test('Anthropic discovery parses data ids', async () => {

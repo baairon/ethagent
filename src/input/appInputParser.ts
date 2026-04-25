@@ -209,6 +209,7 @@ function createTextEvent(text: string): AppInputEvent {
 
 function keycodeEvent(raw: string, codepoint: number, modifier: number): AppInputEvent {
   const key = decodeModifier(modifier)
+  if (codepoint === 9)  return createInputEvent('', { ...key, tab: true }, raw)
   if (codepoint === 13) return createInputEvent('', { ...key, return: true }, raw)
   if (codepoint === 27) return createInputEvent('', { ...key, escape: true, meta: true }, raw)
   const char = String.fromCodePoint(codepoint)

@@ -8,6 +8,12 @@ export type SelectOption<T> = {
   label: string
   hint?: string
   disabled?: boolean
+  role?: 'section' | 'group' | 'notice' | 'option' | 'utility'
+  prefix?: string
+  labelColor?: string
+  hintColor?: string
+  bold?: boolean
+  indent?: number
 }
 
 type SelectProps<T> = {
@@ -76,18 +82,31 @@ export function Select<T>({
       {visibleOptions.map((option, visibleIndex) => {
         const absoluteIndex = windowStart + visibleIndex
         const isActive = absoluteIndex === index
-        const prefix = option.disabled ? ' ' : isActive ? '>' : ' '
-        const prefixColor = option.disabled ? theme.border : isActive ? theme.accentPrimary : theme.dim
-        const labelColor = option.disabled ? theme.dim : isActive ? theme.accentPrimary : theme.text
+        const cursor = option.disabled ? ' ' : isActive ? '>' : ' '
+        const prefix = option.prefix ? `${option.prefix} ` : ''
+        const isUtility = option.role === 'utility'
+        const prefixColor = option.disabled
+          ? option.labelColor ?? theme.border
+          : isActive
+            ? theme.accentPrimary
+            : option.labelColor ?? theme.dim
+        const labelColor = isActive && !option.disabled
+          ? isUtility ? theme.text : theme.accentPrimary
+          : option.labelColor ?? (option.disabled ? theme.dim : isUtility ? theme.textSubtle : theme.text)
+        const hintColor = isActive && !option.disabled
+          ? theme.textSubtle
+          : option.hintColor ?? theme.dim
+        const bold = option.bold ?? (isActive && !option.disabled && !isUtility)
         return (
           <Box key={absoluteIndex} flexDirection="column">
-            <Box flexDirection="row">
-              <Text color={prefixColor}>{prefix} </Text>
-              <Text color={labelColor} bold={isActive && !option.disabled}>{option.label}</Text>
+            <Box flexDirection="row" marginLeft={option.indent ?? 0}>
+              <Text color={prefixColor}>{cursor} </Text>
+              {prefix ? <Text color={prefixColor}>{prefix}</Text> : null}
+              <Text color={labelColor} bold={bold}>{option.label}</Text>
             </Box>
             {option.hint ? (
               <Box marginLeft={2}>
-                <Text color={isActive ? theme.textSubtle : theme.dim}>{option.hint}</Text>
+                <Text color={hintColor}>{option.hint}</Text>
               </Box>
             ) : null}
           </Box>
