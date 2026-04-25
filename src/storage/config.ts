@@ -63,7 +63,7 @@ export async function deleteConfig(): Promise<void> {
 
 export function defaultModelFor(provider: ProviderId): string {
   switch (provider) {
-    case 'openai':    return 'gpt-4o-mini'
+    case 'openai':    return 'gpt-5.2'
     case 'anthropic': return 'claude-sonnet-4-5'
     case 'gemini':    return 'gemini-2.0-flash'
     case 'ollama':    return 'qwen2.5-coder:7b'

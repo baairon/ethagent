@@ -86,7 +86,7 @@ export async function discoverProviderModels(
     const fetchImpl = deps.fetchImpl ?? fetch
     const entries =
       provider === 'openai'
-        ? await discoverOpenAIModels(fetchImpl, provider, baseUrl, apiKey)
+        ? await discoverOpenAIModels(fetchImpl, provider, baseUrl, apiKey, isDefaultOpenAIBaseUrl(baseUrl))
         : provider === 'anthropic'
           ? await discoverAnthropicModels(fetchImpl, apiKey)
           : await discoverGeminiModels(fetchImpl, apiKey)
@@ -121,11 +121,49 @@ function fallbackResult(config: EthagentConfig, error?: string): ModelCatalogRes
   }
 }
 
+const OPENAI_CHAT_PREFIXES = ['gpt-', 'chatgpt-', 'o1', 'o3', 'o4']
+const OPENAI_NON_CHAT_PATTERNS: RegExp[] = [
+  /-instruct(?:$|-)/,
+  /-realtime(?:$|-)/,
+  /-audio(?:$|-)/,
+  /-transcribe(?:$|-)/,
+  /-tts(?:$|-)/,
+  /-search-preview(?:$|-)/,
+  /-image(?:$|-)/,
+]
+const OPENAI_NON_CHAT_FAMILIES = [
+  'text-embedding-',
+  'text-similarity-',
+  'text-search-',
+  'whisper-',
+  'tts-',
+  'dall-e-',
+  'gpt-image-',
+  'omni-moderation-',
+  'text-moderation-',
+  'babbage-',
+  'davinci-',
+  'computer-use-',
+]
+const OPENAI_NON_CHAT_EXACT = new Set(['davinci', 'babbage', 'ada', 'curie'])
+
+function isChatCapableOpenAIModel(id: string): boolean {
+  if (OPENAI_NON_CHAT_EXACT.has(id)) return false
+  if (OPENAI_NON_CHAT_FAMILIES.some(prefix => id.startsWith(prefix))) return false
+  if (OPENAI_NON_CHAT_PATTERNS.some(re => re.test(id))) return false
+  return OPENAI_CHAT_PREFIXES.some(prefix => id.startsWith(prefix))
+}
+
+function isDefaultOpenAIBaseUrl(baseUrl: string): boolean {
+  return baseUrl.replace(/\/+$/, '') === OPENAI_DEFAULT_BASE_URL
+}
+
 async function discoverOpenAIModels(
   fetchImpl: typeof fetch,
   provider: ProviderId,
   baseUrl: string,
   apiKey: string,
+  applyChatFilter: boolean,
 ): Promise<ModelCatalogEntry[]> {
   const urls = openAIModelUrls(baseUrl)
   let lastError: Error | undefined
@@ -145,6 +183,7 @@ async function discoverOpenAIModels(
       const data = await response.json() as { data?: Array<{ id?: unknown }> }
       return (data.data ?? [])
         .filter(item => typeof item.id === 'string' && item.id.length > 0)
+        .filter(item => !applyChatFilter || isChatCapableOpenAIModel(item.id as string))
         .map(item => ({
           provider,
           id: item.id as string,
