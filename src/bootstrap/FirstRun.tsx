@@ -14,7 +14,8 @@ import {
   type EthagentConfig,
   type ProviderId,
 } from '../storage/config.js'
-import { setKey } from '../storage/secrets.js'
+import { setKey, setSecret } from '../storage/secrets.js'
+import { IdentitySetup, type IdentityResult } from '../identity/IdentitySetup.js'
 
 type Step =
   | { kind: 'detecting' }
@@ -26,6 +27,8 @@ type Step =
   | { kind: 'cloud-key'; provider: ProviderId; error?: string }
   | { kind: 'cloud-key-saving'; provider: ProviderId }
   | { kind: 'cloud-model'; provider: ProviderId }
+  | { kind: 'identity'; config: EthagentConfig }
+  | { kind: 'identity-saving'; config: EthagentConfig; result: IdentityResult }
   | { kind: 'saving'; config: EthagentConfig }
   | { kind: 'save-error'; config: EthagentConfig; message: string }
   | { kind: 'done'; config: EthagentConfig }
@@ -45,10 +48,14 @@ const STATUS: Record<Step['kind'], string> = {
   'cloud-key':         'first-run setup · paste API key',
   'cloud-key-saving':  'first-run setup · storing key',
   'cloud-model':       'first-run setup · pick a model',
+  'identity':          'first-run setup · Ethereum identity',
+  'identity-saving':   'first-run setup · storing identity',
   'saving':            'first-run setup · saving config',
   'save-error':        'first-run setup · save failed',
   'done':              'ready',
 }
+
+const IDENTITY_ACCOUNT = 'ethereum:default'
 
 const NAV_BACK = '↑↓ navigate · enter select · esc back'
 const NAV_CANCEL = '↑↓ navigate · enter select · esc cancel setup'
@@ -101,6 +108,34 @@ export const FirstRun: React.FC<FirstRunProps> = ({ onComplete, onCancel }) => {
       })
     return () => { cancelled = true }
   }, [step, onComplete])
+
+  useEffect(() => {
+    if (step.kind !== 'identity-saving') return
+    let cancelled = false
+    const persist = async (): Promise<EthagentConfig> => {
+      if (step.result.kind === 'set') {
+        await setSecret(IDENTITY_ACCOUNT, step.result.privateKey)
+        return {
+          ...step.config,
+          identity: {
+            address: step.result.address,
+            createdAt: new Date().toISOString(),
+          },
+        }
+      }
+      return step.config
+    }
+    persist()
+      .then(config => {
+        if (cancelled) return
+        setStep({ kind: 'saving', config })
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return
+        setStep({ kind: 'save-error', config: step.config, message: (err as Error).message })
+      })
+    return () => { cancelled = true }
+  }, [step])
 
   const hint = (canBack: boolean): React.ReactElement => (
     <Box marginTop={1}>
@@ -175,8 +210,8 @@ export const FirstRun: React.FC<FirstRunProps> = ({ onComplete, onCancel }) => {
         <Splash tipLine={STATUS['ollama-setup']} />
         <OllamaBootstrap
           spec={step.spec}
-          onDone={model => setStep({
-            kind: 'saving',
+          onDone={model => goTo({
+            kind: 'identity',
             config: {
               version: 1,
               provider: 'ollama',
@@ -295,8 +330,8 @@ export const FirstRun: React.FC<FirstRunProps> = ({ onComplete, onCancel }) => {
           <TextInput
             initialValue={defaultModel}
             placeholder={defaultModel}
-            onSubmit={model => setStep({
-              kind: 'saving',
+            onSubmit={model => goTo({
+              kind: 'identity',
               config: {
                 version: 1,
                 provider,
@@ -308,6 +343,33 @@ export const FirstRun: React.FC<FirstRunProps> = ({ onComplete, onCancel }) => {
           />
         </Box>
         {hint(true)}
+      </Box>
+    )
+  }
+
+  if (step.kind === 'identity') {
+    return (
+      <Box flexDirection="column" padding={1}>
+        <Splash tipLine={STATUS['identity']} />
+        <IdentitySetup
+          mode="first-run"
+          onComplete={result => {
+            if (result.kind === 'cancel') {
+              goBack()
+              return
+            }
+            setStep({ kind: 'identity-saving', config: step.config, result })
+          }}
+        />
+      </Box>
+    )
+  }
+
+  if (step.kind === 'identity-saving') {
+    return (
+      <Box flexDirection="column" padding={1}>
+        <Splash tipLine={STATUS['identity-saving']} />
+        <Text color={theme.dim}>storing identity…</Text>
       </Box>
     )
   }

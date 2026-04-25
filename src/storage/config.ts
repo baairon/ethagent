@@ -7,13 +7,21 @@ import { atomicWriteText } from './atomicWrite.js'
 export const PROVIDERS = ['ollama', 'openai', 'anthropic', 'gemini'] as const
 export type ProviderId = (typeof PROVIDERS)[number]
 
+const IdentitySchema = z.object({
+  address: z.string().regex(/^0x[a-fA-F0-9]{40}$/),
+  createdAt: z.string(),
+})
+
 const ConfigSchema = z.object({
   version: z.literal(1),
   provider: z.enum(PROVIDERS),
   model: z.string().min(1),
   baseUrl: z.string().url().optional(),
   firstRunAt: z.string(),
+  identity: IdentitySchema.optional(),
 })
+
+export type EthagentIdentity = z.infer<typeof IdentitySchema>
 
 export type EthagentConfig = z.infer<typeof ConfigSchema>
 

@@ -30,6 +30,7 @@ function context(overrides: Partial<SlashContext> = {}): SlashContext {
     onRewindRequest: () => {},
     onPermissionsRequest: () => {},
     onCompactRequest: () => {},
+    onIdentityRequest: () => {},
     onCopyPickerRequest: () => {},
     onPullStart: () => ({ progressId: 'progress-test', signal: new AbortController().signal }),
     onPullProgress: () => {},
