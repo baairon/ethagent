@@ -52,7 +52,9 @@ import {
   sessionMessagesToRows,
   type TurnCheckpoint,
 } from './chatScreenUtils.js'
-import { ChatBottomPane, type CopyPickerState, type Overlay } from './ChatBottomPane.js'
+import { ChatBottomPane, type CopyPickerState, type IdentityOverlayState, type Overlay } from './ChatBottomPane.js'
+import { setIdentity, getIdentityStatus } from '../storage/identity.js'
+import type { IdentityResult } from '../identity/IdentitySetup.js'
 import { buildResumedSessionState, resolveModelSelection, restoreConversationState } from './chatSessionState.js'
 import { runStreamingTurn } from './chatTurnOrchestrator.js'
 import type { PlanApprovalAction } from './PlanApprovalView.js'
@@ -90,6 +92,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
   const [approxTokens, setApproxTokens] = useState(0)
   const [overlay, setOverlay] = useState<Overlay>('none')
   const [copyPickerState, setCopyPickerState] = useState<CopyPickerState>(null)
+  const [identityOverlay, setIdentityOverlay] = useState<IdentityOverlayState | null>(null)
   const [permissionRequest, setPermissionRequest] = useState<PermissionRequest | null>(null)
   const [mode, setMode] = useState<SessionMode>('chat')
   const [pendingPlan, setPendingPlan] = useState<PendingPlan | null>(null)
@@ -398,6 +401,17 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
       onRewindRequest: () => setOverlay('rewind'),
       onPermissionsRequest: () => setOverlay('permissions'),
       onCompactRequest: () => { void runCompaction('manual') },
+      onIdentityRequest: action => {
+        void (async () => {
+          const status = await getIdentityStatus(configRef.current)
+          const initialAction = action === 'create' || action === 'import' ? action : undefined
+          setIdentityOverlay({
+            initialAction,
+            existing: status ? { address: status.address } : null,
+          })
+          setOverlay('identity')
+        })()
+      },
       onCopyPickerRequest: (turnText, turnLabel) => {
         setCopyPickerState({ turnText, turnLabel })
         setOverlay('copyPicker')
@@ -709,6 +723,28 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
     [cwd, pushNote, replaceConfig],
   )
 
+  const handleIdentityResult = useCallback(
+    (result: IdentityResult) => {
+      setOverlay('none')
+      setIdentityOverlay(null)
+      if (result.kind === 'set') {
+        void (async () => {
+          try {
+            const { config: nextConfig, identity, backend } = await setIdentity(
+              result.privateKey,
+              configRef.current,
+            )
+            replaceConfig(nextConfig)
+            pushNote(`identity saved · ${identity.address} · ${backend}`, 'info')
+          } catch (err: unknown) {
+            pushNote(`identity save failed: ${(err as Error).message}`, 'error')
+          }
+        })()
+      }
+    },
+    [pushNote, replaceConfig],
+  )
+
   const handleCopyDone = useCallback(
     (result: CopyResult, label: string) => {
       setOverlay('none')
@@ -888,6 +924,8 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
           footerRight={footerRight}
           handleModelPick={handleModelPick}
           handleResumePick={handleResumePick}
+          identityOverlay={identityOverlay}
+          handleIdentityResult={handleIdentityResult}
           handleRestoreConversation={handleRestoreConversation}
           handleCopyDone={handleCopyDone}
           handleCopyCancel={handleCopyCancel}

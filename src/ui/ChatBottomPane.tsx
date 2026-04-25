@@ -9,13 +9,18 @@ import { CopyPicker } from './CopyPicker.js'
 import { PermissionPrompt } from './PermissionPrompt.js'
 import { PlanApprovalView, type PlanApprovalAction } from './PlanApprovalView.js'
 import { ChatInput } from './ChatInput.js'
+import { IdentitySetup, type IdentityResult } from '../identity/IdentitySetup.js'
 import type { CopyResult } from '../utils/clipboard.js'
 import { getSlashSuggestions } from '../commands/index.js'
 import { Box, Text } from 'ink'
 import { theme } from './theme.js'
 
-export type Overlay = 'none' | 'modelPicker' | 'resume' | 'rewind' | 'copyPicker' | 'permission' | 'permissions' | 'planApproval'
+export type Overlay = 'none' | 'modelPicker' | 'resume' | 'rewind' | 'copyPicker' | 'permission' | 'permissions' | 'planApproval' | 'identity'
 export type CopyPickerState = { turnText: string; turnLabel: string } | null
+export type IdentityOverlayState = {
+  initialAction: 'create' | 'import' | undefined
+  existing: { address: string } | null
+}
 
 type ChatBottomPaneProps = {
   overlay: Overlay
@@ -34,6 +39,8 @@ type ChatBottomPaneProps = {
   footerRight: React.ReactNode
   handleModelPick: (sel: ModelPickerSelection) => void | Promise<void>
   handleResumePick: (id: string) => void | Promise<void>
+  identityOverlay: IdentityOverlayState | null
+  handleIdentityResult: (result: IdentityResult) => void
   handleRestoreConversation: (turnId: string) => void
   handleCopyDone: (result: CopyResult, label: string) => void
   handleCopyCancel: () => void
@@ -63,6 +70,8 @@ export function ChatBottomPane({
   footerRight,
   handleModelPick,
   handleResumePick,
+  identityOverlay,
+  handleIdentityResult,
   handleRestoreConversation,
   handleCopyDone,
   handleCopyCancel,
@@ -141,6 +150,17 @@ export function ChatBottomPane({
         request={permissionRequest}
         onDecision={resolvePermission}
         onCancel={() => resolvePermission('deny')}
+      />
+    )
+  }
+
+  if (overlay === 'identity' && identityOverlay) {
+    return (
+      <IdentitySetup
+        mode="manage"
+        initialAction={identityOverlay.initialAction}
+        existing={identityOverlay.existing}
+        onComplete={handleIdentityResult}
       />
     )
   }

@@ -3,6 +3,12 @@ import { defaultBaseUrlFor, getConfigPath, saveConfig } from '../storage/config.
 import { isDaemonUp, listInstalled, pullModel, type PullProgress } from '../bootstrap/ollama.js'
 import { detectSpec } from '../bootstrap/runtimeDetection.js'
 import { hasKey } from '../storage/secrets.js'
+import {
+  clearIdentity,
+  getIdentityStatus,
+  getPrivateKey,
+  hasPrivateKey,
+} from '../storage/identity.js'
 import { discoverProviderModels, type ModelCatalogResult } from '../models/catalog.js'
 import { copyToClipboard } from '../utils/clipboard.js'
 import { parseSegments } from '../utils/markdownSegments.js'
@@ -12,6 +18,8 @@ import type { SessionMessage } from '../storage/sessions.js'
 import path from 'node:path'
 import { setCwd } from '../runtime/cwd.js'
 import type { SessionMode } from '../runtime/sessionMode.js'
+
+export type IdentityRequestAction = 'manage' | 'create' | 'import'
 
 export type SlashContext = {
   config: EthagentConfig
@@ -32,6 +40,7 @@ export type SlashContext = {
   onRewindRequest: () => void
   onPermissionsRequest: () => void
   onCompactRequest: () => void
+  onIdentityRequest: (action?: IdentityRequestAction) => void
   onCopyPickerRequest: (turnText: string, turnLabel: string) => void
   onPullStart: (name: string) => { progressId: string; signal: AbortSignal }
   onPullProgress: (progressId: string, event: PullProgress) => void
@@ -317,20 +326,112 @@ const COMMANDS: CommandSpec[] = [
     },
   },
   {
+    name: 'identity',
+    enterBehavior: 'fill',
+    summary: 'Ethereum identity · /identity [status|create|import|export|remove]',
+    run: async (args, ctx) => runIdentity(args, ctx),
+  },
+  {
     name: 'doctor',
     summary: 'spec, config, daemon status, key presence',
     run: async (_args, ctx) => {
-      const [spec, daemonUp, keys] = await Promise.all([
+      const [spec, daemonUp, keys, identity] = await Promise.all([
         detectSpec(),
         isDaemonUp(),
         Promise.all(
           (['openai', 'anthropic', 'gemini'] as ProviderId[]).map(async p => [p, await hasKey(p)] as const),
         ),
+        getIdentityStatus(ctx.config),
       ])
-      return { kind: 'note', text: renderDoctor(spec, daemonUp, keys, ctx) }
+      return { kind: 'note', text: renderDoctor(spec, daemonUp, keys, identity, ctx) }
     },
   },
 ]
+
+async function runIdentity(args: string, ctx: SlashContext): Promise<SlashResult> {
+  const tokens = args.trim().split(/\s+/).filter(Boolean)
+  const sub = tokens[0]?.toLowerCase() ?? ''
+  const rest = tokens.slice(1)
+
+  if (!sub) {
+    ctx.onIdentityRequest('manage')
+    return { kind: 'handled' }
+  }
+
+  if (sub === 'status') {
+    const status = await getIdentityStatus(ctx.config)
+    if (!status) {
+      return {
+        kind: 'note',
+        variant: 'dim',
+        text: 'no Ethereum identity set. run /identity create to make one.',
+      }
+    }
+    const lines = [
+      `address    ${status.address}`,
+      `created    ${status.createdAt}`,
+      `backend    ${status.backend}`,
+    ]
+    return { kind: 'note', text: lines.join('\n') }
+  }
+
+  if (sub === 'create') {
+    ctx.onIdentityRequest('create')
+    return { kind: 'handled' }
+  }
+
+  if (sub === 'import') {
+    ctx.onIdentityRequest('import')
+    return { kind: 'handled' }
+  }
+
+  if (sub === 'export') {
+    if (rest[0] !== '--reveal') {
+      return {
+        kind: 'note',
+        variant: 'error',
+        text: 'identity export prints your private key. re-run with: /identity export --reveal',
+      }
+    }
+    if (!(await hasPrivateKey())) {
+      return { kind: 'note', variant: 'error', text: 'no Ethereum identity to export.' }
+    }
+    const pk = await getPrivateKey()
+    if (!pk) return { kind: 'note', variant: 'error', text: 'private key not available.' }
+    return {
+      kind: 'note',
+      text: [
+        'Ethereum private key (KEEP SECRET):',
+        pk,
+        '',
+        'anyone with this key controls your identity. paste only into trusted wallets.',
+      ].join('\n'),
+    }
+  }
+
+  if (sub === 'remove') {
+    if (rest[0] !== 'confirm') {
+      return {
+        kind: 'note',
+        variant: 'error',
+        text: 'remove deletes your stored key. re-run with: /identity remove confirm',
+      }
+    }
+    const status = await getIdentityStatus(ctx.config)
+    if (!status) {
+      return { kind: 'note', variant: 'dim', text: 'no Ethereum identity to remove.' }
+    }
+    const next = await clearIdentity(ctx.config)
+    ctx.onReplaceConfig(next)
+    return { kind: 'note', text: `removed identity ${status.address}.`, variant: 'dim' }
+  }
+
+  return {
+    kind: 'note',
+    variant: 'error',
+    text: 'usage: /identity [status|create|import|export --reveal|remove confirm]',
+  }
+}
 
 async function runPull(
   name: string,
@@ -406,6 +507,7 @@ function renderDoctor(
   spec: Awaited<ReturnType<typeof detectSpec>>,
   daemonUp: boolean,
   keys: ReadonlyArray<readonly [ProviderId, boolean]>,
+  identity: Awaited<ReturnType<typeof getIdentityStatus>>,
   ctx: SlashContext,
 ): string {
   const lines: string[] = ['diagnostics:']
@@ -423,6 +525,14 @@ function renderDoctor(
   lines.push('keys:')
   for (const [provider, present] of keys) {
     lines.push(`  ${provider.padEnd(9)}  ${present ? 'set' : 'not set'}`)
+  }
+  lines.push('')
+  lines.push('identity:')
+  if (identity) {
+    lines.push(`  address    ${identity.address}`)
+    lines.push(`  backend    ${identity.backend}`)
+  } else {
+    lines.push('  address    not set')
   }
   return lines.join('\n')
 }

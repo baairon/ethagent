@@ -1,60 +1,47 @@
 <img src="https://raw.githubusercontent.com/baairon/ethagent/master/preview/image.png" alt="ethagent" />
 
-A privacy-first AI agent with a portable Ethereum identity. Your identity lives on Ethereum. Your memory lives on IPFS. The model is whatever you plug in.
+A privacy-first AI agent with a portable Ethereum identity. Your identity lives on Ethereum. Your memory lives on IPFS. The model is a replaceable component you can swap any time.
 
 ```bash
 npm install -g ethagent
 ethagent
 ```
 
-## What It Is
+## Why ethagent
 
-`ethagent` is a terminal agent built around one idea: your agent should belong to you, not the platform you happened to use first.
+Every model vendor wants you locked in: your chat history on their servers, your custom instructions in their account, everything your agent learned about you confined to their ecosystem. Switch vendors and you start over.
 
-The model is replaceable. The memory is portable. The identity is durable.
+`ethagent` flips that. The agent belongs to you, not the platform. Your Ethereum address is the durable handle. Your accumulated knowledge is encrypted for that identity and content-addressed so it travels with the address rather than the vendor. The model in the middle is interchangeable.
 
-- Your Ethereum address owns and controls your agent
-- Your knowledge base is pinned to IPFS, content-addressed and portable
-- Your agent is registered onchain via [ERC-8004](https://eips.ethereum.org/EIPS/eip-8004)
-- Everything you teach it compounds across sessions instead of resetting with each vendor switch
+## How it works
 
-## What It Does
+On first run, `ethagent` helps you create or import an Ethereum identity for your agent. That address becomes the durable handle for everything the agent learns and does. The key is encrypted locally for day-to-day use, then backed up as an encrypted recovery blob that can be pinned to IPFS.
 
-`ethagent` gives you a portable agent workflow:
+After setup, start a terminal session and chat with OpenAI, Anthropic, Gemini, or a local Ollama model. Use `Alt+P` to pick a provider/model, or `/model <name>` to switch models within the current provider. Resume, rewind, compact, export, and diagnose sessions without losing continuity.
 
-- first-run setup with provider selection and key-backed config
-- local and cloud model setup and switching
-- streaming terminal chat with persistent sessions
-- session resume, compaction, copy, export, and diagnostics
-- Ethereum-linked agent identity
-- IPFS-backed portable memory
-- recovery across machines
+On a new machine, your wallet authorizes recovery, `ethagent` fetches the encrypted backup from IPFS, and the same agent identity comes back. Memory is encrypted for that identity and pinned to IPFS too, so the agent can move with you across devices.
 
-## Why It Exists
+The agent is registered onchain via [ERC-8004](https://eips.ethereum.org/EIPS/eip-8004), making the same address usable for discovery, recovery, and delegation.
 
-AI platforms compete aggressively and users switch between them constantly. Every time you do, your conversation history, custom instructions, preferences, and everything your agent learned about you resets to zero.
+## Architecture
 
-`ethagent` breaks that cycle. Your knowledge lives on IPFS, your identity lives on Ethereum. Switch models whenever you want. Your agent remembers everything regardless. Your data stays yours, not by policy, but by architecture.
+| Layer | What it does |
+|---|---|
+| Inference | Hotswappable model, local or cloud |
+| Identity | Ethereum address controls the agent identity |
+| Backup | Encrypted identity backup pinned to IPFS, recoverable by wallet authorization |
+| Memory | Encrypted, content-addressed, pinned to IPFS |
+| Registration | ERC-8004 onchain agent record, restorable from address or ENS |
 
-## How It Works
+Identity is the foundation. Once your address exists, every other layer attaches to it.
 
-`ethagent` accumulates a personal knowledge base from conversations, documents, and corrections you provide. That knowledge base is pinned to IPFS so it is content-addressed, verifiable, and portable across machines. The underlying model is hotswappable, so you can run a local LLM or move to a cloud model without losing continuity.
-
-Your agent's identity is registered onchain using ERC-8004, the token standard for autonomous agents on Ethereum. Identity is tied to an Ethereum address or ENS name, which makes the agent recoverable, portable, and persistent beyond any single machine.
-
-| Layer | Where | What it does |
-|---|---|---|
-| Inference | Your machine or cloud | Hotswappable model; cloud by default, local supported |
-| Knowledge | IPFS | Content-addressed, verifiable, portable across any machine |
-| Identity | Ethereum | Permanent agent registration via ERC-8004, restorable from address or ENS |
-
-Your knowledge base is encrypted with your wallet's key. Even though the data lives on IPFS, it is unreadable without your key. Nobody can clone your agent, read its memories, or extract what it knows about you.
+---
 
 ## Links
 
-- [npm package](https://www.npmjs.com/package/ethagent)
+- [npm](https://www.npmjs.com/package/ethagent)
 - [GitHub](https://github.com/baairon/ethagent)
-- [ERC-8004 specification](https://eips.ethereum.org/EIPS/eip-8004)
+- [ERC-8004](https://eips.ethereum.org/EIPS/eip-8004)
 
 ## License
 

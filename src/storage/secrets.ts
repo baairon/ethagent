@@ -115,51 +115,67 @@ function decryptValue(key: Buffer, payload: string): string | null {
 
 export type KeyBackend = 'keyring' | 'encrypted-file'
 
-export async function getKey(provider: ProviderId): Promise<string | null> {
+export async function getSecret(account: string): Promise<string | null> {
   const keytar = await loadKeytar()
   if (keytar) {
-    const v = await keytar.getPassword(KEYTAR_SERVICE, provider)
+    const v = await keytar.getPassword(KEYTAR_SERVICE, account)
     return v ?? null
   }
   const file = await readEncryptedFile()
-  const payload = file[provider]
+  const payload = file[account]
   if (!payload) return null
   const key = await deriveKey()
   return decryptValue(key, payload)
 }
 
-export async function setKey(provider: ProviderId, value: string): Promise<KeyBackend> {
+export async function setSecret(account: string, value: string): Promise<KeyBackend> {
   const trimmed = value.trim()
-  if (!trimmed) throw new Error('key value is empty')
+  if (!trimmed) throw new Error('secret value is empty')
   const keytar = await loadKeytar()
   if (keytar) {
-    await keytar.setPassword(KEYTAR_SERVICE, provider, trimmed)
+    await keytar.setPassword(KEYTAR_SERVICE, account, trimmed)
     return 'keyring'
   }
   const [key, file] = await Promise.all([deriveKey(), readEncryptedFile()])
-  file[provider] = encryptValue(key, trimmed)
+  file[account] = encryptValue(key, trimmed)
   await writeEncryptedFile(file)
   return 'encrypted-file'
 }
 
-export async function rmKey(provider: ProviderId): Promise<void> {
+export async function rmSecret(account: string): Promise<void> {
   const keytar = await loadKeytar()
   if (keytar) {
-    await keytar.deletePassword(KEYTAR_SERVICE, provider)
+    await keytar.deletePassword(KEYTAR_SERVICE, account)
     return
   }
   const file = await readEncryptedFile()
-  if (provider in file) {
-    delete file[provider]
+  if (account in file) {
+    delete file[account]
     await writeEncryptedFile(file)
   }
+}
+
+export async function hasSecret(account: string): Promise<boolean> {
+  const value = await getSecret(account)
+  return value !== null && value.length > 0
 }
 
 export async function whichBackend(): Promise<KeyBackend> {
   return (await loadKeytar()) ? 'keyring' : 'encrypted-file'
 }
 
-export async function hasKey(provider: ProviderId): Promise<boolean> {
-  const value = await getKey(provider)
-  return value !== null && value.length > 0
+export function getKey(provider: ProviderId): Promise<string | null> {
+  return getSecret(provider)
+}
+
+export function setKey(provider: ProviderId, value: string): Promise<KeyBackend> {
+  return setSecret(provider, value)
+}
+
+export function rmKey(provider: ProviderId): Promise<void> {
+  return rmSecret(provider)
+}
+
+export function hasKey(provider: ProviderId): Promise<boolean> {
+  return hasSecret(provider)
 }
