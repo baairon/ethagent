@@ -78,7 +78,7 @@ export const RewindView: React.FC<RewindViewProps> = ({
 
   if (state.kind === 'loading') {
     return (
-      <Surface title="Rewind" subtitle="Loading checkpoints...">
+      <Surface title="rewind" subtitle="loading checkpoints...">
         <Spinner label="loading rewind history..." />
       </Surface>
     )
@@ -86,7 +86,7 @@ export const RewindView: React.FC<RewindViewProps> = ({
 
   if (state.kind === 'error') {
     return (
-      <Surface title="Rewind" tone="muted" footer="Esc closes.">
+      <Surface title="rewind" tone="muted" footer="esc closes.">
         <Text color={theme.dim}>{state.message}</Text>
       </Surface>
     )
@@ -94,8 +94,8 @@ export const RewindView: React.FC<RewindViewProps> = ({
 
   if (state.entries.length === 0) {
     return (
-      <Surface title="Rewind" tone="muted" footer="Esc closes.">
-        <Text color={theme.dim}>No managed edits are available to rewind in this workspace.</Text>
+      <Surface title="rewind" tone="muted" footer="esc closes.">
+        <Text color={theme.dim}>no managed edits are available to rewind in this workspace.</Text>
       </Surface>
     )
   }
@@ -183,7 +183,7 @@ export const RewindView: React.FC<RewindViewProps> = ({
 
   return (
     <Surface
-      title="Rewind"
+      title="rewind"
       subtitle={buildSubtitle(state.stage, selectedEntry.relativePath)}
       footer={buildFooter(state.stage, state.restoring)}
     >
@@ -271,8 +271,8 @@ function buildFileOptions(entries: RewindEntry[], hasMore: boolean): Array<Selec
   if (hasMore) {
     options.push({
       value: LOAD_MORE_VALUE,
-      label: 'Show older checkpoints',
-      hint: 'Load more file history from this directory',
+      label: 'show older checkpoints',
+      hint: 'load more file history from this directory',
     })
   }
   return options
@@ -287,8 +287,8 @@ function buildEntryOptions(entries: RewindEntry[], hasMore: boolean): Array<Sele
   if (hasMore) {
     options.push({
       value: LOAD_MORE_VALUE,
-      label: 'Show older checkpoints',
-      hint: 'Load more checkpoints for this directory',
+      label: 'show older checkpoints',
+      hint: 'load more checkpoints for this directory',
     })
   }
   return options
@@ -297,10 +297,10 @@ function buildEntryOptions(entries: RewindEntry[], hasMore: boolean): Array<Sele
 function buildActionOptions(canRestoreConversation: boolean): Array<SelectOption<RestoreAction>> {
   const options: Array<SelectOption<RestoreAction>> = []
   if (canRestoreConversation) {
-    options.push({ value: 'both', label: 'Restore code and conversation', hint: 'OpenClaude-style full rewind' })
-    options.push({ value: 'conversation', label: 'Restore conversation only', hint: 'Keep current files unchanged' })
+    options.push({ value: 'both', label: 'restore code and conversation', hint: 'full rewind' })
+    options.push({ value: 'conversation', label: 'restore conversation only', hint: 'keep current files unchanged' })
   }
-  options.push({ value: 'code', label: 'Restore code only', hint: 'Revert the selected file checkpoint only' })
+  options.push({ value: 'code', label: 'restore code only', hint: 'revert the selected file checkpoint only' })
   return options
 }
 
@@ -321,13 +321,13 @@ const ActionPreview: React.FC<{
     <Text color={theme.dim}>{formatTimestamp(entry.createdAt)} - {entry.changeSummary}</Text>
     <Text color={theme.textSubtle}>
       {selectedAction === 'both'
-        ? 'Restore the selected file checkpoint and roll the current conversation back to before this prompt.'
+        ? 'restore the selected file checkpoint and roll the current conversation back to before this prompt.'
         : selectedAction === 'conversation'
-          ? 'Restore only the conversation state to before this prompt.'
-          : 'Restore only the selected file checkpoint.'}
+          ? 'restore only the conversation state to before this prompt.'
+          : 'restore only the selected file checkpoint.'}
     </Text>
     {!canRestoreConversation ? (
-      <Text color={theme.dim}>Conversation restore is only available for checkpoints from the current session.</Text>
+      <Text color={theme.dim}>conversation restore is only available for checkpoints from the current session.</Text>
     ) : null}
     <Text color={theme.textSubtle}>{previewContent(entry.previousContent)}</Text>
   </Box>
@@ -367,14 +367,14 @@ function formatTimestamp(iso: string): string {
 }
 
 function buildSubtitle(stage: ReadyState['stage'], relativePath: string): string {
-  if (stage === 'files') return 'Choose a file with saved checkpoints.'
-  if (stage === 'entries') return `Checkpoints for ${relativePath}`
-  return `Choose how to restore ${relativePath}`
+  if (stage === 'files') return 'choose a file with saved checkpoints.'
+  if (stage === 'entries') return `checkpoints for ${relativePath}`
+  return `choose how to restore ${relativePath}`
 }
 
 function buildFooter(stage: ReadyState['stage'], restoring: boolean): string {
-  if (restoring) return 'Restoring...'
-  if (stage === 'files') return 'Enter selects a file. Esc closes.'
-  if (stage === 'entries') return 'Enter chooses a checkpoint. Esc goes back.'
-  return 'Enter restores. Esc goes back.'
+  if (restoring) return 'restoring...'
+  if (stage === 'files') return 'enter selects a file · esc closes'
+  if (stage === 'entries') return 'enter chooses a checkpoint · esc back'
+  return 'enter restores · esc back'
 }

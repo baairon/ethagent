@@ -1,6 +1,6 @@
 <img src="https://raw.githubusercontent.com/baairon/ethagent/master/preview/image.png" alt="ethagent" />
 
-A privacy-first AI agent with a portable Ethereum identity. Your identity lives on Ethereum. Your memory lives on IPFS. The model is a replaceable component you can swap any time.
+A privacy-first AI agent with a portable Ethereum identity. Your identity lives on Ethereum. Your encrypted memory is pinned to IPFS. The model is a replaceable component you can swap any time.
 
 ```bash
 npm install -g ethagent
@@ -11,30 +11,30 @@ ethagent
 
 Every model vendor wants you locked in: your chat history on their servers, your custom instructions in their account, everything your agent learned about you confined to their ecosystem. Switch vendors and you start over.
 
-`ethagent` flips that. The agent belongs to you, not the platform. Your Ethereum address is the durable handle. Your accumulated knowledge is encrypted for that identity and content-addressed so it travels with the address rather than the vendor. The model in the middle is interchangeable.
+ethagent is built around the opposite assumption: the agent should belong to the wallet that controls it. Your Ethereum address is the durable handle, your accumulated knowledge is encrypted for that identity, and the model in the middle remains interchangeable.
 
 ## How it works
 
-- Create or import an identity on first run. Your agent gets an Ethereum address that becomes its durable handle.
-- Keep the key encrypted locally for daily use. A recoverable backup can be encrypted and pinned to IPFS.
-- Chat with OpenAI, Anthropic, Gemini, or a local Ollama model. Use `Alt+P` to pick a provider/model, or `/model <name>` to switch models within the current provider.
-- Keep continuity across sessions with resume, rewind, compaction, export, and diagnostics.
-- Restore on a new machine by authorizing with your wallet, fetching the encrypted IPFS backup, and bringing back the same agent identity.
-- Register the agent onchain via [ERC-8004](https://eips.ethereum.org/EIPS/eip-8004) so the same address can be used for discovery, recovery, and delegation.
+On first run, ethagent creates or restores an ERC-8004 agent with the browser wallet you already use. The wallet owns the token, while encrypted agent state is pinned to IPFS so the same agent can be restored on another machine.
 
-Memory is encrypted for that identity and pinned to IPFS too, so the agent can move with you across devices.
+- Mint or load an ERC-8004 agent token.
+- Back up encrypted state to IPFS and refresh the tokenURI.
+- Switch between OpenAI, Anthropic, Gemini, and local Ollama models.
+- Resume, rewind, compact, export, and diagnose local sessions.
+
+Your memory is encrypted for the wallet that authorized the snapshot. If the ERC-8004 token is transferred or stolen, the new holder can see public token metadata and backup CIDs, but cannot decrypt prior private memory. Only the owner wallet that authorized a snapshot can decrypt it.
 
 ## Architecture
 
 | Layer | What it does |
 |---|---|
 | Inference | Hotswappable model, local or cloud |
-| Identity | Ethereum address controls the agent identity |
-| Backup | Encrypted identity backup pinned to IPFS, recoverable by wallet authorization |
+| Identity | ERC-8004 token owned by your wallet controls the agent identity |
+| Backup | Encrypted agent state pinned to IPFS, recoverable by wallet authorization |
 | Memory | Encrypted, content-addressed, pinned to IPFS |
 | Registration | ERC-8004 onchain agent record, restorable from address or ENS |
 
-Identity is the foundation. Once your address exists, every other layer attaches to it.
+Identity is the foundation. Once your ERC-8004 token exists, every other layer attaches to it.
 
 ---
 

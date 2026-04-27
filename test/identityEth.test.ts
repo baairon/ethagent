@@ -6,6 +6,7 @@ import {
   addressFromPrivateKey,
   toChecksumAddress,
   signMessage,
+  recoverAddressFromSignature,
 } from '../src/identity/eth.js'
 
 test('addressFromPrivateKey derives the canonical address for sk=1', () => {
@@ -68,4 +69,11 @@ test('signMessage returns a 65-byte hex signature', () => {
   const sig = signMessage(pk, 'hello world')
   assert.equal(sig.startsWith('0x'), true)
   assert.equal(sig.length, 2 + 130)
+})
+
+test('recoverAddressFromSignature recovers the signer address', () => {
+  const pk = '0x' + '4'.repeat(64)
+  const message = 'ethagent recovery challenge'
+  const sig = signMessage(pk, message)
+  assert.equal(recoverAddressFromSignature(message, sig), addressFromPrivateKey(pk))
 })

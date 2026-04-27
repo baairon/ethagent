@@ -1,0 +1,696 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ethagent wallet</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    :root {
+      --bg: #000;
+      --hairline: #2a2a2d;
+      --border: #555;
+      --dim: #777;
+      --subtle: #9b9b9b;
+      --text: #f1f1f1;
+      --mint: #d4eedd;
+      --warm: #d8cda8;
+      --info: #90b8e8;
+      --error: #f5a3a3;
+      --eye-1: #f5d8d8;
+      --eye-2: #f5e7cf;
+      --eye-3: #f5f0d4;
+      --eye-4: #d4eedd;
+      --eye-5: #d4e6f5;
+      --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "DejaVu Sans Mono", "Liberation Mono", monospace;
+      --pad: 1.25rem;
+    }
+    html, body { background: var(--bg); overflow-x: hidden; }
+    body {
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 1.5;
+      margin: 0;
+      min-height: 100vh;
+      padding: var(--pad);
+      -webkit-font-smoothing: antialiased;
+    }
+    main { max-width: 52rem; margin: 0 auto; }
+
+    /* ── splash: shared 1.25 line-height ────── */
+    .splash {
+      font-family: var(--mono);
+      font-size: 12px;
+      line-height: 1.25;
+      white-space: pre;
+      margin: 0 0 var(--pad);
+      color: var(--border);
+      overflow: hidden;
+      text-align: left;
+    }
+
+    /* ── ═ rule ──────────────────────────────── */
+    .rule {
+      font-family: var(--mono);
+      font-size: 12px;
+      line-height: 1;
+      white-space: pre;
+      color: var(--hairline);
+      margin: var(--pad) 0;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    /* ── consolidated header ─────────────────── */
+    [data-flow="sign"]        { --accent: var(--warm); }
+    [data-flow="transaction"] { --accent: var(--info); }
+
+    .head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    .head .label {
+      color: var(--accent, var(--mint));
+      font-size: 12px;
+      letter-spacing: 0.04em;
+    }
+    .head .net { color: var(--subtle); font-size: 12px; }
+    .head .net .key { color: var(--dim); margin-right: 0.4rem; }
+
+    .flow-title {
+      color: var(--text);
+      font-size: 14px;
+      font-weight: 500;
+      margin: 0.4rem 0 0;
+    }
+    .flow-detail {
+      color: var(--subtle);
+      font-size: 12.5px;
+      margin: 0.4rem 0 0;
+      word-break: break-all;
+    }
+    .flow-detail .key { color: var(--dim); margin-right: 0.4rem; }
+
+    /* ── status ──────────────────────────────── */
+    .status { display: flex; flex-direction: column; gap: 0.4rem; }
+    .status-line {
+      color: var(--text);
+      font-size: 13px;
+      margin: 0;
+      display: flex;
+      gap: 0.625rem;
+      align-items: baseline;
+    }
+    .status-line .marker {
+      color: var(--accent, var(--mint));
+      width: 1.25rem;
+      flex: none;
+      font-variant-numeric: tabular-nums;
+    }
+    .status-hint {
+      color: var(--dim);
+      font-size: 11.5px;
+      margin: 0 0 0 1.875rem;
+    }
+
+    /* ── error ───────────────────────────────── */
+    .error-title { color: var(--error); font-size: 12px; margin: 0 0 0.4rem; letter-spacing: 0.04em; }
+    .error-title::before { content: "[!] "; }
+    .error-msg { color: var(--text); font-size: 12.5px; margin: 0 0 0.5rem; line-height: 1.55; }
+    .error-hint { color: var(--subtle); font-size: 11.5px; margin: 0; line-height: 1.65; }
+    .error-hint::before { content: "  hint: "; color: var(--dim); }
+    .error-hint a { color: var(--info); text-decoration: underline; text-underline-offset: 2px; text-decoration-thickness: 1px; }
+    .error-hint a:hover { color: var(--text); }
+    .error-hint code::before { content: "`"; color: var(--border); }
+    .error-hint code::after  { content: "`"; color: var(--border); }
+
+    /* ── actions ─────────────────────────────── */
+    .actions { display: flex; gap: 1.25rem; align-items: center; flex-wrap: wrap; }
+    .shortcut {
+      font: inherit;
+      font-family: var(--mono);
+      font-size: 12px;
+      background: transparent;
+      border: 0;
+      padding: 0;
+      cursor: pointer;
+      color: var(--subtle);
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      letter-spacing: 0.02em;
+      transition: color 0.12s;
+    }
+    .shortcut:hover:not(:disabled) { color: var(--text); }
+    .shortcut:disabled { opacity: 0.4; cursor: not-allowed; }
+    .shortcut[hidden] { display: none; }
+    .shortcut.primary { color: var(--mint); }
+    .shortcut.primary:hover:not(:disabled) { color: #fff; }
+
+    .key {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.35rem;
+      padding: 0.1rem 0.45rem;
+      border: 1px solid var(--hairline);
+      color: var(--subtle);
+      font-size: 11px;
+      letter-spacing: 0.04em;
+      min-width: 3.25rem;
+    }
+    .shortcut.primary .key { border-color: var(--mint); color: var(--mint); }
+    .shortcut .pix { color: currentColor; opacity: 0.85; display: inline-flex; }
+
+    .result-row {
+      font-size: 11.5px;
+      color: var(--subtle);
+      font-variant-ligatures: none;
+      margin: 0 0 0 1.875rem;
+      word-break: break-all;
+      display: block;
+    }
+    .result-row .label { color: var(--dim); margin-right: 0.5rem; }
+    .result-row .value { color: var(--text); }
+
+    @keyframes blink-soft { 0%, 65% { opacity: 1; } 80%, 100% { opacity: 0.25; } }
+    .caret {
+      display: inline-block;
+      width: 0.55ch; height: 0.95em;
+      background: currentColor;
+      vertical-align: -0.1em;
+      animation: blink-soft 1.1s steps(1) infinite;
+      margin-left: 0.15ch;
+    }
+  </style>
+</head>
+<body>
+  <main data-flow="sign" id="card">
+    <pre class="splash" id="splash"></pre>
+
+    <pre class="rule" id="rule-1"></pre>
+
+    <div class="head">
+      <span class="label" id="prompt-text">signature request</span>
+    </div>
+    <h2 class="flow-title" id="flow-title">Sign a message to prove ownership</h2>
+    <p class="flow-detail" id="network-row"><span class="key">network</span><span id="net-val">Sepolia</span></p>
+    <p class="flow-detail" id="flow-detail"><span class="key" id="detail-key">message</span><span id="detail-val">—</span></p>
+
+    <pre class="rule" id="rule-2"></pre>
+
+    <div class="status" id="status-block">
+      <p class="status-line"><span class="marker" id="status-marker">[ ]</span><span id="status-text">connecting to your wallet…</span></p>
+      <p class="status-hint" id="status-hint">open your wallet extension if it doesn't pop up automatically.</p>
+    </div>
+
+    <div id="error-block-slot"></div>
+
+    <pre class="rule" id="rule-3"></pre>
+
+    <div class="actions">
+      <button id="approve" class="shortcut primary" hidden>
+        <span class="key"><span class="pix" id="enter-icon"></span><span>enter</span></span>
+        <span>retry</span>
+      </button>
+      <button id="cancel" class="shortcut">
+        <span class="key">esc</span>
+        <span>cancel</span>
+      </button>
+    </div>
+  </main>
+
+  <script>
+    const eth = `░░░░░░░╗░░░░░░░░╗░░╗  ░░╗
+░░╔════╝╚══░░╔══╝░░║  ░░║
+░░░░░╗     ░░║   ░░░░░░░║
+░░╔══╝     ░░║   ░░╔══░░║
+░░░░░░░╗   ░░║   ░░║  ░░║
+╚══════╝   ╚═╝   ╚═╝  ╚═╝`;
+
+    const A = [
+      ` █████╗ `,
+      `██╔══██╗`,
+      `███████║`,
+      `██╔══██║`,
+      `██║  ██║`,
+      `╚═╝  ╚═╝`,
+    ].join('\n');
+
+    const G = [
+      ` ██████╗ `,
+      `██╔════╝ `,
+      `██║  ███╗`,
+      `██║   ██║`,
+      `╚██████╔╝`,
+      ` ╚═════╝ `,
+    ].join('\n');
+
+    const E = [
+      `███████╗`,
+      `██╔════╝`,
+      `█████╗  `,
+      `██╔══╝  `,
+      `███████╗`,
+      `╚══════╝`,
+    ].join('\n');
+
+    const N = [
+      `███╗   ██╗`,
+      `████╗  ██║`,
+      `██╔██╗ ██║`,
+      `██║╚██╗██║`,
+      `██║ ╚████║`,
+      `╚═╝  ╚═══╝`,
+    ].join('\n');
+
+    const T = [
+      `████████╗`,
+      `╚══██╔══╝`,
+      `   ██║   `,
+      `   ██║   `,
+      `   ██║   `,
+      `   ╚═╝   `,
+    ].join('\n');
+
+    const eyes = `
+                                         -+:
+                   :=-                    -%@@@%.
+             *@@@@@#-                           *@@-
+          +@@.                                     +@
+        @@=                               -#=-+++=+:
+      #%        .:===-:                   -@* +@@@@%
+           *@-+@@@@@:                    %@@+  @@@=#@
+          *@=   @@@@@@@-                .@.@@@@@@@ :
+        @@+=@@@@@@@@@@@@:               .% *@@@@@*-=
+       #:-@ -@@@@@@@@@-+%                @  -@@@- #
+       :  #+  @@@@@@@- -%                 =#     =
+           -@:        *@                      .+%%
+              :%#: --
+              .-:
+                                                           `;
+
+    const TAGLINE = ' privacy-first AI agent with a portable Ethereum identity ';
+
+    const eyePalette = [
+      '#f5d8d8',
+      '#f5e7cf',
+      '#f5f0d4',
+      '#d4eedd',
+      '#d4e6f5',
+    ];
+
+    function eyeGradientColor(t) {
+      const clamped = Math.max(0, Math.min(1, t));
+      const scaled = clamped * (eyePalette.length - 1);
+      const index = Math.min(Math.floor(scaled), eyePalette.length - 2);
+      const fraction = scaled - index;
+
+      const parseHex = value => parseInt(value.slice(1), 16);
+      const lower = parseHex(eyePalette[index]);
+      const upper = parseHex(eyePalette[index + 1]);
+      const lerp = (a, b) => Math.round(a + (b - a) * fraction);
+
+      const red = lerp((lower >> 16) & 255, (upper >> 16) & 255);
+      const green = lerp((lower >> 8) & 255, (upper >> 8) & 255);
+      const blue = lerp(lower & 255, upper & 255);
+
+      return '#' + ((1 << 24) | (red << 16) | (green << 8) | blue)
+        .toString(16)
+        .slice(1);
+    }
+
+    function escapeHtml(value) {
+      return String(value == null ? '' : value)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;');
+    }
+
+    function truncateToFit(text, max) {
+      if (text.length <= max) return text;
+      if (max <= 1) return text.slice(0, Math.max(0, max));
+      return text.slice(0, max - 1) + '…';
+    }
+
+    function renderEyes() {
+      return eyes
+        .split('\n')
+        .map(line => {
+          const glyphPositions = [...line]
+            .map((char, index) => ({ char, index }))
+            .filter(entry => entry.char.trim().length > 0)
+            .map(entry => entry.index);
+
+          const firstGlyph = glyphPositions[0] ?? 0;
+          const lastGlyph = glyphPositions[glyphPositions.length - 1] ?? firstGlyph;
+          const span = Math.max(lastGlyph - firstGlyph, 1);
+
+          return [...line]
+            .map((char, index) => {
+              if (!char.trim()) return escapeHtml(char);
+              const t = (index - firstGlyph) / span;
+              return `<span style="color:${eyeGradientColor(t)}">${escapeHtml(char)}</span>`;
+            })
+            .join('');
+        })
+        .join('\n');
+    }
+
+    function renderBrandSplash({ contextLine, tipLine, compact } = {}) {
+      const width = window.innerWidth || 80;
+      const renderCompact = compact ?? width < 720;
+
+      if (renderCompact) {
+        return [
+          renderEyes(),
+          `<span style="color:var(--mint);font-weight:600">ethagent</span>`,
+          `<span style="color:var(--dim)">${escapeHtml(TAGLINE.trim())}</span>`,
+          contextLine ? `<span style="color:var(--dim)">${escapeHtml(contextLine)}</span>` : '',
+          tipLine ? `<span style="color:var(--dim)">${escapeHtml(tipLine)}</span>` : '',
+        ].filter(Boolean).join('\n');
+      }
+
+      const ethLines = eth.split('\n');
+      const aLines = A.split('\n');
+      const gLines = G.split('\n');
+      const eLines = E.split('\n');
+      const nLines = N.split('\n');
+      const tLines = T.split('\n');
+
+      const boxWidth = 69;
+      const topPad = Math.max(0, boxWidth - TAGLINE.length - 1);
+      const bottomInline = contextLine ? ` ${truncateToFit(contextLine, boxWidth - 4)} ` : '';
+      const bottomPad = Math.max(0, boxWidth - bottomInline.length - 1);
+
+      const rows = ethLines.map((_, index) => [
+        '<span style="color:var(--border)">║</span>',
+        `<span style="color:var(--border)">${escapeHtml(ethLines[index])}</span>`,
+        `<span style="color:var(--border)">${escapeHtml(aLines[index])}</span>`,
+        `<span style="color:var(--border)">${escapeHtml(gLines[index])}</span>`,
+        `<span style="color:var(--border)">${escapeHtml(eLines[index])}</span>`,
+        `<span style="color:var(--border)">${escapeHtml(nLines[index])}</span>`,
+        `<span style="color:var(--border)">${escapeHtml(tLines[index])}</span>`,
+        '<span style="color:var(--border)">║</span>',
+      ].join(''));
+
+      const top = [
+        '<span style="color:var(--border)">╔═</span>',
+        `<span style="color:var(--dim)">${escapeHtml(TAGLINE)}</span>`,
+        `<span style="color:var(--border)">${'═'.repeat(topPad)}╗</span>`,
+      ].join('');
+
+      const bottom = bottomInline
+        ? [
+            '<span style="color:var(--border)">╚═</span>',
+            `<span style="color:var(--mint)">${escapeHtml(bottomInline)}</span>`,
+            `<span style="color:var(--border)">${'═'.repeat(bottomPad)}╝</span>`,
+          ].join('')
+        : `<span style="color:var(--border)">${'╚' + '═'.repeat(boxWidth) + '╝'}</span>`;
+
+      return [
+        renderEyes(),
+        top,
+        ...rows,
+        bottom,
+        tipLine ? `\n<span style="color:var(--dim)">${escapeHtml(tipLine)}</span>` : '',
+      ].filter(Boolean).join('\n');
+    }
+    document.getElementById('splash').innerHTML = renderBrandSplash();
+
+    function sizeRules() {
+      const main = document.querySelector('main');
+      const w = main.clientWidth;
+      const cols = Math.max(20, Math.floor(w / 7.2));
+      const line = '═'.repeat(cols);
+      ['rule-1','rule-2','rule-3'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = line;
+      });
+    }
+    sizeRules();
+    window.addEventListener('resize', sizeRules);
+
+    function pixIcon(pixels, size) {
+      size = size || 11;
+      const grid = pixels.length;
+      let rects = '';
+      for (let y = 0; y < grid; y++) {
+        const row = pixels[y] || '';
+        for (let x = 0; x < row.length; x++) if (row[x] === '#') rects += '<rect x="'+x+'" y="'+y+'" width="1" height="1"/>';
+      }
+      return '<svg width="'+size+'" height="'+size+'" viewBox="0 0 '+grid+' '+grid+'" fill="currentColor" shape-rendering="crispEdges">'+rects+'</svg>';
+    }
+    const PIX_ENTER = [
+      "............",
+      "............",
+      "..........#.",
+      "..........#.",
+      "..........#.",
+      ".#........#.",
+      "##........#.",
+      "##########..",
+      "##..........",
+      ".#..........",
+      "............",
+      "............",
+    ];
+    document.getElementById('enter-icon').innerHTML = pixIcon(PIX_ENTER, 10);
+
+    const config = window.__WALLET_CONFIG__ || {
+      sessionToken: 'preview',
+      kind: 'sign',
+      chainIdHex: '0xaa36a7',
+      message: 'ethagent identity proof for 0x9F2a…BC4e',
+    };
+    const CHAINS = {
+      '0x1': { name: 'Ethereum Mainnet' }, '0xaa36a7': { name: 'Sepolia' },
+      '0x2105': { name: 'Base' }, '0x14a34': { name: 'Base Sepolia' },
+      '0xa': { name: 'OP Mainnet' }, '0xa4b1': { name: 'Arbitrum One' },
+    };
+    function chainLabel(hex) {
+      const k = String(hex || '').toLowerCase();
+      return (CHAINS[k] && CHAINS[k].name) || ('chain ' + k);
+    }
+    function shortAddr(addr) {
+      if (!addr || typeof addr !== 'string') return '—';
+      if (addr.length <= 14) return addr;
+      return addr.slice(0, 6) + '…' + addr.slice(-4);
+    }
+
+    const card = document.getElementById('card');
+    const promptText = document.getElementById('prompt-text');
+    const flowTitle = document.getElementById('flow-title');
+    const detailKey = document.getElementById('detail-key');
+    const detailVal = document.getElementById('detail-val');
+    const netVal = document.getElementById('net-val');
+    const statusBlock = document.getElementById('status-block');
+    const statusMarker = document.getElementById('status-marker');
+    const statusText = document.getElementById('status-text');
+    const statusHint = document.getElementById('status-hint');
+    const errorSlot = document.getElementById('error-block-slot');
+    const approve = document.getElementById('approve');
+    const cancel = document.getElementById('cancel');
+
+    const SPINNER_FRAMES = ['|','/','-','\\'];
+    let spinnerHandle = null;
+    function startSpinner() {
+      stopSpinner();
+      let i = 0;
+      spinnerHandle = setInterval(() => {
+        i = (i + 1) % SPINNER_FRAMES.length;
+        statusMarker.textContent = '[' + SPINNER_FRAMES[i] + ']';
+      }, 110);
+    }
+    function stopSpinner() {
+      if (spinnerHandle) { clearInterval(spinnerHandle); spinnerHandle = null; }
+    }
+    function setMarker(text) { stopSpinner(); statusMarker.textContent = text; }
+
+    function applyFlowChrome() {
+      const isSign = config.kind === 'sign';
+      const isAccount = config.kind === 'account';
+      card.dataset.flow = isSign || isAccount ? 'sign' : 'transaction';
+      promptText.textContent = isAccount ? 'wallet request' : isSign ? 'signature request' : 'transaction request';
+      netVal.textContent = isAccount ? 'browser wallet' : chainLabel(config.chainIdHex);
+      flowTitle.textContent = isAccount
+        ? 'Connect wallet to find your agent'
+        : isSign
+          ? 'Sign a message to prove ownership'
+          : 'Submit transaction to mint your ERC-8004 agent';
+      if (isAccount) {
+        detailKey.textContent = 'address';
+        detailVal.textContent = 'selected in wallet';
+      } else if (isSign) {
+        detailKey.textContent = 'message';
+        const preview = (config.message || '').split('\n')[0] || 'prepared at signing time';
+        detailVal.textContent = preview.length > 64 ? preview.slice(0, 64) + '…' : preview;
+      } else if (config.tx) {
+        detailKey.textContent = 'registry';
+        detailVal.textContent = shortAddr(config.tx.to);
+      }
+    }
+
+    function setState(state, payload) {
+      payload = payload || {};
+      errorSlot.innerHTML = '';
+      statusBlock.style.display = 'flex';
+      switch (state) {
+        case 'connecting':
+          startSpinner();
+          statusText.innerHTML = 'connecting to your wallet<span class="caret"></span>';
+          statusHint.textContent = 'open your wallet extension if it doesn\u2019t pop up automatically.';
+          break;
+        case 'approve':
+          setMarker('[?]');
+          statusText.textContent = config.kind === 'account'
+            ? 'approve wallet connection'
+            : config.kind === 'sign'
+            ? 'approve the signature in your wallet'
+            : 'review and submit the transaction in your wallet';
+          statusHint.textContent = config.kind === 'account'
+            ? 'ethagent will use the selected address to search for owned agents.'
+            : config.kind === 'sign'
+            ? 'a prompt should be open. ethagent is waiting for your signature.'
+            : 'check the network and contract address before approving.';
+          break;
+        case 'submitting':
+          startSpinner();
+          if (config.kind === 'account') {
+            statusText.innerHTML = 'connecting wallet<span class="caret"></span>';
+            statusHint.textContent = 'sending the selected address back to ethagent.';
+          } else if (config.kind === 'sign') {
+            statusText.innerHTML = 'verifying signature<span class="caret"></span>';
+            statusHint.textContent = 'recovering the signing address.';
+          } else {
+            statusText.innerHTML = 'submitted · waiting for confirmation<span class="caret"></span>';
+            statusHint.textContent = 'your wallet has accepted the transaction.';
+          }
+          break;
+        case 'done':
+          setMarker('[✓]');
+          statusText.textContent = config.kind === 'account' ? 'connected - returning to ethagent' : config.kind === 'sign'
+            ? 'signed · returning to ethagent'
+            : 'submitted · returning to ethagent';
+          if (payload.txHash) {
+            statusHint.innerHTML = '<span class="result-row"><span class="label">tx</span><span class="value">'+escapeHtml(payload.txHash)+'</span></span>';
+          } else {
+            statusHint.textContent = 'this tab will close shortly.';
+          }
+          break;
+        case 'error':
+          stopSpinner();
+          statusBlock.style.display = 'none';
+          renderError(payload);
+          break;
+      }
+    }
+
+    function renderError(payload) {
+      const msg = payload.message || 'Something went wrong.';
+      const isNoWallet = /no wallet|window\.ethereum|metamask|rabby|brave|extension/i.test(msg);
+      const isUserReject = /user rejected|user denied|cancelled|canceled/i.test(msg);
+      const isWrongChain = /chain|network/i.test(msg) && !isNoWallet;
+      let title = 'wallet error', body = msg, hint = 'press enter to retry, or esc to abort.';
+      if (isNoWallet) {
+        title = 'no browser wallet detected';
+        body = 'ethagent needs a wallet extension installed in this browser to sign or send transactions.';
+        hint = 'install <a href="https://metamask.io/download" target="_blank" rel="noopener">metamask</a>, <a href="https://rabby.io" target="_blank" rel="noopener">rabby</a>, or use brave, then reload.';
+      } else if (isUserReject) {
+        title = 'request rejected';
+        body = 'you declined the request in your wallet.';
+        hint = 'press <code>enter</code> to retry, or <code>esc</code> to abort.';
+      } else if (isWrongChain) {
+        title = 'wrong network';
+        hint = 'ethagent expected <code>'+escapeHtml(chainLabel(config.chainIdHex))+'</code>. switch networks in your wallet, then retry.';
+      }
+      errorSlot.innerHTML =
+        '<p class="error-title">'+escapeHtml(title)+'</p>'+
+        '<p class="error-msg">'+escapeHtml(body)+'</p>'+
+        '<p class="error-hint">'+hint+'</p>';
+    }
+
+    async function post(path, body) {
+      const r = await fetch(path, { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({...(body||{}), sessionToken: config.sessionToken}) });
+      const d = await r.json();
+      if (!r.ok || !d.ok) throw new Error(d.error || 'wallet request failed');
+      return d;
+    }
+    function closeSoon() { setTimeout(() => { window.close(); window.open('','_self'); window.close(); }, 1200); }
+
+    async function ensureWallet() {
+      if (!window.ethereum) throw new Error('No browser wallet detected. Install MetaMask, Rabby, or use Brave, then reload.');
+      setState('connecting');
+      const accounts = await window.ethereum.request({ method:'eth_requestAccounts' });
+      const account = accounts && accounts[0];
+      if (!account) throw new Error('No wallet account was selected.');
+      if (!config.chainIdHex) return account;
+      try { await window.ethereum.request({ method:'wallet_switchEthereumChain', params:[{ chainId: config.chainIdHex }] }); }
+      catch (err) {
+        const cur = await window.ethereum.request({ method:'eth_chainId' });
+        if (String(cur).toLowerCase() !== String(config.chainIdHex).toLowerCase()) throw err;
+      }
+      return account;
+    }
+    async function runWalletFlow() {
+      approve.disabled = true; approve.hidden = true; cancel.disabled = false; errorSlot.innerHTML = '';
+      try {
+        const account = await ensureWallet();
+        if (config.kind === 'account') {
+          setState('submitting');
+          await post('/complete', { account });
+          setState('done'); closeSoon(); return;
+        }
+        if (config.kind === 'sign') {
+          const prepared = config.message ? { message: config.message } : await post('/prepare', { account });
+          setState('approve');
+          const signature = await window.ethereum.request({ method:'personal_sign', params:[prepared.message, account] });
+          setState('submitting');
+          await post('/complete', { account, message: prepared.message, signature });
+          setState('done'); closeSoon(); return;
+        }
+        if (config.kind === 'transaction') {
+          setState('approve');
+          const txHash = await window.ethereum.request({
+            method:'eth_sendTransaction',
+            params:[{ from:account, to:config.tx.to, data:config.tx.data, value:config.tx.value }]
+          });
+          setState('submitting');
+          await post('/complete', { account, txHash });
+          setState('done', { txHash }); closeSoon(); return;
+        }
+        throw new Error('Unknown wallet request type.');
+      } catch (err) {
+        approve.disabled = false; approve.hidden = false; cancel.disabled = false;
+        setState('error', { message: (err && err.message) || String(err) });
+      }
+    }
+    async function cancelFlow() {
+      approve.disabled = true; cancel.disabled = true;
+      await post('/cancel', {}).catch(() => {});
+      setState('done');
+      statusText.textContent = 'cancelled · returning to ethagent';
+      closeSoon();
+    }
+    approve.onclick = runWalletFlow;
+    cancel.onclick = cancelFlow;
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); cancelFlow(); }
+      else if (e.key === 'Enter' && !approve.hidden && !approve.disabled) { e.preventDefault(); runWalletFlow(); }
+    });
+
+    applyFlowChrome();
+    if (!window.__WALLET_PREVIEW__) {
+      window.addEventListener('load', () => setTimeout(runWalletFlow, 150));
+    } else {
+      window.__walletPreview = { setState, setConfig: (c) => { Object.assign(config, c); applyFlowChrome(); } };
+      setState('connecting');
+    }
+  </script>
+</body>
+</html>

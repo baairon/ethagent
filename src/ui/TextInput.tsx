@@ -78,10 +78,17 @@ export function TextInput({
       {label ? <Text color={theme.dim}>{label}</Text> : null}
       <Box flexDirection="row">
         <Text color={theme.accentPrimary}>{'> '}</Text>
-        {showPlaceholder
-          ? <Text color={theme.dim}>{placeholder}</Text>
-          : <Text color={theme.text}>{display}</Text>}
-        <Text color={theme.accentPrimary}>|</Text>
+        {showPlaceholder ? (
+          <>
+            <Text color={theme.accentPrimary}>|</Text>
+            <Text color={theme.dim}>{placeholder}</Text>
+          </>
+        ) : (
+          <>
+            <Text color={theme.text}>{display}</Text>
+            <Text color={theme.accentPrimary}>|</Text>
+          </>
+        )}
       </Box>
       {error ? <Text color="#e87070">{error}</Text> : null}
     </Box>
