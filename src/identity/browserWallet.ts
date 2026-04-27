@@ -34,6 +34,21 @@ type TransactionRequest = {
   onReady?: ReadyHandler
 }
 
+type SignAndTransactionRequest<TPrepared> = {
+  chainId: number
+  expectedAccount?: Address
+  message?: string
+  messageForAccount?: (account: Address) => string
+  timeoutMs?: number
+  onReady?: ReadyHandler
+  prepareTransaction: (wallet: BrowserWalletSignature) => Promise<{
+    to: Address
+    data: Hex
+    value?: Hex
+    prepared: TPrepared
+  }>
+}
+
 type AccountRequest = {
   timeoutMs?: number
   onReady?: ReadyHandler
@@ -48,6 +63,11 @@ export type BrowserWalletSignature = {
 export type BrowserWalletTransaction = {
   account: Address
   txHash: Hex
+}
+
+export type BrowserWalletSignAndTransaction<TPrepared> = BrowserWalletSignature & {
+  txHash: Hex
+  prepared: TPrepared
 }
 
 export type BrowserWalletAccount = {
@@ -129,12 +149,89 @@ export async function sendBrowserWalletTransaction(args: TransactionRequest): Pr
   })
 }
 
+export async function requestBrowserWalletSignatureAndTransaction<TPrepared>(
+  args: SignAndTransactionRequest<TPrepared>,
+): Promise<BrowserWalletSignAndTransaction<TPrepared>> {
+  if (!args.message && !args.messageForAccount) throw new Error('wallet signature request needs a message')
+
+  let prepared:
+    | {
+        account: Address
+        message: string
+        signature: Hex
+        tx: { to: Address; data: Hex; value?: Hex }
+        prepared: TPrepared
+      }
+    | null = null
+
+  return await startBrowserWalletServer<BrowserWalletSignAndTransaction<TPrepared>>({
+    title: 'ethagent wallet approval',
+    timeoutMs: args.timeoutMs,
+    onReady: args.onReady,
+    payload: {
+      kind: 'sign-transaction',
+      chainIdHex: chainIdHex(args.chainId),
+      message: args.message,
+    },
+    prepare: body => {
+      const account = parseAccount(body.account)
+      if (args.expectedAccount && account.toLowerCase() !== args.expectedAccount.toLowerCase()) {
+        throw new Error(`connected wallet ${account} does not match owner ${args.expectedAccount}`)
+      }
+      const message = args.messageForAccount ? args.messageForAccount(account) : args.message!
+      return { message }
+    },
+    prepareTransaction: async body => {
+      const account = parseAccount(body.account)
+      const message = typeof body.message === 'string' ? body.message : ''
+      const signature = parseHex(body.signature, 'wallet signature')
+      if (args.expectedAccount && account.toLowerCase() !== args.expectedAccount.toLowerCase()) {
+        throw new Error(`connected wallet ${account} does not match owner ${args.expectedAccount}`)
+      }
+      const recovered = recoverAddressFromSignature(message, signature)
+      if (recovered.toLowerCase() !== account.toLowerCase()) {
+        throw new Error('wallet signature does not match connected account')
+      }
+      const next = await args.prepareTransaction({ account, message, signature })
+      prepared = {
+        account,
+        message,
+        signature,
+        tx: {
+          to: next.to,
+          data: next.data,
+          ...(next.value ? { value: next.value } : {}),
+        },
+        prepared: next.prepared,
+      }
+      return {
+        tx: prepared.tx,
+      }
+    },
+    complete: body => {
+      if (!prepared) throw new Error('wallet transaction was not prepared')
+      const account = parseAccount(body.account)
+      if (account.toLowerCase() !== prepared.account.toLowerCase()) {
+        throw new Error(`connected wallet ${account} does not match owner ${prepared.account}`)
+      }
+      return {
+        account,
+        message: prepared.message,
+        signature: prepared.signature,
+        txHash: parseHex(body.txHash, 'transaction hash'),
+        prepared: prepared.prepared,
+      }
+    },
+  })
+}
+
 function startBrowserWalletServer<T>(args: {
   title: string
   payload: Record<string, unknown>
   timeoutMs?: number
   onReady?: ReadyHandler
   prepare?: (body: Record<string, unknown>) => Record<string, unknown>
+  prepareTransaction?: (body: Record<string, unknown>) => Promise<Record<string, unknown>>
   complete: (body: Record<string, unknown>) => T
 }): Promise<T> {
   const sessionToken = randomUUID()
@@ -175,6 +272,16 @@ function startBrowserWalletServer<T>(args: {
           return
         }
         respondJson(res, 200, { ok: true, ...args.prepare(body) })
+        return
+      }
+      if (req.method === 'POST' && (url.pathname === '/prepare-transaction' || url.pathname === '/ethagent/prepare-transaction')) {
+        const body = await readJson(req)
+        assertSessionToken(body, sessionToken)
+        if (!args.prepareTransaction) {
+          respondJson(res, 400, { ok: false, error: 'this wallet request does not prepare transactions' })
+          return
+        }
+        respondJson(res, 200, { ok: true, ...(await args.prepareTransaction(body)) })
         return
       }
       if (req.method === 'POST' && (url.pathname === '/complete' || url.pathname === '/ethagent/complete')) {
@@ -274,7 +381,7 @@ function walletPage(title: string, sessionToken: string, payload: Record<string,
   const config = JSON.stringify({ sessionToken, ...payload }).replaceAll('<', '\\u003c')
   const injection = `<script>window.__WALLET_CONFIG__ = ${config};</script>`
   return WALLET_HTML
-    .replace('<title>ethagent wallet</title>', `<title>${escapeHtml(title)}</title>`)
+    .replace(/<title>.*?<\/title>/, `<title>${escapeHtml(title)}</title>`)
     .replace('<head>', `<head>\n  ${injection}`)
 }
 function escapeHtml(value: string): string {

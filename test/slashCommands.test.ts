@@ -49,17 +49,25 @@ test('/model with no args requests the model picker overlay', async () => {
   assert.equal(requested, true)
 })
 
-test('/identity snapshot commands open the identity hub with the requested action', async () => {
+test('/identity load opens the identity hub with the requested action', async () => {
   const requests: unknown[] = []
 
-  assert.deepEqual(await dispatchSlash('/identity export-snapshot', context({
+  assert.deepEqual(await dispatchSlash('/identity load', context({
     onIdentityRequest: action => { requests.push(action) },
   })), { kind: 'handled' })
 
-  assert.deepEqual(await dispatchSlash('/identity import-snapshot .\\exports\\agent.json', context({
-    onIdentityRequest: action => { requests.push(action) },
-  })), { kind: 'handled' })
+  assert.equal(requests[0], 'load')
+})
 
-  assert.equal(requests[0], 'export-snapshot')
-  assert.deepEqual(requests[1], { kind: 'import-snapshot', path: '.\\exports\\agent.json' })
+test('/identity export and import are removed from the ERC-8004 flow', async () => {
+  assert.deepEqual(await dispatchSlash('/identity export', context()), {
+    kind: 'note',
+    variant: 'error',
+    text: 'usage: /identity [status|create|load|remove confirm]',
+  })
+  assert.deepEqual(await dispatchSlash('/identity import', context()), {
+    kind: 'note',
+    variant: 'error',
+    text: 'usage: /identity [status|create|load|remove confirm]',
+  })
 })

@@ -93,7 +93,7 @@ async function addToPinata(
   options: IpfsOptions,
 ): Promise<IpfsAddResult> {
   const jwt = pinataJwt(options)
-  if (!jwt) throw new Error('Pinata is not connected')
+  if (!jwt) throw new Error('IPFS storage credential is missing')
   const body = new FormData()
   const blobPart: BlobPart = typeof content === 'string'
     ? content
@@ -108,10 +108,10 @@ async function addToPinata(
     },
     body,
   })
-  if (!response.ok) throw new Error(`Pinata upload failed: ${response.status} ${response.statusText}`)
+  if (!response.ok) throw new Error(`IPFS upload failed: ${response.status} ${response.statusText}`)
   const data = await response.json() as { data?: { cid?: string }; IpfsHash?: string; Hash?: string; Cid?: string }
   const cid = data.data?.cid ?? data.IpfsHash ?? data.Hash ?? data.Cid
-  if (!cid) throw new Error('Pinata upload response did not include a CID')
+  if (!cid) throw new Error('IPFS upload response did not include a CID')
   return { cid, pinVerified: true, provider: 'pinata' }
 }
 
@@ -123,7 +123,7 @@ async function catFromPinata(cid: string, fetchImpl: FetchLike): Promise<Uint8Ar
   const gateway = normalizeApiUrl(process.env.PINATA_GATEWAY_URL?.trim() || DEFAULT_PINATA_GATEWAY_URL)
   const path = cid.trim().split('/').map(part => encodeURIComponent(part)).join('/')
   const response = await fetchImpl(`${gateway}/ipfs/${path}`)
-  if (!response.ok) throw new Error(`Pinata fetch failed: ${response.status} ${response.statusText}`)
+  if (!response.ok) throw new Error(`IPFS fetch failed: ${response.status} ${response.statusText}`)
   return new Uint8Array(await response.arrayBuffer())
 }
 

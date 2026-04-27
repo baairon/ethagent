@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
   AGENT_STATE_BACKUP_ENVELOPE_VERSION,
-  assertAgentStateSnapshotOwner,
+  assertAgentStateBackupOwner,
   createIdentityBackupEnvelope,
   createAgentStateBackupEnvelope,
   createAgentStateRecoveryChallenge,
@@ -118,7 +118,7 @@ test('agent state recovery challenge is concise wallet-facing copy', () => {
 
   assert.match(challenge, /^ethagent encrypted state access\n/)
   assert.match(challenge, new RegExp(`Owner: ${ownerAddress}`))
-  assert.match(challenge, /Action: authorize this wallet to unlock the encrypted agent snapshot/)
+  assert.match(challenge, /Action: authorize this wallet to unlock the encrypted agent backup/)
   assert.match(challenge, /Version: 1$/)
   assert.doesNotMatch(challenge, /purpose:/)
   assert.doesNotMatch(challenge, /portable ERC-8004 agent state/)
@@ -157,7 +157,7 @@ test('non-owner wallet cannot decrypt prior owner agent state', () => {
   }), /wallet signature/)
 })
 
-test('agent state snapshot owner check detects token transfer before wallet signing', () => {
+test('agent state backup owner check blocks mismatched wallets before signing', () => {
   const ownerPrivateKey = generatePrivateKey()
   const otherPrivateKey = generatePrivateKey()
   const ownerAddress = addressFromPrivateKey(ownerPrivateKey)
@@ -169,6 +169,6 @@ test('agent state snapshot owner check detects token transfer before wallet sign
     state: { privateMemory: 'owner-only state' },
   })
 
-  assert.doesNotThrow(() => assertAgentStateSnapshotOwner(envelope, ownerAddress))
-  assert.throws(() => assertAgentStateSnapshotOwner(envelope, otherAddress), /previous wallet/)
+  assert.doesNotThrow(() => assertAgentStateBackupOwner(envelope, ownerAddress))
+  assert.throws(() => assertAgentStateBackupOwner(envelope, otherAddress), /another wallet/)
 })

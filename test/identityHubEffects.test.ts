@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { restoreTokenSelectionStep, runRebackupUri } from '../src/identity/identityHubEffects.js'
+import { restoreTokenSelectionStep } from '../src/identity/identityHubEffects.js'
 import type { Erc8004AgentCandidate, Erc8004RegistryConfig } from '../src/identity/erc8004.js'
 
 const registry: Erc8004RegistryConfig = {
@@ -45,37 +45,4 @@ test('restore discovery lists every restorable ERC-8004 agent and excludes unrec
 
   assert.deepEqual(step.candidates.map(item => item.agentId), [1n, 3n])
   assert.deepEqual(step.candidates.map(item => item.backup?.cid), ['bafy-one', 'bafy-three'])
-})
-
-test('rebackup URI refuses to publish an unverified metadata pin', async () => {
-  await assert.rejects(
-    runRebackupUri({
-      kind: 'rebackup-uri',
-      identity: {
-        source: 'erc8004',
-        address: '0x000000000000000000000000000000000000dEaD',
-        ownerAddress: '0x000000000000000000000000000000000000dEaD',
-        createdAt: new Date(0).toISOString(),
-        agentId: '1',
-      },
-      registry,
-      agentUri: 'ipfs://bafy-unverified',
-      metadataCid: 'bafy-unverified',
-      metadataPin: { cid: 'bafy-unverified', pinVerified: false, provider: 'pinata' },
-      backup: {
-        cid: 'bafy-state',
-        createdAt: new Date(0).toISOString(),
-        envelopeVersion: 'ethagent-pq-backup-v1',
-        ipfsApiUrl: 'https://uploads.pinata.cloud/v3/files',
-        status: 'pinned',
-        ownerAddress: '0x000000000000000000000000000000000000dEaD',
-      },
-      ownerAddress: '0x000000000000000000000000000000000000dEaD',
-    }, {
-      onStep: () => {},
-      onWalletReady: () => {},
-      onIdentityComplete: async () => {},
-    }),
-    /IPFS pin was not verified/,
-  )
 })

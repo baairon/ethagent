@@ -10,9 +10,8 @@ type ForgetAction = 'confirm' | 'cancel'
 
 export const FORGET_LOCAL_AGENT_COPY = [
   'removes the active local agent from this machine.',
-  'removes any legacy stored local private key.',
   'does not burn, transfer, or delete agent tokens.',
-  'does not delete IPFS snapshots.',
+  'does not delete pinned IPFS backups.',
   'does not delete sessions or chats.',
 ] as const
 

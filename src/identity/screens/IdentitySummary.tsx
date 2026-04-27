@@ -7,14 +7,14 @@ import { identitySummaryRows, lastBackupLabel } from '../identityHubModel.js'
 export const IdentitySummary: React.FC<{
   identity?: EthagentIdentity
   config?: EthagentConfig
-}> = ({ identity }) => {
+}> = ({ identity, config }) => {
   if (!identity) {
     return (
       <Text color={theme.dim}>no agent yet. create or load one.</Text>
     )
   }
 
-  const rows = identitySummaryRows(identity)
+  const rows = identitySummaryRows(identity, config)
   const lastBackup = lastBackupLabel(identity)
   const stateName = typeof (identity.state as Record<string, unknown> | undefined)?.name === 'string'
     ? ((identity.state as Record<string, unknown>).name as string).trim()

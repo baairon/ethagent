@@ -37,9 +37,9 @@ export function identityHubErrorView(err: unknown): IdentityHubErrorView {
   }
   if (err instanceof AgentStateOwnerMismatchError) {
     return {
-      title: 'snapshot locked to previous wallet',
-      detail: `token owner ${shortAddress(err.currentOwner)} cannot read state encrypted for ${shortAddress(err.snapshotOwner)}.`,
-      hint: 'Use the wallet that authorized this snapshot.',
+      title: 'backup locked to another wallet',
+      detail: `wallet ${shortAddress(err.currentOwner)} cannot read state encrypted for ${shortAddress(err.backupOwner)}.`,
+      hint: 'Use the wallet that created this backup.',
     }
   }
   const message = err instanceof Error ? err.message : String(err)
@@ -85,18 +85,23 @@ export function tokenLabel(candidate: Erc8004AgentCandidate): string {
 }
 
 export function tokenCandidateLabel(candidate: Erc8004AgentCandidate): string {
-  return `#${candidate.agentId.toString()} · ${candidate.name?.trim() || 'unnamed agent'}`
+  return candidate.name?.trim() || `agent token #${candidate.agentId.toString()}`
 }
 
 export function tokenCandidateHint(candidate: Erc8004AgentCandidate): string {
   const chain = supportedErc8004ChainForId(candidate.chainId)
   const network = chain?.network ? networkLabel(chain.network) : chain?.name ?? `chain ${candidate.chainId}`
-  if (candidate.backup?.createdAt) return `${network} · pinned ${formatDate(candidate.backup.createdAt)}`
-  return network
+  const parts = [
+    candidate.name?.trim() ? `token #${candidate.agentId.toString()}` : null,
+    network,
+    candidate.backup?.createdAt ? `backup ${formatDate(candidate.backup.createdAt)}` : null,
+  ].filter((part): part is string => Boolean(part))
+  return parts.join(' · ')
 }
 
 export function storageLabel(apiUrl: string): string {
-  return apiUrl.includes('pinata.cloud') ? 'Pinata' : 'custom storage'
+  void apiUrl
+  return 'IPFS'
 }
 
 const NETWORK_LABELS: Record<SelectableNetwork, string> = {
@@ -131,10 +136,6 @@ export function currentNetworkLine(config?: EthagentConfig): string {
   return networkLabel(resolveSelectedNetwork(config))
 }
 
-export function selectedNetworkFooter(config?: EthagentConfig): string {
-  return `network: ${networkLabel(resolveSelectedNetwork(config))}`
-}
-
 export function chainSummaryRow(config?: EthagentConfig, identity?: EthagentIdentity): {
   label: string
   value: string
@@ -153,6 +154,7 @@ export function lastBackupLabel(identity?: EthagentIdentity): string {
 
 export function identitySummaryRows(
   identity: EthagentIdentity | undefined,
+  config?: EthagentConfig,
 ): Array<{
   label: string
   value: string
@@ -162,10 +164,12 @@ export function identitySummaryRows(
   const owner = identity?.ownerAddress ?? identity?.address
   const ownerValue = owner ? shortAddress(owner) : 'not connected'
   const tokenValue = identity?.agentId ? `#${identity.agentId}` : 'not created'
+  const chain = chainSummaryRow(config, identity)
   const stateValue = backup?.cid ? shortCid(backup.cid) : 'not saved yet'
   return [
     { label: 'owner', value: ownerValue, tone: identity ? 'ok' : 'dim' },
     { label: 'token', value: tokenValue, tone: identity?.agentId ? 'ok' : 'dim' },
+    { label: 'network', value: chain.value, tone: chain.tone },
     { label: 'state', value: stateValue, tone: backup ? 'ok' : 'dim' },
   ]
 }

@@ -19,7 +19,6 @@ export type Overlay = 'none' | 'modelPicker' | 'resume' | 'rewind' | 'copyPicker
 export type CopyPickerState = { turnText: string; turnLabel: string } | null
 export type IdentityOverlayState = {
   initialAction: IdentityHubInitialAction | undefined
-  initialImportPath?: string
   existing: { address: string } | null
 }
 
@@ -164,7 +163,6 @@ export function ChatBottomPane({
         config={config}
         cwd={cwd}
         initialAction={identityOverlay.initialAction}
-        initialImportPath={identityOverlay.initialImportPath}
         onComplete={handleIdentityResult}
         onConfigChange={onConfigChange}
       />

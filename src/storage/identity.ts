@@ -6,13 +6,11 @@ import {
 } from './config.js'
 import {
   getSecret,
-  setSecret,
   rmSecret,
   hasSecret,
   whichBackend,
   type KeyBackend,
 } from './secrets.js'
-import { addressFromPrivateKey, validatePrivateKey } from '../identity/eth.js'
 
 const IDENTITY_ACCOUNT = 'ethereum:default'
 
@@ -23,6 +21,7 @@ export type IdentityStatus = {
   backup?: EthagentIdentity['backup']
   source?: EthagentIdentity['source']
   agentId?: string
+  chainId?: number
 } | null
 
 export async function getIdentityStatus(config?: EthagentConfig): Promise<IdentityStatus> {
@@ -36,6 +35,7 @@ export async function getIdentityStatus(config?: EthagentConfig): Promise<Identi
       backup: resolved.identity.backup,
       source: resolved.identity.source,
       agentId: resolved.identity.agentId,
+      chainId: resolved.identity.chainId,
     }
   }
   const present = await hasSecret(IDENTITY_ACCOUNT)
@@ -47,26 +47,8 @@ export async function getIdentityStatus(config?: EthagentConfig): Promise<Identi
     backend,
     backup: resolved.identity.backup,
     source: resolved.identity.source,
+    chainId: resolved.identity.chainId,
   }
-}
-
-export async function setIdentity(
-  privateKey: string,
-  config: EthagentConfig,
-  options: { backup?: EthagentIdentity['backup']; createdAt?: string } = {},
-): Promise<{ identity: EthagentIdentity; backend: KeyBackend; config: EthagentConfig }> {
-  if (!validatePrivateKey(privateKey)) throw new Error('invalid private key')
-  const address = addressFromPrivateKey(privateKey)
-  const backend = await setSecret(IDENTITY_ACCOUNT, privateKey.trim())
-  const identity: EthagentIdentity = {
-    address,
-    createdAt: options.createdAt ?? new Date().toISOString(),
-    source: 'local-key',
-    ...(options.backup ? { backup: options.backup } : {}),
-  }
-  const next: EthagentConfig = { ...config, identity }
-  await saveConfig(next)
-  return { identity, backend, config: next }
 }
 
 export async function setTokenIdentity(
@@ -111,12 +93,4 @@ export async function clearIdentity(config: EthagentConfig): Promise<EthagentCon
   const next = { ...rest } as EthagentConfig
   await saveConfig(next)
   return next
-}
-
-export async function getPrivateKey(): Promise<string | null> {
-  return getSecret(IDENTITY_ACCOUNT)
-}
-
-export async function hasPrivateKey(): Promise<boolean> {
-  return hasSecret(IDENTITY_ACCOUNT)
 }

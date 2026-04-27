@@ -62,6 +62,10 @@ test('browser wallet page explains the wallet approval', () => {
   assert.match(page, /post\('\/complete'/)
   assert.match(page, /post\('\/cancel'/)
   assert.match(page, /setTimeout\(runWalletFlow, 150\)/)
+  assert.match(page, /glyphs/)
+  assert.match(page, /CLOSE_DELAY_MS = 1800/)
+  assert.match(page, /CANCEL_CLOSE_DELAY_MS = 3200/)
+  assert.match(page, /focus-visible/)
 })
 
 test('browser wallet page differentiates transaction requests', () => {
@@ -81,6 +85,21 @@ test('browser wallet page differentiates transaction requests', () => {
   assert.match(page, /Base/)
   assert.match(page, /registry/)
   assert.match(page, /"expectedAccount":"0x000000000000000000000000000000000000dEaD"/)
+})
+
+test('browser wallet page supports the single signature and transaction flow', () => {
+  const page = __testWalletPage('ethagent wallet approval', 'hidden-token', {
+    kind: 'sign-transaction',
+    chainIdHex: '0x14a34',
+    message: 'identity update',
+  })
+
+  assert.match(page, /identity approval/)
+  assert.match(page, /Sign and submit in one wallet flow/)
+  assert.match(page, /post\('\/prepare-transaction'/)
+  assert.match(page, /approve-sign/)
+  assert.match(page, /approve-transaction/)
+  assert.match(page, /saving encrypted IPFS backup/)
 })
 
 test('browser wallet page supports account-only connection requests', () => {

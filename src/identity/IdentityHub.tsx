@@ -1,22 +1,17 @@
 import React, { useEffect, useReducer, useState } from 'react'
 import { Text } from 'ink'
-import { Surface } from '../ui/Surface.js'
-import { Spinner } from '../ui/Spinner.js'
 import { theme } from '../ui/theme.js'
-import { TextInput } from '../ui/TextInput.js'
 import { type EthagentConfig, type EthagentIdentity, type SelectableNetwork } from '../storage/config.js'
 import { clearIdentity, setTokenIdentity } from '../storage/identity.js'
 import { copyToClipboard } from '../utils/clipboard.js'
 import { DEFAULT_IPFS_API_URL } from './ipfs.js'
 import { hasPinataJwt, clearPinataJwt, savePinataJwt } from './pinataJwt.js'
 import { registryConfigFromConfig } from './registryConfig.js'
-import { identityHubErrorView, isRegistrationPreflightError, pinataErrorText, selectedNetworkFooter } from './identityHubModel.js'
-import { identityHubReducer, type Step } from './identityHubReducer.js'
+import { identityHubErrorView, isRegistrationPreflightError, pinataErrorText } from './identityHubModel.js'
+import { identityHubReducer, type ProfileUpdates, type Step } from './identityHubReducer.js'
 import {
   runCreatePreflight,
   runCreateSigning,
-  runCreatePinning,
-  runCreateRegistering,
   runRestoreConnectWallet,
   runRestoreDiscover,
   runRestoreTokenIdSubmit,
@@ -25,14 +20,9 @@ import {
   runRegistrySubmit,
   runRestoreRegistrySubmit,
   runStorageSubmit,
-  runNetworkSelect,
   runRebackupPreflight,
   runRebackupSigning,
-  runRebackupPinning,
-  runRebackupUri,
   runRebackupStorageSubmit,
-  runSnapshotExport,
-  runSnapshotImport,
   isAgentTokenIdRequiredError,
   type EffectCallbacks,
 } from './identityHubEffects.js'
@@ -50,7 +40,6 @@ import { EditProfileFlow } from './screens/EditProfileFlow.js'
 import { ForgetIdentityScreen } from './screens/ForgetIdentityScreen.js'
 import { StorageCredentialScreen } from './screens/StorageCredentialScreen.js'
 import { chainIdForNetwork, erc8004ConfigForSupportedChain, type Erc8004RegistryConfig } from './erc8004.js'
-import type { ProfileUpdates } from './identityHubReducer.js'
 
 const MIN_BUSY_ERROR_MS = 2000
 
@@ -61,6 +50,11 @@ function isWalletCancelled(err: unknown): boolean {
     || /user rejected/i.test(message)
 }
 
+function isStorageError(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err)
+  return /pinata|ipfs|pin|storage/i.test(message)
+}
+
 function waitForMinimumBusyTime(startedAt: number): Promise<void> {
   const remaining = MIN_BUSY_ERROR_MS - (Date.now() - startedAt)
   return remaining > 0
@@ -68,10 +62,7 @@ function waitForMinimumBusyTime(startedAt: number): Promise<void> {
     : Promise.resolve()
 }
 
-type BackupMetadata = NonNullable<EthagentIdentity['backup']>
-
 export type IdentityHubResult =
-  | { kind: 'set'; privateKey: string; address: string; backup?: BackupMetadata }
   | { kind: 'token'; identity: EthagentIdentity }
   | { kind: 'updated'; config: EthagentConfig; message: string }
   | { kind: 'skip' }
@@ -82,23 +73,22 @@ type IdentityHubProps = {
   config?: EthagentConfig
   cwd?: string
   initialAction?: IdentityHubInitialAction
-  initialImportPath?: string
   onComplete: (result: IdentityHubResult) => void
   onConfigChange?: (config: EthagentConfig) => void
 }
 
-export type IdentityHubInitialAction = 'create' | 'import' | 'export-snapshot' | 'import-snapshot'
+export type IdentityHubInitialAction = 'create' | 'load'
 
-export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, cwd, initialAction, initialImportPath, onComplete, onConfigChange }) => {
+export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialAction, onComplete, onConfigChange }) => {
   const identity = config?.identity
-  const [step, dispatch] = useReducer(identityHubReducer, initialStepForAction(initialAction, config, initialImportPath))
+  const [step, dispatch] = useReducer(identityHubReducer, initialStepForAction(initialAction, config))
   const [walletSession, setWalletSession] = useState<BrowserWalletReady | null>(null)
   const [jwtSaved, setJwtSaved] = useState<boolean>(false)
   const [copyNotice, setCopyNotice] = useState<string | null>(null)
   const canRebackup = Boolean(identity?.agentId && (identity?.identityRegistryAddress || config?.erc8004?.identityRegistryAddress))
-  const canExportSnapshot = Boolean(identity?.backup?.cid)
 
   const setStep = (s: Step) => dispatch({ type: 'preflightResolved', step: s })
+  const back = () => dispatch({ type: 'back', from: step })
 
   useEffect(() => { setWalletSession(null) }, [step.kind])
 
@@ -125,16 +115,16 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, cwd, ini
     onIdentityComplete: completeTokenIdentity,
   }
 
-  const errorStep = (err: unknown, back: Step): void => {
-    setStep({ kind: 'error', error: identityHubErrorView(err), back })
+  const errorStep = (err: unknown, backStep: Step): void => {
+    setStep({ kind: 'error', error: identityHubErrorView(err), back: backStep })
   }
 
-  const handleStepError = (err: unknown, back: Step, softCancel: Step = { kind: 'menu' }): void => {
+  const handleStepError = (err: unknown, backStep: Step, softCancel: Step = backStep): void => {
     if (isWalletCancelled(err)) {
       setStep(softCancel)
       return
     }
-    errorStep(err, back)
+    errorStep(err, backStep)
   }
 
   const resolveRegistryForIdentity = (target: EthagentIdentity): Erc8004RegistryConfig | null => {
@@ -150,18 +140,17 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, cwd, ini
     return null
   }
 
-  const triggerRebackup = (back: Step, profileUpdates?: ProfileUpdates): void => {
+  const triggerRebackup = (backStep: Step, profileUpdates?: ProfileUpdates): void => {
     if (!identity) return
     const registry = resolveRegistryForIdentity(identity)
     if (!registry) {
-      errorStep(new Error('no agent registry configured for this identity'), back)
+      errorStep(new Error('no agent registry configured for this identity'), backStep)
       return
     }
     runRebackupPreflight(identity, registry, callbacks, profileUpdates)
-      .catch((err: unknown) => errorStep(err, back))
+      .catch((err: unknown) => errorStep(err, backStep))
   }
 
-  // --- Async effects ---
   useEffect(() => {
     if (step.kind !== 'create-preflight') return
     let cancelled = false
@@ -169,7 +158,7 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, cwd, ini
     runCreatePreflight(step, config, callbacks)
       .catch(async (err: unknown) => {
         await waitForMinimumBusyTime(startedAt)
-        if (!cancelled) errorStep(err, { kind: 'menu' })
+        if (!cancelled) errorStep(err, { kind: 'create-network', name: step.name, description: step.description })
       })
     return () => { cancelled = true }
   }, [step])
@@ -177,41 +166,27 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, cwd, ini
   useEffect(() => {
     if (step.kind !== 'create-signing') return
     let cancelled = false
+    const backStep: Step = { kind: 'create-network', name: step.name, description: step.description }
     runCreateSigning(step, callbacks)
-      .catch((err: unknown) => { if (!cancelled) handleStepError(err, { kind: 'menu' }) })
-    return () => { cancelled = true }
-  }, [step])
-
-  useEffect(() => {
-    if (step.kind !== 'create-pinning') return
-    let cancelled = false
-    const startedAt = Date.now()
-    runCreatePinning(step, callbacks)
-      .catch(async (err: unknown) => {
-        await waitForMinimumBusyTime(startedAt)
+      .catch((err: unknown) => {
         if (cancelled) return
         if (isRegistrationPreflightError(err)) {
-          errorStep(err, { kind: 'menu' })
+          errorStep(err, backStep)
           return
         }
-        setStep({
-          kind: 'create-storage',
-          name: step.name,
-          description: step.description,
-          registry: step.registry,
-          wallet: step.wallet,
-          error: pinataErrorText(err),
-          pinataJwt: step.pinataJwt,
-        })
+        if (isStorageError(err)) {
+          setStep({
+            kind: 'create-storage',
+            name: step.name,
+            description: step.description,
+            registry: step.registry,
+            error: pinataErrorText(err),
+            pinataJwt: step.pinataJwt,
+          })
+          return
+        }
+        handleStepError(err, backStep)
       })
-    return () => { cancelled = true }
-  }, [step])
-
-  useEffect(() => {
-    if (step.kind !== 'create-registering') return
-    let cancelled = false
-    runCreateRegistering(step, callbacks)
-      .catch((err: unknown) => { if (!cancelled) handleStepError(err, { kind: 'menu' }) })
     return () => { cancelled = true }
   }, [step])
 
@@ -227,7 +202,7 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, cwd, ini
           setStep({ kind: 'restore-token-id', ownerHandle: err.ownerAddress, registry: err.registry, error: err.message, purpose: step.purpose })
           return
         }
-        errorStep(err, { kind: 'restore-owner', purpose: step.purpose })
+        errorStep(err, { kind: 'restore-network', ownerHandle: step.ownerHandle, purpose: step.purpose })
       })
     return () => { cancelled = true }
   }, [step])
@@ -247,7 +222,7 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, cwd, ini
     runRestoreFetch(step, callbacks)
       .catch(async (err: unknown) => {
         await waitForMinimumBusyTime(startedAt)
-        if (!cancelled) errorStep(err, { kind: 'restore-owner', purpose: step.purpose })
+        if (!cancelled) errorStep(err, { kind: 'restore-network', ownerHandle: step.candidate.ownerAddress, purpose: step.purpose })
       })
     return () => { cancelled = true }
   }, [step])
@@ -256,7 +231,9 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, cwd, ini
     if (step.kind !== 'restore-authorizing') return
     let cancelled = false
     runRestoreAuthorize(step, callbacks)
-      .catch((err: unknown) => { if (!cancelled) handleStepError(err, { kind: 'restore-owner', purpose: step.purpose }) })
+      .catch((err: unknown) => {
+        if (!cancelled) handleStepError(err, { kind: 'restore-network', ownerHandle: step.candidate.ownerAddress, purpose: step.purpose })
+      })
     return () => { cancelled = true }
   }, [step])
 
@@ -264,64 +241,25 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, cwd, ini
     if (step.kind !== 'rebackup-signing') return
     let cancelled = false
     runRebackupSigning(step, callbacks)
-      .catch((err: unknown) => { if (!cancelled) handleStepError(err, { kind: 'menu' }) })
-    return () => { cancelled = true }
-  }, [step])
-
-  useEffect(() => {
-    if (step.kind !== 'rebackup-pinning') return
-    let cancelled = false
-    const startedAt = Date.now()
-    runRebackupPinning(step, callbacks)
-      .catch(async (err: unknown) => {
-        await waitForMinimumBusyTime(startedAt)
-        if (cancelled) return
-        setStep({
-          kind: 'rebackup-storage',
-          identity: step.identity,
-          registry: step.registry,
-          wallet: step.wallet,
-          error: pinataErrorText(err),
-          pinataJwt: step.pinataJwt,
-        })
-      })
-    return () => { cancelled = true }
-  }, [step])
-
-  useEffect(() => {
-    if (step.kind !== 'rebackup-uri') return
-    let cancelled = false
-    runRebackupUri(step, callbacks)
-      .catch((err: unknown) => { if (!cancelled) handleStepError(err, { kind: 'menu' }) })
-    return () => { cancelled = true }
-  }, [step])
-
-  useEffect(() => {
-    if (step.kind !== 'snapshot-exporting') return
-    let cancelled = false
-    runSnapshotExport(step.identity, { onWalletReady: setWalletSession })
-      .then(file => {
-        if (cancelled) return
-        setCopyNotice(`exported encrypted snapshot to ${file}`)
-        setStep({ kind: 'details' })
-      })
-      .catch((err: unknown) => { if (!cancelled) handleStepError(err, { kind: 'details' }, { kind: 'details' }) })
-    return () => { cancelled = true }
-  }, [step])
-
-  useEffect(() => {
-    if (step.kind !== 'snapshot-importing') return
-    let cancelled = false
-    runSnapshotImport(step.source, callbacks, cwd)
       .catch((err: unknown) => {
-        if (!cancelled) handleStepError(err, { kind: 'snapshot-import-path', initialPath: step.source, error: (err as Error).message }, { kind: 'details' })
+        if (cancelled) return
+        if (isStorageError(err)) {
+          setStep({
+            kind: 'rebackup-storage',
+            identity: step.identity,
+            registry: step.registry,
+            error: pinataErrorText(err),
+            pinataJwt: step.pinataJwt,
+            profileUpdates: step.profileUpdates,
+          })
+          return
+        }
+        handleStepError(err, { kind: 'details' })
       })
     return () => { cancelled = true }
   }, [step])
 
-  // --- Render ---
-  const chainLine = selectedNetworkFooter(config)
-  const footer = <Text color={theme.dim}>{`${chainLine} · enter select · esc back`}</Text>
+  const footer = <Text color={theme.dim}>enter select · esc back</Text>
 
   if (step.kind === 'menu') {
     return (
@@ -352,8 +290,7 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, cwd, ini
     )
   }
 
-  if (['replace-confirm', 'create-name', 'create-description', 'create-preflight', 'create-registry',
-       'create-signing', 'create-pinning', 'create-storage', 'create-registering'].includes(step.kind)) {
+  if (isCreateStep(step)) {
     return (
       <CreateFlow
         step={step}
@@ -379,7 +316,6 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, cwd, ini
               name: step.name,
               description: step.description,
               registry: step.registry,
-              wallet: step.wallet,
               error: (err as Error).message,
               pinataJwt: step.pinataJwt,
             })
@@ -389,12 +325,21 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, cwd, ini
           if (step.kind !== 'create-storage') return
           setStep({ ...step, error })
         }}
-        onBack={() => {
-          if (step.kind === 'create-name') setStep({ kind: 'menu' })
-          else if (step.kind === 'create-description') setStep({ kind: 'create-name' })
-          else setStep({ kind: 'menu' })
-        }}
+        onBack={back}
         onMenu={() => setStep({ kind: 'menu' })}
+      />
+    )
+  }
+
+  if (step.kind === 'create-network') {
+    return (
+      <NetworkScreen
+        config={config}
+        footer={footer}
+        onSelect={(network: SelectableNetwork) => {
+          setStep({ kind: 'create-preflight', name: step.name, description: step.description, network })
+        }}
+        onCancel={back}
       />
     )
   }
@@ -412,7 +357,7 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, cwd, ini
             errorStep(err, { kind: 'restore-network', ownerHandle: step.ownerHandle, purpose: step.purpose })
           }
         }}
-        onCancel={() => setStep({ kind: 'restore-owner', purpose: step.purpose })}
+        onCancel={back}
       />
     )
   }
@@ -454,43 +399,7 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, cwd, ini
           if (!candidate?.backup?.cid) return
           setStep({ kind: 'restore-fetching', cid: candidate.backup.cid, apiUrl: DEFAULT_IPFS_API_URL, candidate, purpose: step.purpose })
         }}
-        onBack={() => {
-          if (step.kind === 'restore-owner') setStep({ kind: 'menu' })
-          else if (step.kind === 'restore-registry') setStep({ kind: 'restore-owner', purpose: step.purpose })
-          else setStep({ kind: 'menu' })
-        }}
-        onMenu={() => setStep({ kind: 'menu' })}
-      />
-    )
-  }
-
-  if (step.kind === 'create-network') {
-    return (
-      <NetworkScreen
-        config={config}
-        footer={footer}
-        onSelect={(network: SelectableNetwork) => {
-          setStep({ kind: 'create-preflight', name: step.name, description: step.description, network })
-        }}
-        onCancel={() => setStep({ kind: 'create-description', name: step.name })}
-      />
-    )
-  }
-
-  if (step.kind === 'network') {
-    return (
-      <NetworkScreen
-        config={config}
-        footer={footer}
-        onSelect={async (network: SelectableNetwork) => {
-          try {
-            await runNetworkSelect(network, config, onConfigChange)
-            setStep({ kind: 'details' })
-          } catch (err: unknown) {
-            errorStep(err, { kind: 'details' })
-          }
-        }}
-        onCancel={() => setStep({ kind: 'details' })}
+        onBack={back}
       />
     )
   }
@@ -505,7 +414,6 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, cwd, ini
         copyNotice={copyNotice}
         canRebackup={canRebackup}
         canEditProfile={canRebackup}
-        canExportSnapshot={canExportSnapshot}
         footer={footer}
         onCopy={async (label, value) => {
           const result = await copyToClipboard(value)
@@ -524,35 +432,10 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, cwd, ini
           setStep({ kind: 'edit-profile-name', identity, registry })
         }}
         onRebackup={() => triggerRebackup({ kind: 'details' })}
-        onExportSnapshot={() => {
-          if (!identity) return
-          setStep({ kind: 'snapshot-exporting', identity })
-        }}
-        onImportSnapshot={() => setStep({ kind: 'snapshot-import-path' })}
         onStorageCredential={() => setStep({ kind: 'storage-credential' })}
         onForgetLocalData={() => setStep({ kind: 'forget-confirm' })}
-        onBack={() => setStep({ kind: 'menu' })}
+        onBack={back}
       />
-    )
-  }
-
-  if (step.kind === 'snapshot-import-path') {
-    return (
-      <Surface
-        title="import encrypted snapshot"
-        subtitle={step.error ?? 'paste an ethagent encrypted snapshot JSON export or its file path.'}
-        footer={footer}
-      >
-        <Text color={theme.dim}>Only the wallet that authorized the snapshot can decrypt it.</Text>
-        <TextInput
-          key={`snapshot-import-${step.initialPath ?? ''}`}
-          initialValue={step.initialPath ?? ''}
-          placeholder="C:\\path\\to\\ethagent-agent-export.json or { ... }"
-          validate={value => value.trim() ? null : 'enter a snapshot export path or JSON'}
-          onSubmit={value => setStep({ kind: 'snapshot-importing', source: value.trim() })}
-          onCancel={() => setStep({ kind: 'details' })}
-        />
-      </Surface>
     )
   }
 
@@ -580,7 +463,7 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, cwd, ini
             setStep({ kind: 'storage-credential-input', error: (err as Error).message })
           }
         }}
-        onCancel={() => setStep({ kind: 'details' })}
+        onCancel={back}
       />
     )
   }
@@ -599,13 +482,7 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, cwd, ini
           runRebackupPreflight(step.identity, step.registry, callbacks, updates)
             .catch((err: unknown) => errorStep(err, { kind: 'details' }))
         }}
-        onBack={() => {
-          if (step.kind === 'edit-profile-description') {
-            setStep({ kind: 'edit-profile-name', identity: step.identity, registry: step.registry })
-          } else {
-            setStep({ kind: 'details' })
-          }
-        }}
+        onBack={back}
         onMenu={() => setStep({ kind: 'details' })}
       />
     )
@@ -635,7 +512,7 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, cwd, ini
             }
           })()
         }}
-        onCancel={() => setStep({ kind: 'details' })}
+        onCancel={back}
       />
     )
   }
@@ -644,32 +521,10 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, cwd, ini
     return (
       <WalletApprovalScreen
         title="approve back up"
-        subtitle="sign the recovery challenge to refresh this agent's encrypted state."
+        subtitle="one browser flow signs, saves the IPFS backup, and updates tokenURI."
         walletSession={walletSession}
-        label="waiting for signature..."
-        onCancel={() => setStep({ kind: 'menu' })}
-      />
-    )
-  }
-
-  if (step.kind === 'rebackup-pinning') {
-    return (
-      <BusyScreen
-        title="save a snapshot"
-        label="pinning encrypted state and metadata..."
-        onCancel={() => setStep({ kind: 'menu' })}
-      />
-    )
-  }
-
-  if (step.kind === 'rebackup-uri') {
-    return (
-      <WalletApprovalScreen
-        title="update tokenURI"
-        subtitle="confirm the transaction so other devices restore the latest snapshot."
-        walletSession={walletSession}
-        label="waiting for transaction..."
-        onCancel={() => setStep({ kind: 'menu' })}
+        label="waiting for wallet approval..."
+        onCancel={() => setStep({ kind: 'details' })}
       />
     )
   }
@@ -686,19 +541,7 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, cwd, ini
             setStep({ ...step, error: (err as Error).message })
           }
         }}
-        onCancel={() => setStep({ kind: 'menu' })}
-      />
-    )
-  }
-
-  if (step.kind === 'snapshot-exporting') {
-    return (
-      <WalletApprovalScreen
-        title="export encrypted snapshot"
-        subtitle="sign with the snapshot owner wallet before writing the encrypted JSON."
-        walletSession={walletSession}
-        label="waiting for approval..."
-        onCancel={() => setStep({ kind: 'details' })}
+        onCancel={back}
       />
     )
   }
@@ -710,19 +553,7 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, cwd, ini
         subtitle="select the wallet that owns the agent you want to load."
         walletSession={walletSession}
         label="waiting for wallet..."
-        onCancel={() => setStep({ kind: 'restore-owner', purpose: step.purpose })}
-      />
-    )
-  }
-
-  if (step.kind === 'snapshot-importing') {
-    return (
-      <WalletApprovalScreen
-        title="import encrypted snapshot"
-        subtitle="sign with the wallet that authorized this snapshot."
-        walletSession={walletSession}
-        label="waiting for approval..."
-        onCancel={() => setStep({ kind: 'details' })}
+        onCancel={back}
       />
     )
   }
@@ -732,7 +563,7 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, cwd, ini
       <BusyScreen
         title="Identity Hub"
         label={step.label}
-        onCancel={() => setStep({ kind: 'menu' })}
+        onCancel={back}
       />
     )
   }
@@ -743,7 +574,7 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, cwd, ini
         error={step.error}
         back={step.back}
         footer={footer}
-        onBack={back => setStep(back)}
+        onBack={backStep => setStep(backStep)}
         onClose={() => onComplete({ kind: 'cancel' })}
       />
     )
@@ -752,20 +583,25 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, cwd, ini
   return null
 }
 
-function isRestoreStep(step: Step): step is Exclude<Extract<Step, { kind: `restore-${string}` }>, { kind: 'restore-wallet' }> {
-  return step.kind.startsWith('restore-') && step.kind !== 'restore-wallet'
+function isCreateStep(step: Step): step is Extract<Step, { kind: 'replace-confirm' | 'create-name' | 'create-description' | 'create-preflight' | 'create-registry' | 'create-signing' | 'create-storage' }> {
+  return step.kind === 'replace-confirm'
+    || step.kind === 'create-name'
+    || step.kind === 'create-description'
+    || step.kind === 'create-preflight'
+    || step.kind === 'create-registry'
+    || step.kind === 'create-signing'
+    || step.kind === 'create-storage'
+}
+
+function isRestoreStep(step: Step): step is Exclude<Extract<Step, { kind: `restore-${string}` }>, { kind: 'restore-wallet' | 'restore-network' }> {
+  return step.kind.startsWith('restore-') && step.kind !== 'restore-wallet' && step.kind !== 'restore-network'
 }
 
 function initialStepForAction(
   action: IdentityHubInitialAction | undefined,
   config: EthagentConfig | undefined,
-  importPath: string | undefined,
 ): Step {
   if (action === 'create') return config?.identity ? { kind: 'replace-confirm', next: 'create' } : { kind: 'create-name' }
-  if (action === 'import') return { kind: 'restore-owner', purpose: 'restore' }
-  if (action === 'export-snapshot') {
-    return config?.identity ? { kind: 'snapshot-exporting', identity: config.identity } : { kind: 'details' }
-  }
-  if (action === 'import-snapshot') return { kind: 'snapshot-import-path', initialPath: importPath }
+  if (action === 'load') return { kind: 'restore-owner', purpose: config?.identity ? 'switch' : 'restore' }
   return { kind: 'menu' }
 }

@@ -87,10 +87,10 @@ export type RestoreAgentStateBackupArgs = {
 
 export class AgentStateOwnerMismatchError extends Error {
   constructor(
-    readonly snapshotOwner: string,
+    readonly backupOwner: string,
     readonly currentOwner: string,
   ) {
-    super('agent state is encrypted for a previous wallet')
+    super('agent backup is encrypted for another wallet')
     this.name = 'AgentStateOwnerMismatchError'
   }
 }
@@ -109,7 +109,7 @@ export function createAgentStateRecoveryChallenge(ownerAddress: string): string 
   return [
     'ethagent encrypted state access',
     `Owner: ${checksum}`,
-    'Action: authorize this wallet to unlock the encrypted agent snapshot',
+    'Action: authorize this wallet to unlock the encrypted agent backup',
     'Version: 1',
   ].join('\n')
 }
@@ -287,11 +287,11 @@ export function restoreAgentStateBackupEnvelope(args: RestoreAgentStateBackupArg
   }
 }
 
-export function assertAgentStateSnapshotOwner(envelope: AgentStateBackupEnvelope, currentOwner: string): void {
-  const snapshotOwner = toChecksumAddress(envelope.ownerAddress)
+export function assertAgentStateBackupOwner(envelope: AgentStateBackupEnvelope, currentOwner: string): void {
+  const backupOwner = toChecksumAddress(envelope.ownerAddress)
   const owner = toChecksumAddress(currentOwner)
-  if (snapshotOwner.toLowerCase() !== owner.toLowerCase()) {
-    throw new AgentStateOwnerMismatchError(snapshotOwner, owner)
+  if (backupOwner.toLowerCase() !== owner.toLowerCase()) {
+    throw new AgentStateOwnerMismatchError(backupOwner, owner)
   }
 }
 

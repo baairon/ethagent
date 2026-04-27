@@ -22,7 +22,7 @@ On first run, ethagent creates or restores an ERC-8004 agent with the browser wa
 - Switch between OpenAI, Anthropic, Gemini, and local Ollama models.
 - Resume, rewind, compact, export, and diagnose local sessions.
 
-Your memory is encrypted for the wallet that authorized the snapshot. If the ERC-8004 token is transferred or stolen, the new holder can see public token metadata and backup CIDs, but cannot decrypt prior private memory. Only the owner wallet that authorized a snapshot can decrypt it.
+Your memory is encrypted for the wallet that authorized each backup. If the ERC-8004 token is transferred, the new holder can see public token metadata and backup CIDs, but cannot decrypt prior private memory without an explicit re-encryption handoff.
 
 ## Architecture
 

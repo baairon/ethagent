@@ -150,7 +150,7 @@
       font-size: 12px;
       background: transparent;
       border: 0;
-      padding: 0;
+      padding: 0.125rem 0;
       cursor: pointer;
       color: var(--subtle);
       display: inline-flex;
@@ -158,6 +158,11 @@
       gap: 0.5rem;
       letter-spacing: 0.02em;
       transition: color 0.12s;
+    }
+    .shortcut:focus { outline: none; }
+    .shortcut:focus-visible {
+      outline: 1px solid var(--hairline);
+      outline-offset: 0.25rem;
     }
     .shortcut:hover:not(:disabled) { color: var(--text); }
     .shortcut:disabled { opacity: 0.4; cursor: not-allowed; }
@@ -170,7 +175,7 @@
       align-items: center;
       justify-content: center;
       gap: 0.35rem;
-      padding: 0.1rem 0.45rem;
+      padding: 0.16rem 0.52rem;
       border: 1px solid var(--hairline);
       color: var(--subtle);
       font-size: 11px;
@@ -230,59 +235,56 @@
   </main>
 
   <script>
-    const eth = `░░░░░░░╗░░░░░░░░╗░░╗  ░░╗
+    const glyphs = {
+      ethagent: {
+        eth: `░░░░░░░╗░░░░░░░░╗░░╗  ░░╗
 ░░╔════╝╚══░░╔══╝░░║  ░░║
 ░░░░░╗     ░░║   ░░░░░░░║
 ░░╔══╝     ░░║   ░░╔══░░║
 ░░░░░░░╗   ░░║   ░░║  ░░║
-╚══════╝   ╚═╝   ╚═╝  ╚═╝`;
-
-    const A = [
-      ` █████╗ `,
-      `██╔══██╗`,
-      `███████║`,
-      `██╔══██║`,
-      `██║  ██║`,
-      `╚═╝  ╚═╝`,
-    ].join('\n');
-
-    const G = [
-      ` ██████╗ `,
-      `██╔════╝ `,
-      `██║  ███╗`,
-      `██║   ██║`,
-      `╚██████╔╝`,
-      ` ╚═════╝ `,
-    ].join('\n');
-
-    const E = [
-      `███████╗`,
-      `██╔════╝`,
-      `█████╗  `,
-      `██╔══╝  `,
-      `███████╗`,
-      `╚══════╝`,
-    ].join('\n');
-
-    const N = [
-      `███╗   ██╗`,
-      `████╗  ██║`,
-      `██╔██╗ ██║`,
-      `██║╚██╗██║`,
-      `██║ ╚████║`,
-      `╚═╝  ╚═══╝`,
-    ].join('\n');
-
-    const T = [
-      `████████╗`,
-      `╚══██╔══╝`,
-      `   ██║   `,
-      `   ██║   `,
-      `   ██║   `,
-      `   ╚═╝   `,
-    ].join('\n');
-
-    const eyes = `
+╚══════╝   ╚═╝   ╚═╝  ╚═╝`,
+        a: [
+          ` █████╗ `,
+          `██╔══██╗`,
+          `███████║`,
+          `██╔══██║`,
+          `██║  ██║`,
+          `╚═╝  ╚═╝`,
+        ].join('\n'),
+        g: [
+          ` ██████╗ `,
+          `██╔════╝ `,
+          `██║  ███╗`,
+          `██║   ██║`,
+          `╚██████╔╝`,
+          ` ╚═════╝ `,
+        ].join('\n'),
+        e: [
+          `███████╗`,
+          `██╔════╝`,
+          `█████╗  `,
+          `██╔══╝  `,
+          `███████╗`,
+          `╚══════╝`,
+        ].join('\n'),
+        n: [
+          `███╗   ██╗`,
+          `████╗  ██║`,
+          `██╔██╗ ██║`,
+          `██║╚██╗██║`,
+          `██║ ╚████║`,
+          `╚═╝  ╚═══╝`,
+        ].join('\n'),
+        t: [
+          `████████╗`,
+          `╚══██╔══╝`,
+          `   ██║   `,
+          `   ██║   `,
+          `   ██║   `,
+          `   ╚═╝   `,
+        ].join('\n'),
+      },
+      eyes: `
                                          -+:
                    :=-                    -%@@@%.
              *@@@@@#-                           *@@-
@@ -297,9 +299,20 @@
            -@:        *@                      .+%%
               :%#: --
               .-:
-                                                           `;
-
-    const TAGLINE = ' privacy-first AI agent with a portable Ethereum identity ';
+                                                           `,
+      tagline: ' privacy-first AI agent with a portable Ethereum identity ',
+      ellipsis: '…',
+      emDash: '—',
+      frame: {
+        topLeft: '╔═',
+        topRight: '╗',
+        side: '║',
+        bottomLeft: '╚═',
+        bottomRight: '╝',
+        horizontal: '═',
+      },
+    };
+    const ethagentGlyphOrder = ['eth', 'a', 'g', 'e', 'n', 't'];
 
     const eyePalette = [
       '#f5d8d8',
@@ -340,11 +353,11 @@
     function truncateToFit(text, max) {
       if (text.length <= max) return text;
       if (max <= 1) return text.slice(0, Math.max(0, max));
-      return text.slice(0, max - 1) + '…';
+      return text.slice(0, max - 1) + glyphs.ellipsis;
     }
 
     function renderEyes() {
-      return eyes
+      return glyphs.eyes
         .split('\n')
         .map(line => {
           const glyphPositions = [...line]
@@ -375,48 +388,39 @@
         return [
           renderEyes(),
           `<span style="color:var(--mint);font-weight:600">ethagent</span>`,
-          `<span style="color:var(--dim)">${escapeHtml(TAGLINE.trim())}</span>`,
+          `<span style="color:var(--dim)">${escapeHtml(glyphs.tagline.trim())}</span>`,
           contextLine ? `<span style="color:var(--dim)">${escapeHtml(contextLine)}</span>` : '',
           tipLine ? `<span style="color:var(--dim)">${escapeHtml(tipLine)}</span>` : '',
         ].filter(Boolean).join('\n');
       }
 
-      const ethLines = eth.split('\n');
-      const aLines = A.split('\n');
-      const gLines = G.split('\n');
-      const eLines = E.split('\n');
-      const nLines = N.split('\n');
-      const tLines = T.split('\n');
+      const logoLines = ethagentGlyphOrder.map(key => glyphs.ethagent[key].split('\n'));
+      const rowCount = Math.max(...logoLines.map(lines => lines.length));
 
       const boxWidth = 69;
-      const topPad = Math.max(0, boxWidth - TAGLINE.length - 1);
+      const topPad = Math.max(0, boxWidth - glyphs.tagline.length - 1);
       const bottomInline = contextLine ? ` ${truncateToFit(contextLine, boxWidth - 4)} ` : '';
       const bottomPad = Math.max(0, boxWidth - bottomInline.length - 1);
 
-      const rows = ethLines.map((_, index) => [
-        '<span style="color:var(--border)">║</span>',
-        `<span style="color:var(--border)">${escapeHtml(ethLines[index])}</span>`,
-        `<span style="color:var(--border)">${escapeHtml(aLines[index])}</span>`,
-        `<span style="color:var(--border)">${escapeHtml(gLines[index])}</span>`,
-        `<span style="color:var(--border)">${escapeHtml(eLines[index])}</span>`,
-        `<span style="color:var(--border)">${escapeHtml(nLines[index])}</span>`,
-        `<span style="color:var(--border)">${escapeHtml(tLines[index])}</span>`,
-        '<span style="color:var(--border)">║</span>',
+      const rows = Array.from({ length: rowCount }, (_, index) => [
+        `<span style="color:var(--border)">${glyphs.frame.side}</span>`,
+        ...logoLines.map(lines => `<span style="color:var(--border)">${escapeHtml(lines[index] || '')}</span>`),
+        `<span style="color:var(--border)">${glyphs.frame.side}</span>`,
       ].join(''));
 
       const top = [
-        '<span style="color:var(--border)">╔═</span>',
-        `<span style="color:var(--dim)">${escapeHtml(TAGLINE)}</span>`,
-        `<span style="color:var(--border)">${'═'.repeat(topPad)}╗</span>`,
+        `<span style="color:var(--border)">${glyphs.frame.topLeft}</span>`,
+        `<span style="color:var(--dim)">${escapeHtml(glyphs.tagline)}</span>`,
+        `<span style="color:var(--border)">${glyphs.frame.horizontal.repeat(topPad)}${glyphs.frame.topRight}</span>`,
       ].join('');
 
       const bottom = bottomInline
         ? [
-            '<span style="color:var(--border)">╚═</span>',
+            `<span style="color:var(--border)">${glyphs.frame.bottomLeft}</span>`,
             `<span style="color:var(--mint)">${escapeHtml(bottomInline)}</span>`,
-            `<span style="color:var(--border)">${'═'.repeat(bottomPad)}╝</span>`,
+            `<span style="color:var(--border)">${glyphs.frame.horizontal.repeat(bottomPad)}${glyphs.frame.bottomRight}</span>`,
           ].join('')
-        : `<span style="color:var(--border)">${'╚' + '═'.repeat(boxWidth) + '╝'}</span>`;
+        : `<span style="color:var(--border)">${glyphs.frame.bottomLeft[0] + glyphs.frame.horizontal.repeat(boxWidth) + glyphs.frame.bottomRight}</span>`;
 
       return [
         renderEyes(),
@@ -438,7 +442,7 @@
 
     function sizeRules() {
       const cols = splashWidthColumns();
-      const line = '═'.repeat(cols);
+      const line = glyphs.frame.horizontal.repeat(cols);
       ['rule-1','rule-2','rule-3'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.textContent = line;
@@ -479,19 +483,59 @@
       chainIdHex: '0xaa36a7',
       message: 'ethagent identity proof for 0x9F2a…BC4e',
     };
+    const CLOSE_DELAY_MS = 1800;
+    const CANCEL_CLOSE_DELAY_MS = 3200;
     const CHAINS = {
       '0x1': { name: 'Ethereum Mainnet' }, '0xaa36a7': { name: 'Sepolia' },
       '0x2105': { name: 'Base' }, '0x14a34': { name: 'Base Sepolia' },
       '0xa': { name: 'OP Mainnet' }, '0xa4b1': { name: 'Arbitrum One' },
+    };
+    const FLOW_COPY = {
+      account: {
+        accent: 'sign',
+        tabTitle: 'ethagent · connect wallet',
+        label: 'wallet request',
+        title: 'Connect wallet to find your agent',
+        detail: null,
+      },
+      sign: {
+        accent: 'sign',
+        tabTitle: 'ethagent · sign message',
+        label: 'signature request',
+        title: 'Sign a message to prove ownership',
+        detail: 'message',
+      },
+      'sign-transaction': {
+        accent: 'transaction',
+        tabTitle: 'ethagent · approve identity update',
+        label: 'identity approval',
+        title: 'Sign and submit in one wallet flow',
+        detail: 'message',
+      },
+      transaction: {
+        accent: 'transaction',
+        tabTitle: 'ethagent · submit transaction',
+        label: 'transaction request',
+        title: 'Submit transaction to mint your ERC-8004 agent',
+        detail: 'registry',
+      },
+    };
+    const STATE_TITLES = {
+      connecting: 'ethagent · connecting wallet',
+      approveSign: 'ethagent · approve signature',
+      preparingTransaction: 'ethagent · preparing transaction',
+      approveTransaction: 'ethagent · approve transaction',
+      error: 'ethagent · wallet error',
+      default: 'ethagent · wallet request',
     };
     function chainLabel(hex) {
       const k = String(hex || '').toLowerCase();
       return (CHAINS[k] && CHAINS[k].name) || ('chain ' + k);
     }
     function shortAddr(addr) {
-      if (!addr || typeof addr !== 'string') return '—';
+      if (!addr || typeof addr !== 'string') return glyphs.emDash;
       if (addr.length <= 14) return addr;
-      return addr.slice(0, 6) + '…' + addr.slice(-4);
+      return addr.slice(0, 6) + glyphs.ellipsis + addr.slice(-4);
     }
 
     const card = document.getElementById('card');
@@ -525,79 +569,74 @@
     }
     function setMarker(text) { stopSpinner(); statusMarker.textContent = text; }
 
-    function tabTitleForFlow() {
-      if (config.kind === 'account') return 'ethagent · connect wallet';
-      if (config.kind === 'sign') return 'ethagent · sign message';
-      if (config.kind === 'transaction') return 'ethagent · submit transaction';
-      return 'ethagent · wallet request';
+    function flowCopy() {
+      return FLOW_COPY[config.kind] || FLOW_COPY.sign;
     }
 
     function tabTitleForState(state) {
-      switch (state) {
-        case 'connecting':
-          return 'ethagent · connecting wallet';
-        case 'approve':
-          return config.kind === 'account'
-            ? 'ethagent · approve connection'
-            : config.kind === 'sign'
-            ? 'ethagent · approve signature'
-            : 'ethagent · approve transaction';
-        case 'submitting':
-          return config.kind === 'account'
-            ? 'ethagent · connecting wallet'
-            : config.kind === 'sign'
-            ? 'ethagent · verifying signature'
-            : 'ethagent · confirming transaction';
-        case 'done':
-          return config.kind === 'account'
-            ? 'ethagent · wallet connected'
-            : config.kind === 'sign'
-            ? 'ethagent · message signed'
-            : 'ethagent · transaction submitted';
-        case 'error':
-          return 'ethagent · wallet error';
-        default:
-          return tabTitleForFlow();
+      if (state === 'connecting') return STATE_TITLES.connecting;
+      if (state === 'approve-sign') return STATE_TITLES.approveSign;
+      if (state === 'preparing-transaction') return STATE_TITLES.preparingTransaction;
+      if (state === 'approve-transaction') return STATE_TITLES.approveTransaction;
+      if (state === 'error') return STATE_TITLES.error;
+      if (state === 'approve') {
+        if (config.kind === 'account') return 'ethagent · approve connection';
+        if (config.kind === 'sign') return STATE_TITLES.approveSign;
+        return STATE_TITLES.approveTransaction;
       }
+      if (state === 'submitting') {
+        if (config.kind === 'account') return STATE_TITLES.connecting;
+        if (config.kind === 'sign') return 'ethagent · verifying signature';
+        return 'ethagent · confirming transaction';
+      }
+      if (state === 'done') {
+        if (config.kind === 'account') return 'ethagent · wallet connected';
+        if (config.kind === 'sign') return 'ethagent · message signed';
+        return 'ethagent · transaction submitted';
+      }
+      return flowCopy().tabTitle || STATE_TITLES.default;
     }
 
     function setTabTitle(title) {
-      document.title = title || tabTitleForFlow();
+      document.title = title || flowCopy().tabTitle || STATE_TITLES.default;
+    }
+
+    function detailPreview(copy) {
+      if (copy.detail === 'message') {
+        const preview = (config.message || '').split('\n')[0] || 'prepared at signing time';
+        return preview.length > 64 ? preview.slice(0, 64) + glyphs.ellipsis : preview;
+      }
+      if (copy.detail === 'registry' && config.tx) return shortAddr(config.tx.to);
+      return '';
     }
 
     function applyFlowChrome() {
-      const isSign = config.kind === 'sign';
-      const isAccount = config.kind === 'account';
-      card.dataset.flow = isSign || isAccount ? 'sign' : 'transaction';
-      promptText.textContent = isAccount ? 'wallet request' : isSign ? 'signature request' : 'transaction request';
-      setTabTitle(tabTitleForFlow());
-      flowTitle.textContent = isAccount
-        ? 'Connect wallet to find your agent'
-        : isSign
-          ? 'Sign a message to prove ownership'
-          : 'Submit transaction to mint your ERC-8004 agent';
+      const copy = flowCopy();
+      card.dataset.flow = copy.accent;
+      promptText.textContent = copy.label;
+      flowTitle.textContent = copy.title;
+      setTabTitle(copy.tabTitle);
 
-      if (isAccount) {
+      if (!copy.detail) {
         networkRow.hidden = true;
         flowDetail.hidden = true;
       } else {
         networkRow.hidden = false;
         flowDetail.hidden = false;
         netVal.textContent = chainLabel(config.chainIdHex);
-
-        if (isSign) {
-          detailKey.textContent = 'message';
-          const preview = (config.message || '').split('\n')[0] || 'prepared at signing time';
-          detailVal.textContent = preview.length > 64 ? preview.slice(0, 64) + '…' : preview;
-        } else if (config.tx) {
-          detailKey.textContent = 'registry';
-          detailVal.textContent = shortAddr(config.tx.to);
-        } else {
-          flowDetail.hidden = true;
-        }
+        detailKey.textContent = copy.detail;
+        detailVal.textContent = detailPreview(copy);
+        flowDetail.hidden = detailVal.textContent.length === 0;
       }
 
       requestAnimationFrame(sizeRules);
+    }
+
+    function setStatus(marker, text, hint, spin) {
+      if (spin) startSpinner();
+      else setMarker(marker);
+      statusText.textContent = text;
+      statusHint.textContent = hint;
     }
 
     function setState(state, payload) {
@@ -607,41 +646,42 @@
       setTabTitle(tabTitleForState(state));
       switch (state) {
         case 'connecting':
-          startSpinner();
-          statusText.textContent = 'connecting to your wallet…';
-          statusHint.textContent = 'open your wallet extension if it doesn\u2019t pop up automatically.';
+          setStatus('[ ]', 'connecting to your wallet…', 'open your wallet extension if it does not pop up automatically.', true);
           break;
         case 'approve':
-          setMarker('[?]');
-          statusText.textContent = config.kind === 'account'
-            ? 'approve wallet connection'
-            : config.kind === 'sign'
-            ? 'approve the signature in your wallet'
-            : 'review and submit the transaction in your wallet';
-          statusHint.textContent = config.kind === 'account'
-            ? 'ethagent will use the selected address to search for owned agents.'
-            : config.kind === 'sign'
-            ? 'a prompt should be open. ethagent is waiting for your signature.'
-            : 'check the network and contract address before approving.';
+          if (config.kind === 'account') {
+            setStatus('[?]', 'approve wallet connection', 'ethagent will use the address selected in wallet to search for owned agents.');
+          } else if (config.kind === 'sign') {
+            setStatus('[?]', 'approve the signature in your wallet', 'a prompt should be open. ethagent is waiting for your signature.');
+          } else {
+            setStatus('[?]', 'review and submit the transaction in your wallet', 'check the network and contract address before approving.');
+          }
+          break;
+        case 'approve-sign':
+          setStatus('[1]', 'approve the signature in your wallet', 'ethagent uses this to encrypt or unlock the agent backup.');
+          break;
+        case 'preparing-transaction':
+          setStatus('[ ]', 'saving encrypted IPFS backup and preparing transaction...', 'keep this page open. the transaction prompt will appear here.', true);
+          break;
+        case 'approve-transaction':
+          setStatus('[2]', 'review and submit the transaction in your wallet', 'check the network and contract address before approving.');
           break;
         case 'submitting':
-          startSpinner();
           if (config.kind === 'account') {
-            statusText.textContent = 'connecting wallet…';
-            statusHint.textContent = 'sending the selected address back to ethagent.';
+            setStatus('[ ]', 'connecting wallet…', 'sending the selected address back to ethagent.', true);
           } else if (config.kind === 'sign') {
-            statusText.textContent = 'verifying signature…';
-            statusHint.textContent = 'recovering the signing address.';
+            setStatus('[ ]', 'verifying signature…', 'recovering the signing address.', true);
           } else {
-            statusText.textContent = 'submitted · waiting for confirmation…';
-            statusHint.textContent = 'your wallet has accepted the transaction.';
+            setStatus('[ ]', 'submitted · waiting for confirmation…', 'your wallet has accepted the transaction.', true);
           }
           break;
         case 'done':
           setMarker('[✓]');
-          statusText.textContent = config.kind === 'account' ? 'connected - returning to ethagent' : config.kind === 'sign'
-            ? 'signed · returning to ethagent'
-            : 'submitted · returning to ethagent';
+          statusText.textContent = config.kind === 'account'
+            ? 'connected - returning to ethagent'
+            : config.kind === 'sign'
+              ? 'signed · returning to ethagent'
+              : 'submitted · returning to ethagent';
           if (payload.txHash) {
             statusHint.innerHTML = '<span class="result-row"><span class="label">tx</span><span class="value">'+escapeHtml(payload.txHash)+'</span></span>';
           } else {
@@ -686,7 +726,16 @@
       if (!r.ok || !d.ok) throw new Error(d.error || 'wallet request failed');
       return d;
     }
-    function closeSoon() { setTimeout(() => { window.close(); window.open('','_self'); window.close(); }, 1200); }
+    function closeSoon(delayMs) {
+      setTimeout(() => {
+        try {
+          if (window.opener && !window.opener.closed) window.opener.focus();
+        } catch (_) {}
+        window.close();
+        window.open('','_self');
+        window.close();
+      }, delayMs == null ? CLOSE_DELAY_MS : delayMs);
+    }
 
     async function ensureWallet() {
       if (!window.ethereum) throw new Error('No browser wallet detected. Install MetaMask, Rabby, or use Brave, then reload.');
@@ -719,6 +768,22 @@
           await post('/complete', { account, message: prepared.message, signature });
           setState('done'); closeSoon(); return;
         }
+        if (config.kind === 'sign-transaction') {
+          const prepared = config.message ? { message: config.message } : await post('/prepare', { account });
+          setState('approve-sign');
+          const signature = await window.ethereum.request({ method:'personal_sign', params:[prepared.message, account] });
+          setState('preparing-transaction');
+          const txPayload = await post('/prepare-transaction', { account, message: prepared.message, signature });
+          setState('approve-transaction');
+          const tx = txPayload.tx || {};
+          const txHash = await window.ethereum.request({
+            method:'eth_sendTransaction',
+            params:[{ from:account, to:tx.to, data:tx.data, value:tx.value }]
+          });
+          setState('submitting');
+          await post('/complete', { account, txHash });
+          setState('done', { txHash }); closeSoon(); return;
+        }
         if (config.kind === 'transaction') {
           setState('approve');
           const txHash = await window.ethereum.request({
@@ -740,7 +805,7 @@
       await post('/cancel', {}).catch(() => {});
       setState('done');
       statusText.textContent = 'cancelled · returning to ethagent';
-      closeSoon();
+      closeSoon(CANCEL_CLOSE_DELAY_MS);
     }
     approve.onclick = runWalletFlow;
     cancel.onclick = cancelFlow;

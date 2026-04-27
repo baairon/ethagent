@@ -1,59 +1,57 @@
 import React, { useEffect, useState } from 'react'
 import { Text, Box } from 'ink'
 import { eyeGradientColor, theme } from './theme.js'
-const eth = `░░░░░░░╗░░░░░░░░╗░░╗  ░░╗
+
+const glyphs = {
+  ethagent: {
+    eth: `░░░░░░░╗░░░░░░░░╗░░╗  ░░╗
 ░░╔════╝╚══░░╔══╝░░║  ░░║
 ░░░░░╗     ░░║   ░░░░░░░║
 ░░╔══╝     ░░║   ░░╔══░░║
 ░░░░░░░╗   ░░║   ░░║  ░░║
-╚══════╝   ╚═╝   ╚═╝  ╚═╝`
-
-const A = [
-  ` █████╗ `,
-  `██╔══██╗`,
-  `███████║`,
-  `██╔══██║`,
-  `██║  ██║`,
-  `╚═╝  ╚═╝`,
-].join('\n')
-
-const G = [
-  ` ██████╗ `,
-  `██╔════╝ `,
-  `██║  ███╗`,
-  `██║   ██║`,
-  `╚██████╔╝`,
-  ` ╚═════╝ `,
-].join('\n')
-
-const E = [
-  `███████╗`,
-  `██╔════╝`,
-  `█████╗  `,
-  `██╔══╝  `,
-  `███████╗`,
-  `╚══════╝`,
-].join('\n')
-
-const N = [
-  `███╗   ██╗`,
-  `████╗  ██║`,
-  `██╔██╗ ██║`,
-  `██║╚██╗██║`,
-  `██║ ╚████║`,
-  `╚═╝  ╚═══╝`,
-].join('\n')
-
-const T = [
-  `████████╗`,
-  `╚══██╔══╝`,
-  `   ██║   `,
-  `   ██║   `,
-  `   ██║   `,
-  `   ╚═╝   `,
-].join('\n')
-
-const eyes = `
+╚══════╝   ╚═╝   ╚═╝  ╚═╝`,
+    a: [
+      ` █████╗ `,
+      `██╔══██╗`,
+      `███████║`,
+      `██╔══██║`,
+      `██║  ██║`,
+      `╚═╝  ╚═╝`,
+    ].join('\n'),
+    g: [
+      ` ██████╗ `,
+      `██╔════╝ `,
+      `██║  ███╗`,
+      `██║   ██║`,
+      `╚██████╔╝`,
+      ` ╚═════╝ `,
+    ].join('\n'),
+    e: [
+      `███████╗`,
+      `██╔════╝`,
+      `█████╗  `,
+      `██╔══╝  `,
+      `███████╗`,
+      `╚══════╝`,
+    ].join('\n'),
+    n: [
+      `███╗   ██╗`,
+      `████╗  ██║`,
+      `██╔██╗ ██║`,
+      `██║╚██╗██║`,
+      `██║ ╚████║`,
+      `╚═╝  ╚═══╝`,
+    ].join('\n'),
+    t: [
+      `████████╗`,
+      `╚══██╔══╝`,
+      `   ██║   `,
+      `   ██║   `,
+      `   ██║   `,
+      `   ╚═╝   `,
+    ].join('\n'),
+  },
+  eyes: `
                                          -+:
                    :=-                    -%@@@%.
              *@@@@@#-                           *@@-
@@ -68,10 +66,23 @@ const eyes = `
            -@:        *@                      .+%%
               :%#: --
               .-:
-                                                           `
+                                                           `,
+  tagline: ' privacy-first AI agent with a portable Ethereum identity ',
+  ellipsis: '…',
+  frame: {
+    topLeft: '╔═',
+    topRight: '╗',
+    side: '║',
+    bottomLeft: '╚═',
+    bottomRight: '╝',
+    horizontal: '═',
+  },
+} as const
+
+const ethagentGlyphOrder = ['eth', 'a', 'g', 'e', 'n', 't'] as const
 
 const Eyes = () => {
-  const lines = eyes.split('\n')
+  const lines = glyphs.eyes.split('\n')
   return (
     <Box flexDirection="column">
       {lines.map((line, li) => {
@@ -105,8 +116,6 @@ type SplashProps = {
   compact?: boolean
 }
 
-const TAGLINE = ' privacy-first AI agent with a portable Ethereum identity '
-
 export const BrandSplash: React.FC<SplashProps> = ({ contextLine, tipLine, compact }) => {
   const [width, setWidth] = useState<number>(() => process.stdout.columns ?? 80)
 
@@ -126,22 +135,18 @@ export const BrandSplash: React.FC<SplashProps> = ({ contextLine, tipLine, compa
       <Box flexDirection="column" alignSelf="flex-start" padding={1}>
         <Eyes />
         <Text bold color={theme.accentPrimary}>ethagent</Text>
-        <Text color={theme.dim}>{TAGLINE.trim()}</Text>
+        <Text color={theme.dim}>{glyphs.tagline.trim()}</Text>
         {contextLine ? <Text color={theme.dim}>{contextLine}</Text> : null}
         {tipLine ? <Text color={theme.dim}>{tipLine}</Text> : null}
       </Box>
     )
   }
 
-  const ethLines = eth.split('\n')
-  const aLines = A.split('\n')
-  const gLines = G.split('\n')
-  const eLines = E.split('\n')
-  const nLines = N.split('\n')
-  const tLines = T.split('\n')
+  const logoLines = ethagentGlyphOrder.map(key => glyphs.ethagent[key].split('\n'))
+  const rowCount = Math.max(...logoLines.map(lines => lines.length))
 
   const w = 69
-  const topPad = Math.max(0, w - TAGLINE.length - 1)
+  const topPad = Math.max(0, w - glyphs.tagline.length - 1)
 
   const bottomInline = contextLine ? ` ${truncateToFit(contextLine, w - 4)} ` : ''
   const bottomPad = Math.max(0, w - bottomInline.length - 1)
@@ -150,30 +155,27 @@ export const BrandSplash: React.FC<SplashProps> = ({ contextLine, tipLine, compa
     <Box flexDirection="column" alignSelf="flex-start" padding={1}>
       <Eyes />
       <Text>
-        <Text color={theme.border}>╔═</Text>
-        <Text color={theme.dim}>{TAGLINE}</Text>
-        <Text color={theme.border}>{'═'.repeat(topPad)}╗</Text>
+        <Text color={theme.border}>{glyphs.frame.topLeft}</Text>
+        <Text color={theme.dim}>{glyphs.tagline}</Text>
+        <Text color={theme.border}>{glyphs.frame.horizontal.repeat(topPad)}{glyphs.frame.topRight}</Text>
       </Text>
-      {ethLines.map((_line, i) => (
+      {Array.from({ length: rowCount }, (_, i) => (
         <Box key={i}>
-          <Text color={theme.border}>║</Text>
-          <Text color={theme.border}>{ethLines[i]}</Text>
-          <Text color={theme.border}>{aLines[i]}</Text>
-          <Text color={theme.border}>{gLines[i]}</Text>
-          <Text color={theme.border}>{eLines[i]}</Text>
-          <Text color={theme.border}>{nLines[i]}</Text>
-          <Text color={theme.border}>{tLines[i]}</Text>
-          <Text color={theme.border}>║</Text>
+          <Text color={theme.border}>{glyphs.frame.side}</Text>
+          {logoLines.map((lines, index) => (
+            <Text key={ethagentGlyphOrder[index]} color={theme.border}>{lines[i] ?? ''}</Text>
+          ))}
+          <Text color={theme.border}>{glyphs.frame.side}</Text>
         </Box>
       ))}
       {bottomInline ? (
         <Text>
-          <Text color={theme.border}>╚═</Text>
+          <Text color={theme.border}>{glyphs.frame.bottomLeft}</Text>
           <Text color={theme.accentMint}>{bottomInline}</Text>
-          <Text color={theme.border}>{'═'.repeat(bottomPad)}╝</Text>
+          <Text color={theme.border}>{glyphs.frame.horizontal.repeat(bottomPad)}{glyphs.frame.bottomRight}</Text>
         </Text>
       ) : (
-        <Text color={theme.border}>{'╚' + '═'.repeat(w) + '╝'}</Text>
+        <Text color={theme.border}>{glyphs.frame.bottomLeft.slice(0, 1) + glyphs.frame.horizontal.repeat(w) + glyphs.frame.bottomRight}</Text>
       )}
       {tipLine ? (
         <Box marginTop={1}>
@@ -187,5 +189,5 @@ export const BrandSplash: React.FC<SplashProps> = ({ contextLine, tipLine, compa
 function truncateToFit(text: string, max: number): string {
   if (text.length <= max) return text
   if (max <= 1) return text.slice(0, Math.max(0, max))
-  return text.slice(0, max - 1) + '…'
+  return text.slice(0, max - 1) + glyphs.ellipsis
 }

@@ -9,8 +9,6 @@ import { IdentitySummary } from './IdentitySummary.js'
 type DetailsAction =
   | 'edit'
   | 'rebackup'
-  | 'export-snapshot'
-  | 'import-snapshot'
   | 'copy'
   | 'storage-credential'
   | 'forget-local'
@@ -24,15 +22,12 @@ type DetailsScreenProps = {
   copyNotice?: string | null
   canRebackup: boolean
   canEditProfile: boolean
-  canExportSnapshot: boolean
   footer: React.ReactNode
   onCopy: (label: string, value: string) => void
   onOpenCopyPicker: () => void
   onCloseCopyPicker: () => void
   onEditProfile: () => void
   onRebackup: () => void
-  onExportSnapshot: () => void
-  onImportSnapshot: () => void
   onStorageCredential: () => void
   onForgetLocalData: () => void
   onBack: () => void
@@ -46,28 +41,25 @@ export const DetailsScreen: React.FC<DetailsScreenProps> = ({
   copyNotice,
   canRebackup,
   canEditProfile,
-  canExportSnapshot,
   footer,
   onCopy,
   onOpenCopyPicker,
   onCloseCopyPicker,
   onEditProfile,
   onRebackup,
-  onExportSnapshot,
-  onImportSnapshot,
   onStorageCredential,
   onForgetLocalData,
   onBack,
 }) => {
   const subtitle = copyPicker
     ? 'pick a value to copy.'
-    : copyNotice ?? 'profile, technical values, storage, and local cleanup.'
+    : copyNotice ?? 'profile, values, IPFS storage, and local cleanup.'
 
   const copyable = copyableIdentityFields(identity)
 
   if (copyPicker) {
     return (
-      <Surface title="agent settings" subtitle={subtitle} footer={footer}>
+      <Surface title="copy values" subtitle={subtitle} footer={footer}>
         <IdentitySummary identity={identity} config={config} />
         <Box marginTop={1}>
           <Select<string>
@@ -83,16 +75,14 @@ export const DetailsScreen: React.FC<DetailsScreenProps> = ({
     )
   }
 
-  const credentialLabel = jwtSaved ? 'IPFS credential' : 'add IPFS credential'
-  const options: Array<{ value: DetailsAction; label: string; disabled?: boolean }> = [
-    { value: 'edit', label: 'edit profile', disabled: !canEditProfile },
-    { value: 'rebackup', label: 'back up', disabled: !canRebackup },
-    { value: 'export-snapshot', label: 'export snapshot', disabled: !canExportSnapshot },
-    { value: 'import-snapshot', label: 'import snapshot' },
-    { value: 'copy', label: 'copy values', disabled: copyable.length === 0 },
-    { value: 'storage-credential', label: credentialLabel },
-    { value: 'forget-local', label: 'forget local agent' },
-    { value: 'back', label: 'back to hub' },
+  const credentialLabel = jwtSaved ? 'IPFS storage' : 'connect IPFS storage'
+  const options: Array<{ value: DetailsAction; label: string; hint: string; disabled?: boolean }> = [
+    { value: 'edit', label: 'edit profile', hint: 'rename the agent or update its description.', disabled: !canEditProfile },
+    { value: 'rebackup', label: 'back up', hint: 'save encrypted state to IPFS and refresh tokenURI.', disabled: !canRebackup },
+    { value: 'copy', label: 'copy values', hint: 'copy owner, token id, CIDs, or agent URI.', disabled: copyable.length === 0 },
+    { value: 'storage-credential', label: credentialLabel, hint: 'manage the local token used for IPFS pinning.' },
+    { value: 'forget-local', label: 'forget local agent', hint: 'remove this machine’s active agent pointer only.' },
+    { value: 'back', label: 'back', hint: 'return to the identity hub.' },
   ]
 
   return (
@@ -105,8 +95,6 @@ export const DetailsScreen: React.FC<DetailsScreenProps> = ({
             if (choice === 'edit') return onEditProfile()
             if (choice === 'copy') return onOpenCopyPicker()
             if (choice === 'rebackup') return onRebackup()
-            if (choice === 'export-snapshot') return onExportSnapshot()
-            if (choice === 'import-snapshot') return onImportSnapshot()
             if (choice === 'storage-credential') return onStorageCredential()
             if (choice === 'forget-local') return onForgetLocalData()
             return onBack()
