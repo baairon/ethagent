@@ -5,7 +5,9 @@ import {
   MAX_CONTINUATION_NUDGES,
   looksLikeContinuationIntent,
   looksLikeToolCapabilityConfusion,
+  looksLikeToolStateClaimWithoutTool,
   parseLocalModelTextToolUse,
+  parseLocalModelTextToolUses,
   runRuntimeTurn,
   type TurnEvent,
 } from '../src/runtime/turn.js'
@@ -206,9 +208,171 @@ test('runRuntimeTurn converts bare Ollama JSON tool text into a real tool use', 
   assert.equal(callsRef.count, 2)
   assert.deepEqual(executedTools, ['list_directory'])
   assert.ok(events.some(e => e.type === 'tool_use_stop' && e.name === 'list_directory'))
+  assert.ok(events.some(e => e.type === 'local_tool_recovery'))
   assert.ok(events.every(e =>
     e.type !== 'assistant_message_committed' || !e.text.includes('"name": "list_directory"'),
   ))
+})
+
+test('runRuntimeTurn converts multiple standalone Ollama JSON tool lines into tool uses', async () => {
+  const { provider, callsRef } = textProvider([
+    [
+      {
+        type: 'text',
+        delta: [
+          'My apologies for that oversight. Let me change directories for you properly.',
+          '',
+          '{"name":"change_directory","arguments":{"path":"~/Downloads/ethagent"}}',
+          '{"name":"read_file","arguments":{"path":"."}}',
+        ].join('\n'),
+      },
+      { type: 'done', stopReason: 'end_turn' },
+    ],
+    [
+      { type: 'text', delta: 'Tool calls completed.' },
+      { type: 'done', stopReason: 'end_turn' },
+    ],
+  ])
+
+  const executedTools: string[] = []
+  const events = await collect(
+    runRuntimeTurn({
+      provider,
+      signal: new AbortController().signal,
+      initialMessages: [{ role: 'user', content: 'change directory then inspect' }],
+      rebuildMessages: () => [{ role: 'user', content: 'change directory then inspect' }],
+      runToolBatch: async pending => {
+        executedTools.push(...pending.map(t => t.name))
+        return {
+          cancelled: false,
+          completedTools: pending.map(t => ({
+            ...t,
+            cwd: '/tmp',
+            result: { ok: true, summary: `${t.name} ok`, content: 'ok' },
+          })),
+        }
+      },
+    }),
+  )
+
+  assert.equal(callsRef.count, 2)
+  assert.deepEqual(executedTools, ['change_directory', 'read_file'])
+  assert.equal(events.filter(e => e.type === 'tool_use_stop').length, 2)
+  assert.ok(events.every(e =>
+    e.type !== 'assistant_message_committed' || !e.text.includes('"name":"change_directory"'),
+  ))
+})
+
+test('runRuntimeTurn nudges local models that claim directory changes before tool use', async () => {
+  const { provider, callsRef } = textProvider([
+    [
+      { type: 'text', delta: 'I am now in the identity directory. Is there something specific you would like to do next?' },
+      { type: 'done', stopReason: 'end_turn' },
+    ],
+    [
+      {
+        type: 'tool_use_stop',
+        id: 'tool-1',
+        name: 'change_directory',
+        input: { path: 'identity' },
+      },
+      { type: 'done', stopReason: 'tool_use' },
+    ],
+    [
+      { type: 'text', delta: 'Now the directory change is complete.' },
+      { type: 'done', stopReason: 'end_turn' },
+    ],
+  ])
+
+  const executedTools: string[] = []
+  const events = await collect(
+    runRuntimeTurn({
+      provider,
+      signal: new AbortController().signal,
+      initialMessages: [{ role: 'user', content: 'yes' }],
+      rebuildMessages: () => [{ role: 'user', content: 'yes' }],
+      runToolBatch: async pending => {
+        executedTools.push(...pending.map(t => t.name))
+        return {
+          cancelled: false,
+          completedTools: pending.map(t => ({
+            ...t,
+            cwd: '/tmp',
+            result: { ok: true, summary: 'changed directory', content: '/tmp/identity' },
+          })),
+        }
+      },
+    }),
+  )
+
+  assert.equal(callsRef.count, 3)
+  assert.deepEqual(executedTools, ['change_directory'])
+  const nudge = events.find(e => e.type === 'continuation_nudge')
+  assert.deepEqual(nudge, { type: 'continuation_nudge', attempt: 1, reason: 'tool_state_claim' })
+})
+
+test('runRuntimeTurn rejects unsupported missing-path claims and retries without reinforcing them', async () => {
+  const seenMessages: Message[][] = []
+  let calls = 0
+  const provider: Provider = {
+    id: 'ollama',
+    model: 'qwen-test',
+    supportsTools: true,
+    async *complete(messages): AsyncIterable<StreamEvent> {
+      seenMessages.push(messages)
+      calls += 1
+      if (calls === 1) {
+        yield {
+          type: 'text',
+          delta: 'It appears that the directory identity does not exist in your current working directory.',
+        }
+        yield { type: 'done', stopReason: 'end_turn' }
+        return
+      }
+      if (calls === 2) {
+        yield {
+          type: 'tool_use_stop',
+          id: 'tool-1',
+          name: 'change_directory',
+          input: { path: 'identity' },
+        }
+        yield { type: 'done', stopReason: 'tool_use' }
+        return
+      }
+      yield { type: 'text', delta: 'Changed into identity.' }
+      yield { type: 'done', stopReason: 'end_turn' }
+    },
+  }
+
+  const executedTools: string[] = []
+  const events = await collect(
+    runRuntimeTurn({
+      provider,
+      signal: new AbortController().signal,
+      initialMessages: [{ role: 'user', content: 'cd into identity' }],
+      rebuildMessages: () => [{ role: 'user', content: 'cd into identity' }],
+      runToolBatch: async pending => {
+        executedTools.push(...pending.map(t => t.name))
+        return {
+          cancelled: false,
+          completedTools: pending.map(t => ({
+            ...t,
+            cwd: '/tmp',
+            result: { ok: true, summary: 'changed directory', content: '/tmp/identity' },
+          })),
+        }
+      },
+    }),
+  )
+
+  assert.equal(calls, 3)
+  assert.deepEqual(executedTools, ['change_directory'])
+  assert.deepEqual(
+    events.find(e => e.type === 'continuation_nudge'),
+    { type: 'continuation_nudge', attempt: 1, reason: 'tool_state_claim' },
+  )
+  assert.doesNotMatch(JSON.stringify(seenMessages[1]), /does not exist/)
+  assert.match(JSON.stringify(seenMessages[1]), /Call the tool now/)
 })
 
 test('runRuntimeTurn nudges local models that claim they cannot use available tools', async () => {
@@ -258,7 +422,10 @@ test('runRuntimeTurn nudges local models that claim they cannot use available to
 
   assert.equal(callsRef.count, 3)
   assert.deepEqual(executedTools, ['run_bash'])
-  assert.equal(events.filter(e => e.type === 'continuation_nudge').length, 1)
+  assert.deepEqual(
+    events.find(e => e.type === 'continuation_nudge'),
+    { type: 'continuation_nudge', attempt: 1, reason: 'tool_capability' },
+  )
 })
 
 test('runRuntimeTurn caps continuation nudges at MAX_CONTINUATION_NUDGES', async () => {
@@ -393,7 +560,7 @@ test('looksLikeContinuationIntent ignores explanatory text without action verbs'
   assert.equal(looksLikeContinuationIntent('I think you should try reading the file.'), false)
 })
 
-test('parseLocalModelTextToolUse accepts only exact local-model tool payloads', () => {
+test('parseLocalModelTextToolUse accepts single local-model tool payloads', () => {
   assert.deepEqual(
     parseLocalModelTextToolUse(
       { id: 'ollama' },
@@ -426,6 +593,25 @@ test('parseLocalModelTextToolUse accepts only exact local-model tool payloads', 
   assert.deepEqual(
     parseLocalModelTextToolUse(
       { id: 'ollama' },
+      [
+        'Here is the directory listing:',
+        '',
+        '```code',
+        'README.md  identity  plans',
+        '```',
+        '',
+        'Next, I will change directories.',
+        '',
+        '```json',
+        '{"name":"change_directory","arguments":{"path":"identity"}}',
+        '```',
+      ].join('\n'),
+    ),
+    { id: 'local-text-tool-0', name: 'change_directory', input: { path: 'identity' } },
+  )
+  assert.deepEqual(
+    parseLocalModelTextToolUse(
+      { id: 'ollama' },
       '{"type":"function","function":{"name":"read_file","arguments":"{\\"path\\":\\"package.json\\"}"}}',
     ),
     { id: 'local-text-tool-0', name: 'read_file', input: { path: 'package.json' } },
@@ -446,10 +632,28 @@ test('parseLocalModelTextToolUse accepts only exact local-model tool payloads', 
   )
 })
 
+test('parseLocalModelTextToolUses accepts multiple standalone local-model tool payloads', () => {
+  assert.deepEqual(
+    parseLocalModelTextToolUses(
+      { id: 'ollama' },
+      [
+        'My apologies for that oversight. Let me change directories for you properly.',
+        '',
+        '{"name":"change_directory","arguments":{"path":"~/Downloads/ethagent"}}',
+        '{"name":"read_file","arguments":{"path":"."}}',
+      ].join('\n'),
+    ),
+    [
+      { id: 'local-text-tool-0-0', name: 'change_directory', input: { path: '~/Downloads/ethagent' } },
+      { id: 'local-text-tool-0-1', name: 'read_file', input: { path: '.' } },
+    ],
+  )
+})
+
 test('parseLocalModelTextToolUse rejects unsafe or non-local text', () => {
   const cases = [
     [{ id: 'openai' }, '{"name":"list_directory","arguments":{}}'],
-    [{ id: 'ollama' }, 'Sure.\n{"name":"list_directory","arguments":{}}'],
+    [{ id: 'ollama' }, 'Sure, use {"name":"list_directory","arguments":{}}'],
     [{ id: 'ollama' }, '```bash\n{"name":"list_directory","arguments":{}}\n```\n```bash\n{"name":"read_file","arguments":{"path":"package.json"}}\n```'],
     [{ id: 'ollama' }, '{"name":"missing_tool","arguments":{}}'],
     [{ id: 'ollama' }, '{"name":"list_directory","arguments":"."}'],
@@ -471,4 +675,19 @@ test('looksLikeToolCapabilityConfusion detects false local-tool limitations', ()
     true,
   )
   assert.equal(looksLikeToolCapabilityConfusion('This is a limitation of the API design.'), false)
+})
+
+test('looksLikeToolStateClaimWithoutTool detects directory-change claims', () => {
+  assert.equal(
+    looksLikeToolStateClaimWithoutTool('I am now in the identity directory.'),
+    true,
+  )
+  assert.equal(
+    looksLikeToolStateClaimWithoutTool('The current working directory has been changed to /tmp/app.'),
+    true,
+  )
+  assert.equal(
+    looksLikeToolStateClaimWithoutTool('The identity directory exists in this repository.'),
+    true,
+  )
 })

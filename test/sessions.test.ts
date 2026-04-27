@@ -1,6 +1,10 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { sessionMessagesToProviderMessages, type SessionMessage } from '../src/storage/sessions.js'
+import {
+  latestUserMessageCorrectsToolState,
+  sessionMessagesToProviderMessages,
+  type SessionMessage,
+} from '../src/storage/sessions.js'
 
 test('sessionMessagesToProviderMessages omits orphaned historical tool uses', () => {
   const messages: SessionMessage[] = [
@@ -160,4 +164,35 @@ test('active-turn tool protocol survives compaction across multiple iterations',
   assert.match(projected, /<h1>ok<\/h1>/, 'active-turn read_file tool_result content must be preserved')
   assert.match(projected, /active-edit/, 'active-turn edit_file tool_use must be preserved')
   assert.match(projected, /edited index\.html/, 'active-turn edit_file tool_result content must be preserved')
+})
+
+test('sessionMessagesToProviderMessages drops unsupported assistant claims after user correction', () => {
+  const messages: SessionMessage[] = [
+    { role: 'user', content: 'cd into identity', createdAt: '2026-04-21T00:00:00.000Z' },
+    {
+      role: 'assistant',
+      content: 'It appears that the directory identity does not exist in your current working directory.',
+      createdAt: '2026-04-21T00:00:01.000Z',
+    },
+    { role: 'user', content: 'it does exist, just try', createdAt: '2026-04-21T00:00:02.000Z' },
+  ]
+
+  const projected = JSON.stringify(sessionMessagesToProviderMessages(messages))
+
+  assert.equal(latestUserMessageCorrectsToolState(messages), true)
+  assert.doesNotMatch(projected, /does not exist/)
+  assert.match(projected, /just try/)
+})
+
+test('latestUserMessageCorrectsToolState accepts terse user corrections', () => {
+  assert.equal(latestUserMessageCorrectsToolState([
+    { role: 'user', content: 'cd into identity', createdAt: '2026-04-21T00:00:00.000Z' },
+    { role: 'assistant', content: 'I am now in the identity directory.', createdAt: '2026-04-21T00:00:01.000Z' },
+    { role: 'user', content: 'u didnt execute the tool call', createdAt: '2026-04-21T00:00:02.000Z' },
+  ]), true)
+  assert.equal(latestUserMessageCorrectsToolState([
+    { role: 'user', content: 'cd into identity', createdAt: '2026-04-21T00:00:00.000Z' },
+    { role: 'assistant', content: 'I am now in the identity directory.', createdAt: '2026-04-21T00:00:01.000Z' },
+    { role: 'user', content: 'u didnt cage it', createdAt: '2026-04-21T00:00:02.000Z' },
+  ]), true)
 })

@@ -14,6 +14,7 @@ import type { CopyResult } from '../utils/clipboard.js'
 import { getSlashSuggestions } from '../commands/index.js'
 import { Box, Text } from 'ink'
 import { theme } from './theme.js'
+import { Spinner } from './Spinner.js'
 
 export type Overlay = 'none' | 'modelPicker' | 'resume' | 'rewind' | 'copyPicker' | 'permission' | 'permissions' | 'planApproval' | 'identity'
 export type CopyPickerState = { turnText: string; turnLabel: string } | null
@@ -32,6 +33,7 @@ type ChatBottomPaneProps = {
   permissionRequest: PermissionRequest | null
   history: string[]
   busy: boolean
+  streaming: boolean
   placeholderHints: string[]
   queuedInputs: string[]
   slashSuggestions: ReturnType<typeof getSlashSuggestions>
@@ -65,6 +67,7 @@ export function ChatBottomPane({
   permissionRequest,
   history,
   busy,
+  streaming,
   placeholderHints,
   queuedInputs,
   slashSuggestions,
@@ -183,6 +186,11 @@ export function ChatBottomPane({
 
   return (
     <Box flexDirection="column" width="100%">
+      {streaming ? (
+        <Box marginLeft={2} marginBottom={1}>
+          <Spinner active hint="esc to cancel" />
+        </Box>
+      ) : null}
       <ChatInput
         onSubmit={handleSubmit}
         history={history}

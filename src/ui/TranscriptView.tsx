@@ -1,6 +1,8 @@
 import React from 'react'
-import { Box, Text } from 'ink'
+import { Box, Text, useStdout } from 'ink'
 import { MessageList, type MessageRow } from './MessageList.js'
+import { estimateMessageRowHeight, selectTailRowsForViewport } from './transcriptViewport.js'
+import { theme } from './theme.js'
 
 type TranscriptViewProps = {
   rows: MessageRow[]
@@ -14,13 +16,26 @@ export const TranscriptView: React.FC<TranscriptViewProps> = ({
   bottomVariant = 'prompt',
 }) => {
   void active
-  void bottomVariant
+  const { stdout } = useStdout()
+  const terminalRows = stdout.rows ?? process.stdout.rows ?? 24
+  const terminalColumns = stdout.columns ?? process.stdout.columns ?? 80
+  const reservedRows = bottomVariant === 'prompt' ? 11 : 7
+  const lineBudget = Math.max(16, Math.min(96, terminalRows - reservedRows + 24))
+  const visible = selectTailRowsForViewport(
+    rows,
+    lineBudget,
+    row => estimateMessageRowHeight(row, terminalColumns),
+  )
+
   return (
     <Box flexDirection="column">
       <Box marginBottom={1}>
         <Text> </Text>
       </Box>
-      <MessageList rows={rows} />
+      {visible.hiddenCount > 0 ? (
+        <Text color={theme.dim}>{`... ${visible.hiddenCount} earlier transcript row${visible.hiddenCount === 1 ? '' : 's'} hidden`}</Text>
+      ) : null}
+      <MessageList rows={visible.rows} />
     </Box>
   )
 }

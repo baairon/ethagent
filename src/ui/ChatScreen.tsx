@@ -881,10 +881,9 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
     : 'tip: type /help to get started · shift+enter for newline'
 
   const placeholderHints = useMemo(() => {
-    if (streaming) return ['streaming... esc to cancel']
-    if (pullInFlight) return ['pull in progress... ctrl+c to cancel']
+    if (pullInFlight) return ['pull in progress… ctrl+c to cancel']
     return []
-  }, [streaming, pullInFlight])
+  }, [pullInFlight])
 
   const runtimeModeLabel = sessionModeLabel(mode)
   const modeColor =
@@ -930,6 +929,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
           permissionRequest={permissionRequest}
           history={history}
           busy={busy}
+          streaming={streaming}
           placeholderHints={placeholderHints}
           queuedInputs={queuedInputs}
           slashSuggestions={slashSuggestions}

@@ -2,6 +2,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import type { Message, Provider } from '../providers/contracts.js'
 import { microCompactSessionMessages, shouldAutoCompact } from '../runtime/compaction.js'
+import { directToolUsesForUserText } from '../runtime/directToolRouter.js'
 import { toPermissionMode, type SessionMode } from '../runtime/sessionMode.js'
 import { runPendingToolUses } from '../runtime/toolExecution.js'
 import { runRuntimeTurn, type TurnEvent } from '../runtime/turn.js'
@@ -212,6 +213,16 @@ export async function runStreamingTurn(
     })
   }
 
+  const discardStreamingRows = () => {
+    flushStreamRows(true)
+    updateRows(prev => prev.filter(row =>
+      !(assistantId && row.id === assistantId)
+      && !(thinkingRowId && row.id === thinkingRowId),
+    ))
+    pendingAssistantTextRef.current = null
+    pendingThinkingTextRef.current = null
+  }
+
   let finishedNormally = false
   let cancelled = false
 
@@ -245,6 +256,24 @@ export async function runStreamingTurn(
     return step
   }
 
+  const directToolUses = provider.supportsTools
+    ? directToolUsesForUserText(userText)
+    : []
+  if (directToolUses.length > 0) {
+    const step = await runToolBatch(directToolUses)
+    const directCancelled = step.cancelled || controller.signal.aborted
+    if (directCancelled) pushNote('(cancelled)', 'dim')
+    setStreaming(false)
+    setActiveCheckpoint(undefined)
+    const workingMessagesForCompactCheck = buildWorking()
+    return {
+      finishedNormally: !directCancelled,
+      cancelled: directCancelled,
+      shouldCompact:
+        !directCancelled && shouldAutoCompact(workingMessagesForCompactCheck, getConfig().model),
+    }
+  }
+
   try {
     for await (const ev of runRuntimeTurn({
       provider,
@@ -258,6 +287,7 @@ export async function runStreamingTurn(
         ensureAssistantRow,
         flushStreamRows,
         finalizeStreamingRows,
+        discardStreamingRows,
         resetIteration,
         setAccumulated: text => { accumulated = text },
         getAccumulated: () => accumulated,
@@ -307,6 +337,7 @@ type EventHandlerContext = {
   ensureAssistantRow: () => string
   flushStreamRows: (immediate?: boolean) => void
   finalizeStreamingRows: () => void
+  discardStreamingRows: () => void
   resetIteration: () => void
   setAccumulated: (text: string) => void
   getAccumulated: () => string
@@ -399,19 +430,21 @@ async function handleEvent(ev: TurnEvent, ctx: EventHandlerContext): Promise<voi
       // instrumentation). No UI side-effect here.
       return
     }
+    case 'local_tool_recovery': {
+      // The runtime recovered tool calls from local model text output.
+      // Discard the streamed assistant rows that contained the JSON blob
+      // so they are not persisted or displayed as prose.
+      ctx.discardStreamingRows()
+      ctx.markPendingToolUse()
+      return
+    }
     case 'continuation_nudge': {
-      // Clean break between provider calls: flush, persist intermediate
-      // assistant text, and reset per-iteration scratch before the next stream.
-      ctx.finalizeStreamingRows()
-      const text = ctx.getAccumulated()
-      if (text) {
-        await ctx.persistTurnMessage({
-          role: 'assistant',
-          content: text,
-          createdAt: ctx.nowIso(),
-          model: ctx.model,
-          turnId: ctx.turnId,
-        })
+      // Clean break between provider calls. Corrective nudges suppress the
+      // unverified assistant row so it cannot become durable context.
+      if (ev.reason === 'tool_state_claim' || ev.reason === 'tool_capability') {
+        ctx.discardStreamingRows()
+      } else {
+        ctx.finalizeStreamingRows()
       }
       ctx.resetIteration()
       return
