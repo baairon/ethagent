@@ -909,11 +909,9 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
         </>
       )}
       <Text color={theme.dim}>esc cancels · alt+p model · alt+i identity</Text>
-      {exitState.pending ? (
-        <Text color={theme.accentPrimary}>  · press {exitState.keyName} again to exit</Text>
-      ) : null}
     </Box>
   )
+  const exitHint = exitState.pending ? 'press ctrl + c again to exit' : null
 
   return (
     <ConversationStack
@@ -937,6 +935,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
           slashSuggestions={slashSuggestions}
           planApprovalContextLabel={pendingPlan?.contextLabel ?? estimatedContextLabel(approxTokens)}
           footerRight={footerRight}
+          exitHint={exitHint}
           handleModelPick={handleModelPick}
           handleResumePick={handleResumePick}
           identityOverlay={identityOverlay}

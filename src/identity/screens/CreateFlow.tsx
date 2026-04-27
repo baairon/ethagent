@@ -56,7 +56,7 @@ export const CreateFlow: React.FC<CreateFlowProps> = ({
 
   if (step.kind === 'replace-confirm') {
     return (
-      <Surface title="create a new agent?" footer="enter selects - esc back">
+      <Surface title="create a new agent?" footer="enter selects · esc back">
         <Text color={theme.dim}>
           your current agent stays in your wallet and remains loadable.
         </Text>
@@ -80,7 +80,7 @@ export const CreateFlow: React.FC<CreateFlowProps> = ({
 
   if (step.kind === 'create-name') {
     return (
-      <Surface title="name your agent" subtitle={indicator} footer="enter continues - esc back">
+      <Surface title="name your agent" subtitle={indicator} footer="enter continues · esc back">
         {step.error ? <Text color="#e87070">{step.error}</Text> : null}
         <TextInput
           key="agent-name"
@@ -95,7 +95,7 @@ export const CreateFlow: React.FC<CreateFlowProps> = ({
 
   if (step.kind === 'create-description') {
     return (
-      <Surface title="describe your agent" subtitle={indicator} footer="enter continues - esc back">
+      <Surface title="describe your agent" subtitle={indicator} footer="enter continues · esc back">
         <Text color={theme.dim}>optional. one short sentence is enough.</Text>
         <TextInput
           key="agent-description"
@@ -123,7 +123,7 @@ export const CreateFlow: React.FC<CreateFlowProps> = ({
       <Surface
         title={`${networkLabel(step.resolution.network)} agent registry`}
         subtitle={step.error ?? 'paste the agent registry address for this network.'}
-        footer="enter continues - esc back"
+        footer="enter continues · esc back"
       >
         <Text color={theme.dim}>rpc defaults to {step.resolution.defaultRpcUrl}</Text>
         <TextInput
@@ -160,13 +160,13 @@ export const CreateFlow: React.FC<CreateFlowProps> = ({
     <Surface
       title="connect IPFS storage"
       subtitle={step.error ?? 'save a Pinata JWT so ethagent can pin encrypted state to IPFS.'}
-      footer="enter continues - esc back"
+      footer="enter continues · esc back"
     >
       <Text>
         <Text color={theme.dim}>paste your Pinata JWT. get one at </Text>
         <Text color={theme.accentPrimary} underline>{PINATA_API_KEYS_URL}</Text>
       </Text>
-      <Text color={theme.dim}>saved encrypted on this device - used only for IPFS pinning</Text>
+      <Text color={theme.dim}>saved encrypted on this device · used only for IPFS pinning</Text>
       <TextInput
         key="create-storage"
         isSecret

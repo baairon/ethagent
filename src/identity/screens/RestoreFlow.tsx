@@ -52,7 +52,7 @@ export const RestoreFlow: React.FC<RestoreFlowProps> = ({
         <Surface
           title={isSwitch ? 'switch agent identity' : 'restore an agent'}
           subtitle="choose how ethagent should find the owner wallet."
-          footer={footerHint('enter select - esc back')}
+          footer={footerHint('enter select · esc back')}
         >
           <Select<'connect' | 'manual'>
             options={[
@@ -72,7 +72,7 @@ export const RestoreFlow: React.FC<RestoreFlowProps> = ({
       <Surface
         title={isSwitch ? 'switch agent identity' : 'restore an agent'}
         subtitle={step.initialOwnerHandle ? 'confirm the wallet or ENS to search.' : 'enter the wallet or ENS that owns it.'}
-        footer={footerHint('enter discover - esc back')}
+        footer={footerHint('enter discover · esc back')}
       >
         <TextInput
           key={`restore-owner-${purpose}-${step.initialOwnerHandle ?? ''}`}
@@ -98,7 +98,7 @@ export const RestoreFlow: React.FC<RestoreFlowProps> = ({
       <Surface
         title={`${networkLabel(resolution.network)} agent registry`}
         subtitle={step.error ? `lookup failed: ${step.error}` : 'paste the agent registry address for this network.'}
-        footer={footerHint('enter discover - esc back')}
+        footer={footerHint('enter discover · esc back')}
       >
         <Text color={theme.dim}>RPC defaults to {resolution.defaultRpcUrl}</Text>
         <TextInput
@@ -139,7 +139,7 @@ export const RestoreFlow: React.FC<RestoreFlowProps> = ({
       <Surface
         title="enter agent token id"
         subtitle={step.error ?? `${networkLabelForRegistry(step.registry)} lookup needs the token id.`}
-        footer={footerHint('enter continue - esc back')}
+        footer={footerHint('enter continue · esc back')}
       >
         <TextInput
           placeholder="#45744"
@@ -156,7 +156,7 @@ export const RestoreFlow: React.FC<RestoreFlowProps> = ({
       <Surface
         title={isSwitch ? 'switch to an agent' : 'choose your agent'}
         subtitle={step.ownerHandle}
-        footer={footerHint('enter select - esc back')}
+        footer={footerHint('enter select · esc back')}
       >
         <Select<string>
           options={step.candidates.map(candidate => ({

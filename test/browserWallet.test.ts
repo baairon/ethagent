@@ -105,6 +105,17 @@ test('browser wallet page supports the single signature and transaction flow', (
   assert.match(page, /saving encrypted IPFS backup/)
 })
 
+test('browser wallet page updates generated signature message details', () => {
+  const page = __testWalletPage('ethagent wallet approval', 'hidden-token', {
+    kind: 'sign-transaction',
+    chainIdHex: '0x2105',
+  })
+
+  assert.doesNotMatch(page, /prepared at signing time/)
+  assert.match(page, /function showPreparedMessage/)
+  assert.match(page, /showPreparedMessage\(prepared\.message\)/)
+})
+
 test('browser wallet page supports account-only connection requests', () => {
   const page = __testWalletPage('ethagent wallet connection', 'hidden-token', {
     kind: 'account',

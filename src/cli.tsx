@@ -93,7 +93,7 @@ const AppRoot: React.FC<{ setExitCode: (code: number) => void }> = ({ setExitCod
   if (phase.kind === 'loading') {
     return (
       <Box padding={1}>
-        <Text color={theme.dim}>loading config…</Text>
+        <Text color={theme.dim}>preparing session...</Text>
       </Box>
     )
   }

@@ -334,7 +334,7 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
   if (step.kind === 'create-network') {
     return (
       <NetworkScreen
-        config={config}
+        subtitle="choose where to create this agent."
         footer={footer}
         onSelect={(network: SelectableNetwork) => {
           setStep({ kind: 'create-preflight', name: step.name, description: step.description, network })
@@ -347,7 +347,7 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
   if (step.kind === 'restore-network') {
     return (
       <NetworkScreen
-        config={config}
+        subtitle="choose a network to search for your agents."
         footer={footer}
         onSelect={(network: SelectableNetwork) => {
           try {
@@ -505,7 +505,7 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
               onComplete({
                 kind: 'updated',
                 config: nextConfig,
-                message: 'forgot local agent. sessions were kept.',
+                message: 'removed agent from this device. sessions were kept.',
               })
             } catch (err: unknown) {
               errorStep(err, { kind: 'forget-confirm' })

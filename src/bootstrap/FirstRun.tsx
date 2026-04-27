@@ -188,7 +188,7 @@ export const FirstRun: React.FC<FirstRunProps> = ({ onComplete, onCancel }) => {
   if (step.kind === 'identity-start-saving') {
     return (
       <Box flexDirection="column" padding={1}>
-        <Splash tipLine="first-run setup - storing identity" />
+        <Splash tipLine="first-run setup · storing identity" />
         <Text color={theme.dim}>storing identity...</Text>
       </Box>
     )

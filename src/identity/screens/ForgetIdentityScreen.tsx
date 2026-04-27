@@ -9,10 +9,10 @@ import { IdentitySummary } from './IdentitySummary.js'
 type ForgetAction = 'confirm' | 'cancel'
 
 export const FORGET_LOCAL_AGENT_COPY = [
-  'removes the active local agent from this machine.',
+  'clears the active agent selection on this machine.',
   'does not burn, transfer, or delete agent tokens.',
   'does not delete pinned IPFS backups.',
-  'does not delete sessions or chats.',
+  'sessions and chats stay on this machine.',
 ] as const
 
 type ForgetIdentityScreenProps = {
@@ -31,21 +31,21 @@ export const ForgetIdentityScreen: React.FC<ForgetIdentityScreenProps> = ({
   onCancel,
 }) => (
   <Surface
-    title="forget local agent?"
-    subtitle="this only removes the active agent from this device."
+    title="remove agent from this device?"
+    subtitle="token, backups, and sessions stay intact."
     footer={footer}
   >
     <IdentitySummary identity={identity} config={config} />
     <Box flexDirection="column" marginTop={1}>
       {FORGET_LOCAL_AGENT_COPY.map(line => (
-        <Text key={line} color={theme.dim}>- {line}</Text>
+        <Text key={line} color={theme.dim}>· {line}</Text>
       ))}
     </Box>
     <Box marginTop={1}>
       <Select<ForgetAction>
         options={[
-          { value: 'confirm', label: 'forget local agent', hint: 'sessions and chats stay on this machine' },
-          { value: 'cancel', label: 'keep it' },
+          { value: 'confirm', label: 'remove from this device' },
+          { value: 'cancel', label: 'keep active agent' },
         ]}
         onSubmit={choice => choice === 'confirm' ? onConfirm() : onCancel()}
         onCancel={onCancel}

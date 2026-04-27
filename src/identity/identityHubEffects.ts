@@ -193,7 +193,7 @@ export async function runCreateSigning(
     state: result.prepared.state,
     backup,
   }
-  await callbacks.onIdentityComplete(nextIdentity, `ERC-8004 agent registered - #${registered.agentId.toString()}`)
+  await callbacks.onIdentityComplete(nextIdentity, `ERC-8004 agent registered · #${registered.agentId.toString()}`)
 }
 
 export async function runRestoreDiscover(
@@ -331,7 +331,7 @@ export async function runRestoreAuthorize(
     state: payload.state,
     backup,
   }
-  await callbacks.onIdentityComplete(nextIdentity, `ERC-8004 agent restored - #${step.candidate.agentId.toString()}`)
+  await callbacks.onIdentityComplete(nextIdentity, `ERC-8004 agent restored · #${step.candidate.agentId.toString()}`)
 }
 
 export async function runRegistrySubmit(

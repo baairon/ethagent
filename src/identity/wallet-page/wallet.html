@@ -34,7 +34,7 @@
       color: var(--text);
       font-family: var(--mono);
       font-size: 13px;
-      line-height: 1.5;
+      line-height: 1;
       margin: 0;
       min-height: 100vh;
       padding: var(--pad);
@@ -51,13 +51,12 @@
       text-align: left;
     }
 
-    /* ── splash: shared 1.25 line-height ────── */
     .splash {
       font-family: var(--mono);
-      font-size: 12px;
-      line-height: 1.25;
+      font-size: 11px;
+      line-height: 1.2;
       white-space: pre;
-      margin: 0 0 var(--pad);
+      margin: 0 0 1.35rem;
       color: var(--border);
       overflow: hidden;
       text-align: left;
@@ -70,7 +69,7 @@
       line-height: 1;
       white-space: pre;
       color: var(--hairline);
-      margin: var(--pad) 0;
+      margin: 1.45rem 0;
       overflow: hidden;
       user-select: none;
     }
@@ -85,28 +84,52 @@
       justify-content: space-between;
       gap: 1rem;
       flex-wrap: wrap;
+      margin-bottom: 0.5rem;
     }
     .head .label {
       color: var(--accent, var(--mint));
-      font-size: 12px;
-      letter-spacing: 0.04em;
+      font-size: 12.5px;
+      letter-spacing: 0.055em;
     }
     .head .net { color: var(--subtle); font-size: 12px; }
     .head .net .key { color: var(--dim); margin-right: 0.4rem; }
 
     .flow-title {
       color: var(--text);
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 500;
-      margin: 0.4rem 0 0;
+      line-height: 1.25;
+      margin: 0 0 0.9rem;
     }
     .flow-detail {
       color: var(--subtle);
-      font-size: 12.5px;
-      margin: 0.4rem 0 0;
-      word-break: break-all;
+      font-size: 13px;
+      line-height: 1.25;
+      margin: 0;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      word-break: normal;
     }
-    .flow-detail .key { color: var(--dim); margin-right: 0.4rem; }
+    .flow-detail + .flow-detail { margin-top: 0.58rem; }
+    .flow-detail .key {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 4.8rem;
+      padding: 0.3rem 0.44rem 0.32rem;
+      border: 1px solid rgba(155, 155, 155, 0.24);
+      border-radius: 0;
+      background: rgba(155, 155, 155, 0.07);
+      color: var(--dim);
+      font-size: 10.5px;
+      line-height: 1.25;
+      letter-spacing: 0.05em;
+    }
+    .flow-detail span:last-child {
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
     .flow-detail[hidden] { display: none; }
 
     /* ── status ──────────────────────────────── */
@@ -138,7 +161,7 @@
       color: var(--text);
       font-size: 12.5px;
       margin: 0 0 0.5rem;
-      line-height: 1.55;
+      line-height: 1.25;
       max-width: 44rem;
       overflow-wrap: anywhere;
     }
@@ -146,7 +169,7 @@
       color: var(--subtle);
       font-size: 11.5px;
       margin: 0;
-      line-height: 1.65;
+      line-height: 1.25;
       max-width: 44rem;
       overflow-wrap: anywhere;
     }
@@ -164,7 +187,7 @@
       font-size: 12px;
       background: transparent;
       border: 0;
-      padding: 0.125rem 0;
+      padding: 0.18rem 0;
       cursor: pointer;
       color: var(--subtle);
       display: inline-flex;
@@ -181,8 +204,6 @@
     .shortcut:hover:not(:disabled) { color: var(--text); }
     .shortcut:disabled { opacity: 0.4; cursor: not-allowed; }
     .shortcut[hidden] { display: none; }
-    .shortcut.primary { color: var(--mint); }
-    .shortcut.primary:hover:not(:disabled) { color: #fff; }
 
     .key {
       display: inline-flex;
@@ -196,7 +217,10 @@
       letter-spacing: 0.04em;
       min-width: 3.25rem;
     }
-    .shortcut.primary .key { border-color: var(--mint); color: var(--mint); }
+    .shortcut .key {
+      padding: 0.22rem 0.68rem;
+      border-color: rgba(155, 155, 155, 0.28);
+    }
     .shortcut .pix { color: currentColor; opacity: 0.85; display: inline-flex; }
 
     .result-row {
@@ -215,8 +239,6 @@
 <body>
   <main data-flow="sign" id="card">
     <pre class="splash" id="splash"></pre>
-
-    <pre class="rule" id="rule-1"></pre>
 
     <div class="head">
       <span class="label" id="prompt-text">signature request</span>
@@ -394,27 +416,12 @@
         .join('\n');
     }
 
-    function renderBrandSplash({ contextLine, tipLine, compact } = {}) {
-      const width = window.innerWidth || 80;
-      const renderCompact = compact ?? width < 720;
-
-      if (renderCompact) {
-        return [
-          renderEyes(),
-          `<span style="color:var(--mint);font-weight:600">ethagent</span>`,
-          `<span style="color:var(--dim)">${escapeHtml(glyphs.tagline.trim())}</span>`,
-          contextLine ? `<span style="color:var(--dim)">${escapeHtml(contextLine)}</span>` : '',
-          tipLine ? `<span style="color:var(--dim)">${escapeHtml(tipLine)}</span>` : '',
-        ].filter(Boolean).join('\n');
-      }
-
+    function renderBrandSplash() {
       const logoLines = ethagentGlyphOrder.map(key => glyphs.ethagent[key].split('\n'));
       const rowCount = Math.max(...logoLines.map(lines => lines.length));
 
       const boxWidth = 69;
       const topPad = Math.max(0, boxWidth - glyphs.tagline.length - 1);
-      const bottomInline = contextLine ? ` ${truncateToFit(contextLine, boxWidth - 4)} ` : '';
-      const bottomPad = Math.max(0, boxWidth - bottomInline.length - 1);
 
       const rows = Array.from({ length: rowCount }, (_, index) => [
         `<span style="color:var(--border)">${glyphs.frame.side}</span>`,
@@ -428,36 +435,42 @@
         `<span style="color:var(--border)">${glyphs.frame.horizontal.repeat(topPad)}${glyphs.frame.topRight}</span>`,
       ].join('');
 
-      const bottom = bottomInline
-        ? [
-            `<span style="color:var(--border)">${glyphs.frame.bottomLeft}</span>`,
-            `<span style="color:var(--mint)">${escapeHtml(bottomInline)}</span>`,
-            `<span style="color:var(--border)">${glyphs.frame.horizontal.repeat(bottomPad)}${glyphs.frame.bottomRight}</span>`,
-          ].join('')
-        : `<span style="color:var(--border)">${glyphs.frame.bottomLeft[0] + glyphs.frame.horizontal.repeat(boxWidth) + glyphs.frame.bottomRight}</span>`;
+      const bottom = `<span style="color:var(--border)">${glyphs.frame.bottomLeft[0] + glyphs.frame.horizontal.repeat(boxWidth) + glyphs.frame.bottomRight}</span>`;
 
       return [
         renderEyes(),
         top,
         ...rows,
         bottom,
-        tipLine ? `\n<span style="color:var(--dim)">${escapeHtml(tipLine)}</span>` : '',
-      ].filter(Boolean).join('\n');
+      ].join('\n');
     }
     document.getElementById('splash').innerHTML = renderBrandSplash();
 
-    function splashWidthColumns() {
-      const splash = document.getElementById('splash');
-      const text = splash ? splash.textContent || '' : '';
+    function textWidthColumns(id) {
+      const el = document.getElementById(id);
+      if (!el || el.hidden || el.style.display === 'none') return 0;
+      const text = el.textContent || '';
       return text
         .split('\n')
-        .reduce((max, line) => Math.max(max, line.length), 20);
+        .reduce((max, line) => Math.max(max, line.length), 0);
+    }
+
+    function ruleWidthColumns() {
+      const contentWidth = Math.max(
+        textWidthColumns('flow-title'),
+        textWidthColumns('network-row'),
+        textWidthColumns('flow-detail'),
+        textWidthColumns('status-block'),
+        textWidthColumns('error-block-slot'),
+        60,
+      );
+      return Math.min(96, contentWidth + 4);
     }
 
     function sizeRules() {
-      const cols = splashWidthColumns();
+      const cols = ruleWidthColumns();
       const line = glyphs.frame.horizontal.repeat(cols);
-      ['rule-1','rule-2','rule-3'].forEach(id => {
+      ['rule-2','rule-3'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.textContent = line;
       });
@@ -675,13 +688,27 @@
       document.title = title || flowCopy().tabTitle || STATE_TITLES.default;
     }
 
+    function messagePreview(message) {
+      const preview = String(message || '').split('\n')[0];
+      return preview.length > 64 ? preview.slice(0, 64) + glyphs.ellipsis : preview;
+    }
+
     function detailPreview(copy) {
       if (copy.detail === 'message') {
-        const preview = (config.message || '').split('\n')[0] || 'prepared at signing time';
-        return preview.length > 64 ? preview.slice(0, 64) + glyphs.ellipsis : preview;
+        return messagePreview(config.message);
       }
       if (copy.detail === 'registry' && config.tx) return shortAddr(config.tx.to);
       return '';
+    }
+
+    function showPreparedMessage(message) {
+      const copy = flowCopy();
+      if (copy.detail !== 'message') return;
+      const preview = messagePreview(message);
+      detailKey.textContent = copy.detail;
+      detailVal.textContent = preview;
+      flowDetail.hidden = preview.length === 0;
+      requestAnimationFrame(sizeRules);
     }
 
     function applyFlowChrome() {
@@ -752,7 +779,7 @@
         case 'done':
           setMarker('[✓]');
           statusText.textContent = config.kind === 'account'
-            ? 'connected - returning to ethagent'
+            ? 'connected · returning to ethagent'
             : config.kind === 'sign'
               ? 'signed · returning to ethagent'
               : 'submitted · returning to ethagent';
@@ -837,6 +864,7 @@
         }
         if (config.kind === 'sign') {
           const prepared = config.message ? { message: config.message } : await post('/prepare', { account });
+          showPreparedMessage(prepared.message);
           setState('approve');
           const signature = await walletRequest('personal_sign', [prepared.message, account]);
           setState('submitting');
@@ -845,6 +873,7 @@
         }
         if (config.kind === 'sign-transaction') {
           const prepared = config.message ? { message: config.message } : await post('/prepare', { account });
+          showPreparedMessage(prepared.message);
           setState('approve-sign');
           const signature = await walletRequest('personal_sign', [prepared.message, account]);
           setState('preparing-transaction');

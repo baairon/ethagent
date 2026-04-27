@@ -12,7 +12,6 @@ type DetailsAction =
   | 'copy'
   | 'storage-credential'
   | 'forget-local'
-  | 'back'
 
 type DetailsScreenProps = {
   identity?: EthagentIdentity
@@ -52,14 +51,14 @@ export const DetailsScreen: React.FC<DetailsScreenProps> = ({
   onBack,
 }) => {
   const subtitle = copyPicker
-    ? 'pick a value to copy.'
-    : copyNotice ?? 'profile, values, IPFS storage, and local cleanup.'
+    ? 'choose a saved agent value.'
+    : copyNotice ?? 'edit profile · back up · copy values · IPFS storage · device'
 
   const copyable = copyableIdentityFields(identity)
 
   if (copyPicker) {
     return (
-      <Surface title="copy values" subtitle={subtitle} footer={footer}>
+      <Surface title="copy agent values" subtitle={subtitle} footer={footer}>
         <IdentitySummary identity={identity} config={config} />
         <Box marginTop={1}>
           <Select<string>
@@ -76,17 +75,16 @@ export const DetailsScreen: React.FC<DetailsScreenProps> = ({
   }
 
   const credentialLabel = jwtSaved ? 'IPFS storage' : 'connect IPFS storage'
-  const options: Array<{ value: DetailsAction; label: string; hint: string; disabled?: boolean }> = [
-    { value: 'edit', label: 'edit profile', hint: 'rename the agent or update its description.', disabled: !canEditProfile },
-    { value: 'rebackup', label: 'back up', hint: 'save encrypted state to IPFS and refresh tokenURI.', disabled: !canRebackup },
-    { value: 'copy', label: 'copy values', hint: 'copy owner, token id, CIDs, or agent URI.', disabled: copyable.length === 0 },
-    { value: 'storage-credential', label: credentialLabel, hint: 'manage the local token used for IPFS pinning.' },
-    { value: 'forget-local', label: 'forget local agent', hint: 'remove this machine’s active agent pointer only.' },
-    { value: 'back', label: 'back', hint: 'return to the identity hub.' },
+  const options: Array<{ value: DetailsAction; label: string; disabled?: boolean }> = [
+    { value: 'edit', label: 'edit profile', disabled: !canEditProfile },
+    { value: 'rebackup', label: 'back up', disabled: !canRebackup },
+    { value: 'copy', label: 'copy values', disabled: copyable.length === 0 },
+    { value: 'storage-credential', label: credentialLabel },
+    { value: 'forget-local', label: 'remove from this device' },
   ]
 
   return (
-    <Surface title="agent settings" subtitle={subtitle} footer={footer}>
+    <Surface title="manage agent" subtitle={subtitle} footer={footer}>
       <IdentitySummary identity={identity} config={config} />
       <Box marginTop={1}>
         <Select<DetailsAction>
@@ -97,7 +95,6 @@ export const DetailsScreen: React.FC<DetailsScreenProps> = ({
             if (choice === 'rebackup') return onRebackup()
             if (choice === 'storage-credential') return onStorageCredential()
             if (choice === 'forget-local') return onForgetLocalData()
-            return onBack()
           }}
           onCancel={onBack}
         />
