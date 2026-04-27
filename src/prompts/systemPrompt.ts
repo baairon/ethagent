@@ -67,6 +67,8 @@ function buildToolEnabledPrompt(ctx: SystemPromptContext): string {
         'Reads, edits, and shell commands are permission-gated. Use the narrowest reasonable action.',
         'When multiple file changes are needed, inspect first, then request only the specific reads/edits needed for the next immediate step.',
         '**DISCOVERY**: Call `list_directory` before declaring files are missing or deciding which files to edit in an uninspected directory.',
+        '**DIRECT REQUESTS**: If the user asks to change directory, list files, or read a file, respond with exactly one matching native tool call. Do not substitute prose or claim the action was taken.',
+        '**EVIDENCE REQUIRED**: Do not claim a path is missing, a directory does not exist, or a file is absent unless you have a `list_directory` or `read_file` result from this conversation that confirms it.',
         '**TOOL TYPING**: Tool names are NOT shell commands. NEVER pass `list_directory`, `read_file`, `edit_file`, or `change_directory` directly to `run_bash`. Call the matching native tool.',
         'Prefer targeted `read_file` and `edit_file` calls over general `run_bash` operations when both solve the task.',
         ...(ctx.mode === 'plan'

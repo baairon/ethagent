@@ -1,6 +1,11 @@
 import type { Message, Provider, StreamEvent } from '../providers/contracts.js'
 import type { ToolResult } from '../tools/contracts.js'
 import { getTool } from '../tools/registry.js'
+import {
+  looksLikeToolStateClaim,
+  unsupportedToolStateClaims,
+  type ToolEvidence,
+} from './toolClaimGuards.js'
 
 type ProviderTurnEvent =
   | { type: 'text'; delta: string }
@@ -54,11 +59,19 @@ function normalize(event: StreamEvent): ProviderTurnEvent {
  */
 export const MAX_CONTINUATION_NUDGES = 3
 
+export type ContinuationNudgeReason =
+  | 'continuation'
+  | 'tool_capability'
+  | 'tool_state_claim'
+
 const CONTINUATION_NUDGE_TEXT =
   'Continue with the task. Use the appropriate tools to proceed.'
 
 const TOOL_CAPABILITY_NUDGE_TEXT =
   'You do have access to the provided tools in this environment. Continue by making the appropriate tool call; do not ask the user to run commands or paste command output.'
+
+const TOOL_STATE_CLAIM_NUDGE_TEXT =
+  'Do not claim that files, directories, or workspace state changed unless you have executed the appropriate tool. Call the tool now.'
 
 /**
  * TurnEvent — events emitted by the runtime turn loop. The UI layer subscribes
@@ -87,7 +100,8 @@ export type TurnEvent =
       result: ToolResult
       cwd: string
     }
-  | { type: 'continuation_nudge'; attempt: number }
+  | { type: 'continuation_nudge'; attempt: number; reason: ContinuationNudgeReason }
+  | { type: 'local_tool_recovery' }
   | { type: 'error'; message: string }
   | { type: 'cancelled' }
   | { type: 'done'; finishedNormally: boolean }
@@ -159,7 +173,7 @@ export type RuntimeTurnParams = {
  * Intentionally absent:
  *   - No provider-family branching (no isLocalProvider specialization).
  *   - No broad regex fallback tool parsing. A narrow Ollama/Qwen
- *     compatibility parser handles exact one-tool JSON payloads only.
+ *     compatibility parser handles standalone JSON tool payloads only.
  *   - No duplicate-tool-call suppression. The model is allowed to repeat.
  *   - No forced-repair retries on tool input validation errors — errors go
  *     back to the model as tool_result(is_error) and the model decides.
@@ -179,6 +193,7 @@ export async function* runRuntimeTurn(
   let workingMessages = initialMessages
   let continuationNudges = 0
   let iterationIndex = 0
+  const toolEvidenceThisTurn: ToolEvidence[] = []
 
   // eslint-disable-next-line no-constant-condition
   while (true) {
@@ -247,34 +262,86 @@ export async function* runRuntimeTurn(
     }
 
     if (pendingToolUses.length === 0) {
-      const parsedToolUse = parseLocalModelTextToolUse(provider, assistantText, iterationIndex - 1)
-      if (parsedToolUse) {
-        pendingToolUses.push(parsedToolUse)
-        yield {
-          type: 'tool_use_stop',
-          id: parsedToolUse.id,
-          name: parsedToolUse.name,
-          input: parsedToolUse.input,
+      const parsedToolUses = parseLocalModelTextToolUses(provider, assistantText, iterationIndex - 1)
+      if (parsedToolUses.length > 0) {
+        pendingToolUses.push(...parsedToolUses)
+        // Signal the orchestrator to discard any streamed assistant text
+        // rows that contained the JSON blob — they should not be persisted.
+        yield { type: 'local_tool_recovery' }
+        for (const parsedToolUse of parsedToolUses) {
+          yield {
+            type: 'tool_use_stop',
+            id: parsedToolUse.id,
+            name: parsedToolUse.name,
+            input: parsedToolUse.input,
+          }
         }
+      }
+    }
+
+    if (pendingToolUses.length === 0) {
+      const unsupportedClaims = unsupportedToolStateClaims(assistantText, toolEvidenceThisTurn)
+      if (unsupportedClaims.length > 0) {
+        if (continuationNudges < maxContinuationNudges) {
+          continuationNudges += 1
+          yield {
+            type: 'continuation_nudge',
+            attempt: continuationNudges,
+            reason: 'tool_state_claim',
+          }
+          // Rebuild from scratch, inject a correction context message to
+          // demote prior unsupported assistant claims, then append the nudge.
+          // This prevents the model from reinforcing its own false claims
+          // on subsequent iterations within the same turn.
+          workingMessages = [
+            ...rebuildMessages(),
+            {
+              role: 'user',
+              content:
+                'The previous assistant response claimed workspace state without executing a tool. '
+                + 'Treat that claim as unreliable. '
+                + TOOL_STATE_CLAIM_NUDGE_TEXT,
+            },
+          ]
+          continue
+        }
+        yield {
+          type: 'error',
+          message: 'model claimed workspace state without matching tool evidence',
+        }
+        yield { type: 'done', finishedNormally: false }
+        return
       }
     }
 
     // No tool work: model decided this turn is over (modulo continuation nudge).
     if (pendingToolUses.length === 0) {
-      if (assistantText) {
-        yield { type: 'assistant_message_committed', text: assistantText }
-      }
-
-      const nudgeText = nextNudgeText(provider, assistantText)
-      if (assistantText && continuationNudges < maxContinuationNudges && nudgeText) {
+      const nudge = nextNudge(provider, assistantText)
+      if (assistantText && continuationNudges < maxContinuationNudges && nudge) {
         continuationNudges += 1
-        yield { type: 'continuation_nudge', attempt: continuationNudges }
+        yield {
+          type: 'continuation_nudge',
+          attempt: continuationNudges,
+          reason: nudge.reason,
+        }
         workingMessages = [
           ...rebuildMessages(),
-          { role: 'assistant', content: assistantText },
-          { role: 'user', content: nudgeText },
+          ...(nudge.keepAssistantContext ? [{ role: 'assistant' as const, content: assistantText }] : []),
+          { role: 'user', content: nudge.text },
         ]
         continue
+      }
+      if (assistantText && nudge?.reason === 'tool_capability') {
+        yield {
+          type: 'error',
+          message: 'model refused available tools after corrective nudges',
+        }
+        yield { type: 'done', finishedNormally: false }
+        return
+      }
+
+      if (assistantText) {
+        yield { type: 'assistant_message_committed', text: assistantText }
       }
 
       yield { type: 'done', finishedNormally: true }
@@ -286,6 +353,12 @@ export async function* runRuntimeTurn(
     // We then emit tool_executed events so UI adapters that care (e.g., tests)
     // can observe each completed tool before we loop back to the provider.
     const batch = await runToolBatch(pendingToolUses)
+    for (const completed of batch.completedTools) {
+      toolEvidenceThisTurn.push({
+        name: completed.name,
+        result: { ok: completed.result.ok },
+      })
+    }
 
     for (const completed of batch.completedTools) {
       yield {
@@ -313,45 +386,85 @@ export function parseLocalModelTextToolUse(
   assistantText: string,
   iterationIndex = 0,
 ): PendingToolUse | null {
-  if (provider.id !== 'ollama') return null
-
-  const payload = extractSingleToolPayload(assistantText)
-  if (!payload) return null
-
-  const call = parseTextToolPayload(payload)
-  if (!call) return null
-
-  const { name, input } = call
-  if (typeof name !== 'string') return null
-  if (!isRecord(input)) return null
-  if (!getTool(name)) return null
-
-  return {
-    id: `local-text-tool-${iterationIndex}`,
-    name,
-    input,
-  }
+  const parsed = parseLocalModelTextToolUses(provider, assistantText, iterationIndex)
+  return parsed.length === 1 ? parsed[0]! : null
 }
 
-function extractSingleToolPayload(text: string): string | null {
+export function parseLocalModelTextToolUses(
+  provider: Pick<Provider, 'id'>,
+  assistantText: string,
+  iterationIndex = 0,
+): PendingToolUse[] {
+  if (provider.id !== 'ollama') return []
+
+  const calls = extractTextToolCalls(assistantText)
+  if (calls.length === 0) return []
+
+  return calls.map((call, index) => ({
+    id: calls.length === 1 ? `local-text-tool-${iterationIndex}` : `local-text-tool-${iterationIndex}-${index}`,
+    name: call.name,
+    input: call.input,
+  }))
+}
+
+function extractTextToolCalls(text: string): Array<{ name: string; input: Record<string, unknown> }> {
+  const payloads = extractToolPayloadCandidates(text)
+  const calls = payloads.flatMap(parseTextToolPayloads)
+  return calls.filter(call => typeof call.name === 'string' && isRecord(call.input) && Boolean(getTool(call.name)))
+}
+
+function extractToolPayloadCandidates(text: string): string[] {
   const trimmed = text.trim()
-  if (!trimmed) return null
+  if (!trimmed) return []
 
   const exact = normalizeToolPayloadCandidate(trimmed)
-  if (exact.startsWith('{') && exact.endsWith('}')) return exact
-  if (exact.startsWith('[') && exact.endsWith(']')) return exact
+  if (exact.startsWith('{') && exact.endsWith('}')) return [exact]
+  if (exact.startsWith('[') && exact.endsWith(']')) return [exact]
 
   const fencedOnlyMatch = trimmed.match(/^```[^\r\n]*\r?\n([\s\S]*?)\r?\n```$/i)
-  if (fencedOnlyMatch) return normalizeToolPayloadCandidate(fencedOnlyMatch[1]!)
+  if (fencedOnlyMatch) return [normalizeToolPayloadCandidate(fencedOnlyMatch[1]!)]
 
   const embedded = [
     ...[...trimmed.matchAll(/<tool_call>\s*([\s\S]*?)\s*<\/tool_call>/gi)].map(match => match[1]!),
     ...[...trimmed.matchAll(/```[^\r\n]*\r?\n([\s\S]*?)\r?\n```/g)].map(match => match[1]!),
+    ...extractStandaloneJsonPayloads(trimmed),
   ].map(normalizeToolPayloadCandidate)
 
-  const unique = [...new Set(embedded)]
-  if (unique.length === 1) return unique[0]!
-  return null
+  return [...new Set(embedded)]
+}
+
+function extractStandaloneJsonPayloads(text: string): string[] {
+  const lines = text.split(/\r?\n/)
+  const out: string[] = []
+
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i] ?? ''
+    const first = normalizeToolPayloadCandidate(line)
+    if (!first.startsWith('{') && !first.startsWith('[')) continue
+
+    let candidate = line
+    for (let j = i; j < lines.length; j += 1) {
+      if (j > i) candidate += `\n${lines[j] ?? ''}`
+      const normalized = normalizeToolPayloadCandidate(candidate)
+      if (canParseJson(normalized)) {
+        out.push(normalized)
+        i = j
+        break
+      }
+      if (candidate.length > 20_000) break
+    }
+  }
+
+  return out
+}
+
+function canParseJson(value: string): boolean {
+  try {
+    JSON.parse(value)
+    return true
+  } catch {
+    return false
+  }
 }
 
 function normalizeToolPayloadCandidate(candidate: string): string {
@@ -367,36 +480,48 @@ function normalizeToolPayloadCandidate(candidate: string): string {
   return normalized
 }
 
-function parseTextToolPayload(payload: string): { name: string; input: Record<string, unknown> } | null {
+function parseTextToolPayloads(payload: string): Array<{ name: string; input: Record<string, unknown> }> {
   let parsed: unknown
   try {
     parsed = JSON.parse(payload)
   } catch {
-    return null
+    return []
   }
 
-  return normalizeParsedToolPayload(parsed)
+  return normalizeParsedToolPayloads(parsed)
 }
 
-function normalizeParsedToolPayload(value: unknown): { name: string; input: Record<string, unknown> } | null {
+function parseTextToolPayload(payload: string): { name: string; input: Record<string, unknown> } | null {
+  const calls = parseTextToolPayloads(payload)
+  return calls.length === 1 ? calls[0]! : null
+}
+
+function normalizeParsedToolPayloads(value: unknown): Array<{ name: string; input: Record<string, unknown> }> {
   if (Array.isArray(value)) {
-    return value.length === 1 ? normalizeParsedToolPayload(value[0]) : null
+    return value.flatMap(normalizeParsedToolPayloads)
   }
-  if (!isRecord(value)) return null
+  if (!isRecord(value)) return []
 
   const toolCalls = value.tool_calls
   if (Array.isArray(toolCalls)) {
-    return toolCalls.length === 1 ? normalizeParsedToolPayload(toolCalls[0]) : null
+    return toolCalls.flatMap(normalizeParsedToolPayloads)
   }
 
   const fn = value.function
   if (isRecord(fn)) {
-    return normalizeNameAndInput(fn.name, fn.arguments)
+    const call = normalizeNameAndInput(fn.name, fn.arguments)
+    return call ? [call] : []
   }
 
   const name = value.name ?? value.tool ?? value.tool_name ?? value.function_name
   const rawInput = value.arguments ?? value.input ?? value.parameters ?? value.args ?? {}
-  return normalizeNameAndInput(name, rawInput)
+  const call = normalizeNameAndInput(name, rawInput)
+  return call ? [call] : []
+}
+
+function normalizeParsedToolPayload(value: unknown): { name: string; input: Record<string, unknown> } | null {
+  const calls = normalizeParsedToolPayloads(value)
+  return calls.length === 1 ? calls[0]! : null
 }
 
 function normalizeNameAndInput(
@@ -424,11 +549,24 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-function nextNudgeText(provider: Pick<Provider, 'supportsTools'>, assistantText: string): string | null {
+function nextNudge(
+  provider: Pick<Provider, 'supportsTools'>,
+  assistantText: string,
+): { text: string; reason: ContinuationNudgeReason; keepAssistantContext: boolean } | null {
   if (provider.supportsTools && looksLikeToolCapabilityConfusion(assistantText)) {
-    return TOOL_CAPABILITY_NUDGE_TEXT
+    return {
+      text: TOOL_CAPABILITY_NUDGE_TEXT,
+      reason: 'tool_capability',
+      keepAssistantContext: false,
+    }
   }
-  if (looksLikeContinuationIntent(assistantText)) return CONTINUATION_NUDGE_TEXT
+  if (looksLikeContinuationIntent(assistantText)) {
+    return {
+      text: CONTINUATION_NUDGE_TEXT,
+      reason: 'continuation',
+      keepAssistantContext: true,
+    }
+  }
   return null
 }
 
@@ -439,6 +577,10 @@ export function looksLikeToolCapabilityConfusion(text: string): boolean {
   const toolTask =
     /\b(run|execute|shell command|command output|local machine|terminal|files?|directories|workspace|paste|share the contents)\b/
   return limitation.test(lower) && toolTask.test(lower)
+}
+
+export function looksLikeToolStateClaimWithoutTool(text: string): boolean {
+  return looksLikeToolStateClaim(text)
 }
 
 /**

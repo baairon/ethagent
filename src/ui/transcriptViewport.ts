@@ -1,3 +1,5 @@
+import type { MessageRow } from './MessageList.js'
+
 export type TranscriptAnchor = {
   rowId: string
   offset: number
@@ -57,4 +59,62 @@ export function resolveScrollTopFromAnchor(
 
 export function clampLine(line: number, maxScrollTop: number): number {
   return Math.max(0, Math.min(maxScrollTop, Math.floor(line)))
+}
+
+export type TranscriptTailSelection<T> = {
+  rows: T[]
+  hiddenCount: number
+}
+
+export function selectTailRowsForViewport<T>(
+  rows: T[],
+  maxLines: number,
+  estimateHeight: (row: T) => number,
+): TranscriptTailSelection<T> {
+  if (rows.length === 0) return { rows: [], hiddenCount: 0 }
+
+  const budget = Math.max(1, Math.floor(maxLines))
+  let used = 0
+  let start = rows.length - 1
+
+  for (; start >= 0; start -= 1) {
+    const row = rows[start]
+    if (!row) break
+    const height = Math.max(1, estimateHeight(row))
+    if (used > 0 && used + height > budget) break
+    used += height
+  }
+
+  const firstVisible = Math.max(0, start + 1)
+  return {
+    rows: rows.slice(firstVisible),
+    hiddenCount: firstVisible,
+  }
+}
+
+export function estimateMessageRowHeight(row: MessageRow, columns = 80): number {
+  const contentWidth = Math.max(20, columns - 8)
+  switch (row.role) {
+    case 'user':
+      return 1 + wrappedLineCount(row.content, contentWidth)
+    case 'assistant':
+      return 1 + wrappedLineCount([row.content, row.liveTail ?? ''].filter(Boolean).join('\n'), contentWidth)
+    case 'thinking':
+      return 2
+    case 'tool_use':
+      return 3 + (row.input ? wrappedLineCount(row.input, contentWidth) : 0)
+    case 'tool_result':
+      return 3 + wrappedLineCount(row.content, contentWidth)
+    case 'note':
+      return 1 + wrappedLineCount(row.content, contentWidth)
+    case 'progress':
+      return 4
+  }
+}
+
+function wrappedLineCount(text: string, width: number): number {
+  if (!text) return 1
+  return text
+    .split(/\r?\n/)
+    .reduce((total, line) => total + Math.max(1, Math.ceil(line.length / width)), 0)
 }

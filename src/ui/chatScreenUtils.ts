@@ -4,7 +4,12 @@ import type { Message } from '../providers/contracts.js'
 import { isLocalProvider } from '../providers/registry.js'
 import type { SessionMode } from '../runtime/sessionMode.js'
 import type { EthagentConfig } from '../storage/config.js'
-import { sessionMessagesToProviderMessages, type SessionMessage } from '../storage/sessions.js'
+import {
+  latestUserMessageCorrectsToolState,
+  sessionMessagesToProviderMessages,
+  TOOL_CORRECTION_CONTEXT_MESSAGE,
+  type SessionMessage,
+} from '../storage/sessions.js'
 import type { MessageRow } from './MessageList.js'
 
 export type TurnCheckpoint = {
@@ -24,6 +29,9 @@ export function buildBaseMessages(
   options: { preserveTurnId?: string; compactToolHistory?: boolean } = {},
 ): Message[] {
   const compactToolHistory = options.compactToolHistory ?? isLocalProvider(config.provider)
+  const correctionContext = latestUserMessageCorrectsToolState(sessionMessages)
+    ? [systemMessage(TOOL_CORRECTION_CONTEXT_MESSAGE)]
+    : []
   return [
     systemMessage(buildSystemPrompt({
       cwd,
@@ -32,6 +40,7 @@ export function buildBaseMessages(
       hasTools,
       mode,
     })),
+    ...correctionContext,
     ...sessionMessagesToProviderMessages(sessionMessages, {
       compactToolHistory,
       preserveTurnId: options.preserveTurnId,

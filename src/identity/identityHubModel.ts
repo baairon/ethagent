@@ -88,6 +88,13 @@ export function tokenCandidateLabel(candidate: Erc8004AgentCandidate): string {
   return candidate.name?.trim() || `agent token #${candidate.agentId.toString()}`
 }
 
+export function tokenCandidateSelectLabel(
+  candidate: Erc8004AgentCandidate,
+  current = false,
+): string {
+  return `${tokenCandidateLabel(candidate)}${current ? '  *' : ''}`
+}
+
 export function tokenCandidateHint(candidate: Erc8004AgentCandidate): string {
   const chain = supportedErc8004ChainForId(candidate.chainId)
   const network = chain?.network ? networkLabel(chain.network) : chain?.name ?? `chain ${candidate.chainId}`

@@ -161,6 +161,107 @@ test('runStreamingTurn executes Ollama JSON tool text without persisting fake as
   assert.ok(rows.some(row => row.role === 'assistant' && /package\.json/i.test(row.content)))
 })
 
+test('runStreamingTurn executes direct cd requests without asking the model', async () => {
+  const cwd = await fs.mkdtemp(path.join(os.tmpdir(), 'ethagent-orch-'))
+  const sessionMessages: SessionMessage[] = []
+  const rows: MessageRow[] = []
+  let providerCalls = 0
+  let toolCalls = 0
+
+  const provider: Provider = {
+    id: 'ollama',
+    model: 'qwen-test',
+    supportsTools: true,
+    async *complete(): AsyncIterable<StreamEvent> {
+      providerCalls += 1
+      yield { type: 'text', delta: 'should not be called' }
+      yield { type: 'done', stopReason: 'end_turn' }
+    },
+  }
+
+  const result = await runStreamingTurn(makeContext({
+    cwd,
+    provider,
+    userText: 'cd into identity',
+    sessionMessages,
+    rows,
+    executeTool: async (name, input) => {
+      toolCalls += 1
+      assert.equal(name, 'change_directory')
+      assert.deepEqual(input, { path: 'identity' })
+      return { result: { ok: true, summary: 'changed directory', content: path.join(cwd, 'identity') } }
+    },
+  }))
+
+  assert.equal(result.finishedNormally, true)
+  assert.equal(providerCalls, 0)
+  assert.equal(toolCalls, 1)
+  assert.ok(sessionMessages.some(m => m.role === 'tool_use' && m.name === 'change_directory'))
+  assert.ok(rows.some(row => row.role === 'tool_result' && row.name === 'change_directory'))
+})
+
+test('runStreamingTurn suppresses unverified state claims during corrective nudges', async () => {
+  const cwd = await fs.mkdtemp(path.join(os.tmpdir(), 'ethagent-orch-'))
+  const sessionMessages: SessionMessage[] = []
+  const rows: MessageRow[] = []
+  let providerCalls = 0
+  let toolCalls = 0
+
+  const provider: Provider = {
+    id: 'ollama',
+    model: 'qwen-test',
+    supportsTools: true,
+    async *complete(): AsyncIterable<StreamEvent> {
+      providerCalls += 1
+      if (providerCalls === 1) {
+        yield {
+          type: 'text',
+          delta: 'It appears that the directory identity does not exist in your current working directory.',
+        }
+        yield { type: 'done', stopReason: 'end_turn' }
+        return
+      }
+      if (providerCalls === 2) {
+        yield {
+          type: 'tool_use_stop',
+          id: 'tool-1',
+          name: 'change_directory',
+          input: { path: 'identity' },
+        }
+        yield { type: 'done', stopReason: 'tool_use' }
+        return
+      }
+      yield { type: 'text', delta: 'Changed into identity.' }
+      yield { type: 'done', stopReason: 'end_turn' }
+    },
+  }
+
+  const result = await runStreamingTurn(makeContext({
+    cwd,
+    provider,
+    userText: 'yes',
+    sessionMessages,
+    rows,
+    executeTool: async (name, input) => {
+      toolCalls += 1
+      assert.equal(name, 'change_directory')
+      assert.deepEqual(input, { path: 'identity' })
+      return { result: { ok: true, summary: 'changed directory', content: path.join(cwd, 'identity') } }
+    },
+  }))
+
+  assert.equal(result.finishedNormally, true)
+  assert.equal(providerCalls, 3)
+  assert.equal(toolCalls, 1)
+  assert.ok(sessionMessages.every(message =>
+    message.role !== 'assistant' || !/does not exist/i.test(message.content),
+  ))
+  assert.ok(rows.every(row =>
+    row.role !== 'assistant' || !/does not exist/i.test(row.content),
+  ))
+  assert.ok(rows.some(row => row.role === 'assistant' && /Changed into identity/i.test(row.content)))
+})
+
 test('runStreamingTurn stops when model emits no tool_uses (model decides it is done)', async () => {
   const cwd = await fs.mkdtemp(path.join(os.tmpdir(), 'ethagent-orch-'))
   const sessionMessages: SessionMessage[] = []

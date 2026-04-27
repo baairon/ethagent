@@ -19,6 +19,7 @@ import {
   storageLabel,
   tokenCandidateHint,
   tokenCandidateLabel,
+  tokenCandidateSelectLabel,
 } from '../src/identity/identityHubModel.js'
 
 test('identity hub formats insufficient-funds preflight errors for compact display', () => {
@@ -292,6 +293,8 @@ test('current agent candidate marker requires the selected token identity', () =
   assert.equal(isCurrentAgentCandidate(identity, { ...candidate, agentId: 1n }), false)
   assert.equal(isCurrentAgentCandidate(identity, { ...candidate, chainId: 1 }), false)
   assert.equal(isCurrentAgentCandidate(undefined, candidate), false)
+  assert.equal(tokenCandidateSelectLabel(candidate, true), 'agent token #45744  *')
+  assert.equal(tokenCandidateSelectLabel(candidate, false), 'agent token #45744')
 })
 
 function assertNoNetworkJargon(value: string): void {

@@ -6,6 +6,10 @@ import type { Message } from '../providers/contracts.js'
 import { getCwd } from '../runtime/cwd.js'
 import type { SessionMode } from '../runtime/sessionMode.js'
 import { atomicWriteText } from './atomicWrite.js'
+import {
+  isUserCorrectionOfToolState,
+  looksLikeToolStateClaim,
+} from '../runtime/toolClaimGuards.js'
 
 export type SessionMessage =
   | { version?: 2; role: 'user'; content: string; createdAt: string; turnId?: string }
@@ -178,15 +182,20 @@ export type ProviderMessageProjectionOptions = {
   preserveTurnId?: string
 }
 
+export const TOOL_CORRECTION_CONTEXT_MESSAGE =
+  'The latest user message corrects a prior assistant claim about tool or filesystem state. Treat user correction and tool_result messages as authoritative. Ignore any recent assistant claim about files, directories, cwd, or tool execution unless it is backed by a tool_result, and retry with the appropriate tool.'
+
 export function sessionMessagesToProviderMessages(
   messages: SessionMessage[],
   options: ProviderMessageProjectionOptions = {},
 ): Message[] {
   const out: Message[] = []
   const pendingToolUses = new Map<string, { name: string; input: Record<string, unknown> }>()
+  const invalidatedAssistantMessages = invalidatedAssistantClaimIndexes(messages)
 
-  for (const message of messages) {
+  for (const [index, message] of messages.entries()) {
     if (message.role === 'system' || message.role === 'user' || message.role === 'assistant') {
+      if (message.role === 'assistant' && invalidatedAssistantMessages.has(index)) continue
       out.push({ role: message.role, content: message.content })
       continue
     }
@@ -223,6 +232,45 @@ export function sessionMessagesToProviderMessages(
   }
 
   return out
+}
+
+export function latestUserMessageCorrectsToolState(messages: SessionMessage[]): boolean {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index]
+    if (!message) continue
+    if (message.role === 'system') continue
+    return message.role === 'user' && isUserCorrectionOfToolState(message.content)
+  }
+  return false
+}
+
+function invalidatedAssistantClaimIndexes(messages: SessionMessage[]): Set<number> {
+  const invalidated = new Set<number>()
+
+  for (let index = 0; index < messages.length; index += 1) {
+    const message = messages[index]
+    if (message?.role !== 'user' || !isUserCorrectionOfToolState(message.content)) continue
+
+    for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
+      const prior = messages[cursor]
+      if (!prior) continue
+      if (prior.role === 'user') break
+      if (prior.role !== 'assistant') continue
+      if (!looksLikeToolStateClaim(prior.content)) continue
+      if (hasToolEvidenceBetween(messages, cursor, index)) continue
+      invalidated.add(cursor)
+    }
+  }
+
+  return invalidated
+}
+
+function hasToolEvidenceBetween(messages: SessionMessage[], start: number, end: number): boolean {
+  for (let index = start + 1; index < end; index += 1) {
+    const message = messages[index]
+    if (message?.role === 'tool_result') return true
+  }
+  return false
 }
 
 function shouldCompactToolMessage(

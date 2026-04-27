@@ -6,7 +6,12 @@ import { TextInput } from '../../ui/TextInput.js'
 import { theme } from '../../ui/theme.js'
 import { isAddress } from 'viem'
 import { normalizeErc8004RegistryConfig } from '../erc8004.js'
-import { isCurrentAgentCandidate, networkLabel, tokenCandidateHint, tokenCandidateLabel } from '../identityHubModel.js'
+import {
+  isCurrentAgentCandidate,
+  networkLabel,
+  tokenCandidateHint,
+  tokenCandidateSelectLabel,
+} from '../identityHubModel.js'
 import { registryConfigFromConfig } from '../registryConfig.js'
 import type { Step } from '../identityHubReducer.js'
 import { WalletApprovalScreen } from './WalletApprovalScreen.js'
@@ -160,10 +165,10 @@ export const RestoreFlow: React.FC<RestoreFlowProps> = ({
       >
         <Select<string>
           options={step.candidates.map(candidate => {
-            const currentMarker = isSwitch && isCurrentAgentCandidate(config?.identity, candidate) ? '  *' : ''
+            const current = isSwitch && isCurrentAgentCandidate(config?.identity, candidate)
             return {
               value: candidate.agentId.toString(),
-              label: `${tokenCandidateLabel(candidate)}${currentMarker}`,
+              label: tokenCandidateSelectLabel(candidate, current),
               hint: tokenCandidateHint(candidate),
             }
           })}
