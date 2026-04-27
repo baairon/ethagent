@@ -57,6 +57,9 @@ export const MAX_CONTINUATION_NUDGES = 3
 const CONTINUATION_NUDGE_TEXT =
   'Continue with the task. Use the appropriate tools to proceed.'
 
+const TOOL_CAPABILITY_NUDGE_TEXT =
+  'You do have access to the provided tools in this environment. Continue by making the appropriate tool call; do not ask the user to run commands or paste command output.'
+
 /**
  * TurnEvent — events emitted by the runtime turn loop. The UI layer subscribes
  * and translates these into Ink rows, notes, permission prompts, and session
@@ -262,17 +265,14 @@ export async function* runRuntimeTurn(
         yield { type: 'assistant_message_committed', text: assistantText }
       }
 
-      if (
-        assistantText &&
-        continuationNudges < maxContinuationNudges &&
-        looksLikeContinuationIntent(assistantText)
-      ) {
+      const nudgeText = nextNudgeText(provider, assistantText)
+      if (assistantText && continuationNudges < maxContinuationNudges && nudgeText) {
         continuationNudges += 1
         yield { type: 'continuation_nudge', attempt: continuationNudges }
         workingMessages = [
           ...rebuildMessages(),
           { role: 'assistant', content: assistantText },
-          { role: 'user', content: CONTINUATION_NUDGE_TEXT },
+          { role: 'user', content: nudgeText },
         ]
         continue
       }
@@ -318,16 +318,10 @@ export function parseLocalModelTextToolUse(
   const payload = extractSingleToolPayload(assistantText)
   if (!payload) return null
 
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(payload)
-  } catch {
-    return null
-  }
+  const call = parseTextToolPayload(payload)
+  if (!call) return null
 
-  if (!isRecord(parsed)) return null
-  const name = parsed.name
-  const input = parsed.arguments
+  const { name, input } = call
   if (typeof name !== 'string') return null
   if (!isRecord(input)) return null
   if (!getTool(name)) return null
@@ -343,18 +337,108 @@ function extractSingleToolPayload(text: string): string | null {
   const trimmed = text.trim()
   if (!trimmed) return null
 
-  const toolCallMatch = trimmed.match(/^<tool_call>\s*([\s\S]*?)\s*<\/tool_call>$/i)
-  if (toolCallMatch) return toolCallMatch[1]!.trim()
+  const exact = normalizeToolPayloadCandidate(trimmed)
+  if (exact.startsWith('{') && exact.endsWith('}')) return exact
+  if (exact.startsWith('[') && exact.endsWith(']')) return exact
 
-  const fencedMatch = trimmed.match(/^```(?:json)?\s*\r?\n([\s\S]*?)\r?\n```$/i)
-  if (fencedMatch) return fencedMatch[1]!.trim()
+  const fencedOnlyMatch = trimmed.match(/^```[^\r\n]*\r?\n([\s\S]*?)\r?\n```$/i)
+  if (fencedOnlyMatch) return normalizeToolPayloadCandidate(fencedOnlyMatch[1]!)
 
-  if (trimmed.startsWith('{') && trimmed.endsWith('}')) return trimmed
+  const embedded = [
+    ...[...trimmed.matchAll(/<tool_call>\s*([\s\S]*?)\s*<\/tool_call>/gi)].map(match => match[1]!),
+    ...[...trimmed.matchAll(/```[^\r\n]*\r?\n([\s\S]*?)\r?\n```/g)].map(match => match[1]!),
+  ].map(normalizeToolPayloadCandidate)
+
+  const unique = [...new Set(embedded)]
+  if (unique.length === 1) return unique[0]!
   return null
+}
+
+function normalizeToolPayloadCandidate(candidate: string): string {
+  let normalized = candidate
+    .trim()
+    .split(/\r?\n/)
+    .map(line => line.replace(/^\s*\d+\s+(?=[{\[<"])/, ''))
+    .join('\n')
+    .trim()
+
+  const toolCallMatch = normalized.match(/^<tool_call>\s*([\s\S]*?)\s*<\/tool_call>$/i)
+  if (toolCallMatch) normalized = toolCallMatch[1]!.trim()
+  return normalized
+}
+
+function parseTextToolPayload(payload: string): { name: string; input: Record<string, unknown> } | null {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(payload)
+  } catch {
+    return null
+  }
+
+  return normalizeParsedToolPayload(parsed)
+}
+
+function normalizeParsedToolPayload(value: unknown): { name: string; input: Record<string, unknown> } | null {
+  if (Array.isArray(value)) {
+    return value.length === 1 ? normalizeParsedToolPayload(value[0]) : null
+  }
+  if (!isRecord(value)) return null
+
+  const toolCalls = value.tool_calls
+  if (Array.isArray(toolCalls)) {
+    return toolCalls.length === 1 ? normalizeParsedToolPayload(toolCalls[0]) : null
+  }
+
+  const fn = value.function
+  if (isRecord(fn)) {
+    return normalizeNameAndInput(fn.name, fn.arguments)
+  }
+
+  const name = value.name ?? value.tool ?? value.tool_name ?? value.function_name
+  const rawInput = value.arguments ?? value.input ?? value.parameters ?? value.args ?? {}
+  return normalizeNameAndInput(name, rawInput)
+}
+
+function normalizeNameAndInput(
+  name: unknown,
+  rawInput: unknown,
+): { name: string; input: Record<string, unknown> } | null {
+  if (typeof name !== 'string') return null
+  const input = parseToolInput(rawInput)
+  if (!input) return null
+  return { name, input }
+}
+
+function parseToolInput(rawInput: unknown): Record<string, unknown> | null {
+  if (isRecord(rawInput)) return rawInput
+  if (typeof rawInput !== 'string') return null
+  try {
+    const parsed = JSON.parse(rawInput)
+    return isRecord(parsed) ? parsed : null
+  } catch {
+    return null
+  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function nextNudgeText(provider: Pick<Provider, 'supportsTools'>, assistantText: string): string | null {
+  if (provider.supportsTools && looksLikeToolCapabilityConfusion(assistantText)) {
+    return TOOL_CAPABILITY_NUDGE_TEXT
+  }
+  if (looksLikeContinuationIntent(assistantText)) return CONTINUATION_NUDGE_TEXT
+  return null
+}
+
+export function looksLikeToolCapabilityConfusion(text: string): boolean {
+  const lower = text.toLowerCase()
+  const limitation =
+    /\b(i (do not|don't|cannot|can't) (have|access|run|execute|inspect|read|list|use)|no direct access|unable to|not able to|currently operating under|limitations and restrictions)\b/
+  const toolTask =
+    /\b(run|execute|shell command|command output|local machine|terminal|files?|directories|workspace|paste|share the contents)\b/
+  return limitation.test(lower) && toolTask.test(lower)
 }
 
 /**

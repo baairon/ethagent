@@ -4,6 +4,7 @@ import type { Message, Provider, StreamEvent } from '../src/providers/contracts.
 import {
   MAX_CONTINUATION_NUDGES,
   looksLikeContinuationIntent,
+  looksLikeToolCapabilityConfusion,
   parseLocalModelTextToolUse,
   runRuntimeTurn,
   type TurnEvent,
@@ -210,6 +211,56 @@ test('runRuntimeTurn converts bare Ollama JSON tool text into a real tool use', 
   ))
 })
 
+test('runRuntimeTurn nudges local models that claim they cannot use available tools', async () => {
+  const { provider, callsRef } = textProvider([
+    [
+      {
+        type: 'text',
+        delta: "I don't have direct access to running shell commands on your local machine.",
+      },
+      { type: 'done', stopReason: 'end_turn' },
+    ],
+    [
+      {
+        type: 'tool_use_stop',
+        id: 'tool-1',
+        name: 'run_bash',
+        input: { command: 'ls ./bin' },
+      },
+      { type: 'done', stopReason: 'tool_use' },
+    ],
+    [
+      { type: 'text', delta: 'bin contains ethagent.js.' },
+      { type: 'done', stopReason: 'end_turn' },
+    ],
+  ])
+
+  const executedTools: string[] = []
+  const events = await collect(
+    runRuntimeTurn({
+      provider,
+      signal: new AbortController().signal,
+      initialMessages: [{ role: 'user', content: 'run ls ./bin' }],
+      rebuildMessages: () => [{ role: 'user', content: 'run ls ./bin' }],
+      runToolBatch: async pending => {
+        executedTools.push(...pending.map(t => t.name))
+        return {
+          cancelled: false,
+          completedTools: pending.map(t => ({
+            ...t,
+            cwd: '/tmp',
+            result: { ok: true, summary: 'ran ls ./bin', content: 'ethagent.js' },
+          })),
+        }
+      },
+    }),
+  )
+
+  assert.equal(callsRef.count, 3)
+  assert.deepEqual(executedTools, ['run_bash'])
+  assert.equal(events.filter(e => e.type === 'continuation_nudge').length, 1)
+})
+
 test('runRuntimeTurn caps continuation nudges at MAX_CONTINUATION_NUDGES', async () => {
   // Every response is a continuation-shaped text with no tool_use. The loop
   // should nudge MAX_CONTINUATION_NUDGES times, then give up and emit done.
@@ -365,12 +416,41 @@ test('parseLocalModelTextToolUse accepts only exact local-model tool payloads', 
     ),
     { id: 'local-text-tool-0', name: 'list_directory', input: {} },
   )
+  assert.deepEqual(
+    parseLocalModelTextToolUse(
+      { id: 'ollama' },
+      'Run the following command:\n\n```bash\n01 {"name":"run_bash","arguments":{"command":"ls ./bin"}}\n```\n',
+    ),
+    { id: 'local-text-tool-0', name: 'run_bash', input: { command: 'ls ./bin' } },
+  )
+  assert.deepEqual(
+    parseLocalModelTextToolUse(
+      { id: 'ollama' },
+      '{"type":"function","function":{"name":"read_file","arguments":"{\\"path\\":\\"package.json\\"}"}}',
+    ),
+    { id: 'local-text-tool-0', name: 'read_file', input: { path: 'package.json' } },
+  )
+  assert.deepEqual(
+    parseLocalModelTextToolUse(
+      { id: 'ollama' },
+      '{"tool_calls":[{"function":{"name":"list_directory","arguments":{"path":"src"}}}]}',
+    ),
+    { id: 'local-text-tool-0', name: 'list_directory', input: { path: 'src' } },
+  )
+  assert.deepEqual(
+    parseLocalModelTextToolUse(
+      { id: 'ollama' },
+      '[{"tool_name":"list_directory","parameters":{"path":"test"}}]',
+    ),
+    { id: 'local-text-tool-0', name: 'list_directory', input: { path: 'test' } },
+  )
 })
 
 test('parseLocalModelTextToolUse rejects unsafe or non-local text', () => {
   const cases = [
     [{ id: 'openai' }, '{"name":"list_directory","arguments":{}}'],
     [{ id: 'ollama' }, 'Sure.\n{"name":"list_directory","arguments":{}}'],
+    [{ id: 'ollama' }, '```bash\n{"name":"list_directory","arguments":{}}\n```\n```bash\n{"name":"read_file","arguments":{"path":"package.json"}}\n```'],
     [{ id: 'ollama' }, '{"name":"missing_tool","arguments":{}}'],
     [{ id: 'ollama' }, '{"name":"list_directory","arguments":"."}'],
     [{ id: 'ollama' }, '{"name":"list_directory","arguments":{}'],
@@ -379,4 +459,16 @@ test('parseLocalModelTextToolUse rejects unsafe or non-local text', () => {
   for (const [provider, text] of cases) {
     assert.equal(parseLocalModelTextToolUse(provider, text), null)
   }
+})
+
+test('looksLikeToolCapabilityConfusion detects false local-tool limitations', () => {
+  assert.equal(
+    looksLikeToolCapabilityConfusion("I don't have direct access to running shell commands on your local machine."),
+    true,
+  )
+  assert.equal(
+    looksLikeToolCapabilityConfusion('I cannot inspect local files unless you share the contents here.'),
+    true,
+  )
+  assert.equal(looksLikeToolCapabilityConfusion('This is a limitation of the API design.'), false)
 })
