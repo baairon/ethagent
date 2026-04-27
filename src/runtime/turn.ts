@@ -1,5 +1,6 @@
 import type { Message, Provider, StreamEvent } from '../providers/contracts.js'
 import type { ToolResult } from '../tools/contracts.js'
+import { getTool } from '../tools/registry.js'
 
 type ProviderTurnEvent =
   | { type: 'text'; delta: string }
@@ -154,7 +155,8 @@ export type RuntimeTurnParams = {
  *
  * Intentionally absent:
  *   - No provider-family branching (no isLocalProvider specialization).
- *   - No regex fallback tool parsing. Native tool_use is the only source.
+ *   - No broad regex fallback tool parsing. A narrow Ollama/Qwen
+ *     compatibility parser handles exact one-tool JSON payloads only.
  *   - No duplicate-tool-call suppression. The model is allowed to repeat.
  *   - No forced-repair retries on tool input validation errors — errors go
  *     back to the model as tool_result(is_error) and the model decides.
@@ -241,6 +243,19 @@ export async function* runRuntimeTurn(
       return
     }
 
+    if (pendingToolUses.length === 0) {
+      const parsedToolUse = parseLocalModelTextToolUse(provider, assistantText, iterationIndex - 1)
+      if (parsedToolUse) {
+        pendingToolUses.push(parsedToolUse)
+        yield {
+          type: 'tool_use_stop',
+          id: parsedToolUse.id,
+          name: parsedToolUse.name,
+          input: parsedToolUse.input,
+        }
+      }
+    }
+
     // No tool work: model decided this turn is over (modulo continuation nudge).
     if (pendingToolUses.length === 0) {
       if (assistantText) {
@@ -291,6 +306,55 @@ export async function* runRuntimeTurn(
 
     workingMessages = rebuildMessages()
   }
+}
+
+export function parseLocalModelTextToolUse(
+  provider: Pick<Provider, 'id'>,
+  assistantText: string,
+  iterationIndex = 0,
+): PendingToolUse | null {
+  if (provider.id !== 'ollama') return null
+
+  const payload = extractSingleToolPayload(assistantText)
+  if (!payload) return null
+
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(payload)
+  } catch {
+    return null
+  }
+
+  if (!isRecord(parsed)) return null
+  const name = parsed.name
+  const input = parsed.arguments
+  if (typeof name !== 'string') return null
+  if (!isRecord(input)) return null
+  if (!getTool(name)) return null
+
+  return {
+    id: `local-text-tool-${iterationIndex}`,
+    name,
+    input,
+  }
+}
+
+function extractSingleToolPayload(text: string): string | null {
+  const trimmed = text.trim()
+  if (!trimmed) return null
+
+  const toolCallMatch = trimmed.match(/^<tool_call>\s*([\s\S]*?)\s*<\/tool_call>$/i)
+  if (toolCallMatch) return toolCallMatch[1]!.trim()
+
+  const fencedMatch = trimmed.match(/^```(?:json)?\s*\r?\n([\s\S]*?)\r?\n```$/i)
+  if (fencedMatch) return fencedMatch[1]!.trim()
+
+  if (trimmed.startsWith('{') && trimmed.endsWith('}')) return trimmed
+  return null
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 /**

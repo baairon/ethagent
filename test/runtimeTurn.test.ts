@@ -4,6 +4,7 @@ import type { Message, Provider, StreamEvent } from '../src/providers/contracts.
 import {
   MAX_CONTINUATION_NUDGES,
   looksLikeContinuationIntent,
+  parseLocalModelTextToolUse,
   runRuntimeTurn,
   type TurnEvent,
 } from '../src/runtime/turn.js'
@@ -165,6 +166,50 @@ test('runRuntimeTurn triggers a continuation nudge when model signals intent wit
   assert.deepEqual(done, { type: 'done', finishedNormally: true })
 })
 
+test('runRuntimeTurn converts bare Ollama JSON tool text into a real tool use', async () => {
+  const { provider, callsRef } = textProvider([
+    [
+      {
+        type: 'text',
+        delta: '{\n  "name": "list_directory",\n  "arguments": {}\n}',
+      },
+      { type: 'done', stopReason: 'end_turn' },
+    ],
+    [
+      { type: 'text', delta: 'Directory listed.' },
+      { type: 'done', stopReason: 'end_turn' },
+    ],
+  ])
+
+  const executedTools: string[] = []
+  const events = await collect(
+    runRuntimeTurn({
+      provider,
+      signal: new AbortController().signal,
+      initialMessages: [{ role: 'user', content: 'list files' }],
+      rebuildMessages: () => [{ role: 'user', content: 'list files' }],
+      runToolBatch: async pending => {
+        executedTools.push(...pending.map(t => t.name))
+        return {
+          cancelled: false,
+          completedTools: pending.map(t => ({
+            ...t,
+            cwd: '/tmp',
+            result: { ok: true, summary: 'listed .', content: 'a.txt' },
+          })),
+        }
+      },
+    }),
+  )
+
+  assert.equal(callsRef.count, 2)
+  assert.deepEqual(executedTools, ['list_directory'])
+  assert.ok(events.some(e => e.type === 'tool_use_stop' && e.name === 'list_directory'))
+  assert.ok(events.every(e =>
+    e.type !== 'assistant_message_committed' || !e.text.includes('"name": "list_directory"'),
+  ))
+})
+
 test('runRuntimeTurn caps continuation nudges at MAX_CONTINUATION_NUDGES', async () => {
   // Every response is a continuation-shaped text with no tool_use. The loop
   // should nudge MAX_CONTINUATION_NUDGES times, then give up and emit done.
@@ -295,4 +340,43 @@ test('looksLikeContinuationIntent ignores explanatory text without action verbs'
     false,
   )
   assert.equal(looksLikeContinuationIntent('I think you should try reading the file.'), false)
+})
+
+test('parseLocalModelTextToolUse accepts only exact local-model tool payloads', () => {
+  assert.deepEqual(
+    parseLocalModelTextToolUse(
+      { id: 'ollama' },
+      '{\n  "name": "list_directory",\n  "arguments": {}\n}',
+      2,
+    ),
+    { id: 'local-text-tool-2', name: 'list_directory', input: {} },
+  )
+  assert.deepEqual(
+    parseLocalModelTextToolUse(
+      { id: 'ollama' },
+      '```json\n{"name":"list_directory","arguments":{"path":"."}}\n```',
+    ),
+    { id: 'local-text-tool-0', name: 'list_directory', input: { path: '.' } },
+  )
+  assert.deepEqual(
+    parseLocalModelTextToolUse(
+      { id: 'ollama' },
+      '<tool_call>{"name":"list_directory","arguments":{}}</tool_call>',
+    ),
+    { id: 'local-text-tool-0', name: 'list_directory', input: {} },
+  )
+})
+
+test('parseLocalModelTextToolUse rejects unsafe or non-local text', () => {
+  const cases = [
+    [{ id: 'openai' }, '{"name":"list_directory","arguments":{}}'],
+    [{ id: 'ollama' }, 'Sure.\n{"name":"list_directory","arguments":{}}'],
+    [{ id: 'ollama' }, '{"name":"missing_tool","arguments":{}}'],
+    [{ id: 'ollama' }, '{"name":"list_directory","arguments":"."}'],
+    [{ id: 'ollama' }, '{"name":"list_directory","arguments":{}'],
+  ] as const
+
+  for (const [provider, text] of cases) {
+    assert.equal(parseLocalModelTextToolUse(provider, text), null)
+  }
 })

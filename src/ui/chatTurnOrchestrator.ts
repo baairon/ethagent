@@ -374,6 +374,7 @@ async function handleEvent(ev: TurnEvent, ctx: EventHandlerContext): Promise<voi
     }
     case 'tool_use_stop': {
       ctx.markPendingToolUse()
+      ctx.finalizeStreamingRows()
       return
     }
     case 'assistant_message_committed': {
