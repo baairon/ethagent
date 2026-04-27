@@ -134,8 +134,22 @@
     /* ── error ───────────────────────────────── */
     .error-title { color: var(--error); font-size: 12px; margin: 0 0 0.4rem; letter-spacing: 0.04em; }
     .error-title::before { content: "[!] "; }
-    .error-msg { color: var(--text); font-size: 12.5px; margin: 0 0 0.5rem; line-height: 1.55; }
-    .error-hint { color: var(--subtle); font-size: 11.5px; margin: 0; line-height: 1.65; }
+    .error-msg {
+      color: var(--text);
+      font-size: 12.5px;
+      margin: 0 0 0.5rem;
+      line-height: 1.55;
+      max-width: 44rem;
+      overflow-wrap: anywhere;
+    }
+    .error-hint {
+      color: var(--subtle);
+      font-size: 11.5px;
+      margin: 0;
+      line-height: 1.65;
+      max-width: 44rem;
+      overflow-wrap: anywhere;
+    }
     .error-hint::before { content: "  hint: "; color: var(--dim); }
     .error-hint a { color: var(--info); text-decoration: underline; text-underline-offset: 2px; text-decoration-thickness: 1px; }
     .error-hint a:hover { color: var(--text); }
@@ -485,6 +499,8 @@
     };
     const CLOSE_DELAY_MS = 1800;
     const CANCEL_CLOSE_DELAY_MS = 3200;
+    const WALLET_PROVIDER_WAIT_MS = 3000;
+    const WALLET_PROVIDER_POLL_MS = 100;
     const CHAINS = {
       '0x1': { name: 'Ethereum Mainnet' }, '0xaa36a7': { name: 'Sepolia' },
       '0x2105': { name: 'Base' }, '0x14a34': { name: 'Base Sepolia' },
@@ -553,6 +569,64 @@
     const errorSlot = document.getElementById('error-block-slot');
     const approve = document.getElementById('approve');
     const cancel = document.getElementById('cancel');
+    let announcedEthereum = null;
+    let activeEthereum = null;
+
+    function rememberAnnouncedProvider(event) {
+      const provider = event && event.detail && event.detail.provider;
+      if (provider && !announcedEthereum) announcedEthereum = provider;
+    }
+    window.addEventListener('eip6963:announceProvider', rememberAnnouncedProvider);
+    try { window.dispatchEvent(new Event('eip6963:requestProvider')); } catch (_) {}
+
+    function ethereumProvider() {
+      return activeEthereum || window.ethereum || announcedEthereum;
+    }
+
+    function noWalletError() {
+      return new Error('No browser wallet detected. Install MetaMask, Rabby, or use Brave.');
+    }
+
+    function waitForEthereumProvider(timeoutMs) {
+      const existing = ethereumProvider();
+      if (existing) return Promise.resolve(existing);
+
+      return new Promise((resolve, reject) => {
+        let settled = false;
+        const cleanup = () => {
+          clearTimeout(timer);
+          clearInterval(interval);
+          window.removeEventListener('ethereum#initialized', check);
+          window.removeEventListener('eip6963:announceProvider', onAnnounce);
+        };
+        const finish = (fn) => {
+          if (settled) return;
+          settled = true;
+          cleanup();
+          fn();
+        };
+        const check = () => {
+          const provider = ethereumProvider();
+          if (provider) finish(() => resolve(provider));
+        };
+        const onAnnounce = (event) => {
+          rememberAnnouncedProvider(event);
+          check();
+        };
+        const timer = setTimeout(() => finish(() => reject(noWalletError())), timeoutMs || WALLET_PROVIDER_WAIT_MS);
+        const interval = setInterval(check, WALLET_PROVIDER_POLL_MS);
+        window.addEventListener('ethereum#initialized', check);
+        window.addEventListener('eip6963:announceProvider', onAnnounce);
+        try { window.dispatchEvent(new Event('eip6963:requestProvider')); } catch (_) {}
+        check();
+      });
+    }
+
+    async function walletRequest(method, params) {
+      const provider = ethereumProvider();
+      if (!provider) throw noWalletError();
+      return await provider.request(params === undefined ? { method } : { method, params });
+    }
 
     const SPINNER_FRAMES = ['|','/','-','\\'];
     let spinnerHandle = null;
@@ -704,8 +778,8 @@
       let title = 'wallet error', body = msg, hint = 'press enter to retry, or esc to abort.';
       if (isNoWallet) {
         title = 'no browser wallet detected';
-        body = 'ethagent needs a wallet extension installed in this browser to sign or send transactions.';
-        hint = 'install <a href="https://metamask.io/download" target="_blank" rel="noopener">metamask</a>, <a href="https://rabby.io" target="_blank" rel="noopener">rabby</a>, or use brave, then reload.';
+        body = 'Install or enable a browser wallet for this tab.';
+        hint = 'try <a href="https://metamask.io/download" target="_blank" rel="noopener">metamask</a>, <a href="https://rabby.io" target="_blank" rel="noopener">rabby</a>, or brave, then press <code>enter</code>.';
       } else if (isUserReject) {
         title = 'request rejected';
         body = 'you declined the request in your wallet.';
@@ -738,15 +812,16 @@
     }
 
     async function ensureWallet() {
-      if (!window.ethereum) throw new Error('No browser wallet detected. Install MetaMask, Rabby, or use Brave, then reload.');
       setState('connecting');
-      const accounts = await window.ethereum.request({ method:'eth_requestAccounts' });
+      const provider = await waitForEthereumProvider();
+      activeEthereum = provider;
+      const accounts = await provider.request({ method:'eth_requestAccounts' });
       const account = accounts && accounts[0];
       if (!account) throw new Error('No wallet account was selected.');
       if (!config.chainIdHex) return account;
-      try { await window.ethereum.request({ method:'wallet_switchEthereumChain', params:[{ chainId: config.chainIdHex }] }); }
+      try { await provider.request({ method:'wallet_switchEthereumChain', params:[{ chainId: config.chainIdHex }] }); }
       catch (err) {
-        const cur = await window.ethereum.request({ method:'eth_chainId' });
+        const cur = await provider.request({ method:'eth_chainId' });
         if (String(cur).toLowerCase() !== String(config.chainIdHex).toLowerCase()) throw err;
       }
       return account;
@@ -763,7 +838,7 @@
         if (config.kind === 'sign') {
           const prepared = config.message ? { message: config.message } : await post('/prepare', { account });
           setState('approve');
-          const signature = await window.ethereum.request({ method:'personal_sign', params:[prepared.message, account] });
+          const signature = await walletRequest('personal_sign', [prepared.message, account]);
           setState('submitting');
           await post('/complete', { account, message: prepared.message, signature });
           setState('done'); closeSoon(); return;
@@ -771,25 +846,19 @@
         if (config.kind === 'sign-transaction') {
           const prepared = config.message ? { message: config.message } : await post('/prepare', { account });
           setState('approve-sign');
-          const signature = await window.ethereum.request({ method:'personal_sign', params:[prepared.message, account] });
+          const signature = await walletRequest('personal_sign', [prepared.message, account]);
           setState('preparing-transaction');
           const txPayload = await post('/prepare-transaction', { account, message: prepared.message, signature });
           setState('approve-transaction');
           const tx = txPayload.tx || {};
-          const txHash = await window.ethereum.request({
-            method:'eth_sendTransaction',
-            params:[{ from:account, to:tx.to, data:tx.data, value:tx.value }]
-          });
+          const txHash = await walletRequest('eth_sendTransaction', [{ from:account, to:tx.to, data:tx.data, value:tx.value }]);
           setState('submitting');
           await post('/complete', { account, txHash });
           setState('done', { txHash }); closeSoon(); return;
         }
         if (config.kind === 'transaction') {
           setState('approve');
-          const txHash = await window.ethereum.request({
-            method:'eth_sendTransaction',
-            params:[{ from:account, to:config.tx.to, data:config.tx.data, value:config.tx.value }]
-          });
+          const txHash = await walletRequest('eth_sendTransaction', [{ from:account, to:config.tx.to, data:config.tx.data, value:config.tx.value }]);
           setState('submitting');
           await post('/complete', { account, txHash });
           setState('done', { txHash }); closeSoon(); return;

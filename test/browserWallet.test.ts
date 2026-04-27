@@ -65,6 +65,9 @@ test('browser wallet page explains the wallet approval', () => {
   assert.match(page, /glyphs/)
   assert.match(page, /CLOSE_DELAY_MS = 1800/)
   assert.match(page, /CANCEL_CLOSE_DELAY_MS = 3200/)
+  assert.match(page, /WALLET_PROVIDER_WAIT_MS = 3000/)
+  assert.match(page, /eip6963:requestProvider/)
+  assert.doesNotMatch(page, /ethagent needs a wallet extension installed/)
   assert.match(page, /focus-visible/)
 })
 
