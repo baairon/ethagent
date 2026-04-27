@@ -9,7 +9,7 @@ import { CopyPicker } from './CopyPicker.js'
 import { PermissionPrompt } from './PermissionPrompt.js'
 import { PlanApprovalView, type PlanApprovalAction } from './PlanApprovalView.js'
 import { ChatInput } from './ChatInput.js'
-import { IdentitySetup, type IdentityResult } from '../identity/IdentitySetup.js'
+import { IdentityHub, type IdentityHubInitialAction, type IdentityHubResult } from '../identity/IdentityHub.js'
 import type { CopyResult } from '../utils/clipboard.js'
 import { getSlashSuggestions } from '../commands/index.js'
 import { Box, Text } from 'ink'
@@ -18,7 +18,8 @@ import { theme } from './theme.js'
 export type Overlay = 'none' | 'modelPicker' | 'resume' | 'rewind' | 'copyPicker' | 'permission' | 'permissions' | 'planApproval' | 'identity'
 export type CopyPickerState = { turnText: string; turnLabel: string } | null
 export type IdentityOverlayState = {
-  initialAction: 'create' | 'import' | undefined
+  initialAction: IdentityHubInitialAction | undefined
+  initialImportPath?: string
   existing: { address: string } | null
 }
 
@@ -40,7 +41,7 @@ type ChatBottomPaneProps = {
   handleModelPick: (sel: ModelPickerSelection) => void | Promise<void>
   handleResumePick: (id: string) => void | Promise<void>
   identityOverlay: IdentityOverlayState | null
-  handleIdentityResult: (result: IdentityResult) => void
+  handleIdentityResult: (result: IdentityHubResult) => void
   handleRestoreConversation: (turnId: string) => void
   handleCopyDone: (result: CopyResult, label: string) => void
   handleCopyCancel: () => void
@@ -48,6 +49,7 @@ type ChatBottomPaneProps = {
   handlePlanApproval: (action: PlanApprovalAction) => void | Promise<void>
   handlePlanApprovalCancel: () => void
   onPermissionRulesChanged: (rules: SessionPermissionRule[]) => void
+  onConfigChange: (config: EthagentConfig) => void
   handleSubmit: (value: string) => void | Promise<void>
   setOverlay: React.Dispatch<React.SetStateAction<Overlay>>
   pushNote: (text: string, kind?: 'info' | 'error' | 'dim') => void
@@ -79,6 +81,7 @@ export function ChatBottomPane({
   handlePlanApproval,
   handlePlanApprovalCancel,
   onPermissionRulesChanged,
+  onConfigChange,
   handleSubmit,
   setOverlay,
   pushNote,
@@ -156,11 +159,14 @@ export function ChatBottomPane({
 
   if (overlay === 'identity' && identityOverlay) {
     return (
-      <IdentitySetup
+      <IdentityHub
         mode="manage"
+        config={config}
+        cwd={cwd}
         initialAction={identityOverlay.initialAction}
-        existing={identityOverlay.existing}
+        initialImportPath={identityOverlay.initialImportPath}
         onComplete={handleIdentityResult}
+        onConfigChange={onConfigChange}
       />
     )
   }

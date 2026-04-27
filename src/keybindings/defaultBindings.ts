@@ -6,5 +6,6 @@ export const DEFAULT_BINDINGS: Binding[] = [
 
   { context: 'Chat',   chord: { key: 'escape' },               action: 'chat:cancel' },
   { context: 'Chat',   chord: { key: 'p', meta: true },        action: 'chat:modelPicker' },
+  { context: 'Chat',   chord: { key: 'i', meta: true },        action: 'chat:identityHub' },
   { context: 'Chat',   chord: { key: 'tab', shift: true },     action: 'chat:cycleMode' },
 ]

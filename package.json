@@ -38,9 +38,11 @@
   "dependencies": {
     "@noble/curves": "^1.9.7",
     "@noble/hashes": "^1.8.0",
+    "@noble/post-quantum": "^0.6.1",
     "ink": "^6.8.0",
     "react": "^19.2.4",
     "tsx": "^4.21.0",
+    "viem": "^2.48.4",
     "zod": "^3.25.76"
   },
   "devDependencies": {

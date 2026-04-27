@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
-import { setIdentity, getIdentityStatus, getPrivateKey, clearIdentity } from '../src/storage/identity.js'
+import { setIdentity, setTokenIdentity, getIdentityStatus, getPrivateKey, clearIdentity } from '../src/storage/identity.js'
 import { saveConfig, getConfigPath, getConfigDir, type EthagentConfig } from '../src/storage/config.js'
 import { generatePrivateKey, addressFromPrivateKey } from '../src/identity/eth.js'
 
@@ -79,6 +79,68 @@ test('clearIdentity removes both config field and stored secret', async () => {
     assert.equal(status, null)
     const stored = await getPrivateKey()
     assert.equal(stored, null)
+  })
+})
+
+test('setTokenIdentity persists ERC-8004 identity without a stored private key', async () => {
+  await withTempHome(async () => {
+    const config = baseConfig()
+    await saveConfig(config)
+    const identity = {
+      source: 'erc8004' as const,
+      address: '0x000000000000000000000000000000000000dEaD',
+      ownerAddress: '0x000000000000000000000000000000000000dEaD',
+      createdAt: new Date(0).toISOString(),
+      chainId: 1,
+      rpcUrl: 'https://ethereum.publicnode.com',
+      identityRegistryAddress: '0x8004A169FB4a3325136EB29fA0ceB6D2e539a432',
+      agentId: '42',
+      agentUri: 'ipfs://bafy-agent',
+      state: { name: 'agent' },
+    }
+
+    const updated = await setTokenIdentity(config, identity)
+    const status = await getIdentityStatus(updated)
+
+    assert.equal(status?.backend, 'browser-wallet')
+    assert.equal(status?.agentId, '42')
+    assert.equal(await getPrivateKey(), null)
+  })
+})
+
+test('clearIdentity removes ERC-8004 identity metadata without touching other config', async () => {
+  await withTempHome(async () => {
+    const config = {
+      ...baseConfig(),
+      selectedNetwork: 'base' as const,
+      erc8004: {
+        chainId: 8453,
+        rpcUrl: 'https://base.publicnode.com',
+        identityRegistryAddress: '0x8004A169FB4a3325136EB29fA0ceB6D2e539a432',
+      },
+    }
+    await saveConfig(config)
+    const identity = {
+      source: 'erc8004' as const,
+      address: '0x000000000000000000000000000000000000dEaD',
+      ownerAddress: '0x000000000000000000000000000000000000dEaD',
+      createdAt: new Date(0).toISOString(),
+      chainId: 8453,
+      rpcUrl: 'https://base.publicnode.com',
+      identityRegistryAddress: '0x8004A169FB4a3325136EB29fA0ceB6D2e539a432',
+      agentId: '42',
+      agentUri: 'ipfs://bafy-agent',
+      state: { name: 'agent' },
+    }
+    const withToken = await setTokenIdentity(config, identity)
+
+    const cleared = await clearIdentity(withToken)
+
+    assert.equal(cleared.identity, undefined)
+    assert.equal(cleared.provider, config.provider)
+    assert.equal(cleared.model, config.model)
+    assert.equal(cleared.selectedNetwork, 'base')
+    assert.equal(cleared.erc8004?.chainId, 8453)
   })
 })
 

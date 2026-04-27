@@ -82,7 +82,7 @@ export function Select<T>({
       {visibleOptions.map((option, visibleIndex) => {
         const absoluteIndex = windowStart + visibleIndex
         const isActive = absoluteIndex === index
-        const cursor = option.disabled ? ' ' : isActive ? '>' : ' '
+        const cursor = option.disabled ? ' ' : isActive ? '›' : ' '
         const prefix = option.prefix ? `${option.prefix} ` : ''
         const isUtility = option.role === 'utility'
         const prefixColor = option.disabled

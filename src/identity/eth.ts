@@ -2,8 +2,13 @@ import { secp256k1 } from '@noble/curves/secp256k1.js'
 import { keccak_256 } from '@noble/hashes/sha3.js'
 import crypto from 'node:crypto'
 
+type RecoverableSecp256k1 = typeof secp256k1 & {
+  recoverPublicKey: (signature: Uint8Array, message: Uint8Array) => Uint8Array
+}
+
 const HEX_RE = /^(0x)?[0-9a-fA-F]+$/
 const ADDR_RE = /^0x[0-9a-fA-F]{40}$/
+const SIG_RE = /^0x[0-9a-fA-F]{130}$/
 
 function stripHex(input: string): string {
   return input.startsWith('0x') || input.startsWith('0X') ? input.slice(2) : input
@@ -27,6 +32,24 @@ function bytesToHex(bytes: Uint8Array): string {
     out += bytes[i]!.toString(16).padStart(2, '0')
   }
   return out
+}
+
+function ethereumMessageDigest(message: string | Uint8Array): Uint8Array {
+  const data = typeof message === 'string' ? new TextEncoder().encode(message) : message
+  const prefix = new TextEncoder().encode(`\x19Ethereum Signed Message:\n${data.length}`)
+  const payload = new Uint8Array(prefix.length + data.length)
+  payload.set(prefix, 0)
+  payload.set(data, prefix.length)
+  return keccak_256(payload)
+}
+
+function addressFromPublicKey(publicKey: Uint8Array): string {
+  const uncompressed = publicKey.length === 65
+    ? publicKey
+    : secp256k1.Point.fromBytes(publicKey).toBytes(false)
+  const hash = keccak_256(uncompressed.subarray(1))
+  const addrBytes = hash.subarray(-20)
+  return toChecksumAddress('0x' + bytesToHex(addrBytes))
 }
 
 export function generatePrivateKey(): string {
@@ -62,9 +85,7 @@ export function addressFromPrivateKey(input: string): string {
   if (!validatePrivateKey(input)) throw new Error('invalid private key')
   const bytes = hexToBytes(stripHex(input.trim()))
   const pub = secp256k1.getPublicKey(bytes, false)
-  const hash = keccak_256(pub.subarray(1))
-  const addrBytes = hash.subarray(-20)
-  return toChecksumAddress('0x' + bytesToHex(addrBytes))
+  return addressFromPublicKey(pub)
 }
 
 export function toChecksumAddress(address: string): string {
@@ -86,12 +107,7 @@ export function toChecksumAddress(address: string): string {
 export function signMessage(privateKey: string, message: string | Uint8Array): string {
   if (!validatePrivateKey(privateKey)) throw new Error('invalid private key')
   const sk = hexToBytes(stripHex(privateKey.trim()))
-  const data = typeof message === 'string' ? new TextEncoder().encode(message) : message
-  const prefix = new TextEncoder().encode(`\x19Ethereum Signed Message:\n${data.length}`)
-  const payload = new Uint8Array(prefix.length + data.length)
-  payload.set(prefix, 0)
-  payload.set(data, prefix.length)
-  const digest = keccak_256(payload)
+  const digest = ethereumMessageDigest(message)
   const sig = secp256k1.sign(digest, sk, { prehash: false })
   const compact = sig.toBytes('compact')
   const r = compact.subarray(0, 32)
@@ -102,4 +118,20 @@ export function signMessage(privateKey: string, message: string | Uint8Array): s
   out.set(s, 32)
   out[64] = v
   return '0x' + bytesToHex(out)
+}
+
+export function recoverAddressFromSignature(message: string | Uint8Array, signature: string): string {
+  if (!SIG_RE.test(signature)) throw new Error('invalid signature')
+  const bytes = hexToBytes(stripHex(signature))
+  const v = bytes[64]!
+  const recovery = v >= 27 ? v - 27 : v
+  if (recovery < 0 || recovery > 3) throw new Error('invalid recovery id')
+  const recovered = new Uint8Array(65)
+  recovered[0] = recovery
+  recovered.set(bytes.subarray(0, 64), 1)
+  const publicKey = (secp256k1 as RecoverableSecp256k1).recoverPublicKey(
+    recovered,
+    ethereumMessageDigest(message),
+  )
+  return addressFromPublicKey(publicKey)
 }

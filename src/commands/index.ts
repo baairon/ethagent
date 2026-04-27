@@ -19,7 +19,12 @@ import path from 'node:path'
 import { setCwd } from '../runtime/cwd.js'
 import type { SessionMode } from '../runtime/sessionMode.js'
 
-export type IdentityRequestAction = 'manage' | 'create' | 'import'
+export type IdentityRequestAction =
+  | 'manage'
+  | 'create'
+  | 'import'
+  | 'export-snapshot'
+  | { kind: 'import-snapshot'; path?: string }
 
 export type SlashContext = {
   config: EthagentConfig
@@ -328,7 +333,7 @@ const COMMANDS: CommandSpec[] = [
   {
     name: 'identity',
     enterBehavior: 'fill',
-    summary: 'Ethereum identity · /identity [status|create|import|export|remove]',
+    summary: 'Ethereum identity · /identity [status|create|import|export-snapshot|import-snapshot|export|remove]',
     run: async (args, ctx) => runIdentity(args, ctx),
   },
   {
@@ -372,6 +377,8 @@ async function runIdentity(args: string, ctx: SlashContext): Promise<SlashResult
       `created    ${status.createdAt}`,
       `backend    ${status.backend}`,
     ]
+    if (status.source) lines.push(`source     ${status.source}`)
+    if (status.agentId) lines.push(`token      #${status.agentId}`)
     return { kind: 'note', text: lines.join('\n') }
   }
 
@@ -385,12 +392,30 @@ async function runIdentity(args: string, ctx: SlashContext): Promise<SlashResult
     return { kind: 'handled' }
   }
 
+  if (sub === 'export-snapshot') {
+    ctx.onIdentityRequest('export-snapshot')
+    return { kind: 'handled' }
+  }
+
+  if (sub === 'import-snapshot') {
+    ctx.onIdentityRequest({ kind: 'import-snapshot', path: rest.join(' ').trim() || undefined })
+    return { kind: 'handled' }
+  }
+
   if (sub === 'export') {
+    const status = await getIdentityStatus(ctx.config)
+    if (status?.source === 'erc8004' || status?.agentId) {
+      return {
+        kind: 'note',
+        variant: 'error',
+        text: 'ERC-8004 identities are controlled by your browser wallet; ethagent has no private key to export.',
+      }
+    }
     if (rest[0] !== '--reveal') {
       return {
         kind: 'note',
         variant: 'error',
-        text: 'identity export prints your private key. re-run with: /identity export --reveal',
+        text: 'legacy identity export prints your private key. re-run with: /identity export --reveal',
       }
     }
     if (!(await hasPrivateKey())) {
@@ -414,7 +439,7 @@ async function runIdentity(args: string, ctx: SlashContext): Promise<SlashResult
       return {
         kind: 'note',
         variant: 'error',
-        text: 'remove deletes your stored key. re-run with: /identity remove confirm',
+        text: 'remove deletes local identity metadata and any legacy stored key. re-run with: /identity remove confirm',
       }
     }
     const status = await getIdentityStatus(ctx.config)
@@ -429,7 +454,7 @@ async function runIdentity(args: string, ctx: SlashContext): Promise<SlashResult
   return {
     kind: 'note',
     variant: 'error',
-    text: 'usage: /identity [status|create|import|export --reveal|remove confirm]',
+    text: 'usage: /identity [status|create|import|export-snapshot|import-snapshot <path>|export --reveal|remove confirm]',
   }
 }
 
@@ -531,6 +556,8 @@ function renderDoctor(
   if (identity) {
     lines.push(`  address    ${identity.address}`)
     lines.push(`  backend    ${identity.backend}`)
+    if (identity.source) lines.push(`  source     ${identity.source}`)
+    if (identity.agentId) lines.push(`  token      #${identity.agentId}`)
   } else {
     lines.push('  address    not set')
   }

@@ -5,6 +5,7 @@ export const ACTIONS = [
   'app:redraw',
   'chat:cancel',
   'chat:modelPicker',
+  'chat:identityHub',
   'chat:cycleMode',
 ] as const
 

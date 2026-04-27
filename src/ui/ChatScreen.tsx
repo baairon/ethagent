@@ -53,8 +53,8 @@ import {
   type TurnCheckpoint,
 } from './chatScreenUtils.js'
 import { ChatBottomPane, type CopyPickerState, type IdentityOverlayState, type Overlay } from './ChatBottomPane.js'
-import { setIdentity, getIdentityStatus } from '../storage/identity.js'
-import type { IdentityResult } from '../identity/IdentitySetup.js'
+import { setIdentity, setTokenIdentity, getIdentityStatus } from '../storage/identity.js'
+import type { IdentityHubResult } from '../identity/IdentityHub.js'
 import { buildResumedSessionState, resolveModelSelection, restoreConversationState } from './chatSessionState.js'
 import { runStreamingTurn } from './chatTurnOrchestrator.js'
 import type { PlanApprovalAction } from './PlanApprovalView.js'
@@ -404,9 +404,14 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
       onIdentityRequest: action => {
         void (async () => {
           const status = await getIdentityStatus(configRef.current)
-          const initialAction = action === 'create' || action === 'import' ? action : undefined
+          const initialAction = typeof action === 'object'
+            ? action.kind
+            : action === 'create' || action === 'import' || action === 'export-snapshot'
+              ? action
+              : undefined
           setIdentityOverlay({
             initialAction,
+            initialImportPath: typeof action === 'object' ? action.path : undefined,
             existing: status ? { address: status.address } : null,
           })
           setOverlay('identity')
@@ -625,6 +630,19 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
   )
 
   useKeybinding(
+    'chat:identityHub',
+    () => {
+      if (overlay !== 'none') return
+      setIdentityOverlay({
+        initialAction: undefined,
+        existing: configRef.current.identity ? { address: configRef.current.identity.address } : null,
+      })
+      setOverlay('identity')
+    },
+    { context: 'Chat', isActive: overlay === 'none' },
+  )
+
+  useKeybinding(
     'chat:cycleMode',
     () => {
       if (overlay !== 'none') return
@@ -724,9 +742,14 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
   )
 
   const handleIdentityResult = useCallback(
-    (result: IdentityResult) => {
+    (result: IdentityHubResult) => {
       setOverlay('none')
       setIdentityOverlay(null)
+      if (result.kind === 'updated') {
+        replaceConfig(result.config)
+        pushNote(result.message, 'info')
+        return
+      }
       if (result.kind === 'set') {
         void (async () => {
           try {
@@ -736,6 +759,18 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
             )
             replaceConfig(nextConfig)
             pushNote(`identity saved · ${identity.address} · ${backend}`, 'info')
+          } catch (err: unknown) {
+            pushNote(`identity save failed: ${(err as Error).message}`, 'error')
+          }
+        })()
+        return
+      }
+      if (result.kind === 'token') {
+        void (async () => {
+          try {
+            const nextConfig = await setTokenIdentity(configRef.current, result.identity)
+            replaceConfig(nextConfig)
+            pushNote(`identity saved · ERC-8004 #${result.identity.agentId}`, 'info')
           } catch (err: unknown) {
             pushNote(`identity save failed: ${(err as Error).message}`, 'error')
           }
@@ -893,7 +928,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
           <Text color={theme.dim}> · </Text>
         </>
       )}
-      <Text color={theme.dim}>esc cancels · alt+p swap model</Text>
+      <Text color={theme.dim}>esc cancels · alt+p model · alt+i identity</Text>
       {exitState.pending ? (
         <Text color={theme.accentPrimary}>  · press {exitState.keyName} again to exit</Text>
       ) : null}
@@ -933,6 +968,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
           handlePlanApproval={handlePlanApproval}
           handlePlanApprovalCancel={handlePlanApprovalCancel}
           onPermissionRulesChanged={rules => { permissionRulesRef.current = rules }}
+          onConfigChange={replaceConfig}
           handleSubmit={handleSubmit}
           setOverlay={setOverlay}
           pushNote={pushNote}

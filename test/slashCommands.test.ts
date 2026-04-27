@@ -48,3 +48,18 @@ test('/model with no args requests the model picker overlay', async () => {
   assert.deepEqual(result, { kind: 'handled' })
   assert.equal(requested, true)
 })
+
+test('/identity snapshot commands open the identity hub with the requested action', async () => {
+  const requests: unknown[] = []
+
+  assert.deepEqual(await dispatchSlash('/identity export-snapshot', context({
+    onIdentityRequest: action => { requests.push(action) },
+  })), { kind: 'handled' })
+
+  assert.deepEqual(await dispatchSlash('/identity import-snapshot .\\exports\\agent.json', context({
+    onIdentityRequest: action => { requests.push(action) },
+  })), { kind: 'handled' })
+
+  assert.equal(requests[0], 'export-snapshot')
+  assert.deepEqual(requests[1], { kind: 'import-snapshot', path: '.\\exports\\agent.json' })
+})

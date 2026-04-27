@@ -16,10 +16,13 @@ import {
 } from '../storage/config.js'
 import { setKey, setSecret } from '../storage/secrets.js'
 import { IdentitySetup, type IdentityResult } from '../identity/IdentitySetup.js'
+import { IdentityHub, type IdentityHubResult } from '../identity/IdentityHub.js'
 
 type Step =
   | { kind: 'detecting' }
   | { kind: 'detect-error'; message: string }
+  | { kind: 'identity-start'; spec: SpecSnapshot }
+  | { kind: 'identity-start-saving'; spec: SpecSnapshot; result: IdentityHubResult }
   | { kind: 'choose-path'; spec: SpecSnapshot }
   | { kind: 'ollama-setup'; spec: SpecSnapshot }
   | { kind: 'ollama-manual'; spec: SpecSnapshot }
@@ -38,7 +41,7 @@ type FirstRunProps = {
   onCancel: () => void
 }
 
-const STATUS: Record<Step['kind'], string> = {
+const STATUS: Record<string, string> = {
   'detecting':         'first-run setup · inspecting machine',
   'detect-error':      'first-run setup · detection failed',
   'choose-path':       'first-run setup · choose how to run',
@@ -63,6 +66,7 @@ const NAV_CANCEL = '↑↓ navigate · enter select · esc cancel setup'
 export const FirstRun: React.FC<FirstRunProps> = ({ onComplete, onCancel }) => {
   const [step, setStep] = useState<Step>({ kind: 'detecting' })
   const [history, setHistory] = useState<Step[]>([])
+  const [firstRunIdentity, setFirstRunIdentity] = useState<EthagentConfig['identity']>(undefined)
 
   const goTo = (next: Step): void => {
     setHistory(h => [...h, step])
@@ -84,7 +88,7 @@ export const FirstRun: React.FC<FirstRunProps> = ({ onComplete, onCancel }) => {
     detectSpec()
       .then(spec => {
         if (cancelled) return
-        setStep({ kind: 'choose-path', spec })
+        setStep({ kind: 'identity-start', spec })
       })
       .catch((err: unknown) => {
         if (cancelled) return
@@ -110,29 +114,31 @@ export const FirstRun: React.FC<FirstRunProps> = ({ onComplete, onCancel }) => {
   }, [step, onComplete])
 
   useEffect(() => {
-    if (step.kind !== 'identity-saving') return
+    if (step.kind !== 'identity-start-saving') return
     let cancelled = false
-    const persist = async (): Promise<EthagentConfig> => {
+    const persist = async (): Promise<void> => {
       if (step.result.kind === 'set') {
         await setSecret(IDENTITY_ACCOUNT, step.result.privateKey)
-        return {
-          ...step.config,
-          identity: {
-            address: step.result.address,
-            createdAt: new Date().toISOString(),
-          },
-        }
+        setFirstRunIdentity({
+          address: step.result.address,
+          createdAt: new Date().toISOString(),
+          ...(step.result.backup ? { backup: step.result.backup } : {}),
+        })
+      } else if (step.result.kind === 'token') {
+        setFirstRunIdentity(step.result.identity)
       }
-      return step.config
     }
     persist()
-      .then(config => {
+      .then(() => {
         if (cancelled) return
-        setStep({ kind: 'saving', config })
+        setStep({ kind: 'choose-path', spec: step.spec })
       })
       .catch((err: unknown) => {
         if (cancelled) return
-        setStep({ kind: 'save-error', config: step.config, message: (err as Error).message })
+        setStep({
+          kind: 'detect-error',
+          message: `could not store identity: ${(err as Error).message}`,
+        })
       })
     return () => { cancelled = true }
   }, [step])
@@ -142,6 +148,9 @@ export const FirstRun: React.FC<FirstRunProps> = ({ onComplete, onCancel }) => {
       <Text color={theme.dim}>{canBack ? NAV_BACK : NAV_CANCEL}</Text>
     </Box>
   )
+
+  const withFirstRunIdentity = (config: EthagentConfig): EthagentConfig =>
+    firstRunIdentity ? { ...config, identity: firstRunIdentity } : config
 
   if (step.kind === 'detecting') {
     return (
@@ -164,6 +173,37 @@ export const FirstRun: React.FC<FirstRunProps> = ({ onComplete, onCancel }) => {
             onCancel={onCancel}
           />
         </Box>
+      </Box>
+    )
+  }
+
+  if (step.kind === 'identity-start') {
+    return (
+      <Box flexDirection="column" padding={1}>
+        <Splash tipLine="first-run setup · agent identity" />
+        <IdentityHub
+          mode="first-run"
+          onComplete={result => {
+            if (result.kind === 'cancel') {
+              onCancel()
+              return
+            }
+            if (result.kind === 'skip') {
+              setStep({ kind: 'choose-path', spec: step.spec })
+              return
+            }
+            setStep({ kind: 'identity-start-saving', spec: step.spec, result })
+          }}
+        />
+      </Box>
+    )
+  }
+
+  if (step.kind === 'identity-start-saving') {
+    return (
+      <Box flexDirection="column" padding={1}>
+        <Splash tipLine="first-run setup - storing identity" />
+        <Text color={theme.dim}>storing identity...</Text>
       </Box>
     )
   }
@@ -211,14 +251,14 @@ export const FirstRun: React.FC<FirstRunProps> = ({ onComplete, onCancel }) => {
         <OllamaBootstrap
           spec={step.spec}
           onDone={model => goTo({
-            kind: 'identity',
-            config: {
+            kind: 'saving',
+            config: withFirstRunIdentity({
               version: 1,
               provider: 'ollama',
               model,
               baseUrl: defaultBaseUrlFor('ollama'),
               firstRunAt: new Date().toISOString(),
-            },
+            }),
           })}
           onManual={() => setStep({ kind: 'ollama-manual', spec: step.spec })}
           onBack={goBack}
@@ -331,13 +371,13 @@ export const FirstRun: React.FC<FirstRunProps> = ({ onComplete, onCancel }) => {
             initialValue={defaultModel}
             placeholder={defaultModel}
             onSubmit={model => goTo({
-              kind: 'identity',
-              config: {
+              kind: 'saving',
+              config: withFirstRunIdentity({
                 version: 1,
                 provider,
                 model: model.trim() || defaultModel,
                 firstRunAt: new Date().toISOString(),
-              },
+              }),
             })}
             onCancel={goBack}
           />

@@ -7,9 +7,36 @@ import { atomicWriteText } from './atomicWrite.js'
 export const PROVIDERS = ['ollama', 'openai', 'anthropic', 'gemini'] as const
 export type ProviderId = (typeof PROVIDERS)[number]
 
+export const SELECTABLE_NETWORKS = ['mainnet', 'arbitrum', 'base', 'optimism', 'polygon'] as const
+export type SelectableNetwork = (typeof SELECTABLE_NETWORKS)[number]
+
 const IdentitySchema = z.object({
   address: z.string().regex(/^0x[a-fA-F0-9]{40}$/),
   createdAt: z.string(),
+  source: z.enum(['local-key', 'erc8004']).optional(),
+  ownerAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/).optional(),
+  chainId: z.number().int().positive().optional(),
+  rpcUrl: z.string().url().optional(),
+  identityRegistryAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/).optional(),
+  agentId: z.string().min(1).optional(),
+  agentUri: z.string().min(1).optional(),
+  metadataCid: z.string().min(1).optional(),
+  state: z.record(z.unknown()).optional(),
+  backup: z.object({
+    cid: z.string().min(1),
+    createdAt: z.string(),
+    envelopeVersion: z.string().min(1),
+    ipfsApiUrl: z.string().url(),
+    status: z.enum(['pinned', 'restored', 'failed', 'unknown']),
+    ownerAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/).optional(),
+    chainId: z.number().int().positive().optional(),
+    rpcUrl: z.string().url().optional(),
+    identityRegistryAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/).optional(),
+    agentId: z.string().min(1).optional(),
+    agentUri: z.string().min(1).optional(),
+    metadataCid: z.string().min(1).optional(),
+    txHash: z.string().regex(/^0x[a-fA-F0-9]+$/).optional(),
+  }).optional(),
 })
 
 const ConfigSchema = z.object({
@@ -19,6 +46,13 @@ const ConfigSchema = z.object({
   baseUrl: z.string().url().optional(),
   firstRunAt: z.string(),
   identity: IdentitySchema.optional(),
+  erc8004: z.object({
+    chainId: z.number().int().positive(),
+    rpcUrl: z.string().url(),
+    identityRegistryAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/),
+    fromBlock: z.string().regex(/^\d+$/).optional(),
+  }).optional(),
+  selectedNetwork: z.enum(SELECTABLE_NETWORKS).optional(),
 })
 
 export type EthagentIdentity = z.infer<typeof IdentitySchema>

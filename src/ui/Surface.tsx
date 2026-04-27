@@ -25,13 +25,16 @@ export const Surface: React.FC<SurfaceProps> = ({
   tone = 'primary',
   children,
 }) => {
-  const color = toneColor[tone]
-
+  const borderColor = toneColor[tone]
   return (
-    <Box flexDirection="column" borderStyle="round" borderColor={color} paddingX={1} paddingY={0}>
+    <Box flexDirection="column" borderStyle="round" borderColor={borderColor} paddingX={1} paddingY={0}>
       <Box flexDirection="column">
-        <Text color={color} bold>{title}</Text>
-        {subtitle ? <Text color={theme.dim}>{subtitle}</Text> : null}
+        <Text color={borderColor} bold>{title}</Text>
+        {subtitle ? (
+          typeof subtitle === 'string'
+            ? <Text color={theme.dim}>{subtitle}</Text>
+            : subtitle
+        ) : null}
       </Box>
       {children ? <Box flexDirection="column" marginTop={1}>{children}</Box> : null}
       {footer ? (
@@ -42,4 +45,3 @@ export const Surface: React.FC<SurfaceProps> = ({
     </Box>
   )
 }
-

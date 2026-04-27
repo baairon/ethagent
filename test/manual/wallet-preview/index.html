@@ -1,0 +1,199 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ethagent wallet — preview</title>
+  <style>
+    html, body { margin: 0; padding: 0; background: #050505; height: 100%; font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; color: #f1f1f1; }
+    .frame { display: block; width: 100%; height: 100vh; border: 0; background: #000; }
+    .label {
+      position: fixed; top: 12px; left: 14px; z-index: 5;
+      color: #777; font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="label">wallet.html · preview harness</div>
+  <iframe id="frame" class="frame" src="wallet.html"></iframe>
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <script type="text/babel" src="tweaks-panel.jsx"></script>
+
+  <div id="tweaks-root"></div>
+
+  <script type="text/babel">
+    const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+      "flow": "sign",
+      "state": "connecting",
+      "chain": "0xaa36a7",
+      "showTxHashOnDone": true
+    }/*EDITMODE-END*/;
+
+    const FLOWS = ['sign', 'transaction'];
+    const STATES = ['connecting', 'approve', 'submitting', 'done', 'error'];
+    const ERROR_KINDS = ['no-wallet', 'rejected', 'wrong-chain', 'generic'];
+    const CHAINS = [
+      ['0x1',      'Ethereum Mainnet'],
+      ['0xaa36a7', 'Sepolia'],
+      ['0x2105',   'Base'],
+      ['0xa4b1',   'Arbitrum One'],
+    ];
+
+    const ERROR_MESSAGES = {
+      'no-wallet':  'No browser wallet detected. Install MetaMask, Rabby, or use Brave, then reload.',
+      'rejected':   'User rejected the request in the wallet.',
+      'wrong-chain':'Wrong network selected in your wallet.',
+      'generic':    'wallet signature does not match connected account',
+    };
+
+    const EXAMPLE_TX_HASH = '0x9f2a4e7c1b3d8f6a5c2e0a9d7b4f1c8e6a3d5b2f0c7e9a1d4b6f8c0e2a5d7b9f';
+
+    const SAMPLE_CONFIG = {
+      sign: {
+        kind: 'sign',
+        chainIdHex: '0xaa36a7',
+        message: 'ethagent identity proof for 0x9F2a…BC4e\nnonce: 7c3e91a4',
+      },
+      transaction: {
+        kind: 'transaction',
+        chainIdHex: '0xaa36a7',
+        expectedAccount: '0x9F2a4E7C1B3D8F6A5C2E0a9D7B4F1c8E6A3DBC4e',
+        tx: {
+          to: '0xCa11ab1eDecafC0ffeeBeefC0deF00dCAfeBabe1',
+          data: '0xabcdef',
+        },
+      },
+    };
+
+    function App() {
+      const { tweaks, setTweak } = useTweaks(TWEAK_DEFAULTS);
+      const [errorKind, setErrorKind] = React.useState('no-wallet');
+      const frameReady = React.useRef(false);
+
+      // Wait for iframe load and inject preview hook
+      React.useEffect(() => {
+        const frame = document.getElementById('frame');
+        const onLoad = () => {
+          // Re-inject preview flag and reload — the page checks __WALLET_PREVIEW__ at boot
+          if (!frame.contentWindow.__WALLET_PREVIEW__) {
+            // Inject before scripts run by setting on contentWindow then forcing reload
+            // Strategy: rewrite via postMessage isn't possible, so we patch after-the-fact
+            // by calling the exposed driver if present, else schedule a reload with a hash flag
+          }
+          frameReady.current = true;
+          apply();
+        };
+        frame.addEventListener('load', onLoad);
+        return () => frame.removeEventListener('load', onLoad);
+      }, []);
+
+      // Inject __WALLET_PREVIEW__ via querystring trick: re-source the frame to wallet.html?preview=1
+      React.useEffect(() => {
+        const frame = document.getElementById('frame');
+        // Listen to load and patch window
+        const reload = () => {
+          frame.src = 'about:blank';
+          setTimeout(() => {
+            // Use srcdoc approach: fetch wallet.html, prepend the preview flag
+            fetch('wallet.html').then(r => r.text()).then(html => {
+              const patched = html.replace(
+                '<head>',
+                '<head><script>window.__WALLET_PREVIEW__ = true;<\/script>'
+              );
+              frame.srcdoc = patched;
+            });
+          }, 50);
+        };
+        reload();
+      }, []);
+
+      const apply = React.useCallback(() => {
+        const frame = document.getElementById('frame');
+        const w = frame.contentWindow;
+        if (!w || !w.__walletPreview) {
+          setTimeout(apply, 60);
+          return;
+        }
+        const base = SAMPLE_CONFIG[tweaks.flow];
+        w.__walletPreview.setConfig({ ...base, chainIdHex: tweaks.chain });
+        if (tweaks.state === 'error') {
+          w.__walletPreview.setState('error', { message: ERROR_MESSAGES[errorKind] });
+        } else if (tweaks.state === 'done' && tweaks.flow === 'transaction' && tweaks.showTxHashOnDone) {
+          w.__walletPreview.setState('done', { txHash: EXAMPLE_TX_HASH });
+        } else {
+          w.__walletPreview.setState(tweaks.state);
+        }
+      }, [tweaks, errorKind]);
+
+      React.useEffect(() => { apply(); }, [apply]);
+
+      // Re-apply when iframe finishes loading after srcdoc set
+      React.useEffect(() => {
+        const frame = document.getElementById('frame');
+        const onLoad = () => setTimeout(apply, 80);
+        frame.addEventListener('load', onLoad);
+        return () => frame.removeEventListener('load', onLoad);
+      }, [apply]);
+
+      return (
+        <TweaksPanel title="Wallet preview">
+          <TweakSection title="Flow">
+            <TweakRadio
+              label="Request type"
+              value={tweaks.flow}
+              options={FLOWS.map(v => ({ value: v, label: v }))}
+              onChange={(v) => setTweak('flow', v)}
+            />
+            <TweakSelect
+              label="Chain"
+              value={tweaks.chain}
+              options={CHAINS.map(([v, l]) => ({ value: v, label: l }))}
+              onChange={(v) => setTweak('chain', v)}
+            />
+          </TweakSection>
+
+          <TweakSection title="State">
+            <TweakSelect
+              label="Status"
+              value={tweaks.state}
+              options={STATES.map(v => ({ value: v, label: v }))}
+              onChange={(v) => setTweak('state', v)}
+            />
+            {tweaks.state === 'error' ? (
+              <TweakSelect
+                label="Error kind"
+                value={errorKind}
+                options={ERROR_KINDS.map(v => ({ value: v, label: v }))}
+                onChange={setErrorKind}
+              />
+            ) : null}
+            {tweaks.state === 'done' && tweaks.flow === 'transaction' ? (
+              <TweakToggle
+                label="Show tx hash"
+                value={tweaks.showTxHashOnDone}
+                onChange={(v) => setTweak('showTxHashOnDone', v)}
+              />
+            ) : null}
+          </TweakSection>
+
+          <TweakSection title="Quick walk">
+            <TweakButton onClick={async () => {
+              const seq = ['connecting', 'approve', 'submitting', 'done'];
+              for (const s of seq) {
+                setTweak('state', s);
+                await new Promise(r => setTimeout(r, 1100));
+              }
+            }}>Play happy path</TweakButton>
+          </TweakSection>
+        </TweaksPanel>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('tweaks-root')).render(<App />);
+  </script>
+</body>
+</html>
