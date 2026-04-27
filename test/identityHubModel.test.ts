@@ -90,13 +90,13 @@ test('identity hub summary collapses gracefully when no identity is loaded', () 
   assert.equal(rows[3]?.value, 'not saved yet')
 })
 
-test('forget local agent confirmation keeps the local wipe boundary explicit', () => {
+test('local agent removal confirmation keeps the device-only boundary explicit', () => {
   const copy = FORGET_LOCAL_AGENT_COPY.join('\n')
-  assert.match(copy, /active local agent/)
+  assert.match(copy, /active agent selection/)
   assert.doesNotMatch(copy, /legacy|obsolete|older installs/)
   assert.match(copy, /does not burn, transfer, or delete agent tokens/)
   assert.match(copy, /does not delete pinned IPFS backups/)
-  assert.match(copy, /does not delete sessions or chats/)
+  assert.match(copy, /sessions and chats stay/)
 })
 
 test('storage credential confirmation distinguishes pinning control from identity cleanup', () => {

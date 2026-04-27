@@ -1,6 +1,6 @@
 # Identity Hub Smoke Test
 
-Use this checklist for live ERC-8004 wallet testing. The covered flow is create, load, back up, edit profile, and forget local agent. Token transfers require an explicit re-encryption handoff before prior private memory is readable by a new owner.
+Use this checklist for live ERC-8004 wallet testing. The covered flow is create, load, back up, edit profile, and remove the active agent from this device. Token transfers require an explicit re-encryption handoff before prior private memory is readable by a new owner.
 
 ## Prerequisites
 

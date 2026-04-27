@@ -44,7 +44,7 @@ export const MenuScreen: React.FC<MenuScreenProps> = ({
         { value: 'backup', label: 'back up', hint: 'save encrypted state to IPFS and refresh tokenURI', disabled: !canRebackup },
         { value: 'load', label: 'switch agent', hint: 'pick a different token your wallet holds' },
         { value: 'create', label: 'new agent', hint: 'mint another agent token' },
-        { value: 'details', label: 'settings', hint: 'profile, values, IPFS storage, local cleanup' },
+        { value: 'details', label: 'settings', hint: 'profile, backup, storage' },
         { value: 'cancel', label: 'close' },
       ]
     : [

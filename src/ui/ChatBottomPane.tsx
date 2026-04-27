@@ -37,6 +37,7 @@ type ChatBottomPaneProps = {
   slashSuggestions: ReturnType<typeof getSlashSuggestions>
   planApprovalContextLabel: string
   footerRight: React.ReactNode
+  exitHint: string | null
   handleModelPick: (sel: ModelPickerSelection) => void | Promise<void>
   handleResumePick: (id: string) => void | Promise<void>
   identityOverlay: IdentityOverlayState | null
@@ -69,6 +70,7 @@ export function ChatBottomPane({
   slashSuggestions,
   planApprovalContextLabel,
   footerRight,
+  exitHint,
   handleModelPick,
   handleResumePick,
   identityOverlay,
@@ -191,11 +193,14 @@ export function ChatBottomPane({
         footerRight={footerRight}
         cwd={cwd}
       />
-      <Box marginLeft={2} marginTop={0}>
+      <Box marginLeft={2} marginTop={0} flexDirection="column">
         <Text>
           <Text color={theme.dim}>workspace · </Text>
           <Text color={theme.textSubtle}>{cwd}</Text>
         </Text>
+        {exitHint ? (
+          <Text color={theme.accentPrimary}>{exitHint}</Text>
+        ) : null}
       </Box>
     </Box>
   )
