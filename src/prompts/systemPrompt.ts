@@ -96,7 +96,7 @@ function buildToolEnabledPrompt(ctx: SystemPromptContext): string {
             '**NO FAKE COMPLETIONS**: NEVER claim you have updated or created a file if you have not used the edit tools. Talk is cheap, use the tools.',
             'One tool call per response when a tool is needed. Wait for the tool result before deciding the next step.',
             'For targeted edits with `oldText`, copy the text verbatim from the most recent `read_file` output. For full file writes, omit `oldText` and provide just `newText` with the complete content.',
-            'Do NOT emit `<|im_start|>`, `<|im_end|>`, `<tool_call>`, or other chat-template tokens as part of the visible response.',
+            'Do NOT emit `<|im_start|>`, `<|im_end|>`, or other chat-template tokens as visible prose.',
           ],
         )]
       : []),

@@ -109,6 +109,58 @@ test('runStreamingTurn completes a single tool call and loops back for model sum
   assert.ok(rows.some(row => row.role === 'assistant' && /Created hello\.txt/i.test(row.content)))
 })
 
+test('runStreamingTurn executes Ollama JSON tool text without persisting fake assistant text', async () => {
+  const cwd = await fs.mkdtemp(path.join(os.tmpdir(), 'ethagent-orch-'))
+  const sessionMessages: SessionMessage[] = []
+  const rows: MessageRow[] = []
+  let providerCalls = 0
+  let toolCalls = 0
+
+  const provider: Provider = {
+    id: 'ollama',
+    model: 'qwen-test',
+    supportsTools: true,
+    async *complete(): AsyncIterable<StreamEvent> {
+      providerCalls += 1
+      if (providerCalls === 1) {
+        yield { type: 'text', delta: '{\n  "name": "list_directory",\n  "arguments": {}\n}' }
+        yield { type: 'done', stopReason: 'end_turn' }
+      } else {
+        yield { type: 'text', delta: 'I see package.json and src.' }
+        yield { type: 'done', stopReason: 'end_turn' }
+      }
+    },
+  }
+
+  const result = await runStreamingTurn(makeContext({
+    cwd,
+    provider,
+    userText: 'list all the files in this directory',
+    sessionMessages,
+    rows,
+    mode: 'chat',
+    executeTool: async (name, input) => {
+      toolCalls += 1
+      assert.equal(name, 'list_directory')
+      assert.deepEqual(input, {})
+      return { result: { ok: true, summary: 'listed .', content: 'package.json\nsrc' } }
+    },
+  }))
+
+  assert.equal(result.finishedNormally, true)
+  assert.equal(providerCalls, 2)
+  assert.equal(toolCalls, 1)
+  assert.ok(sessionMessages.some(m => m.role === 'tool_use' && m.name === 'list_directory'))
+  assert.ok(sessionMessages.some(m => m.role === 'tool_result' && m.name === 'list_directory'))
+  assert.ok(sessionMessages.every(m =>
+    m.role !== 'assistant' || !m.content.includes('"name": "list_directory"'),
+  ))
+  assert.ok(rows.every(row =>
+    row.role !== 'assistant' || !row.content.includes('"name": "list_directory"'),
+  ))
+  assert.ok(rows.some(row => row.role === 'assistant' && /package\.json/i.test(row.content)))
+})
+
 test('runStreamingTurn stops when model emits no tool_uses (model decides it is done)', async () => {
   const cwd = await fs.mkdtemp(path.join(os.tmpdir(), 'ethagent-orch-'))
   const sessionMessages: SessionMessage[] = []
@@ -314,4 +366,3 @@ test('runStreamingTurn persists assistant text before stopping', async () => {
 
   assert.ok(sessionMessages.some(m => m.role === 'assistant' && m.content === 'Done.'))
 })
-
