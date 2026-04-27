@@ -6,7 +6,7 @@ import { TextInput } from '../../ui/TextInput.js'
 import { theme } from '../../ui/theme.js'
 import { isAddress } from 'viem'
 import { normalizeErc8004RegistryConfig } from '../erc8004.js'
-import { networkLabel, tokenCandidateHint, tokenCandidateLabel } from '../identityHubModel.js'
+import { isCurrentAgentCandidate, networkLabel, tokenCandidateHint, tokenCandidateLabel } from '../identityHubModel.js'
 import { registryConfigFromConfig } from '../registryConfig.js'
 import type { Step } from '../identityHubReducer.js'
 import { WalletApprovalScreen } from './WalletApprovalScreen.js'
@@ -159,11 +159,14 @@ export const RestoreFlow: React.FC<RestoreFlowProps> = ({
         footer={footerHint('enter select · esc back')}
       >
         <Select<string>
-          options={step.candidates.map(candidate => ({
-            value: candidate.agentId.toString(),
-            label: tokenCandidateLabel(candidate),
-            hint: tokenCandidateHint(candidate),
-          }))}
+          options={step.candidates.map(candidate => {
+            const currentMarker = isSwitch && isCurrentAgentCandidate(config?.identity, candidate) ? '  *' : ''
+            return {
+              value: candidate.agentId.toString(),
+              label: `${tokenCandidateLabel(candidate)}${currentMarker}`,
+              hint: tokenCandidateHint(candidate),
+            }
+          })}
           onSubmit={onTokenSelect}
           onCancel={onBack}
         />

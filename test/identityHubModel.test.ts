@@ -11,6 +11,7 @@ import {
   identityHubErrorView,
   identityDetailSections,
   identitySummaryRows,
+  isCurrentAgentCandidate,
   lastBackupLabel,
   networkLabel,
   networkMenuTagline,
@@ -264,6 +265,33 @@ test('token candidate hint falls back to network only when no backup is pinned y
 
   assert.equal(tokenCandidateLabel(candidate), 'agent token #1')
   assert.equal(tokenCandidateHint(candidate), 'ethereum mainnet')
+})
+
+test('current agent candidate marker requires the selected token identity', () => {
+  const identity = {
+    address: '0x8DDe0C47EdC7C0a0745f56d4BB92a959CD0c5394',
+    ownerAddress: '0x8DDe0C47EdC7C0a0745f56d4BB92a959CD0c5394',
+    createdAt: new Date(0).toISOString(),
+    source: 'erc8004',
+    agentId: '45744',
+    agentUri: 'ipfs://bafy-metadata',
+    chainId: 8453,
+    identityRegistryAddress: '0x8004A169FB4a3325136EB29fA0ceB6D2e539a432',
+  } as const
+  const candidate = {
+    ownerAddress: '0x8DDe0C47EdC7C0a0745f56d4BB92a959CD0c5394',
+    chainId: 8453,
+    rpcUrl: 'https://base.publicnode.com',
+    identityRegistryAddress: '0x8004A169FB4a3325136EB29fA0ceB6D2e539a432',
+    agentId: 45744n,
+    agentUri: 'ipfs://bafy-metadata',
+    registration: null,
+  } as const
+
+  assert.equal(isCurrentAgentCandidate(identity, candidate), true)
+  assert.equal(isCurrentAgentCandidate(identity, { ...candidate, agentId: 1n }), false)
+  assert.equal(isCurrentAgentCandidate(identity, { ...candidate, chainId: 1 }), false)
+  assert.equal(isCurrentAgentCandidate(undefined, candidate), false)
 })
 
 function assertNoNetworkJargon(value: string): void {

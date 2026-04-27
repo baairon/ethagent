@@ -99,6 +99,25 @@ export function tokenCandidateHint(candidate: Erc8004AgentCandidate): string {
   return parts.join(' · ')
 }
 
+export function isCurrentAgentCandidate(
+  identity: EthagentIdentity | undefined,
+  candidate: Erc8004AgentCandidate,
+): boolean {
+  if (!identity?.agentId) return false
+  if (identity.agentId !== candidate.agentId.toString()) return false
+
+  const owner = identity.ownerAddress ?? identity.address
+  if (owner && owner.toLowerCase() !== candidate.ownerAddress.toLowerCase()) return false
+  if (identity.chainId !== undefined && identity.chainId !== candidate.chainId) return false
+  if (
+    identity.identityRegistryAddress
+    && identity.identityRegistryAddress.toLowerCase() !== candidate.identityRegistryAddress.toLowerCase()
+  ) {
+    return false
+  }
+  return true
+}
+
 export function storageLabel(apiUrl: string): string {
   void apiUrl
   return 'IPFS'
