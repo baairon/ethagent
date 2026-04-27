@@ -3,9 +3,11 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
-import { setIdentity, setTokenIdentity, getIdentityStatus, getPrivateKey, clearIdentity } from '../src/storage/identity.js'
-import { saveConfig, getConfigPath, getConfigDir, type EthagentConfig } from '../src/storage/config.js'
-import { generatePrivateKey, addressFromPrivateKey } from '../src/identity/eth.js'
+import { setTokenIdentity, getIdentityStatus, clearIdentity } from '../src/storage/identity.js'
+import { saveConfig, type EthagentConfig } from '../src/storage/config.js'
+import { getSecret, setSecret } from '../src/storage/secrets.js'
+
+const IDENTITY_ACCOUNT = 'ethereum:default'
 
 async function withTempHome(fn: () => Promise<void>): Promise<void> {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'ethagent-id-test-'))
@@ -27,59 +29,6 @@ const baseConfig = (): EthagentConfig => ({
   provider: 'openai',
   model: 'gpt-test',
   firstRunAt: new Date(0).toISOString(),
-})
-
-test('setIdentity persists the address but never the private key in config.json', async () => {
-  await withTempHome(async () => {
-    const config = baseConfig()
-    await saveConfig(config)
-    const pk = generatePrivateKey()
-    const expected = addressFromPrivateKey(pk)
-
-    const { config: updated, identity } = await setIdentity(pk, config)
-    assert.equal(updated.identity?.address, expected)
-    assert.equal(identity.address, expected)
-
-    const raw = await fs.readFile(getConfigPath(), 'utf8')
-    const stripped = pk.startsWith('0x') ? pk.slice(2) : pk
-    assert.equal(raw.includes(stripped), false, 'private key must not appear in config.json')
-    assert.equal(raw.includes(expected), true, 'address must appear in config.json')
-  })
-})
-
-test('getPrivateKey + getIdentityStatus round-trip', async () => {
-  await withTempHome(async () => {
-    const config = baseConfig()
-    await saveConfig(config)
-    const pk = generatePrivateKey()
-    const { config: updated } = await setIdentity(pk, config)
-
-    const status = await getIdentityStatus(updated)
-    assert.ok(status, 'identity status should be present')
-    assert.equal(status?.address, updated.identity?.address)
-    assert.match(status?.backend ?? '', /^(keyring|encrypted-file)$/)
-
-    const stored = await getPrivateKey()
-    assert.equal((stored ?? '').toLowerCase(), pk.toLowerCase())
-  })
-})
-
-test('clearIdentity removes both config field and stored secret', async () => {
-  await withTempHome(async () => {
-    const config = baseConfig()
-    await saveConfig(config)
-    const pk = generatePrivateKey()
-    const { config: withId } = await setIdentity(pk, config)
-    assert.ok(withId.identity)
-
-    const cleared = await clearIdentity(withId)
-    assert.equal(cleared.identity, undefined)
-
-    const status = await getIdentityStatus(cleared)
-    assert.equal(status, null)
-    const stored = await getPrivateKey()
-    assert.equal(stored, null)
-  })
 })
 
 test('setTokenIdentity persists ERC-8004 identity without a stored private key', async () => {
@@ -104,7 +53,8 @@ test('setTokenIdentity persists ERC-8004 identity without a stored private key',
 
     assert.equal(status?.backend, 'browser-wallet')
     assert.equal(status?.agentId, '42')
-    assert.equal(await getPrivateKey(), null)
+    assert.equal(status?.chainId, 1)
+    assert.equal(await getSecret(IDENTITY_ACCOUNT), null)
   })
 })
 
@@ -144,27 +94,22 @@ test('clearIdentity removes ERC-8004 identity metadata without touching other co
   })
 })
 
-test('private key never lands in plaintext anywhere under ~/.ethagent/', async () => {
+test('clearIdentity also removes any legacy local private key secret', async () => {
   await withTempHome(async () => {
     const config = baseConfig()
     await saveConfig(config)
-    const pk = generatePrivateKey()
-    const stripped = pk.startsWith('0x') ? pk.slice(2) : pk
-    await setIdentity(pk, config)
+    await setSecret(IDENTITY_ACCOUNT, 'legacy-private-key')
+    assert.equal(await getSecret(IDENTITY_ACCOUNT), 'legacy-private-key')
 
-    const dir = getConfigDir()
-    const entries = await fs.readdir(dir)
-    for (const entry of entries) {
-      const full = path.join(dir, entry)
-      const stat = await fs.stat(full)
-      if (!stat.isFile()) continue
-      const buf = await fs.readFile(full)
-      const text = buf.toString('utf8')
-      assert.equal(
-        text.toLowerCase().includes(stripped.toLowerCase()),
-        false,
-        `private key must not appear in ${entry}`,
-      )
-    }
+    await clearIdentity({
+      ...config,
+      identity: {
+        address: '0x000000000000000000000000000000000000dEaD',
+        createdAt: new Date(0).toISOString(),
+        source: 'local-key',
+      },
+    })
+
+    assert.equal(await getSecret(IDENTITY_ACCOUNT), null)
   })
 })

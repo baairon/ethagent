@@ -6,8 +6,6 @@ import { hasKey } from '../storage/secrets.js'
 import {
   clearIdentity,
   getIdentityStatus,
-  getPrivateKey,
-  hasPrivateKey,
 } from '../storage/identity.js'
 import { discoverProviderModels, type ModelCatalogResult } from '../models/catalog.js'
 import { copyToClipboard } from '../utils/clipboard.js'
@@ -22,9 +20,7 @@ import type { SessionMode } from '../runtime/sessionMode.js'
 export type IdentityRequestAction =
   | 'manage'
   | 'create'
-  | 'import'
-  | 'export-snapshot'
-  | { kind: 'import-snapshot'; path?: string }
+  | 'load'
 
 export type SlashContext = {
   config: EthagentConfig
@@ -333,7 +329,7 @@ const COMMANDS: CommandSpec[] = [
   {
     name: 'identity',
     enterBehavior: 'fill',
-    summary: 'Ethereum identity · /identity [status|create|import|export-snapshot|import-snapshot|export|remove]',
+    summary: 'Ethereum identity · /identity [status|create|load|remove]',
     run: async (args, ctx) => runIdentity(args, ctx),
   },
   {
@@ -387,51 +383,9 @@ async function runIdentity(args: string, ctx: SlashContext): Promise<SlashResult
     return { kind: 'handled' }
   }
 
-  if (sub === 'import') {
-    ctx.onIdentityRequest('import')
+  if (sub === 'load') {
+    ctx.onIdentityRequest('load')
     return { kind: 'handled' }
-  }
-
-  if (sub === 'export-snapshot') {
-    ctx.onIdentityRequest('export-snapshot')
-    return { kind: 'handled' }
-  }
-
-  if (sub === 'import-snapshot') {
-    ctx.onIdentityRequest({ kind: 'import-snapshot', path: rest.join(' ').trim() || undefined })
-    return { kind: 'handled' }
-  }
-
-  if (sub === 'export') {
-    const status = await getIdentityStatus(ctx.config)
-    if (status?.source === 'erc8004' || status?.agentId) {
-      return {
-        kind: 'note',
-        variant: 'error',
-        text: 'ERC-8004 identities are controlled by your browser wallet; ethagent has no private key to export.',
-      }
-    }
-    if (rest[0] !== '--reveal') {
-      return {
-        kind: 'note',
-        variant: 'error',
-        text: 'legacy identity export prints your private key. re-run with: /identity export --reveal',
-      }
-    }
-    if (!(await hasPrivateKey())) {
-      return { kind: 'note', variant: 'error', text: 'no Ethereum identity to export.' }
-    }
-    const pk = await getPrivateKey()
-    if (!pk) return { kind: 'note', variant: 'error', text: 'private key not available.' }
-    return {
-      kind: 'note',
-      text: [
-        'Ethereum private key (KEEP SECRET):',
-        pk,
-        '',
-        'anyone with this key controls your identity. paste only into trusted wallets.',
-      ].join('\n'),
-    }
   }
 
   if (sub === 'remove') {
@@ -454,7 +408,7 @@ async function runIdentity(args: string, ctx: SlashContext): Promise<SlashResult
   return {
     kind: 'note',
     variant: 'error',
-    text: 'usage: /identity [status|create|import|export-snapshot|import-snapshot <path>|export --reveal|remove confirm]',
+    text: 'usage: /identity [status|create|load|remove confirm]',
   }
 }
 

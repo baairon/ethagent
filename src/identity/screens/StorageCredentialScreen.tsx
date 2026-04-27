@@ -13,7 +13,7 @@ type StorageCredentialAction = 'edit' | 'forget' | 'back'
 
 export const STORAGE_CREDENTIAL_FORGET_COPY = [
   'removes the saved IPFS storage token from this machine.',
-  'existing pinned files and snapshots are not deleted.',
+  'existing pinned IPFS backups are not deleted.',
   'ethagent cannot pin new encrypted state with that account until you save a token again.',
   'agent identity and sessions stay on this machine.',
 ] as const
@@ -107,7 +107,7 @@ export const StorageCredentialScreen: React.FC<StorageCredentialScreenProps> = (
           options={[
             { value: 'edit', label: hasCredential ? 'replace credential' : 'save credential' },
             { value: 'forget', label: 'forget credential', disabled: !hasCredential },
-            { value: 'back', label: 'back to settings' },
+              { value: 'back', label: 'back' },
           ]}
           onSubmit={choice => {
             if (choice === 'edit') return onEdit()

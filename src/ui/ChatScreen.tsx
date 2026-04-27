@@ -53,7 +53,7 @@ import {
   type TurnCheckpoint,
 } from './chatScreenUtils.js'
 import { ChatBottomPane, type CopyPickerState, type IdentityOverlayState, type Overlay } from './ChatBottomPane.js'
-import { setIdentity, setTokenIdentity, getIdentityStatus } from '../storage/identity.js'
+import { setTokenIdentity, getIdentityStatus } from '../storage/identity.js'
 import type { IdentityHubResult } from '../identity/IdentityHub.js'
 import { buildResumedSessionState, resolveModelSelection, restoreConversationState } from './chatSessionState.js'
 import { runStreamingTurn } from './chatTurnOrchestrator.js'
@@ -404,14 +404,9 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
       onIdentityRequest: action => {
         void (async () => {
           const status = await getIdentityStatus(configRef.current)
-          const initialAction = typeof action === 'object'
-            ? action.kind
-            : action === 'create' || action === 'import' || action === 'export-snapshot'
-              ? action
-              : undefined
+          const initialAction = action === 'create' || action === 'load' ? action : undefined
           setIdentityOverlay({
             initialAction,
-            initialImportPath: typeof action === 'object' ? action.path : undefined,
             existing: status ? { address: status.address } : null,
           })
           setOverlay('identity')
@@ -748,21 +743,6 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
       if (result.kind === 'updated') {
         replaceConfig(result.config)
         pushNote(result.message, 'info')
-        return
-      }
-      if (result.kind === 'set') {
-        void (async () => {
-          try {
-            const { config: nextConfig, identity, backend } = await setIdentity(
-              result.privateKey,
-              configRef.current,
-            )
-            replaceConfig(nextConfig)
-            pushNote(`identity saved · ${identity.address} · ${backend}`, 'info')
-          } catch (err: unknown) {
-            pushNote(`identity save failed: ${(err as Error).message}`, 'error')
-          }
-        })()
         return
       }
       if (result.kind === 'token') {

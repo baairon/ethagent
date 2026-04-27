@@ -6,7 +6,7 @@ import { TextInput } from '../../ui/TextInput.js'
 import { theme } from '../../ui/theme.js'
 import { isAddress } from 'viem'
 import { normalizeErc8004RegistryConfig } from '../erc8004.js'
-import { networkLabel, storageLabel, tokenCandidateHint, tokenCandidateLabel } from '../identityHubModel.js'
+import { networkLabel, tokenCandidateHint, tokenCandidateLabel } from '../identityHubModel.js'
 import { registryConfigFromConfig } from '../registryConfig.js'
 import type { Step } from '../identityHubReducer.js'
 import { WalletApprovalScreen } from './WalletApprovalScreen.js'
@@ -14,8 +14,10 @@ import { BusyScreen } from './BusyScreen.js'
 import type { BrowserWalletReady } from '../browserWallet.js'
 import type { EthagentConfig } from '../../storage/config.js'
 
+type RestoreStep = Exclude<Extract<Step, { kind: `restore-${string}` }>, { kind: 'restore-wallet' | 'restore-network' }>
+
 type RestoreFlowProps = {
-  step: Step
+  step: RestoreStep
   config?: EthagentConfig
   walletSession: BrowserWalletReady | null
   onSetStep: (step: Step) => void
@@ -25,7 +27,6 @@ type RestoreFlowProps = {
   onTokenIdSubmit: (value: string) => void
   onTokenSelect: (tokenId: string) => void
   onBack: () => void
-  onMenu: () => void
 }
 
 const footerHint = (hint: string) => <Text color={theme.dim}>{hint}</Text>
@@ -41,7 +42,6 @@ export const RestoreFlow: React.FC<RestoreFlowProps> = ({
   onTokenIdSubmit,
   onTokenSelect,
   onBack,
-  onMenu,
 }) => {
   const purpose = 'purpose' in step ? step.purpose ?? 'restore' : 'restore'
   const isSwitch = purpose === 'switch'
@@ -52,7 +52,7 @@ export const RestoreFlow: React.FC<RestoreFlowProps> = ({
         <Surface
           title={isSwitch ? 'switch agent identity' : 'restore an agent'}
           subtitle="choose how ethagent should find the owner wallet."
-          footer={footerHint('enter select Â· esc back')}
+          footer={footerHint('enter select - esc back')}
         >
           <Select<'connect' | 'manual'>
             options={[
@@ -63,7 +63,7 @@ export const RestoreFlow: React.FC<RestoreFlowProps> = ({
               if (choice === 'connect') return onConnectWallet()
               onSetStep({ kind: 'restore-owner', purpose: step.purpose, mode: 'manual' })
             }}
-            onCancel={onMenu}
+            onCancel={onBack}
           />
         </Surface>
       )
@@ -72,7 +72,7 @@ export const RestoreFlow: React.FC<RestoreFlowProps> = ({
       <Surface
         title={isSwitch ? 'switch agent identity' : 'restore an agent'}
         subtitle={step.initialOwnerHandle ? 'confirm the wallet or ENS to search.' : 'enter the wallet or ENS that owns it.'}
-        footer={footerHint('enter discover · esc back')}
+        footer={footerHint('enter discover - esc back')}
       >
         <TextInput
           key={`restore-owner-${purpose}-${step.initialOwnerHandle ?? ''}`}
@@ -80,7 +80,13 @@ export const RestoreFlow: React.FC<RestoreFlowProps> = ({
           placeholder="name.eth or 0x..."
           validate={validateOwnerHandleInput}
           onSubmit={ownerHandle => onOwnerSubmit(ownerHandle.trim())}
-          onCancel={onMenu}
+          onCancel={() => {
+            if (step.mode === 'manual' && !step.initialOwnerHandle) {
+              onSetStep({ kind: 'restore-owner', purpose: step.purpose })
+              return
+            }
+            onBack()
+          }}
         />
       </Surface>
     )
@@ -92,7 +98,7 @@ export const RestoreFlow: React.FC<RestoreFlowProps> = ({
       <Surface
         title={`${networkLabel(resolution.network)} agent registry`}
         subtitle={step.error ? `lookup failed: ${step.error}` : 'paste the agent registry address for this network.'}
-        footer={footerHint('enter discover · esc back')}
+        footer={footerHint('enter discover - esc back')}
       >
         <Text color={theme.dim}>RPC defaults to {resolution.defaultRpcUrl}</Text>
         <TextInput
@@ -122,8 +128,8 @@ export const RestoreFlow: React.FC<RestoreFlowProps> = ({
       <BusyScreen
         title={isSwitch ? 'finding agent identities' : 'finding agents'}
         subtitle={step.ownerHandle}
-        label="checking supported networks..."
-        onCancel={onMenu}
+        label="searching this network..."
+        onCancel={onBack}
       />
     )
   }
@@ -133,13 +139,13 @@ export const RestoreFlow: React.FC<RestoreFlowProps> = ({
       <Surface
         title="enter agent token id"
         subtitle={step.error ?? `${networkLabelForRegistry(step.registry)} lookup needs the token id.`}
-        footer={footerHint('enter continue · esc hub')}
+        footer={footerHint('enter continue - esc back')}
       >
         <TextInput
           placeholder="#45744"
           validate={value => parseTokenIdInput(value) ? null : 'enter a token id'}
           onSubmit={value => onTokenIdSubmit(value.trim())}
-          onCancel={onMenu}
+          onCancel={onBack}
         />
       </Surface>
     )
@@ -150,7 +156,7 @@ export const RestoreFlow: React.FC<RestoreFlowProps> = ({
       <Surface
         title={isSwitch ? 'switch to an agent' : 'choose your agent'}
         subtitle={step.ownerHandle}
-        footer={footerHint('enter select · esc hub')}
+        footer={footerHint('enter select - esc back')}
       >
         <Select<string>
           options={step.candidates.map(candidate => ({
@@ -159,7 +165,7 @@ export const RestoreFlow: React.FC<RestoreFlowProps> = ({
             hint: tokenCandidateHint(candidate),
           }))}
           onSubmit={onTokenSelect}
-          onCancel={onMenu}
+          onCancel={onBack}
         />
       </Surface>
     )
@@ -169,9 +175,9 @@ export const RestoreFlow: React.FC<RestoreFlowProps> = ({
     return (
       <BusyScreen
         title={isSwitch ? 'switching agent identity' : 'restoring your agent'}
-        subtitle={storageLabel(step.apiUrl)}
-        label="opening encrypted state..."
-        onCancel={onMenu}
+        subtitle="IPFS"
+        label="opening encrypted state from IPFS..."
+        onCancel={onBack}
       />
     )
   }
@@ -183,7 +189,7 @@ export const RestoreFlow: React.FC<RestoreFlowProps> = ({
         subtitle={isSwitch ? 'use the wallet that owns this agent to switch.' : 'use the wallet that owns this agent.'}
         walletSession={walletSession}
         label="waiting for approval..."
-        onCancel={onMenu}
+        onCancel={onBack}
       />
     )
   }

@@ -469,7 +469,7 @@ export async function preflightSetAgentUri(args: Erc8004RegistryConfig & {
     const looksLikeOwnershipRevert = /not.*owner|owner.*only|unauthor|forbidden|caller/i.test(detail)
     throw new RegisterAgentPreflightError({
       code: 'simulation-failed',
-      title: 'snapshot blocked',
+      title: 'backup update blocked',
       detail,
       hint: looksLikeOwnershipRevert
         ? `Connect the wallet that owns this agent (${args.account}) and try again.`

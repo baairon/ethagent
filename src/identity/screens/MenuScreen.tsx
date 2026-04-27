@@ -37,19 +37,19 @@ export const MenuScreen: React.FC<MenuScreenProps> = ({
   const title = mode === 'first-run' ? 'set up your agent' : 'your agent'
   const subtitle = mode === 'first-run'
     ? 'create a portable agent or load one you already own.'
-    : 'back up, switch, or start a new one. yours stays loadable.'
+    : 'back up, switch, or start a new one.'
 
   const options: Array<{ value: Action; label: string; hint?: string; disabled?: boolean }> = identity
     ? [
-        { value: 'backup', label: 'back up', hint: 'snapshot encrypted memory and refresh tokenURI', disabled: !canRebackup },
+        { value: 'backup', label: 'back up', hint: 'save encrypted state to IPFS and refresh tokenURI', disabled: !canRebackup },
         { value: 'load', label: 'switch agent', hint: 'pick a different token your wallet holds' },
-        { value: 'create', label: 'create new agent', hint: 'your current agent stays loadable. you can switch back any time.' },
-        { value: 'details', label: 'agent settings', hint: 'profile, technical values, storage, local cleanup' },
+        { value: 'create', label: 'new agent', hint: 'mint another agent token' },
+        { value: 'details', label: 'settings', hint: 'profile, values, IPFS storage, local cleanup' },
         { value: 'cancel', label: 'close' },
       ]
     : [
         { value: 'create', label: 'create new agent', hint: 'mint an agent token with your wallet' },
-        { value: 'load', label: 'load existing agent', hint: 'find an agent token your wallet already holds' },
+        { value: 'load', label: 'load agent', hint: 'find an agent token your wallet already holds' },
         ...(mode === 'first-run'
           ? [{ value: 'skip' as Action, label: 'skip for now', hint: 'come back any time with /identity' }]
           : [{ value: 'cancel' as Action, label: 'close' }]),

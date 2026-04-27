@@ -15,7 +15,6 @@ import {
   networkLabel,
   networkMenuTagline,
   networkSubtitle,
-  selectedNetworkFooter,
   storageLabel,
   tokenCandidateHint,
   tokenCandidateLabel,
@@ -49,19 +48,19 @@ test('identity hub formats blocked registration without raw wallet language', ()
   assert.equal(view.hint, 'No transaction was sent.')
 })
 
-test('identity hub explains transferred-token snapshots without generic decrypt copy', () => {
+test('identity hub explains locked backups without generic decrypt copy', () => {
   const view = identityHubErrorView(new AgentStateOwnerMismatchError(
     '0x000000000000000000000000000000000000dEaD',
     '0x000000000000000000000000000000000000bEEF',
   ))
 
-  assert.equal(view.title, 'snapshot locked to previous wallet')
-  assert.equal(view.detail, 'token owner 0x0000...bEEF cannot read state encrypted for 0x0000...dEaD.')
-  assert.equal(view.hint, 'Use the wallet that authorized this snapshot.')
+  assert.equal(view.title, 'backup locked to another wallet')
+  assert.equal(view.detail, 'wallet 0x0000...bEEF cannot read state encrypted for 0x0000...dEaD.')
+  assert.equal(view.hint, 'Use the wallet that created this backup.')
 })
 
 test('identity hub summary always shows the short state CID for the menu card', () => {
-  assert.equal(storageLabel('https://uploads.pinata.cloud/v3/files'), 'Pinata')
+  assert.equal(storageLabel('https://uploads.pinata.cloud/v3/files'), 'IPFS')
   const rows = identitySummaryRows({
     source: 'erc8004',
     address: '0x000000000000000000000000000000000000dEaD',
@@ -77,32 +76,33 @@ test('identity hub summary always shows the short state CID for the menu card', 
     },
   })
 
-  assert.deepEqual(rows.map(row => row.label), ['owner', 'token', 'state'])
-  assert.equal(rows[2]?.value, 'bafybeigdy...3w6y7q')
+  assert.deepEqual(rows.map(row => row.label), ['owner', 'token', 'network', 'state'])
+  assert.equal(rows[3]?.value, 'bafybeigdy...3w6y7q')
   assert.equal(rows[0]?.value, '0x0000...dEaD')
 })
 
 test('identity hub summary collapses gracefully when no identity is loaded', () => {
   const rows = identitySummaryRows(undefined)
-  assert.deepEqual(rows.map(row => row.label), ['owner', 'token', 'state'])
+  assert.deepEqual(rows.map(row => row.label), ['owner', 'token', 'network', 'state'])
   assert.equal(rows[0]?.value, 'not connected')
   assert.equal(rows[1]?.value, 'not created')
-  assert.equal(rows[2]?.value, 'not saved yet')
+  assert.equal(rows[2]?.value, 'ethereum mainnet')
+  assert.equal(rows[3]?.value, 'not saved yet')
 })
 
 test('forget local agent confirmation keeps the local wipe boundary explicit', () => {
   const copy = FORGET_LOCAL_AGENT_COPY.join('\n')
   assert.match(copy, /active local agent/)
-  assert.match(copy, /legacy stored local private key/)
+  assert.doesNotMatch(copy, /legacy|obsolete|older installs/)
   assert.match(copy, /does not burn, transfer, or delete agent tokens/)
-  assert.match(copy, /does not delete IPFS snapshots/)
+  assert.match(copy, /does not delete pinned IPFS backups/)
   assert.match(copy, /does not delete sessions or chats/)
 })
 
 test('storage credential confirmation distinguishes pinning control from identity cleanup', () => {
   const copy = STORAGE_CREDENTIAL_FORGET_COPY.join('\n')
   assert.match(copy, /saved IPFS storage token/)
-  assert.match(copy, /existing pinned files and snapshots are not deleted/)
+  assert.match(copy, /existing pinned IPFS backups are not deleted/)
   assert.match(copy, /cannot pin new encrypted state/)
   assert.match(copy, /agent identity and sessions stay/)
 })
@@ -147,20 +147,6 @@ test('chainSummaryRow prefers identity.chainId, falls back to selectedNetwork', 
   )
   assert.equal(fromIdentity.value, 'ethereum mainnet')
   assert.equal(fromIdentity.tone, 'ok')
-})
-
-test('selectedNetworkFooter uses concise user-facing network copy', () => {
-  const footer = selectedNetworkFooter({
-    version: 1,
-    provider: 'openai',
-    model: 'gpt-test',
-    firstRunAt: new Date(0).toISOString(),
-    selectedNetwork: 'base',
-  })
-  assert.equal(footer, 'network: base')
-  assertNoNetworkJargon(footer)
-  assert.doesNotMatch(footer, /token contract/i)
-  assert.doesNotMatch(footer, /0x8004/i)
 })
 
 test('networkMenuTagline explains network selection without protocol jargon', () => {
@@ -259,8 +245,8 @@ test('token candidate hint stays terse so wallets with many agents stay scannabl
     registration: null,
   } as const
 
-  assert.equal(tokenCandidateLabel(candidate), '#45744 · research agent')
-  assert.equal(tokenCandidateHint(candidate), 'base · pinned 2026-04-25')
+  assert.equal(tokenCandidateLabel(candidate), 'research agent')
+  assert.equal(tokenCandidateHint(candidate), 'token #45744 · base · backup 2026-04-25')
   assert.doesNotMatch(tokenCandidateHint(candidate), /owner/)
   assert.doesNotMatch(tokenCandidateHint(candidate), /state/)
 })
@@ -276,6 +262,7 @@ test('token candidate hint falls back to network only when no backup is pinned y
     registration: null,
   } as const
 
+  assert.equal(tokenCandidateLabel(candidate), 'agent token #1')
   assert.equal(tokenCandidateHint(candidate), 'ethereum mainnet')
 })
 

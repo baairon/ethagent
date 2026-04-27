@@ -1,13 +1,9 @@
-import type { Address } from 'viem'
 import type { EthagentConfig, EthagentIdentity, SelectableNetwork } from '../storage/config.js'
 import type { Erc8004AgentCandidate, Erc8004RegistryConfig } from './erc8004.js'
 import type { RegistryResolution } from './registryConfig.js'
-import type { BrowserWalletSignature } from './browserWallet.js'
 import type { AgentStateBackupEnvelope } from './backupEnvelope.js'
 import type { IdentityHubErrorView } from './identityHubModel.js'
-import type { IpfsAddResult } from './ipfs.js'
 
-type BackupMetadata = NonNullable<EthagentIdentity['backup']>
 export type RestorePurpose = 'restore' | 'switch'
 export type DetailsView = Extract<Step, { kind: 'details' }>
 export type ProfileUpdates = { name?: string; description?: string }
@@ -21,9 +17,7 @@ export type Step =
   | { kind: 'create-preflight'; name: string; description: string; network?: SelectableNetwork }
   | { kind: 'create-registry'; name: string; description: string; resolution: RegistryResolution; error?: string }
   | { kind: 'create-signing'; name: string; description: string; registry: Erc8004RegistryConfig; pinataJwt?: string }
-  | { kind: 'create-pinning'; name: string; description: string; registry: Erc8004RegistryConfig; wallet: BrowserWalletSignature; apiUrl: string; pinataJwt?: string }
-  | { kind: 'create-storage'; name: string; description: string; registry: Erc8004RegistryConfig; wallet?: BrowserWalletSignature; error?: string; pinataJwt?: string }
-  | { kind: 'create-registering'; name: string; description: string; registry: Erc8004RegistryConfig; ownerAddress: Address; agentUri: string; metadataCid: string; metadataPin: IpfsAddResult; backup: BackupMetadata; state: Record<string, unknown> }
+  | { kind: 'create-storage'; name: string; description: string; registry: Erc8004RegistryConfig; error?: string; pinataJwt?: string }
   | { kind: 'restore-owner'; purpose?: RestorePurpose; initialOwnerHandle?: string; mode?: 'choose' | 'manual' }
   | { kind: 'restore-wallet'; purpose?: RestorePurpose }
   | { kind: 'restore-network'; ownerHandle: string; purpose?: RestorePurpose }
@@ -34,19 +28,13 @@ export type Step =
   | { kind: 'restore-fetching'; cid: string; apiUrl: string; candidate: Erc8004AgentCandidate; purpose?: RestorePurpose }
   | { kind: 'restore-authorizing'; cid: string; apiUrl: string; envelope: AgentStateBackupEnvelope; candidate: Erc8004AgentCandidate; purpose?: RestorePurpose }
   | { kind: 'rebackup-signing'; identity: EthagentIdentity; registry: Erc8004RegistryConfig; pinataJwt?: string; profileUpdates?: ProfileUpdates }
-  | { kind: 'rebackup-pinning'; identity: EthagentIdentity; registry: Erc8004RegistryConfig; wallet: BrowserWalletSignature; apiUrl: string; pinataJwt?: string; profileUpdates?: ProfileUpdates }
-  | { kind: 'rebackup-uri'; identity: EthagentIdentity; registry: Erc8004RegistryConfig; agentUri: string; metadataCid: string; metadataPin: IpfsAddResult; backup: BackupMetadata; ownerAddress: Address; profileUpdates?: ProfileUpdates }
-  | { kind: 'rebackup-storage'; identity: EthagentIdentity; registry: Erc8004RegistryConfig; wallet?: BrowserWalletSignature; error?: string; pinataJwt?: string; profileUpdates?: ProfileUpdates }
+  | { kind: 'rebackup-storage'; identity: EthagentIdentity; registry: Erc8004RegistryConfig; error?: string; pinataJwt?: string; profileUpdates?: ProfileUpdates }
   | { kind: 'edit-profile-name'; identity: EthagentIdentity; registry: Erc8004RegistryConfig }
   | { kind: 'edit-profile-description'; identity: EthagentIdentity; registry: Erc8004RegistryConfig; name: string }
   | { kind: 'forget-confirm' }
   | { kind: 'storage-credential' }
   | { kind: 'storage-credential-input'; error?: string }
   | { kind: 'storage-credential-forget-confirm' }
-  | { kind: 'snapshot-exporting'; identity: EthagentIdentity }
-  | { kind: 'snapshot-import-path'; initialPath?: string; error?: string }
-  | { kind: 'snapshot-importing'; source: string }
-  | { kind: 'network' }
   | { kind: 'details'; copyPicker?: boolean }
   | { kind: 'busy'; label: string }
   | { kind: 'error'; error: IdentityHubErrorView; back: Step }
@@ -71,8 +59,6 @@ export type Action =
   | { type: 'tokenSelected'; step: Step }
   | { type: 'fetched'; step: Step }
   | { type: 'authorized' }
-  | { type: 'selectNetwork' }
-  | { type: 'networkSelected'; network: SelectableNetwork }
   | { type: 'openDetails' }
   | { type: 'startForgetIdentity' }
   | { type: 'cancelForgetIdentity' }
@@ -110,10 +96,6 @@ export function identityHubReducer(state: Step, action: Action): Step {
       return action.step
     case 'startRestore':
       return { kind: 'restore-owner' }
-    case 'selectNetwork':
-      return { kind: 'network' }
-    case 'networkSelected':
-      return { kind: 'details' }
     case 'openDetails':
       return { kind: 'details' }
     case 'startForgetIdentity':
@@ -143,32 +125,38 @@ function backStep(from: Step): Step {
       return { kind: 'create-name' }
     case 'create-network':
       return { kind: 'create-description', name: from.name }
+    case 'create-preflight':
+      return { kind: 'create-network', name: from.name, description: from.description }
     case 'create-registry':
-      return { kind: 'menu' }
+      return { kind: 'create-network', name: from.name, description: from.description }
+    case 'create-signing':
+      return { kind: 'create-network', name: from.name, description: from.description }
     case 'create-storage':
-      return { kind: 'menu' }
+      return { kind: 'create-network', name: from.name, description: from.description }
     case 'restore-owner':
       return { kind: 'menu' }
     case 'restore-wallet':
       return { kind: 'restore-owner', purpose: from.purpose }
     case 'restore-network':
-      return { kind: 'restore-owner', purpose: from.purpose }
+      return { kind: 'restore-owner', purpose: from.purpose, initialOwnerHandle: from.ownerHandle, mode: 'manual' }
     case 'restore-registry':
-      return { kind: 'restore-owner', purpose: from.purpose }
+      return { kind: 'restore-owner', purpose: from.purpose, initialOwnerHandle: from.ownerHandle, mode: 'manual' }
+    case 'restore-discovering':
+      return { kind: 'restore-network', ownerHandle: from.ownerHandle, purpose: from.purpose }
     case 'restore-token-id':
-      return { kind: 'menu' }
+      return { kind: 'restore-network', ownerHandle: from.ownerHandle, purpose: from.purpose }
     case 'restore-select-token':
-      return { kind: 'menu' }
-    case 'network':
-      return { kind: 'details' }
+      return { kind: 'restore-network', ownerHandle: from.ownerHandle, purpose: from.purpose }
+    case 'restore-fetching':
+      return { kind: 'restore-network', ownerHandle: from.candidate.ownerAddress, purpose: from.purpose }
+    case 'restore-authorizing':
+      return { kind: 'restore-network', ownerHandle: from.candidate.ownerAddress, purpose: from.purpose }
     case 'details':
       if (from.copyPicker) return { kind: 'details' }
       return { kind: 'menu' }
     case 'rebackup-signing':
-    case 'rebackup-pinning':
-    case 'rebackup-uri':
     case 'rebackup-storage':
-      return { kind: 'menu' }
+      return { kind: 'details' }
     case 'edit-profile-name':
       return { kind: 'details' }
     case 'edit-profile-description':
@@ -177,9 +165,6 @@ function backStep(from: Step): Step {
     case 'storage-credential':
     case 'storage-credential-input':
     case 'storage-credential-forget-confirm':
-    case 'snapshot-exporting':
-    case 'snapshot-import-path':
-    case 'snapshot-importing':
       return { kind: 'details' }
     case 'error':
       return from.back
@@ -188,7 +173,7 @@ function backStep(from: Step): Step {
   }
 }
 
-export const CREATE_STEP_LABELS = ['name', 'describe', 'connect', 'register']
+export const CREATE_STEP_LABELS = ['name', 'describe', 'network', 'create']
 
 export function createStepNumber(step: Step): number {
   switch (step.kind) {
@@ -196,13 +181,12 @@ export function createStepNumber(step: Step): number {
       return 1
     case 'create-description':
       return 2
+    case 'create-network':
+      return 3
     case 'create-preflight':
     case 'create-storage':
     case 'create-registry':
     case 'create-signing':
-      return 3
-    case 'create-pinning':
-    case 'create-registering':
       return 4
     default:
       return 0

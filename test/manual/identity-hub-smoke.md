@@ -1,12 +1,11 @@
 # Identity Hub Smoke Test
 
-Use this checklist for live ERC-8004 wallet testing. The security goal is that token ownership enables discovery and token control, but old encrypted memory remains readable only by the wallet that authorized that snapshot.
+Use this checklist for live ERC-8004 wallet testing. The covered flow is create, load, back up, edit profile, and forget local agent. Token transfers require an explicit re-encryption handoff before prior private memory is readable by a new owner.
 
 ## Prerequisites
 
-- Wallet A: original minter.
-- Wallet B: non-owner wallet for transfer/theft simulation.
-- Both wallets funded on the chosen supported network.
+- Wallet A: owner and original minter.
+- Wallet funded on the chosen supported network.
 - Fresh ethagent config or a backed-up local config.
 - IPFS upload credentials available to the app.
 
@@ -27,22 +26,6 @@ Use this checklist for live ERC-8004 wallet testing. The security goal is that t
 2. Expected: the owner/ENS prompt appears before network search and is pre-filled with the current owner.
 3. Confirm or edit the owner, then select the network.
 4. Expected: search begins only after owner confirmation and network selection.
-
-## Transfer Or Theft Simulation
-
-1. Transfer the ERC-8004 token from Wallet A to Wallet B.
-2. Use a clean local profile and restore by entering Wallet B.
-3. Select the same network.
-4. Expected: ethagent discovers the token because `ownerOf` is Wallet B.
-5. Continue restore.
-6. Expected: ethagent stops before wallet signing with `snapshot locked to previous wallet`.
-7. Expected: Wallet B can see public token metadata and backup CIDs, but cannot decrypt Wallet A's prior encrypted state.
-
-## Original Owner After Transfer
-
-1. Restore by entering Wallet A after the token has moved.
-2. Expected: discovery does not present the transferred token under Wallet A.
-3. If Wallet A still has an old state CID outside the discovery flow, Wallet A can decrypt that historical snapshot; this does not imply current token ownership.
 
 ## Automated Checks
 
