@@ -120,11 +120,17 @@ function buildResumeOptions(
       }
 
       const baseLabel = formatFirstLine(session.firstUserMessage) || '(empty session)'
-      const label = session.id === currentSessionId ? `${baseLabel}  (current)` : baseLabel
+      const markers = [
+        session.id === currentSessionId ? 'current' : '',
+      ].filter(Boolean)
+      const label = markers.length > 0 ? `${baseLabel}  (${markers.join(', ')})` : baseLabel
+      const summaryHint = session.compactedFromSessionId
+        ? `summary from ${session.compactedFromSessionId.slice(0, 8)}`
+        : null
       options.push({
         value: session.id,
         label,
-        hint: `${session.turnCount} turn${session.turnCount === 1 ? '' : 's'} · ${formatRelative(session.mtimeMs)}`,
+        hint: `${session.turnCount} turn${session.turnCount === 1 ? '' : 's'} - ${formatRelative(session.mtimeMs)}${summaryHint ? ` - ${summaryHint}` : ''}`,
       })
     }
   }

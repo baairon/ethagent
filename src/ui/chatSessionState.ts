@@ -92,11 +92,17 @@ export function buildResumedSessionState(args: {
         role: 'note',
         id: args.nextRowId(),
         kind: 'dim',
-        content: `resumed from session ${args.metadata?.id?.slice(0, 8) ?? ''}`.trim(),
+        content: formatResumeNote(args.metadata),
       },
     ],
     statusStartedAt: Date.now(),
   }
+}
+
+function formatResumeNote(metadata: SessionMetadata | null): string {
+  const id = metadata?.id?.slice(0, 8) ?? ''
+  const source = metadata?.compactedFromSessionId ? ` summarized from ${metadata.compactedFromSessionId.slice(0, 8)}` : ''
+  return `resumed from session ${id}.${source}`.trim()
 }
 
 export function restoreConversationState(

@@ -8,10 +8,13 @@ import { listInstalled, isDaemonUp } from '../bootstrap/ollama.js'
 import { hasKey, rmKey, setKey } from '../storage/secrets.js'
 import { defaultModelFor, type EthagentConfig, type ProviderId } from '../storage/config.js'
 import { clearModelCatalogCache, discoverProviderModels, type ModelCatalogResult } from '../models/catalog.js'
+import { contextWindowInfo } from '../runtime/compaction.js'
 import {
   buildModelPickerOptions,
   MODEL_PICKER_CLOUD_PROVIDERS,
+  orderModelsForContextFit,
   type CloudProviderId,
+  type ModelPickerContextFit,
   type ModelPickerOptionsData,
 } from './modelPickerOptions.js'
 
@@ -23,6 +26,7 @@ type ModelPickerProps = {
   currentConfig: EthagentConfig
   currentProvider: ProviderId
   currentModel: string
+  contextFit?: ModelPickerContextFit | null
   onPick: (selection: ModelPickerSelection) => void
   onCancel: () => void
 }
@@ -40,6 +44,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
   currentConfig,
   currentProvider,
   currentModel,
+  contextFit,
   onPick,
   onCancel,
 }) => {
@@ -77,7 +82,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
 
   if (state.kind === 'loading') {
     return (
-      <Surface title="switch provider / model" subtitle="choose a provider and model.">
+      <Surface title={contextFit ? 'switch to larger-context model' : 'switch provider / model'} subtitle="loading providers and models.">
         <Spinner label="loading providers..." />
       </Surface>
     )
@@ -88,8 +93,8 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
     return (
       <Surface
         title={`${action} ${provider} api key`}
-        subtitle="stored in your os keyring when available · never written to config in plaintext."
-        footer="enter saves · esc returns to picker"
+        subtitle="stored in your os keyring when available; never written to config in plaintext."
+        footer="enter saves; esc returns to picker"
       >
         {submitting ? (
           <Spinner label={`saving ${provider} key...`} />
@@ -113,7 +118,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
       <Surface
         title={`${provider} api key`}
         subtitle="manage the stored key for this provider."
-        footer="enter selects · esc returns to picker"
+        footer="enter selects; esc returns to picker"
       >
         {submitting ? (
           <Spinner label={`removing ${provider} key...`} />
@@ -145,7 +150,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
 
   if (state.kind === 'catalog') {
     const catalog = state.data.cloudCatalogs[state.provider]
-    const options = buildCatalogOptions(state.provider, catalog, currentProvider, currentModel)
+    const options = buildCatalogOptions(state.provider, catalog, currentProvider, currentModel, contextFit)
     const initialIndex = options.findIndex(opt => {
       if (opt.disabled) return false
       const parsed = parseFullCatalogValue(opt.value)
@@ -154,8 +159,8 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
     return (
       <Surface
         title={`${state.provider} full catalog`}
-        subtitle="all discovered models for this provider"
-        footer="enter selects · esc returns to picker"
+        subtitle={contextFit ? contextFitSubtitle(contextFit) : 'all discovered models for this provider'}
+        footer="enter selects; esc returns to picker"
       >
         <Select
           options={options}
@@ -172,7 +177,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
   }
 
   const { data } = state
-  const options = buildModelPickerOptions(data, { currentProvider, currentModel })
+  const options = buildModelPickerOptions(data, { currentProvider, currentModel, contextFit })
   const initialIndex = options.findIndex(opt => {
     if (opt.disabled) return false
     if (opt.value.startsWith('ol:')) return opt.value.slice(3) === currentModel && currentProvider === 'ollama'
@@ -182,9 +187,9 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
 
   return (
     <Surface
-      title="switch provider / model"
-      subtitle="cloud providers show curated catalog choices · local ollama models are listed in full"
-      footer="enter selects · esc closes · /models for full catalog"
+      title={contextFit ? 'switch to larger-context model' : 'switch provider / model'}
+      subtitle={contextFit ? contextFitSubtitle(contextFit) : 'cloud providers show curated catalog choices - local ollama models are listed in full'}
+      footer="enter selects; esc closes; /models for full catalog"
     >
       <Select
         options={options}
@@ -237,6 +242,7 @@ function buildCatalogOptions(
   catalog: ModelCatalogResult | undefined,
   currentProvider: ProviderId,
   currentModel: string,
+  contextFit?: ModelPickerContextFit | null,
 ): SelectOption<string>[] {
   if (!catalog || catalog.entries.length === 0) {
     return [{
@@ -247,12 +253,13 @@ function buildCatalogOptions(
       prefix: 'note',
     }]
   }
-  return catalog.entries.map(entry => {
-    const active = currentProvider === provider && currentModel === entry.id
-    const suffix = entry.source === 'fallback' ? '  fallback' : ''
+  const sourceById = new Map(catalog.entries.map(entry => [entry.id, entry.source]))
+  return orderModelsForContextFit(provider, catalog.entries.map(entry => entry.id), contextFit).map(id => {
+    const active = currentProvider === provider && currentModel === id
+    const suffix = sourceById.get(id) === 'fallback' ? '  fallback' : ''
     return {
-      value: `full:${provider}:${entry.id}`,
-      label: `${entry.id}${active ? '  *' : ''}${suffix}`,
+      value: `full:${provider}:${id}`,
+      label: contextFitLabel(provider, id, `${id}${active ? '  *' : ''}${suffix}`, contextFit),
       role: 'option',
     }
   })
@@ -351,6 +358,38 @@ function configForProvider(config: EthagentConfig, provider: CloudProviderId): E
     model: config.provider === provider ? config.model : defaultModelFor(provider),
     baseUrl: provider === 'openai' && config.provider === 'openai' ? config.baseUrl : undefined,
   }
+}
+
+function contextFitSubtitle(contextFit: ModelPickerContextFit): string {
+  const threshold = contextFit.thresholdPercent ?? 90
+  return `pending prompt needs ~${formatTokens(contextFit.usedTokens)} tokens; choose a model under ${threshold}% or use /compact.`
+}
+
+function contextFitLabel(
+  provider: ProviderId,
+  model: string,
+  baseLabel: string,
+  contextFit?: ModelPickerContextFit | null,
+): string {
+  if (!contextFit) return baseLabel
+  const info = contextWindowInfo(provider, model)
+  const percent = info.tokens > 0 ? Math.round((contextFit.usedTokens / info.tokens) * 100) : 0
+  return `${baseLabel}  ${formatContextWindow(info.tokens)} ctx ${percent}%`
+}
+
+function formatTokens(count: number): string {
+  if (count < 1000) return String(count)
+  if (count < 10_000) return `${(count / 1000).toFixed(1)}k`
+  return `${Math.round(count / 1000)}k`
+}
+
+function formatContextWindow(tokens: number): string {
+  if (tokens >= 1_000_000) {
+    const millions = tokens / 1_000_000
+    return Number.isInteger(millions) ? `${millions}m` : `${millions.toFixed(1)}m`
+  }
+  if (tokens >= 1000) return `${Math.round(tokens / 1000)}k`
+  return String(tokens)
 }
 
 function providerKeyPlaceholder(provider: ProviderId): string {

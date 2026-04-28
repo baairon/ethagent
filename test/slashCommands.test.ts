@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { dispatchSlash, type SlashContext } from '../src/commands/index.js'
 import type { EthagentConfig } from '../src/storage/config.js'
+import { contextUsageFromTokens } from '../src/runtime/compaction.js'
 
 const config: EthagentConfig = {
   version: 1,
@@ -15,6 +16,7 @@ function context(overrides: Partial<SlashContext> = {}): SlashContext {
     config,
     turns: 0,
     approxTokens: 0,
+    contextUsage: contextUsageFromTokens(0, config.provider, config.model),
     startedAt: 0,
     sessionId: 'session-test',
     cwd: process.cwd(),

@@ -2,44 +2,93 @@ import type { Message, Provider } from '../providers/contracts.js'
 import { approximateTokens, messageTextContent } from '../utils/messages.js'
 import type { SessionMessage } from '../storage/sessions.js'
 
-const COMPACT_SYSTEM = `You compress prior chat turns into a short, faithful summary. Output format:
-- One paragraph (<=120 words) covering facts, decisions, goals, and pending threads.
-- No preamble, no meta-commentary, no apology.`
+const COMPACT_SYSTEM = `Summarize this coding-agent conversation so work can continue in a new conversation.
+Keep the summary concise but complete. Preserve the current goal, user constraints, key decisions, relevant files, tool results, pending tasks, and known failures. Do not claim unverified work was completed. No preamble.`
+
+export type ContextWindowConfidence = 'exact' | 'inferred' | 'fallback'
+
+export type ContextWindowInfo = {
+  tokens: number
+  confidence: ContextWindowConfidence
+  source: string
+}
+
+export type ContextUsage = {
+  usedTokens: number
+  windowTokens: number
+  percent: number
+  confidence: ContextWindowConfidence
+  source: string
+}
 
 export function contextWindow(model: string): number {
+  return contextWindowInfo('', model).tokens
+}
+
+export function contextWindowInfo(provider: string, model: string): ContextWindowInfo {
   const lower = model.toLowerCase()
-  if (lower.includes('qwen') && lower.includes('coder')) return 32_768
-  if (lower.includes('llama3')) return 8_192
-  if (lower.includes('claude')) return 200_000
-  if (lower.includes('gemini')) return 1_000_000
-  if (lower.includes('gpt-4o')) return 128_000
-  return 8_192
+  const providerLower = provider.toLowerCase()
+  if (lower.includes('qwen')) {
+    return { tokens: 32_768, confidence: 'inferred', source: 'qwen default' }
+  }
+  if (lower.includes('llama3')) {
+    return { tokens: 128_000, confidence: 'inferred', source: 'llama3 family default' }
+  }
+  if (providerLower === 'anthropic' || lower.includes('claude')) {
+    return { tokens: 200_000, confidence: 'inferred', source: 'claude family default' }
+  }
+  if (providerLower === 'gemini' || lower.includes('gemini')) {
+    return { tokens: 1_000_000, confidence: 'inferred', source: 'gemini family default' }
+  }
+  if (
+    lower.includes('gpt-4.1')
+  ) {
+    return { tokens: 1_000_000, confidence: 'inferred', source: 'gpt-4.1 family default' }
+  }
+  if (
+    providerLower === 'openai'
+    || lower.includes('gpt-4o')
+    || /^o[134](?:-|$)/.test(lower)
+  ) {
+    return { tokens: 128_000, confidence: 'inferred', source: 'openai chat default' }
+  }
+  return { tokens: 128_000, confidence: 'fallback', source: 'ethagent fallback' }
 }
 
-export function shouldAutoCompact(messages: Message[], model: string, ratio = 0.8): boolean {
-  const budget = contextWindow(model) * ratio
-  return approximateTokens(messages) > budget
+export function contextUsage(messages: Message[], provider: string, model: string): ContextUsage {
+  return contextUsageFromTokens(approximateTokens(messages), provider, model)
 }
 
-const KEEP_TAIL_TURNS = 2
+export function contextUsageFromTokens(tokens: number, provider: string, model: string): ContextUsage {
+  const info = contextWindowInfo(provider, model)
+  const usedTokens = Math.max(0, Math.ceil(tokens))
+  return {
+    usedTokens,
+    windowTokens: info.tokens,
+    percent: info.tokens > 0 ? Math.round((usedTokens / info.tokens) * 100) : 0,
+    confidence: info.confidence,
+    source: info.source,
+  }
+}
+
+export function shouldConfirmContextUsage(usage: Pick<ContextUsage, 'percent'>, thresholdPercent = 90): boolean {
+  return usage.percent >= thresholdPercent
+}
 
 export async function compactTranscript(
   provider: Provider,
   transcript: Message[],
-): Promise<{ ok: true; compacted: Message[] } | { ok: false; reason: string }> {
+): Promise<{ ok: true; summary: string } | { ok: false; reason: string }> {
   const nonSystem = transcript.filter(m => m.role !== 'system')
-  if (nonSystem.length <= KEEP_TAIL_TURNS * 2) {
+  if (nonSystem.length < 2) {
     return { ok: false, reason: 'not enough turns to compact' }
   }
 
-  const headCount = nonSystem.length - KEEP_TAIL_TURNS * 2
-  const head = nonSystem.slice(0, headCount)
-  const tail = nonSystem.slice(headCount)
-  const serialized = head.map(m => `${m.role}: ${messageTextContent(m)}`).join('\n\n')
+  const serialized = nonSystem.map(m => `${m.role}: ${messageTextContent(m)}`).join('\n\n')
 
   const prompt: Message[] = [
     { role: 'system', content: COMPACT_SYSTEM },
-    { role: 'user', content: `Summarize this chat history:\n\n${serialized}` },
+    { role: 'user', content: `Summarize this conversation for continuation in a new conversation:\n\n${serialized}` },
   ]
 
   const controller = new AbortController()
@@ -57,20 +106,7 @@ export async function compactTranscript(
   summary = summary.trim()
   if (summary.length < 40) return { ok: false, reason: 'summary too short' }
 
-  const system = transcript.find(m => m.role === 'system')
-  const out: Message[] = []
-  if (system) out.push(system)
-  out.push({ role: 'user', content: `[summary of earlier conversation]\n${summary}` })
-  out.push({ role: 'assistant', content: 'Understood.' })
-  for (const m of tail) out.push(m)
-  return { ok: true, compacted: out }
-}
-
-export function truncateFallback(messages: Message[], keepTurns = 6): Message[] {
-  const system = messages.find(m => m.role === 'system')
-  const rest = messages.filter(m => m.role !== 'system')
-  const kept = rest.slice(-keepTurns * 2)
-  return system ? [system, ...kept] : kept
+  return { ok: true, summary }
 }
 
 export type MicroCompactOptions = {
@@ -186,5 +222,5 @@ function summarizeCompactedTurns(messages: SessionMessage[]): string {
 function oneLine(text: string, limit: number): string {
   const normalized = text.replace(/\s+/g, ' ').trim()
   if (normalized.length <= limit) return normalized
-  return `${normalized.slice(0, limit - 1)}…`
+  return `${normalized.slice(0, Math.max(0, limit - 3))}...`
 }

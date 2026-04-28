@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
   buildModelPickerOptions,
+  orderModelsForContextFit,
   type CloudProviderId,
   type ModelPickerOptionsData,
 } from '../src/ui/modelPickerOptions.js'
@@ -163,13 +164,13 @@ test('picker options expose grouped catalog and key management for keyed and unk
     currentModel: 'gpt-5.2',
   })
 
-  assert.equal(optionByValue(options, 'key:manage:openai').label, 'api key · manage')
+  assert.equal(optionByValue(options, 'key:manage:openai').label, 'api key - manage')
   assert.equal(optionByValue(options, 'catalog:openai').label, 'full catalog')
   assert.equal(optionByValue(options, 'catalog:openai').role, 'utility')
   assert.equal(optionByValue(options, 'catalog:openai').indent, 4)
   assert.equal(optionByValue(options, 'key:manage:openai').role, 'utility')
   assert.equal(optionByValue(options, 'key:manage:openai').indent, 4)
-  assert.equal(optionByValue(options, 'key:set:anthropic').label, 'api key · add')
+  assert.equal(optionByValue(options, 'key:set:anthropic').label, 'api key - add')
   assert.equal(optionByValue(options, 'key:set:anthropic').role, 'utility')
   assert.equal(optionByValue(options, 'key:set:anthropic').indent, 4)
   assert.equal(options.some(option => option.value === 'key:set:openai'), false)
@@ -241,4 +242,47 @@ test('fallback catalogs show provider-level notice and still expose the configur
   )
   assert.deepEqual(valuesFor(options, 'gemini'), ['gemini-2.0-flash'])
   assert.equal(optionByValue(options, 'c:gemini:gemini-2.0-flash').hint, undefined)
+})
+
+test('context fit mode ranks larger fitting models before over-limit local models', () => {
+  const ordered = orderModelsForContextFit(
+    'ollama',
+    ['qwen2.5-coder:7b', 'llama3.1:8b'],
+    { usedTokens: 32_000, thresholdPercent: 90 },
+  )
+
+  assert.deepEqual(ordered, ['llama3.1:8b', 'qwen2.5-coder:7b'])
+})
+
+test('context fit mode annotates projected usage and prefers larger cloud windows', () => {
+  const options = buildModelPickerOptions(baseData({
+    models: [
+      { name: 'qwen2.5-coder:7b', sizeBytes: 4_700_000_000 },
+      { name: 'llama3.1:8b', sizeBytes: 4_900_000_000 },
+    ],
+    cloudKeys: {
+      openai: true,
+      anthropic: true,
+      gemini: false,
+    },
+    cloudCatalogs: {
+      openai: catalog('openai', ['gpt-5.2', 'gpt-4o', 'gpt-4.1']),
+      anthropic: catalog('anthropic', ['claude-sonnet-4-5-20250929']),
+    },
+  }), {
+    currentProvider: 'ollama' as ProviderId,
+    currentModel: 'qwen2.5-coder:7b',
+    contextFit: { usedTokens: 32_000, thresholdPercent: 90 },
+  })
+
+  const localValues = options
+    .map(option => option.value)
+    .filter(value => value.startsWith('ol:'))
+    .map(value => value.slice(3))
+  assert.deepEqual(localValues, ['llama3.1:8b', 'qwen2.5-coder:7b'])
+  assert.match(optionByValue(options, 'ol:llama3.1:8b').label, /128k ctx 25%/)
+  assert.match(optionByValue(options, 'ol:qwen2.5-coder:7b').label, /33k ctx 98%/)
+  assert.equal(valuesFor(options, 'openai')[0], 'gpt-4.1')
+  assert.match(optionByValue(options, 'c:openai:gpt-4.1').label, /1m ctx 3%/)
+  assert.match(optionByValue(options, 'c:anthropic:claude-sonnet-4-5-20250929').label, /200k ctx 16%/)
 })

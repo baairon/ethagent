@@ -5,7 +5,7 @@ import type { EthagentConfig } from '../storage/config.js'
 import type { Provider, Message } from '../providers/contracts.js'
 import type { PullProgress } from '../bootstrap/ollama.js'
 import { createProvider } from '../providers/registry.js'
-import { approximateTokens, messageTextContent } from '../utils/messages.js'
+import { approximateTokens } from '../utils/messages.js'
 import {
   dispatchSlash,
   parseSlash,
@@ -14,10 +14,11 @@ import {
 } from '../commands/index.js'
 import { theme } from './theme.js'
 import { BrandSplash } from './BrandSplash.js'
-import { SessionStatus } from './SessionStatus.js'
+import { SessionStatus, formatTokens } from './SessionStatus.js'
 import { type MessageRow } from './MessageList.js'
 import { ConversationStack } from './ConversationStack.js'
 import { ModelPicker, type ModelPickerSelection } from './ModelPicker.js'
+import type { ModelPickerContextFit } from './modelPickerOptions.js'
 import type { CopyResult } from '../utils/clipboard.js'
 import { useKeybinding, useRegisterKeybindingContext } from '../keybindings/KeybindingProvider.js'
 import { useCancelRequest } from '../hooks/useCancelRequest.js'
@@ -35,7 +36,10 @@ import { loadPermissionRules, savePermissionRule } from '../storage/permissions.
 import { appendHistory, readHistory } from '../storage/history.js'
 import {
   compactTranscript,
-  truncateFallback,
+  contextUsage,
+  contextUsageFromTokens,
+  shouldConfirmContextUsage,
+  type ContextUsage,
 } from '../runtime/compaction.js'
 import { defaultBaseUrlFor, defaultModelFor, saveConfig } from '../storage/config.js'
 import { getCwd as getRuntimeCwd, setCwd as setRuntimeCwd, syncCwdFromProcess } from '../runtime/cwd.js'
@@ -52,12 +56,13 @@ import {
   sessionMessagesToRows,
   type TurnCheckpoint,
 } from './chatScreenUtils.js'
-import { ChatBottomPane, type CopyPickerState, type IdentityOverlayState, type Overlay } from './ChatBottomPane.js'
+import { ChatBottomPane, type ContextLimitState, type CopyPickerState, type IdentityOverlayState, type Overlay } from './ChatBottomPane.js'
 import { setTokenIdentity, getIdentityStatus } from '../storage/identity.js'
 import type { IdentityHubResult } from '../identity/IdentityHub.js'
 import { buildResumedSessionState, resolveModelSelection, restoreConversationState } from './chatSessionState.js'
 import { runStreamingTurn } from './chatTurnOrchestrator.js'
 import type { PlanApprovalAction } from './PlanApprovalView.js'
+import type { ContextLimitAction } from './ContextLimitView.js'
 
 type ChatScreenProps = {
   config: EthagentConfig
@@ -78,7 +83,7 @@ let rowIdSeq = 0
 const nextRowId = (): string => `row-${++rowIdSeq}`
 const nowIso = (): string => new Date().toISOString()
 const STREAM_FLUSH_MS = 120
-const SOFT_CONTEXT_LIMIT_TOKENS = 32_000
+const CONTEXT_CONFIRM_PERCENT = 90
 
 export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, onReplaceConfig }) => {
   useRegisterKeybindingContext('Chat')
@@ -92,6 +97,8 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
   const [approxTokens, setApproxTokens] = useState(0)
   const [overlay, setOverlay] = useState<Overlay>('none')
   const [copyPickerState, setCopyPickerState] = useState<CopyPickerState>(null)
+  const [contextLimitState, setContextLimitState] = useState<ContextLimitState>(null)
+  const [modelPickerContextFit, setModelPickerContextFit] = useState<ModelPickerContextFit | null>(null)
   const [identityOverlay, setIdentityOverlay] = useState<IdentityOverlayState | null>(null)
   const [permissionRequest, setPermissionRequest] = useState<PermissionRequest | null>(null)
   const [mode, setMode] = useState<SessionMode>('chat')
@@ -100,6 +107,9 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
   const [sessionKey, setSessionKey] = useState<number>(0)
   const [cwd, setCwd] = useState<string>(() => syncCwdFromProcess())
   const [statusStartedAt, setStatusStartedAt] = useState<number>(() => Date.now())
+  const [activeContextUsage, setActiveContextUsage] = useState<ContextUsage>(() =>
+    contextUsageFromTokens(0, initialConfig.provider, initialConfig.model),
+  )
 
   const rowsRef = useRef<MessageRow[]>([])
   const sessionMessagesRef = useRef<SessionMessage[]>([])
@@ -122,6 +132,8 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
   const activeCheckpointRef = useRef<TurnCheckpoint | undefined>(undefined)
   const statsSegmentStartRef = useRef<number>(0)
   const pendingPlanRef = useRef<PendingPlan | null>(null)
+  const contextLimitStateRef = useRef<ContextLimitState>(null)
+  const contextModelSwitchPromptRef = useRef<string | null>(null)
 
   useEffect(() => { rowsRef.current = rows }, [rows])
   useEffect(() => { overlayRef.current = overlay }, [overlay])
@@ -129,6 +141,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
   useEffect(() => { cwdRef.current = cwd }, [cwd])
   useEffect(() => { modeRef.current = mode }, [mode])
   useEffect(() => { pendingPlanRef.current = pendingPlan }, [pendingPlan])
+  useEffect(() => { contextLimitStateRef.current = contextLimitState }, [contextLimitState])
 
   useEffect(() => {
     if (prevConfigRef.current === config) return
@@ -190,6 +203,8 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
 
   const replaceConfig = useCallback(
     (next: EthagentConfig) => {
+      configRef.current = next
+      providerRef.current = createProvider(next)
       setConfig(next)
       onReplaceConfig?.(next)
     },
@@ -205,6 +220,31 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
     }
   }, [])
 
+  const clearContextLimit = useCallback(() => {
+    contextLimitStateRef.current = null
+    setContextLimitState(null)
+    if (overlayRef.current === 'contextLimit') {
+      overlayRef.current = 'none'
+      setOverlay('none')
+    }
+  }, [])
+
+  const openModelPicker = useCallback((contextFit?: ModelPickerContextFit | null, pendingPrompt?: string | null) => {
+    contextModelSwitchPromptRef.current = pendingPrompt ?? null
+    setModelPickerContextFit(contextFit ?? null)
+    overlayRef.current = 'modelPicker'
+    setOverlay('modelPicker')
+  }, [])
+
+  const handleModelPickerCancel = useCallback(() => {
+    const hadPendingPrompt = contextModelSwitchPromptRef.current !== null
+    contextModelSwitchPromptRef.current = null
+    setModelPickerContextFit(null)
+    overlayRef.current = 'none'
+    setOverlay('none')
+    if (hadPendingPrompt) pushNote('pending message cancelled.', 'dim')
+  }, [pushNote])
+
   const changeCwd = useCallback((next: string) => {
     const updated = next === getRuntimeCwd() ? next : setRuntimeCwd(next, cwdRef.current)
     cwdRef.current = updated
@@ -213,25 +253,24 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
     setSessionKey(k => k + 1)
   }, [clearPendingPlan])
 
-  const resetVisibleStats = useCallback(() => {
-    statsSegmentStartRef.current = sessionMessagesRef.current.length
-    setTurns(0)
-    setApproxTokens(0)
-    setStatusStartedAt(Date.now())
-  }, [])
-
   const clearTranscript = useCallback(() => {
     setRows([])
     setTurns(0)
     setApproxTokens(0)
+    setActiveContextUsage(contextUsageFromTokens(0, configRef.current.provider, configRef.current.model))
     setQueuedInputs([])
     clearPendingPlan()
+    clearContextLimit()
+    contextModelSwitchPromptRef.current = null
+    setModelPickerContextFit(null)
     sessionMessagesRef.current = []
     statsSegmentStartRef.current = 0
     setStatusStartedAt(Date.now())
-    setSessionId(newSessionId())
+    const nextId = newSessionId()
+    sessionIdRef.current = nextId
+    setSessionId(nextId)
     setSessionKey(k => k + 1)
-  }, [clearPendingPlan])
+  }, [clearContextLimit, clearPendingPlan])
 
   const doExit = useCallback(() => {
     streamAbortRef.current?.abort()
@@ -257,12 +296,40 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
   )
 
   const refreshVisibleStats = useCallback(
-    (messages: SessionMessage[], providerSupportsTools: boolean, cwdForStats: string, configForStats: EthagentConfig, modeForStats: SessionMode) => {
-      const segment = messages.slice(statsSegmentStartRef.current)
-      setTurns(segment.filter(message => message.role === 'user').length)
-      setApproxTokens(approximateTokens(buildBaseMessages(segment, configForStats, providerSupportsTools, cwdForStats, modeForStats)))
+    (messages: SessionMessage[], providerSupportsTools: boolean, cwdForStats: string, configForStats: EthagentConfig, modeForStats: SessionMode): ContextUsage => {
+      const built = buildBaseMessages(messages, configForStats, providerSupportsTools, cwdForStats, modeForStats)
+      const tokens = approximateTokens(built)
+      const usage = contextUsageFromTokens(tokens, configForStats.provider, configForStats.model)
+      setTurns(messages.filter(message => message.role === 'user').length)
+      setApproxTokens(tokens)
+      setActiveContextUsage(usage)
+      return usage
     },
     [],
+  )
+
+  const warnIfContextPressure = useCallback(
+    (usage: ContextUsage, configForUsage: EthagentConfig) => {
+      if (!shouldConfirmContextUsage(usage, CONTEXT_CONFIRM_PERCENT)) return
+      const action = usage.percent >= 100
+        ? 'New requests will ask you to summarize into a new conversation, switch models, ignore and send, or cancel.'
+        : 'Run /compact before continuing, keep the next prompt short, switch models, or choose to send despite the warning.'
+      pushNote(
+        `current transcript is ${usage.percent}% of ${configForUsage.model}'s context (~${formatTokens(usage.usedTokens)} / ${formatTokens(usage.windowTokens)}). ${action}`,
+        usage.percent >= 100 ? 'error' : 'dim',
+      )
+    },
+    [pushNote],
+  )
+
+  const applyConfigChange = useCallback(
+    (next: EthagentConfig): ContextUsage => {
+      replaceConfig(next)
+      const usage = refreshVisibleStats(sessionMessagesRef.current, providerRef.current.supportsTools, cwdRef.current, next, modeRef.current)
+      warnIfContextPressure(usage, next)
+      return usage
+    },
+    [refreshVisibleStats, replaceConfig, warnIfContextPressure],
   )
 
   const attachActiveTurn = useCallback(<T extends SessionMessage>(message: T): T => {
@@ -323,54 +390,91 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
     })
   }, [])
 
-  const reinstateFromMessages = useCallback((messages: Message[]) => {
-    const nextRows: MessageRow[] = []
-    for (const msg of messages) {
-      if (msg.role === 'system') continue
-      const text = messageTextContent(msg)
-      if (msg.role === 'user') {
-        nextRows.push({ role: 'user', id: nextRowId(), content: text })
-      } else if (msg.role === 'assistant') {
-        nextRows.push({ role: 'assistant', id: nextRowId(), content: text })
-      }
-    }
-    setRows(nextRows)
-    setApproxTokens(approximateTokens(messages))
-  }, [])
-
   const runCompaction = useCallback(
-    async (reason: 'manual' | 'auto') => {
-      if (compactingRef.current) return
+    async (): Promise<boolean> => {
+      if (compactingRef.current) return false
+      const sourceSessionId = sessionIdRef.current
+      const sourceMessages = sessionMessagesRef.current
       const priorMessages: Message[] = buildBaseMessages(
-        sessionMessagesRef.current,
+        sourceMessages,
         configRef.current,
         providerRef.current.supportsTools,
-        cwd,
-        mode,
+        cwdRef.current,
+        modeRef.current,
       )
       if (priorMessages.length <= 5) {
         pushNote('not enough turns to compact yet.', 'dim')
-        return
+        return false
       }
       compactingRef.current = true
-      pushNote(reason === 'auto' ? 'context filling up - compacting...' : 'compacting transcript...', 'dim')
+      pushNote('summarizing into a new conversation; current conversation remains active.', 'dim')
       try {
         const result = await compactTranscript(providerRef.current, priorMessages)
         if (!result.ok) {
-          const fallback = truncateFallback(priorMessages)
-          reinstateFromMessages(fallback)
-          pushNote(`compact failed (${result.reason}); trimmed transcript.`, 'dim')
-        } else {
-          reinstateFromMessages(result.compacted)
-          pushNote('transcript compacted.', 'dim')
+          pushNote(`compact failed: ${result.reason}`, 'error')
+          return false
         }
+
+        const nextSessionId = newSessionId()
+        const createdAt = nowIso()
+        const summaryMessage: SessionMessage = {
+          role: 'user',
+          content: [
+            `Summary of conversation ${sourceSessionId.slice(0, 8)}:`,
+            '',
+            result.summary,
+          ].join('\n'),
+          createdAt,
+        }
+        const acknowledgement: SessionMessage = {
+          role: 'assistant',
+          content: 'Ready to continue from this summary.',
+          createdAt: nowIso(),
+          model: configRef.current.model,
+        }
+
+        const context = {
+          cwd: cwdRef.current,
+          provider: configRef.current.provider,
+          model: configRef.current.model,
+          mode: modeRef.current,
+        }
+        await ensureSessionMetadata(nextSessionId, context)
+        await updateSessionActivity(
+          nextSessionId,
+          context,
+          { compactedFromSessionId: sourceSessionId },
+        )
+        await appendSessionMessage(nextSessionId, summaryMessage, context)
+        await appendSessionMessage(nextSessionId, acknowledgement, context)
+
+        const nextMessages = [summaryMessage, acknowledgement]
+        sessionIdRef.current = nextSessionId
+        setSessionId(nextSessionId)
+        sessionMessagesRef.current = nextMessages
+        statsSegmentStartRef.current = 0
+        setRows([
+          {
+            role: 'note',
+            id: nextRowId(),
+            kind: 'dim',
+            content: `kept ${sourceSessionId.slice(0, 8)} active; summarized into ${nextSessionId.slice(0, 8)}.`,
+          },
+          ...sessionMessagesToRows(nextMessages, nextRowId),
+        ])
+        setQueuedInputs([])
+        setStatusStartedAt(Date.now())
+        refreshVisibleStats(nextMessages, providerRef.current.supportsTools, cwdRef.current, configRef.current, modeRef.current)
+        setSessionKey(key => key + 1)
+        return true
       } catch (err: unknown) {
         pushNote(`compact error: ${(err as Error).message}`, 'error')
+        return false
       } finally {
         compactingRef.current = false
       }
     },
-    [mode, pushNote, reinstateFromMessages],
+    [pushNote, refreshVisibleStats],
   )
 
   const assistantTurns = useCallback((): string[] => {
@@ -386,21 +490,22 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
       config: configRef.current,
       turns,
       approxTokens,
+      contextUsage: activeContextUsage,
       startedAt: statusStartedAt,
       sessionId: sessionIdRef.current,
       cwd,
       sessionMessages: () => sessionMessagesRef.current,
       mode,
       assistantTurns,
-      onReplaceConfig: replaceConfig,
+      onReplaceConfig: applyConfigChange,
       onChangeCwd: changeCwd,
       onClear: clearTranscript,
       onExit: doExit,
       onResumeRequest: () => setOverlay('resume'),
-      onModelPickerRequest: () => setOverlay('modelPicker'),
+      onModelPickerRequest: () => openModelPicker(),
       onRewindRequest: () => setOverlay('rewind'),
       onPermissionsRequest: () => setOverlay('permissions'),
-      onCompactRequest: () => { void runCompaction('manual') },
+      onCompactRequest: () => { void runCompaction() },
       onIdentityRequest: action => {
         void (async () => {
           const status = await getIdentityStatus(configRef.current)
@@ -425,16 +530,18 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
       approxTokens,
       statusStartedAt,
       assistantTurns,
-      replaceConfig,
+      applyConfigChange,
       changeCwd,
       clearTranscript,
       doExit,
+      openModelPicker,
       runCompaction,
       beginPull,
       updatePull,
       finishPull,
       cwd,
       mode,
+      activeContextUsage,
     ],
   )
 
@@ -528,8 +635,8 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
             sessionId: sessionIdRef.current,
             provider: configRef.current.provider,
             model: configRef.current.model,
-            contextLabel: estimatedContextLabel(
-              approximateTokens(buildBaseMessages(sessionMessagesRef.current, configRef.current, turnProvider.supportsTools, cwdRef.current, activeMode)),
+            contextLabel: formatContextLabel(
+              contextUsage(buildBaseMessages(sessionMessagesRef.current, configRef.current, turnProvider.supportsTools, cwdRef.current, activeMode), configRef.current.provider, configRef.current.model),
             ),
             awaitingApproval: true,
           }
@@ -542,9 +649,6 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
       })
       refreshVisibleStats(sessionMessagesRef.current, turnProvider.supportsTools, cwdRef.current, configRef.current, activeMode)
       streamAbortRef.current = null
-      if (result.shouldCompact) {
-        void runCompaction('auto')
-      }
       if (
         result.finishedNormally &&
         activeMode === 'plan' &&
@@ -556,10 +660,60 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
         setOverlay('planApproval')
       }
     },
-    [applySessionRule, attachActiveTurn, executeTool, mode, persistSessionMessage, pushNote, refreshVisibleStats, runCompaction],
+    [applySessionRule, attachActiveTurn, executeTool, mode, persistSessionMessage, pushNote, refreshVisibleStats],
   )
 
   const pullInFlight = pullsRef.current.size > 0
+
+  const projectedUsageForInput = useCallback((userText: string, modeOverride?: SessionMode): ContextUsage => {
+    const activeMode = modeOverride ?? modeRef.current
+    const turnProvider = createProvider(configRef.current, { mode: activeMode })
+    const projectedMessages: SessionMessage[] = [
+      ...sessionMessagesRef.current,
+      { role: 'user', content: userText, createdAt: nowIso() },
+    ]
+    return contextUsage(
+      buildBaseMessages(projectedMessages, configRef.current, turnProvider.supportsTools, cwdRef.current, activeMode),
+      configRef.current.provider,
+      configRef.current.model,
+    )
+  }, [])
+
+  const showContextLimitForPrompt = useCallback((prompt: string): ContextUsage => {
+    contextModelSwitchPromptRef.current = null
+    setModelPickerContextFit(null)
+    const projected = projectedUsageForInput(prompt)
+    contextLimitStateRef.current = { usage: projected, prompt }
+    setContextLimitState(contextLimitStateRef.current)
+    overlayRef.current = 'contextLimit'
+    setOverlay('contextLimit')
+    return projected
+  }, [projectedUsageForInput])
+
+  const continuePendingPromptAfterModelSwitch = useCallback(
+    async (prompt: string | null) => {
+      if (!prompt) {
+        setModelPickerContextFit(null)
+        return
+      }
+      contextModelSwitchPromptRef.current = null
+      setModelPickerContextFit(null)
+      const projected = projectedUsageForInput(prompt)
+      if (shouldConfirmContextUsage(projected, CONTEXT_CONFIRM_PERCENT)) {
+        contextLimitStateRef.current = { usage: projected, prompt }
+        setContextLimitState(contextLimitStateRef.current)
+        overlayRef.current = 'contextLimit'
+        setOverlay('contextLimit')
+        pushNote(
+          `selected model is still ${projected.percent}% of its context (~${formatTokens(projected.usedTokens)} / ${formatTokens(projected.windowTokens)}).`,
+          projected.percent >= 100 ? 'error' : 'dim',
+        )
+        return
+      }
+      await runStream(prompt)
+    },
+    [projectedUsageForInput, pushNote, runStream],
+  )
 
   const handleSubmit = useCallback(
     async (value: string) => {
@@ -587,9 +741,55 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
         return
       }
 
+      const projected = projectedUsageForInput(value)
+      if (shouldConfirmContextUsage(projected, CONTEXT_CONFIRM_PERCENT)) {
+        showContextLimitForPrompt(value)
+        return
+      }
+
       await runStream(value)
     },
-    [buildSlashContext, pullInFlight, pushNote, runStream, streaming],
+    [buildSlashContext, pullInFlight, projectedUsageForInput, pushNote, runStream, showContextLimitForPrompt, streaming],
+  )
+
+  const handleContextLimitCancel = useCallback(() => {
+    clearContextLimit()
+    pushNote('pending message cancelled.', 'dim')
+  }, [clearContextLimit, pushNote])
+
+  const handleContextLimitAction = useCallback(
+    async (action: ContextLimitAction) => {
+      const state = contextLimitStateRef.current
+      if (!state) {
+        clearContextLimit()
+        return
+      }
+      const prompt = state.prompt
+      clearContextLimit()
+      if (action === 'cancel') {
+        pushNote('pending message cancelled.', 'dim')
+        return
+      }
+      if (action === 'switchModel') {
+        openModelPicker(
+          { usedTokens: state.usage.usedTokens, thresholdPercent: CONTEXT_CONFIRM_PERCENT },
+          prompt,
+        )
+        return
+      }
+      if (action === 'compact') {
+        const compacted = await runCompaction()
+        if (!compacted) return
+      }
+      if (action === 'send') {
+        pushNote(
+          'sending despite context warning; this may hit provider rate/context limits faster or degrade model/tool behavior.',
+          'dim',
+        )
+      }
+      await runStream(prompt)
+    },
+    [clearContextLimit, openModelPicker, pushNote, runCompaction, runStream],
   )
 
   const handleCancelStream = useCallback(() => {
@@ -620,7 +820,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
 
   useKeybinding(
     'chat:modelPicker',
-    () => { if (overlay === 'none') setOverlay('modelPicker') },
+    () => { if (overlay === 'none') openModelPicker() },
     { context: 'Chat', isActive: overlay === 'none' },
   )
 
@@ -657,20 +857,26 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
 
   const handleModelPick = useCallback(
     async (sel: ModelPickerSelection) => {
+      const pendingPrompt = contextModelSwitchPromptRef.current
+      overlayRef.current = 'none'
       setOverlay('none')
       if (sel.kind === 'ollama') {
         const resolution = resolveModelSelection(sel, configRef.current, {
           defaultBaseUrlFor,
           defaultModelFor,
         })
-        if (resolution.kind === 'noop') return
+        if (resolution.kind === 'noop') {
+          if (pendingPrompt) showContextLimitForPrompt(pendingPrompt)
+          return
+        }
         try {
           await saveConfig(resolution.config)
-          replaceConfig(resolution.config)
-          resetVisibleStats()
+          applyConfigChange(resolution.config)
           pushNote(resolution.notice, resolution.tone)
+          await continuePendingPromptAfterModelSwitch(pendingPrompt)
         } catch (err: unknown) {
           pushNote(`model switch failed: ${(err as Error).message}`, 'error')
+          if (pendingPrompt) showContextLimitForPrompt(pendingPrompt)
         }
         return
       }
@@ -678,17 +884,21 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
         defaultBaseUrlFor,
         defaultModelFor,
       })
-      if (resolution.kind === 'noop') return
+      if (resolution.kind === 'noop') {
+        if (pendingPrompt) showContextLimitForPrompt(pendingPrompt)
+        return
+      }
       try {
         await saveConfig(resolution.config)
-        replaceConfig(resolution.config)
-        resetVisibleStats()
+        applyConfigChange(resolution.config)
         pushNote(resolution.notice, resolution.tone)
+        await continuePendingPromptAfterModelSwitch(pendingPrompt)
       } catch (err: unknown) {
         pushNote(`provider switch failed: ${(err as Error).message}`, 'error')
+        if (pendingPrompt) showContextLimitForPrompt(pendingPrompt)
       }
     },
-    [pushNote, replaceConfig, resetVisibleStats],
+    [applyConfigChange, continuePendingPromptAfterModelSwitch, pushNote, showContextLimitForPrompt],
   )
 
   const handleResumePick = useCallback(
@@ -720,8 +930,10 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
         }
         if (resumed.config) replaceConfig(resumed.config)
         clearPendingPlan()
+        clearContextLimit()
         modeRef.current = resumed.mode
         setMode(resumed.mode)
+        sessionIdRef.current = id
         setSessionId(id)
         sessionMessagesRef.current = loaded
         statsSegmentStartRef.current = 0
@@ -733,7 +945,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
         pushNote(`resume failed: ${(err as Error).message}`, 'error')
       }
     },
-    [cwd, pushNote, replaceConfig],
+    [clearContextLimit, clearPendingPlan, cwd, pushNote, refreshVisibleStats, replaceConfig],
   )
 
   const handleIdentityResult = useCallback(
@@ -741,7 +953,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
       setOverlay('none')
       setIdentityOverlay(null)
       if (result.kind === 'updated') {
-        replaceConfig(result.config)
+        applyConfigChange(result.config)
         pushNote(result.message, 'info')
         return
       }
@@ -749,7 +961,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
         void (async () => {
           try {
             const nextConfig = await setTokenIdentity(configRef.current, result.identity)
-            replaceConfig(nextConfig)
+            applyConfigChange(nextConfig)
             pushNote(`identity saved · ERC-8004 #${result.identity.agentId}`, 'info')
           } catch (err: unknown) {
             pushNote(`identity save failed: ${(err as Error).message}`, 'error')
@@ -757,7 +969,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
         })()
       }
     },
-    [pushNote, replaceConfig],
+    [applyConfigChange, pushNote],
   )
 
   const handleCopyDone = useCallback(
@@ -807,6 +1019,83 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
     setSessionKey(key => key + 1)
   }, [])
 
+  const startSummarizedPlanImplementationContext = useCallback(
+    async (plan: string): Promise<boolean> => {
+      if (compactingRef.current) return false
+
+      const sourceSessionId = sessionIdRef.current
+      const priorMessages = buildBaseMessages(
+        sessionMessagesRef.current,
+        configRef.current,
+        providerRef.current.supportsTools,
+        cwdRef.current,
+        modeRef.current,
+      )
+
+      if (priorMessages.length <= 5) {
+        startFreshImplementationContext()
+        pushNote('not enough planning context to summarize; starting a plan-only implementation conversation.', 'dim')
+        return true
+      }
+
+      compactingRef.current = true
+      pushNote('summarizing planning context into a new conversation; this conversation remains active.', 'dim')
+      try {
+        const result = await compactTranscript(providerRef.current, priorMessages)
+        if (!result.ok) {
+          pushNote(`context summary failed: ${result.reason}`, 'error')
+          return false
+        }
+
+        const nextSessionId = newSessionId()
+        const createdAt = nowIso()
+        const nextMessages = buildPlanTransferSeedMessages({
+          sourceSessionId,
+          summary: result.summary,
+          plan,
+          createdAt,
+        })
+        const context = {
+          cwd: cwdRef.current,
+          provider: configRef.current.provider,
+          model: configRef.current.model,
+          mode: modeRef.current,
+        }
+
+        await ensureSessionMetadata(nextSessionId, context)
+        await updateSessionActivity(nextSessionId, context, { compactedFromSessionId: sourceSessionId })
+        for (const message of nextMessages) {
+          await appendSessionMessage(nextSessionId, message, context)
+        }
+
+        sessionIdRef.current = nextSessionId
+        setSessionId(nextSessionId)
+        sessionMessagesRef.current = nextMessages
+        statsSegmentStartRef.current = 0
+        setRows([
+          {
+            role: 'note',
+            id: nextRowId(),
+            kind: 'dim',
+            content: `kept ${sourceSessionId.slice(0, 8)} active; transferred plan into ${nextSessionId.slice(0, 8)}.`,
+          },
+          ...sessionMessagesToRows(nextMessages, nextRowId),
+        ])
+        setQueuedInputs([])
+        setStatusStartedAt(Date.now())
+        refreshVisibleStats(nextMessages, providerRef.current.supportsTools, cwdRef.current, configRef.current, modeRef.current)
+        setSessionKey(key => key + 1)
+        return true
+      } catch (err: unknown) {
+        pushNote(`context summary error: ${(err as Error).message}`, 'error')
+        return false
+      } finally {
+        compactingRef.current = false
+      }
+    },
+    [pushNote, refreshVisibleStats, startFreshImplementationContext],
+  )
+
   const handlePlanApprovalCancel = useCallback(() => {
     const plan = pendingPlanRef.current
     if (plan) {
@@ -838,15 +1127,22 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
       }
 
       const nextMode: SessionMode = 'accept-edits'
+      if (action === 'apply-summary') {
+        const transferred = await startSummarizedPlanImplementationContext(plan.text)
+        if (!transferred) return
+      }
       clearPendingPlan()
       modeRef.current = nextMode
       setMode(nextMode)
-      if (action === 'apply-fresh') {
-        startFreshImplementationContext()
-      }
       await runStream(buildPlanImplementationPrompt(plan.text), nextMode)
     },
-    [clearPendingPlan, handlePlanApprovalCancel, pushNote, runStream, startFreshImplementationContext],
+    [
+      clearPendingPlan,
+      handlePlanApprovalCancel,
+      pushNote,
+      runStream,
+      startSummarizedPlanImplementationContext,
+    ],
   )
 
   const busy = pullInFlight
@@ -870,10 +1166,18 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
     drainingQueueRef.current = true
     const next = queuedInputs[0]
     setQueuedInputs(prev => prev.slice(1))
-    void runStream(next!).finally(() => {
+    void (async () => {
+      if (!next) return
+      const projected = projectedUsageForInput(next)
+      if (shouldConfirmContextUsage(projected, CONTEXT_CONFIRM_PERCENT)) {
+        showContextLimitForPrompt(next)
+        return
+      }
+      await runStream(next)
+    })().finally(() => {
       drainingQueueRef.current = false
     })
-  }, [overlay, pullInFlight, queuedInputs, runStream, streaming])
+  }, [overlay, projectedUsageForInput, pullInFlight, pushNote, queuedInputs, runStream, showContextLimitForPrompt, streaming])
 
   const contextLine = `${config.provider} · ${config.model} · ${compressHome(cwd)}`
   const tipLine = streaming
@@ -892,8 +1196,15 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
       : mode === 'accept-edits'
         ? theme.accentPeach
         : theme.accentMint
+  const exitHint = exitState.pending ? 'ctrl+c again to quit' : null
   const footerRight = (
     <Box flexDirection="row">
+      {exitHint ? (
+        <>
+          <Text color={theme.accentPrimary}>{exitHint}</Text>
+          <Text color={theme.dim}> · </Text>
+        </>
+      ) : null}
       {runtimeModeLabel ? (
         <>
           <Text color={modeColor}>{runtimeModeLabel}</Text>
@@ -910,8 +1221,6 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
       <Text color={theme.dim}>esc cancels · alt+p model · alt+i identity</Text>
     </Box>
   )
-  const exitHint = exitState.pending ? 'press ctrl + c again to exit' : null
-
   return (
     <ConversationStack
       header={<BrandSplash key={`splash-${sessionKey}`} contextLine={contextLine} tipLine={tipLine} />}
@@ -926,6 +1235,8 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
           cwd={cwd}
           currentSessionId={sessionId}
           copyPickerState={copyPickerState}
+          contextLimitState={contextLimitState}
+          modelPickerContextFit={modelPickerContextFit}
           permissionRequest={permissionRequest}
           history={history}
           busy={busy}
@@ -933,10 +1244,10 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
           placeholderHints={placeholderHints}
           queuedInputs={queuedInputs}
           slashSuggestions={slashSuggestions}
-          planApprovalContextLabel={pendingPlan?.contextLabel ?? estimatedContextLabel(approxTokens)}
+          planApprovalContextLabel={pendingPlan?.contextLabel ?? formatContextLabel(activeContextUsage)}
           footerRight={footerRight}
-          exitHint={exitHint}
           handleModelPick={handleModelPick}
+          handleModelPickerCancel={handleModelPickerCancel}
           handleResumePick={handleResumePick}
           identityOverlay={identityOverlay}
           handleIdentityResult={handleIdentityResult}
@@ -946,6 +1257,8 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
           resolvePermission={resolvePermission}
           handlePlanApproval={handlePlanApproval}
           handlePlanApprovalCancel={handlePlanApprovalCancel}
+          handleContextLimitAction={handleContextLimitAction}
+          handleContextLimitCancel={handleContextLimitCancel}
           onPermissionRulesChanged={rules => { permissionRulesRef.current = rules }}
           onConfigChange={replaceConfig}
           handleSubmit={handleSubmit}
@@ -960,16 +1273,16 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
           turns={turns}
           approxTokens={approxTokens}
           startedAt={statusStartedAt}
+          contextUsage={activeContextUsage}
         />
       )}
     />
   )
 }
 
-function estimatedContextLabel(tokens: number): string {
-  if (!Number.isFinite(tokens) || tokens <= 0) return 'Estimated context: empty'
-  const percent = Math.max(0, Math.min(99, Math.round((tokens / SOFT_CONTEXT_LIMIT_TOKENS) * 100)))
-  return `Estimated context: ~${percent}% used`
+function formatContextLabel(usage: ContextUsage): string {
+  if (!Number.isFinite(usage.usedTokens) || usage.usedTokens <= 0) return 'Estimated context: empty'
+  return `Estimated context: ${usage.percent}% used`
 }
 
 export function buildPlanImplementationPrompt(plan: string): string {
@@ -985,4 +1298,32 @@ export function buildPlanImplementationPrompt(plan: string): string {
     '',
     plan,
   ].join('\n')
+}
+
+export function buildPlanTransferSeedMessages(args: {
+  sourceSessionId: string
+  summary: string
+  plan: string
+  createdAt: string
+}): SessionMessage[] {
+  return [
+    {
+      role: 'user',
+      content: [
+        `Planning context summary from conversation ${args.sourceSessionId.slice(0, 8)}:`,
+        '',
+        args.summary.trim(),
+      ].join('\n'),
+      createdAt: args.createdAt,
+    },
+    {
+      role: 'user',
+      content: [
+        'Approved plan to implement:',
+        '',
+        args.plan.trim(),
+      ].join('\n'),
+      createdAt: args.createdAt,
+    },
+  ]
 }
