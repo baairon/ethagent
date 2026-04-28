@@ -16,6 +16,7 @@ import type { SessionMessage } from '../storage/sessions.js'
 import path from 'node:path'
 import { setCwd } from '../runtime/cwd.js'
 import type { SessionMode } from '../runtime/sessionMode.js'
+import type { ContextUsage } from '../runtime/compaction.js'
 
 export type IdentityRequestAction =
   | 'manage'
@@ -26,6 +27,7 @@ export type SlashContext = {
   config: EthagentConfig
   turns: number
   approxTokens: number
+  contextUsage: ContextUsage
   startedAt: number
   sessionId: string
   cwd: string
@@ -108,8 +110,13 @@ const COMMANDS: CommandSpec[] = [
   },
   {
     name: 'status',
-    summary: 'provider, model, session id, turns, tokens, elapsed',
+    summary: 'provider, model, session id, turns, context, elapsed',
     run: (_args, ctx) => ({ kind: 'note', text: renderStatus(ctx) }),
+  },
+  {
+    name: 'context',
+    summary: 'show model context usage and compaction options',
+    run: (_args, ctx) => ({ kind: 'note', text: renderContext(ctx) }),
   },
   {
     name: 'cd',
@@ -476,9 +483,32 @@ function renderStatus(ctx: SlashContext): string {
     `model      ${ctx.config.model}`,
     `cwd        ${ctx.cwd}`,
     `session    ${ctx.sessionId.slice(0, 8)}`,
+    'state      active',
     `turns      ${ctx.turns}`,
     `tokens     ~${ctx.approxTokens}`,
+    `context    ${ctx.contextUsage.percent}% (~${ctx.contextUsage.usedTokens}/${ctx.contextUsage.windowTokens}, ${ctx.contextUsage.source})`,
     `elapsed    ${elapsed}`,
+  ].join('\n')
+}
+
+function renderContext(ctx: SlashContext): string {
+  const usage = ctx.contextUsage
+  const free = Math.max(0, usage.windowTokens - usage.usedTokens)
+  const action =
+    usage.percent >= 90
+      ? 'Context is near the model limit. New requests will ask you to summarize into a new conversation, switch models, ignore and send, or cancel.'
+      : usage.percent >= 75
+        ? 'Context is getting full. Consider /compact before a new task boundary.'
+        : 'Context has comfortable room.'
+  return [
+    'context usage:',
+    `  model      ${ctx.config.provider} - ${ctx.config.model}`,
+    `  used       ~${usage.usedTokens} / ${usage.windowTokens} tokens (${usage.percent}%)`,
+    `  free       ~${free} tokens`,
+    `  estimate   ${usage.confidence} (${usage.source})`,
+    '  session    active',
+    '',
+    action,
   ].join('\n')
 }
 

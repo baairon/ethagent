@@ -1,7 +1,6 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import type { Message, Provider } from '../providers/contracts.js'
-import { microCompactSessionMessages, shouldAutoCompact } from '../runtime/compaction.js'
 import { directToolUsesForUserText } from '../runtime/directToolRouter.js'
 import { toPermissionMode, type SessionMode } from '../runtime/sessionMode.js'
 import { runPendingToolUses } from '../runtime/toolExecution.js'
@@ -58,7 +57,6 @@ export type TurnOrchestratorContext = {
 export type StreamingTurnResult = {
   finishedNormally: boolean
   cancelled: boolean
-  shouldCompact: boolean
 }
 
 /**
@@ -70,8 +68,8 @@ export type StreamingTurnResult = {
  *   - persist SessionMessages on commit boundaries,
  *   - drive the tool batch (permission prompts, row pushes, persistence),
  *   - surface plan-mode output to the caller,
- *   - return a summary of what happened (finishedNormally / cancelled /
- *     shouldCompact) for the caller to act on.
+ *   - return a summary of what happened (finishedNormally / cancelled)
+ *     for the caller to act on.
  */
 export async function runStreamingTurn(
   context: TurnOrchestratorContext,
@@ -265,12 +263,9 @@ export async function runStreamingTurn(
     if (directCancelled) pushNote('(cancelled)', 'dim')
     setStreaming(false)
     setActiveCheckpoint(undefined)
-    const workingMessagesForCompactCheck = buildWorking()
     return {
       finishedNormally: !directCancelled,
       cancelled: directCancelled,
-      shouldCompact:
-        !directCancelled && shouldAutoCompact(workingMessagesForCompactCheck, getConfig().model),
     }
   }
 
@@ -320,12 +315,9 @@ export async function runStreamingTurn(
   setStreaming(false)
   setActiveCheckpoint(undefined)
 
-  const workingMessagesForCompactCheck = buildWorking()
   return {
     finishedNormally,
     cancelled,
-    shouldCompact:
-      finishedNormally && shouldAutoCompact(workingMessagesForCompactCheck, getConfig().model),
   }
 }
 
@@ -441,7 +433,12 @@ async function handleEvent(ev: TurnEvent, ctx: EventHandlerContext): Promise<voi
     case 'continuation_nudge': {
       // Clean break between provider calls. Corrective nudges suppress the
       // unverified assistant row so it cannot become durable context.
-      if (ev.reason === 'tool_state_claim' || ev.reason === 'tool_capability') {
+      if (
+        ev.reason === 'tool_state_claim' ||
+        ev.reason === 'tool_capability' ||
+        ev.reason === 'tool_protocol_fake' ||
+        ev.reason === 'tool_delegation'
+      ) {
         ctx.discardStreamingRows()
       } else {
         ctx.finalizeStreamingRows()
@@ -451,7 +448,11 @@ async function handleEvent(ev: TurnEvent, ctx: EventHandlerContext): Promise<voi
     }
     case 'error': {
       ctx.pushNote(ev.message, 'error')
-      ctx.finalizeStreamingRows()
+      if (ev.discardAssistant) {
+        ctx.discardStreamingRows()
+      } else {
+        ctx.finalizeStreamingRows()
+      }
       return
     }
     case 'cancelled': {
@@ -531,12 +532,8 @@ function buildWorkingMessages(
   preserveTurnId?: string,
 ): Message[] {
   const config = context.getConfig()
-  const { messages: compacted } = microCompactSessionMessages(
-    [...context.getSessionMessages()],
-    { activeTurnId: preserveTurnId },
-  )
   return buildBaseMessages(
-    compacted,
+    [...context.getSessionMessages()],
     config,
     context.provider.supportsTools,
     context.getCwd(),

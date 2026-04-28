@@ -2,6 +2,7 @@ import React from 'react'
 import type { EthagentConfig } from '../storage/config.js'
 import type { PermissionDecision, PermissionRequest, SessionPermissionRule } from '../tools/contracts.js'
 import { type ModelPickerSelection, ModelPicker } from './ModelPicker.js'
+import type { ModelPickerContextFit } from './modelPickerOptions.js'
 import { ResumeView } from './ResumeView.js'
 import { RewindView } from './RewindView.js'
 import { PermissionsView } from './PermissionsView.js'
@@ -15,13 +16,19 @@ import { getSlashSuggestions } from '../commands/index.js'
 import { Box, Text } from 'ink'
 import { theme } from './theme.js'
 import { Spinner } from './Spinner.js'
+import { ContextLimitView, type ContextLimitAction } from './ContextLimitView.js'
+import type { ContextUsage } from '../runtime/compaction.js'
 
-export type Overlay = 'none' | 'modelPicker' | 'resume' | 'rewind' | 'copyPicker' | 'permission' | 'permissions' | 'planApproval' | 'identity'
+export type Overlay = 'none' | 'modelPicker' | 'resume' | 'rewind' | 'copyPicker' | 'permission' | 'permissions' | 'planApproval' | 'identity' | 'contextLimit'
 export type CopyPickerState = { turnText: string; turnLabel: string } | null
 export type IdentityOverlayState = {
   initialAction: IdentityHubInitialAction | undefined
   existing: { address: string } | null
 }
+export type ContextLimitState = {
+  usage: ContextUsage
+  prompt: string
+} | null
 
 type ChatBottomPaneProps = {
   overlay: Overlay
@@ -30,6 +37,8 @@ type ChatBottomPaneProps = {
   cwd: string
   currentSessionId: string
   copyPickerState: CopyPickerState
+  contextLimitState: ContextLimitState
+  modelPickerContextFit: ModelPickerContextFit | null
   permissionRequest: PermissionRequest | null
   history: string[]
   busy: boolean
@@ -39,8 +48,8 @@ type ChatBottomPaneProps = {
   slashSuggestions: ReturnType<typeof getSlashSuggestions>
   planApprovalContextLabel: string
   footerRight: React.ReactNode
-  exitHint: string | null
   handleModelPick: (sel: ModelPickerSelection) => void | Promise<void>
+  handleModelPickerCancel: () => void
   handleResumePick: (id: string) => void | Promise<void>
   identityOverlay: IdentityOverlayState | null
   handleIdentityResult: (result: IdentityHubResult) => void
@@ -50,6 +59,8 @@ type ChatBottomPaneProps = {
   resolvePermission: (decision: PermissionDecision) => void
   handlePlanApproval: (action: PlanApprovalAction) => void | Promise<void>
   handlePlanApprovalCancel: () => void
+  handleContextLimitAction: (action: ContextLimitAction) => void | Promise<void>
+  handleContextLimitCancel: () => void
   onPermissionRulesChanged: (rules: SessionPermissionRule[]) => void
   onConfigChange: (config: EthagentConfig) => void
   handleSubmit: (value: string) => void | Promise<void>
@@ -64,6 +75,8 @@ export function ChatBottomPane({
   cwd,
   currentSessionId,
   copyPickerState,
+  contextLimitState,
+  modelPickerContextFit,
   permissionRequest,
   history,
   busy,
@@ -73,8 +86,8 @@ export function ChatBottomPane({
   slashSuggestions,
   planApprovalContextLabel,
   footerRight,
-  exitHint,
   handleModelPick,
+  handleModelPickerCancel,
   handleResumePick,
   identityOverlay,
   handleIdentityResult,
@@ -84,6 +97,8 @@ export function ChatBottomPane({
   resolvePermission,
   handlePlanApproval,
   handlePlanApprovalCancel,
+  handleContextLimitAction,
+  handleContextLimitCancel,
   onPermissionRulesChanged,
   onConfigChange,
   handleSubmit,
@@ -96,8 +111,9 @@ export function ChatBottomPane({
         currentConfig={config}
         currentProvider={config.provider}
         currentModel={config.model}
+        contextFit={modelPickerContextFit}
         onPick={handleModelPick}
-        onCancel={() => setOverlay('none')}
+        onCancel={handleModelPickerCancel}
       />
     )
   }
@@ -184,6 +200,17 @@ export function ChatBottomPane({
     )
   }
 
+  if (overlay === 'contextLimit' && contextLimitState) {
+    return (
+      <ContextLimitView
+        usage={contextLimitState.usage}
+        promptPreview={summarizePrompt(contextLimitState.prompt)}
+        onSelect={handleContextLimitAction}
+        onCancel={handleContextLimitCancel}
+      />
+    )
+  }
+
   return (
     <Box flexDirection="column" width="100%">
       {streaming ? (
@@ -206,10 +233,13 @@ export function ChatBottomPane({
           <Text color={theme.dim}>workspace · </Text>
           <Text color={theme.textSubtle}>{cwd}</Text>
         </Text>
-        {exitHint ? (
-          <Text color={theme.accentPrimary}>{exitHint}</Text>
-        ) : null}
       </Box>
     </Box>
   )
+}
+
+function summarizePrompt(text: string): string {
+  const normalized = text.replace(/\s+/g, ' ').trim()
+  if (normalized.length <= 100) return normalized
+  return `${normalized.slice(0, 97)}...`
 }

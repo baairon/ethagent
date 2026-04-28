@@ -4,7 +4,7 @@ import { Surface } from './Surface.js'
 import { theme } from './theme.js'
 import { useAppInput } from '../input/AppInputProvider.js'
 
-export type PlanApprovalAction = 'apply' | 'apply-fresh' | 'continue'
+export type PlanApprovalAction = 'apply' | 'apply-summary' | 'continue'
 
 type PlanApprovalViewProps = {
   contextLabel: string
@@ -12,7 +12,7 @@ type PlanApprovalViewProps = {
   onCancel: () => void
 }
 
-const OPTIONS: Array<{
+export const PLAN_APPROVAL_OPTIONS: Array<{
   value: PlanApprovalAction
   label: string
   title: string
@@ -22,13 +22,13 @@ const OPTIONS: Array<{
     value: 'apply',
     label: 'Yes, implement this plan',
     title: 'Switch to Accept Edits and start coding.',
-    detail: contextLabel => `Keep this conversation. ${contextLabel}.`,
+    detail: contextLabel => `Same conversation. ${contextLabel}.`,
   },
   {
-    value: 'apply-fresh',
-    label: 'Yes, clear context and implement',
-    title: 'Start a fresh implementation thread.',
-    detail: () => 'Fresh model context seeded with this plan only.',
+    value: 'apply-summary',
+    label: 'Yes, start a new conversation',
+    title: 'Summarize context and start coding.',
+    detail: () => 'Keeps this conversation active and carries summary plus plan.',
   },
   {
     value: 'continue',
@@ -44,13 +44,13 @@ export const PlanApprovalView: React.FC<PlanApprovalViewProps> = ({
   onCancel,
 }) => {
   const [index, setIndex] = useState(0)
-  const selected = OPTIONS[index] ?? OPTIONS[0]!
+  const selected = PLAN_APPROVAL_OPTIONS[index] ?? PLAN_APPROVAL_OPTIONS[0]!
 
   useAppInput((input, key) => {
     if (key.upArrow || input === 'k') {
-      setIndex(current => (current - 1 + OPTIONS.length) % OPTIONS.length)
+      setIndex(current => (current - 1 + PLAN_APPROVAL_OPTIONS.length) % PLAN_APPROVAL_OPTIONS.length)
     } else if (key.downArrow || input === 'j') {
-      setIndex(current => (current + 1) % OPTIONS.length)
+      setIndex(current => (current + 1) % PLAN_APPROVAL_OPTIONS.length)
     } else if (key.return) {
       onSelect(selected.value)
     } else if (key.escape) {
@@ -66,7 +66,7 @@ export const PlanApprovalView: React.FC<PlanApprovalViewProps> = ({
     >
       <Box flexDirection="row">
         <Box flexDirection="column" minWidth={36}>
-          {OPTIONS.map((option, optionIndex) => {
+          {PLAN_APPROVAL_OPTIONS.map((option, optionIndex) => {
             const active = optionIndex === index
             return (
               <Box key={option.value} flexDirection="row">

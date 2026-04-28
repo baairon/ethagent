@@ -4,6 +4,8 @@ import type { Message, Provider, StreamEvent } from '../src/providers/contracts.
 import {
   MAX_CONTINUATION_NUDGES,
   looksLikeContinuationIntent,
+  looksLikeFakeToolProtocolText,
+  looksLikeToolDelegationText,
   looksLikeToolCapabilityConfusion,
   looksLikeToolStateClaimWithoutTool,
   parseLocalModelTextToolUse,
@@ -428,6 +430,155 @@ test('runRuntimeTurn nudges local models that claim they cannot use available to
   )
 })
 
+test('runRuntimeTurn nudges fake local tool protocol text instead of persisting it', async () => {
+  const { provider, callsRef } = textProvider([
+    [
+      {
+        type: 'text',
+        delta: 'Sure! Let\'s list the current directory contents first.\n\n```code\nchange_directory,edit_file,list_directory,read_file,run_bash,write_file\n```',
+      },
+      { type: 'done', stopReason: 'end_turn' },
+    ],
+    [
+      {
+        type: 'tool_use_stop',
+        id: 'tool-1',
+        name: 'list_directory',
+        input: {},
+      },
+      { type: 'done', stopReason: 'tool_use' },
+    ],
+    [
+      { type: 'text', delta: 'Directory listed.' },
+      { type: 'done', stopReason: 'end_turn' },
+    ],
+  ])
+
+  const executedTools: string[] = []
+  const events = await collect(
+    runRuntimeTurn({
+      provider,
+      signal: new AbortController().signal,
+      initialMessages: [{ role: 'user', content: 'list files' }],
+      rebuildMessages: () => [{ role: 'user', content: 'list files' }],
+      runToolBatch: async pending => {
+        executedTools.push(...pending.map(t => t.name))
+        return {
+          cancelled: false,
+          completedTools: pending.map(t => ({
+            ...t,
+            cwd: '/tmp',
+            result: { ok: true, summary: 'listed .', content: 'package.json' },
+          })),
+        }
+      },
+    }),
+  )
+
+  assert.equal(callsRef.count, 3)
+  assert.deepEqual(executedTools, ['list_directory'])
+  assert.deepEqual(
+    events.find(e => e.type === 'continuation_nudge'),
+    { type: 'continuation_nudge', attempt: 1, reason: 'tool_protocol_fake' },
+  )
+  assert.ok(events.every(e =>
+    e.type !== 'assistant_message_committed' || !e.text.includes('change_directory,edit_file'),
+  ))
+})
+
+test('runRuntimeTurn nudges native tool delegation prose instead of persisting it', async () => {
+  const { provider, callsRef } = textProvider([
+    [
+      {
+        type: 'text',
+        delta: 'Before proceeding with the plan, let\'s inspect the directory structure. Please run list_directory to see what files are available in the current working directory.',
+      },
+      { type: 'done', stopReason: 'end_turn' },
+    ],
+    [
+      {
+        type: 'tool_use_stop',
+        id: 'tool-1',
+        name: 'list_directory',
+        input: {},
+      },
+      { type: 'done', stopReason: 'tool_use' },
+    ],
+    [
+      { type: 'text', delta: 'Directory listed.' },
+      { type: 'done', stopReason: 'end_turn' },
+    ],
+  ])
+
+  const executedTools: string[] = []
+  const events = await collect(
+    runRuntimeTurn({
+      provider,
+      signal: new AbortController().signal,
+      initialMessages: [{ role: 'user', content: 'implement the plan' }],
+      rebuildMessages: () => [{ role: 'user', content: 'implement the plan' }],
+      runToolBatch: async pending => {
+        executedTools.push(...pending.map(t => t.name))
+        return {
+          cancelled: false,
+          completedTools: pending.map(t => ({
+            ...t,
+            cwd: '/tmp',
+            result: { ok: true, summary: 'listed .', content: 'package.json' },
+          })),
+        }
+      },
+    }),
+  )
+
+  assert.equal(callsRef.count, 3)
+  assert.deepEqual(executedTools, ['list_directory'])
+  assert.deepEqual(
+    events.find(e => e.type === 'continuation_nudge'),
+    { type: 'continuation_nudge', attempt: 1, reason: 'tool_delegation' },
+  )
+  assert.ok(events.every(e =>
+    e.type !== 'assistant_message_committed' || !e.text.includes('Please run list_directory'),
+  ))
+})
+
+test('runRuntimeTurn errors after repeated native tool delegation prose', async () => {
+  const responses: Array<StreamEvent[]> = []
+  for (let i = 0; i < MAX_CONTINUATION_NUDGES + 1; i += 1) {
+    responses.push([
+      {
+        type: 'text',
+        delta: 'Please run list_directory to inspect the current working directory.',
+      },
+      { type: 'done', stopReason: 'end_turn' },
+    ])
+  }
+  const { provider, callsRef } = textProvider(responses)
+
+  const events = await collect(
+    runRuntimeTurn({
+      provider,
+      signal: new AbortController().signal,
+      initialMessages: [{ role: 'user', content: 'inspect files' }],
+      rebuildMessages: () => [{ role: 'user', content: 'inspect files' }],
+      runToolBatch: async () => ({ cancelled: false, completedTools: [] }),
+    }),
+  )
+
+  assert.equal(callsRef.count, 1 + MAX_CONTINUATION_NUDGES)
+  assert.equal(
+    events.filter(e => e.type === 'continuation_nudge' && e.reason === 'tool_delegation').length,
+    MAX_CONTINUATION_NUDGES,
+  )
+  assert.ok(events.some(e =>
+    e.type === 'error' && e.message === 'model asked the user to run a tool instead of making a tool call',
+  ))
+  assert.ok(events.every(e =>
+    e.type !== 'assistant_message_committed' || !e.text.includes('Please run list_directory'),
+  ))
+  assert.deepEqual(events.at(-1), { type: 'done', finishedNormally: false })
+})
+
 test('runRuntimeTurn caps continuation nudges at MAX_CONTINUATION_NUDGES', async () => {
   // Every response is a continuation-shaped text with no tool_use. The loop
   // should nudge MAX_CONTINUATION_NUDGES times, then give up and emit done.
@@ -675,6 +826,26 @@ test('looksLikeToolCapabilityConfusion detects false local-tool limitations', ()
     true,
   )
   assert.equal(looksLikeToolCapabilityConfusion('This is a limitation of the API design.'), false)
+})
+
+test('looksLikeFakeToolProtocolText detects printed tool menus', () => {
+  assert.equal(
+    looksLikeFakeToolProtocolText('```code\nchange_directory,edit_file,list_directory,read_file,run_bash,write_file\n```'),
+    true,
+  )
+  assert.equal(looksLikeFakeToolProtocolText('I will use read_file next.'), false)
+})
+
+test('looksLikeToolDelegationText detects native tool requests in prose', () => {
+  assert.equal(
+    looksLikeToolDelegationText('Please run list_directory to see what files are available.'),
+    true,
+  )
+  assert.equal(
+    looksLikeToolDelegationText('Before proceeding, I will use read_file to inspect package.json.'),
+    true,
+  )
+  assert.equal(looksLikeToolDelegationText('The list_directory tool exists.'), false)
 })
 
 test('looksLikeToolStateClaimWithoutTool detects directory-change claims', () => {

@@ -63,6 +63,8 @@ export type ContinuationNudgeReason =
   | 'continuation'
   | 'tool_capability'
   | 'tool_state_claim'
+  | 'tool_protocol_fake'
+  | 'tool_delegation'
 
 const CONTINUATION_NUDGE_TEXT =
   'Continue with the task. Use the appropriate tools to proceed.'
@@ -73,8 +75,14 @@ const TOOL_CAPABILITY_NUDGE_TEXT =
 const TOOL_STATE_CLAIM_NUDGE_TEXT =
   'Do not claim that files, directories, or workspace state changed unless you have executed the appropriate tool. Call the tool now.'
 
+const TOOL_PROTOCOL_FAKE_NUDGE_TEXT =
+  'The previous response printed tool names or a tool menu instead of calling a tool. Tool names are not text output. Make exactly one native tool call now.'
+
+const TOOL_DELEGATION_NUDGE_TEXT =
+  'Do not ask the user to run native tools. You have access to the tools in this environment. Make exactly one native tool call now.'
+
 /**
- * TurnEvent — events emitted by the runtime turn loop. The UI layer subscribes
+ * TurnEvent - events emitted by the runtime turn loop. The UI layer subscribes
  * and translates these into Ink rows, notes, permission prompts, and session
  * writes. Modeled after openclaude's event shape but trimmed to what ethagent
  * actually uses.
@@ -102,7 +110,7 @@ export type TurnEvent =
     }
   | { type: 'continuation_nudge'; attempt: number; reason: ContinuationNudgeReason }
   | { type: 'local_tool_recovery' }
-  | { type: 'error'; message: string }
+  | { type: 'error'; message: string; discardAssistant?: boolean }
   | { type: 'cancelled' }
   | { type: 'done'; finishedNormally: boolean }
 
@@ -139,7 +147,7 @@ export type ToolBatchRunner = (
  * rebuildWorkingMessages: after every tool batch, the host recomputes the
  * Message[] it wants to send to the provider. This keeps microcompact,
  * system-prompt composition, and file-mention context completely outside the
- * loop — the loop only cares about "give me the next prompt window".
+ * loop - the loop only cares about "give me the next prompt window".
  */
 export type RebuildMessages = () => Message[]
 
@@ -151,7 +159,7 @@ export type RuntimeTurnParams = {
   /**
    * Called after every tool execution round to rebuild the Message[] for the
    * next provider call. The host is responsible for microcompact, system
-   * prompt, and any mention context — the loop is deliberately dumb here.
+   * prompt, and any mention context - the loop is deliberately dumb here.
    */
   rebuildMessages: RebuildMessages
   runToolBatch: ToolBatchRunner
@@ -160,7 +168,7 @@ export type RuntimeTurnParams = {
 }
 
 /**
- * runRuntimeTurn — the one and only turn loop.
+ * runRuntimeTurn - the one and only turn loop.
  *
  * Shape (ported from openclaude/src/query.ts:244):
  *   1. Stream the provider.
@@ -175,7 +183,7 @@ export type RuntimeTurnParams = {
  *   - No broad regex fallback tool parsing. A narrow Ollama/Qwen
  *     compatibility parser handles standalone JSON tool payloads only.
  *   - No duplicate-tool-call suppression. The model is allowed to repeat.
- *   - No forced-repair retries on tool input validation errors — errors go
+ *   - No forced-repair retries on tool input validation errors - errors go
  *     back to the model as tool_result(is_error) and the model decides.
  */
 export async function* runRuntimeTurn(
@@ -266,7 +274,7 @@ export async function* runRuntimeTurn(
       if (parsedToolUses.length > 0) {
         pendingToolUses.push(...parsedToolUses)
         // Signal the orchestrator to discard any streamed assistant text
-        // rows that contained the JSON blob — they should not be persisted.
+        // rows that contained the JSON blob - they should not be persisted.
         yield { type: 'local_tool_recovery' }
         for (const parsedToolUse of parsedToolUses) {
           yield {
@@ -277,6 +285,52 @@ export async function* runRuntimeTurn(
           }
         }
       }
+    }
+
+    if (pendingToolUses.length === 0 && provider.supportsTools && looksLikeFakeToolProtocolText(assistantText)) {
+      if (continuationNudges < maxContinuationNudges) {
+        continuationNudges += 1
+        yield {
+          type: 'continuation_nudge',
+          attempt: continuationNudges,
+          reason: 'tool_protocol_fake',
+        }
+        workingMessages = [
+          ...rebuildMessages(),
+          { role: 'user', content: TOOL_PROTOCOL_FAKE_NUDGE_TEXT },
+        ]
+        continue
+      }
+      yield {
+        type: 'error',
+        message: 'model printed tool names instead of making a tool call',
+        discardAssistant: true,
+      }
+      yield { type: 'done', finishedNormally: false }
+      return
+    }
+
+    if (pendingToolUses.length === 0 && provider.supportsTools && looksLikeToolDelegationText(assistantText)) {
+      if (continuationNudges < maxContinuationNudges) {
+        continuationNudges += 1
+        yield {
+          type: 'continuation_nudge',
+          attempt: continuationNudges,
+          reason: 'tool_delegation',
+        }
+        workingMessages = [
+          ...rebuildMessages(),
+          { role: 'user', content: TOOL_DELEGATION_NUDGE_TEXT },
+        ]
+        continue
+      }
+      yield {
+        type: 'error',
+        message: 'model asked the user to run a tool instead of making a tool call',
+        discardAssistant: true,
+      }
+      yield { type: 'done', finishedNormally: false }
+      return
     }
 
     if (pendingToolUses.length === 0) {
@@ -308,6 +362,7 @@ export async function* runRuntimeTurn(
         yield {
           type: 'error',
           message: 'model claimed workspace state without matching tool evidence',
+          discardAssistant: true,
         }
         yield { type: 'done', finishedNormally: false }
         return
@@ -583,8 +638,48 @@ export function looksLikeToolStateClaimWithoutTool(text: string): boolean {
   return looksLikeToolStateClaim(text)
 }
 
+export function looksLikeFakeToolProtocolText(text: string): boolean {
+  const lower = text.toLowerCase()
+  if (!lower.trim()) return false
+
+  const toolNames = new Set(
+    [...lower.matchAll(/\b(change_directory|edit_file|list_directory|read_file|run_bash|write_file|delete_file)\b/g)]
+      .map(match => match[1]),
+  )
+  if (toolNames.size < 2) return false
+
+  const codeBlock = /```|code\s*(?:-|:)?\s*block/.test(lower)
+  const toolMenu = /\b(available tools|tool functions|functions are|tools are|native tools)\b/.test(lower)
+  const actionIntent = /\b(let'?s|let me|i'?ll|i will|first|next)\b.{0,80}\b(list|read|inspect|execute|run|change|edit|write)\b/.test(lower)
+  const commaSeparatedTools = /(?:change_directory|edit_file|list_directory|read_file|run_bash|write_file|delete_file)(?:\s*,\s*|\s+){1,}/.test(lower)
+
+  return (codeBlock || toolMenu || actionIntent) && commaSeparatedTools
+}
+
+export function looksLikeToolDelegationText(text: string): boolean {
+  const lower = text.toLowerCase()
+  if (!lower.trim()) return false
+
+  const toolName = '(?:change_directory|edit_file|list_directory|read_file|run_bash|write_file|delete_file)'
+  if (!new RegExp(`\\b${toolName}\\b`).test(lower)) return false
+
+  const directToolRef = `(?:\`?${toolName}\`?|the\\s+\`?${toolName}\`?\\s+tool)`
+  const action = '(?:run|execute|call|use|invoke)'
+  const askPrefix = "(?:please|kindly|can you|could you|would you|you can|you should|you need to|you'll need to|try to|go ahead and)"
+  const selfPrefix = "(?:i'll|i will|let me|let's|we should|we need to|before proceeding|first|next|now)"
+
+  const askUser = new RegExp(`\\b${askPrefix}\\b.{0,100}\\b${action}\\b.{0,50}${directToolRef}`).test(lower)
+  const selfIntent = new RegExp(`\\b${selfPrefix}\\b.{0,100}\\b${action}\\b.{0,50}${directToolRef}`).test(lower)
+  const commandForm = new RegExp(`\\b${action}\\s+${directToolRef}\\b`).test(lower)
+    && /\b(please|before proceeding|first|next|now|to proceed)\b/.test(lower)
+  const asksForOutput = new RegExp(`${directToolRef}.{0,120}\\b(output|result|files?|directory structure|working directory)\\b`).test(lower)
+    && /\b(please|you|run|paste|share|provide)\b/.test(lower)
+
+  return askUser || selfIntent || commandForm || asksForOutput
+}
+
 /**
- * looksLikeContinuationIntent — heuristic port of openclaude's continuation
+ * looksLikeContinuationIntent - heuristic port of openclaude's continuation
  * nudge detection (query.ts:1394-1463).
  *
  * Two rules:

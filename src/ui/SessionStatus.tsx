@@ -1,5 +1,6 @@
 import React from 'react'
 import { Box, Text } from 'ink'
+import type { ContextUsage } from '../runtime/compaction.js'
 import { theme } from './theme.js'
 
 type StatusBarProps = {
@@ -8,6 +9,7 @@ type StatusBarProps = {
   turns: number
   approxTokens: number
   startedAt: number
+  contextUsage: ContextUsage
 }
 
 const SessionStatusInner: React.FC<StatusBarProps> = ({
@@ -16,11 +18,12 @@ const SessionStatusInner: React.FC<StatusBarProps> = ({
   turns,
   approxTokens,
   startedAt,
+  contextUsage,
 }) => {
   return (
     <Box flexDirection="row">
       <Text color={theme.dim}>
-        {provider} · {model} · {turns} {turns === 1 ? 'turn' : 'turns'} · ~{formatTokens(approxTokens)} tokens · {formatElapsed(Date.now() - startedAt)}
+        {provider} - {model} - {turns} {turns === 1 ? 'turn' : 'turns'} - ~{formatTokens(approxTokens)} tokens - Context {contextUsage.percent}% (~{formatTokens(contextUsage.usedTokens)} / {formatTokens(contextUsage.windowTokens)}) - {formatElapsed(Date.now() - startedAt)}
       </Text>
     </Box>
   )
@@ -44,4 +47,3 @@ export function formatElapsed(ms: number): string {
   const minRem = minutes % 60
   return `${hours}h${minRem.toString().padStart(2, '0')}m`
 }
-

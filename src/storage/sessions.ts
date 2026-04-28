@@ -30,6 +30,9 @@ export type SessionMetadata = {
   mode?: SessionMode
   firstUserMessage: string
   turnCount: number
+  archivedAt?: string
+  compactedToSessionId?: string
+  compactedFromSessionId?: string
 }
 
 export type SessionSummary = SessionMetadata & {
@@ -135,7 +138,7 @@ export async function ensureSessionMetadata(id: string, context: SessionWriteCon
 export async function updateSessionActivity(
   id: string,
   context: SessionWriteContext,
-  changes: Partial<Pick<SessionMetadata, 'workspaceRoot' | 'lastCwd' | 'provider' | 'model' | 'mode'>>,
+  changes: Partial<Pick<SessionMetadata, 'workspaceRoot' | 'lastCwd' | 'provider' | 'model' | 'mode' | 'compactedFromSessionId'>>,
 ): Promise<SessionMetadata> {
   const base = await ensureSessionMetadata(id, context)
   const next: SessionMetadata = {
@@ -147,6 +150,23 @@ export async function updateSessionActivity(
     provider: changes.provider ?? context.provider ?? base.provider,
     model: changes.model ?? context.model ?? base.model,
     mode: changes.mode ?? context.mode ?? base.mode,
+    compactedFromSessionId: changes.compactedFromSessionId ?? base.compactedFromSessionId,
+  }
+  await writeSessionMetadata(next)
+  return next
+}
+
+export async function archiveSession(
+  id: string,
+  context: SessionWriteContext,
+  details: { compactedToSessionId?: string } = {},
+): Promise<SessionMetadata> {
+  const base = await ensureSessionMetadata(id, context)
+  const next: SessionMetadata = {
+    ...base,
+    updatedAt: new Date().toISOString(),
+    archivedAt: base.archivedAt ?? new Date().toISOString(),
+    compactedToSessionId: details.compactedToSessionId ?? base.compactedToSessionId,
   }
   await writeSessionMetadata(next)
   return next
@@ -369,6 +389,9 @@ function normalizeMetadata(
     mode: raw.mode,
     firstUserMessage: raw.firstUserMessage || '',
     turnCount: raw.turnCount ?? 0,
+    archivedAt: raw.archivedAt,
+    compactedToSessionId: raw.compactedToSessionId,
+    compactedFromSessionId: raw.compactedFromSessionId,
   }
 }
 

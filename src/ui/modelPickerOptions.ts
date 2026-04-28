@@ -1,5 +1,6 @@
 import { defaultModelFor, type ProviderId } from '../storage/config.js'
 import { type ModelCatalogEntry, type ModelCatalogResult } from '../models/catalog.js'
+import { contextWindowInfo } from '../runtime/compaction.js'
 import { type SelectOption } from './Select.js'
 
 export type CloudProviderId = Exclude<ProviderId, 'ollama'>
@@ -14,9 +15,15 @@ export type ModelPickerOptionsData = {
   cloudCatalogs: Partial<Record<ProviderId, ModelCatalogResult>>
 }
 
+export type ModelPickerContextFit = {
+  usedTokens: number
+  thresholdPercent?: number
+}
+
 export type ModelPickerOptionsContext = {
   currentProvider: ProviderId
   currentModel: string
+  contextFit?: ModelPickerContextFit | null
 }
 
 const CURATED_CLOUD_MODEL_LIMIT = 3
@@ -35,10 +42,19 @@ export function buildModelPickerOptions(
   } else if (data.models.length === 0) {
     options.push(noticeOption('hdr:no-models', 'no models installed - pull one with /pull <name>'))
   } else {
-    for (const m of data.models) {
-      const active = context.currentProvider === 'ollama' && m.name === context.currentModel
-      const size = formatSize(m.sizeBytes)
-      options.push(rowOption(`ol:${m.name}`, `${active ? '* ' : '  '}${m.name}${size ? ` · ${size}` : ''}`))
+    const models = orderModelsForContextFit(
+      'ollama',
+      data.models.map(model => model.name),
+      context.contextFit,
+    )
+    const modelSizes = new Map(data.models.map(model => [model.name, model.sizeBytes]))
+    for (const model of models) {
+      const active = context.currentProvider === 'ollama' && model === context.currentModel
+      const size = formatSize(modelSizes.get(model) ?? 0)
+      options.push(rowOption(
+        `ol:${model}`,
+        contextFitLabel('ollama', model, `${active ? '* ' : '  '}${model}${size ? ` - ${size}` : ''}`, context.contextFit),
+      ))
     }
   }
 
@@ -47,7 +63,7 @@ export function buildModelPickerOptions(
     options.push(groupOption(`hdr:cloud:${provider}`, provider))
     const keySet = data.cloudKeys[provider] === true
     if (!keySet) {
-      options.push(utilityOption(`key:set:${provider}`, 'api key · add'))
+      options.push(utilityOption(`key:set:${provider}`, 'api key - add'))
       continue
     }
 
@@ -61,7 +77,7 @@ export function buildModelPickerOptions(
       ))
     }
 
-    const models = cloudPickerModels(provider, catalog, context)
+    const models = orderModelsForContextFit(provider, cloudPickerModels(provider, catalog, context), context.contextFit)
     if (models.length === 0) {
       options.push(noticeOption(`hdr:cloud-empty:${provider}`, 'no selectable models', CHILD_INDENT))
     }
@@ -69,11 +85,11 @@ export function buildModelPickerOptions(
       const active = context.currentProvider === provider && context.currentModel === model
       options.push(rowOption(
         `c:${provider}:${model}`,
-        `${model}${active ? '  *' : ''}`,
+        contextFitLabel(provider, model, `${model}${active ? '  *' : ''}`, context.contextFit),
       ))
     }
     options.push(utilityOption(`catalog:${provider}`, 'full catalog'))
-    options.push(utilityOption(`key:manage:${provider}`, 'api key · manage'))
+    options.push(utilityOption(`key:manage:${provider}`, 'api key - manage'))
   }
 
   return options
@@ -104,6 +120,43 @@ export function curateDiscoveredCloudEntries(
   const unique = dedupeEntries(entries)
   const eligible = unique.filter(entry => isCuratedModelCandidate(provider, entry.id))
   return rankEntriesByRecency(eligible).slice(0, CURATED_CLOUD_MODEL_LIMIT).map(item => item.entry)
+}
+
+export function orderModelsForContextFit(
+  provider: ProviderId,
+  models: string[],
+  contextFit?: ModelPickerContextFit | null,
+): string[] {
+  if (!contextFit) return models
+  return models
+    .map((model, index) => ({ model, index, fit: modelContextFit(provider, model, contextFit) }))
+    .sort((a, b) => {
+      if (a.fit.fits !== b.fit.fits) return a.fit.fits ? -1 : 1
+      return b.fit.windowTokens - a.fit.windowTokens || a.index - b.index
+    })
+    .map(item => item.model)
+}
+
+function contextFitLabel(
+  provider: ProviderId,
+  model: string,
+  baseLabel: string,
+  contextFit?: ModelPickerContextFit | null,
+): string {
+  if (!contextFit) return baseLabel
+  const fit = modelContextFit(provider, model, contextFit)
+  return `${baseLabel}  ${formatContextWindow(fit.windowTokens)} ctx ${fit.percent}%`
+}
+
+function modelContextFit(provider: ProviderId, model: string, contextFit: ModelPickerContextFit): {
+  fits: boolean
+  percent: number
+  windowTokens: number
+} {
+  const windowTokens = contextWindowInfo(provider, model).tokens
+  const percent = windowTokens > 0 ? Math.round((contextFit.usedTokens / windowTokens) * 100) : 0
+  const threshold = contextFit.thresholdPercent ?? 90
+  return { fits: percent < threshold, percent, windowTokens }
 }
 
 function sectionOption(value: string, label: string): SelectOption<string> {
@@ -161,6 +214,15 @@ function formatSize(bytes: number): string {
   const gb = bytes / 1e9
   if (gb >= 1) return `${gb.toFixed(1)} GB`
   return `${Math.round(bytes / 1e6)} MB`
+}
+
+function formatContextWindow(tokens: number): string {
+  if (tokens >= 1_000_000) {
+    const millions = tokens / 1_000_000
+    return Number.isInteger(millions) ? `${millions}m` : `${millions.toFixed(1)}m`
+  }
+  if (tokens >= 1000) return `${Math.round(tokens / 1000)}k`
+  return String(tokens)
 }
 
 type RankedEntry = {

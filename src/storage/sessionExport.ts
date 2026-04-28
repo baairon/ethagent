@@ -33,8 +33,8 @@ export async function exportSessionMarkdown(
         : m.role === 'assistant'
           ? '## assistant'
           : m.role === 'tool_use'
-            ? `## tool use · ${m.name}`
-            : `## tool result · ${m.name}`
+            ? `## tool use - ${m.name}`
+            : `## tool result - ${m.name}`
     lines.push(`${header}  <sub>${m.createdAt}</sub>`)
     lines.push('')
     if (m.role === 'tool_use') {

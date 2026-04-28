@@ -1,7 +1,9 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
+  contextUsageFromTokens,
   microCompactSessionMessages,
+  shouldConfirmContextUsage,
   shouldMicroCompact,
 } from '../src/runtime/compaction.js'
 import type { SessionMessage } from '../src/storage/sessions.js'
@@ -82,4 +84,25 @@ test('microCompactSessionMessages produces a summary referencing recent user req
   const body = (summary as { content?: unknown }).content
   assert.ok(typeof body === 'string')
   assert.match(body, /Most recent earlier user requests/)
+})
+
+test('context usage is calculated against the active model window', () => {
+  const llama = contextUsageFromTokens(32_000, 'ollama', 'llama3.1')
+  const qwen = contextUsageFromTokens(32_000, 'ollama', 'qwen2.5-coder:7b')
+  const openai = contextUsageFromTokens(32_000, 'openai', 'gpt-4o')
+  const gpt41 = contextUsageFromTokens(32_000, 'openai', 'gpt-4.1')
+
+  assert.equal(llama.windowTokens, 128_000)
+  assert.equal(llama.percent, 25)
+  assert.equal(qwen.windowTokens, 32_768)
+  assert.equal(qwen.percent, 98)
+  assert.equal(openai.windowTokens, 128_000)
+  assert.equal(openai.percent, 25)
+  assert.equal(gpt41.windowTokens, 1_000_000)
+  assert.equal(gpt41.percent, 3)
+})
+
+test('context confirmation uses percent without compacting automatically', () => {
+  assert.equal(shouldConfirmContextUsage(contextUsageFromTokens(28_000, 'ollama', 'qwen2.5-coder:7b'), 90), false)
+  assert.equal(shouldConfirmContextUsage(contextUsageFromTokens(30_000, 'ollama', 'qwen2.5-coder:7b'), 90), true)
 })

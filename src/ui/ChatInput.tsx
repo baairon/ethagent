@@ -521,14 +521,14 @@ export const ChatInput: React.FC<PromptInputProps> = ({
             ) : null}
             <Box flexDirection="column" height={display.visibleLineCount} overflowY="hidden">
               {display.lines.map(line => (
-                <Text key={line.visualLineIndex}>
+                <Box key={line.visualLineIndex} flexDirection="row">
                   {line.visualLineIndex === 0 ? (
                     <Text color={promptColor}>{promptChar} </Text>
                   ) : (
                     <Text color={theme.dim}>{'  '}</Text>
                   )}
-                  {line.node}
-                </Text>
+                  <Box width={wrapWidth}>{line.node}</Box>
+                </Box>
               ))}
             </Box>
             {display.hiddenBelow > 0 ? (
