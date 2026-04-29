@@ -106,11 +106,12 @@ test('local agent removal confirmation keeps the device-only boundary explicit',
 
 test('local data management copy distinguishes local reset from remote identity records', () => {
   const copy = LOCAL_DATA_MANAGEMENT_COPY.join('\n')
-  assert.match(copy, /Private markdown lives locally/)
+  assert.match(copy, /SOUL\.md and MEMORY\.md are private local continuity files/)
+  assert.match(copy, /SKILLS\.md is public discovery metadata/)
   assert.match(copy, /Save snapshot and publish encrypts private markdown/)
   assert.match(copy, /ethagent reset wipes local identity metadata/)
-  assert.match(copy, /preserves installed local LLM assets/)
-  assert.match(copy, /does not delete onchain tokens or IPFS-pinned snapshots/)
+  assert.match(copy, /keeps installed local LLM assets/)
+  assert.match(copy, /cannot delete onchain tokens or IPFS pins/)
 })
 
 test('storage credential confirmation distinguishes pinning control from identity cleanup', () => {

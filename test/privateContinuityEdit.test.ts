@@ -104,15 +104,13 @@ test('private continuity read prompts and ensures missing vault scaffolds are re
       onDirectoryChange: () => {},
     })
 
-    assert.equal(prompts, 1)
+    assert.equal(prompts, 0)
     assert.equal(outcome.result.ok, true)
     assert.equal(outcome.sessionRule, undefined)
     assert.equal(outcome.persistRule, false)
     assert.match(outcome.result.content, /1: # .* Memory/)
     assert.match(outcome.result.content, /Durable User Preferences/)
-    assert.equal(seenRequest?.kind, 'private-continuity-read')
-    if (seenRequest?.kind !== 'private-continuity-read') throw new Error('expected private continuity read request')
-    assert.deepEqual(permissionOptionsForRequest(seenRequest).map(option => option.value), ['allow-once', 'deny'])
+    assert.equal(seenRequest, undefined)
 
     await fs.access(continuityVaultRef(identity).memoryPath)
   })
@@ -201,8 +199,8 @@ test('approved private continuity edit records identity history but no rewind ch
     assert.match(outcome.result.content, /previous version saved to private identity history/)
     assert.match(outcome.result.content, /\/rewind does not restore identity markdown/)
     assert.match(outcome.result.content, /review file: .*MEMORY\.md/)
-    assert.match(outcome.result.content, /Alt\+I -> memory, persona, skills/)
-    assert.match(outcome.result.content, /save\/publish later/)
+    assert.match(outcome.result.content, /identity hub, memory and persona/)
+    assert.match(outcome.result.content, /identity hub snapshots/)
     assert.match((await readContinuityFiles(identity))['MEMORY.md'], /Identity history can restore private memory/)
 
     const history = await listPrivateContinuityHistory(identity)

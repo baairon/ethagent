@@ -34,7 +34,10 @@ export type Step =
   | { kind: 'continuity-dashboard'; notice?: string }
   | { kind: 'continuity-private'; notice?: string }
   | { kind: 'continuity-public'; notice?: string }
-  | { kind: 'continuity-unlocking'; identity: EthagentIdentity }
+  | { kind: 'continuity-snapshots'; notice?: string }
+  | { kind: 'continuity-history-restore-confirm'; snapshotId: string }
+  | { kind: 'continuity-unlocking'; identity: EthagentIdentity; cid?: string; publicSkillsCid?: string; returnTo?: 'private' | 'snapshots' }
+  | { kind: 'rebackup-start'; back: Step }
   | { kind: 'edit-profile-name'; identity: EthagentIdentity; registry: Erc8004RegistryConfig }
   | { kind: 'edit-profile-description'; identity: EthagentIdentity; registry: Erc8004RegistryConfig; name: string }
   | { kind: 'forget-confirm' }
@@ -163,7 +166,12 @@ function backStep(from: Step): Step {
       return { kind: 'menu' }
     case 'rebackup-signing':
     case 'rebackup-storage':
-      return { kind: 'details' }
+    case 'rebackup-start':
+      return from.kind === 'rebackup-start' ? from.back : { kind: 'details' }
+    case 'continuity-snapshots':
+      return { kind: 'continuity-dashboard' }
+    case 'continuity-history-restore-confirm':
+      return { kind: 'continuity-snapshots' }
     case 'continuity-dashboard':
       return { kind: 'details' }
     case 'continuity-private':

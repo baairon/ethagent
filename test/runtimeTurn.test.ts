@@ -110,7 +110,7 @@ test('runRuntimeTurn loops provider after tool batch and feeds rebuilt messages'
   assert.equal(callsRef.count, 2)
   assert.ok(events.some(e => e.type === 'tool_use_stop' && e.name === 'read_file'))
   assert.ok(events.some(e => e.type === 'tool_executed' && e.name === 'read_file'))
-  // Two iteration_start events — one per provider call.
+  // Two iteration_start events - one per provider call.
   assert.equal(events.filter(e => e.type === 'iteration_start').length, 2)
   // rebuildMessages should be called at least once (for the follow-up stream).
   assert.ok(rebuiltCalls.length >= 1)
@@ -363,6 +363,52 @@ test('runRuntimeTurn repairs empty local private continuity tool input with a ta
     e.type === 'tool_executed'
     && e.name === 'propose_private_continuity_edit'
     && e.result.ok,
+  ))
+  assert.deepEqual(events.at(-1), { type: 'done', finishedNormally: true })
+})
+
+test('runRuntimeTurn retries when the provider emits reasoning with no visible answer', async () => {
+  const seenMessages: Message[][] = []
+  let calls = 0
+  const provider: Provider = {
+    id: 'ollama',
+    model: 'qwen-test',
+    supportsTools: true,
+    async *complete(messages): AsyncIterable<StreamEvent> {
+      seenMessages.push(messages)
+      calls += 1
+      if (calls === 1) {
+        yield { type: 'thinking', delta: 'I found the answer privately.' }
+        yield { type: 'done', stopReason: 'end_turn' }
+        return
+      }
+      yield { type: 'text', delta: 'Here is the visible answer.' }
+      yield { type: 'done', stopReason: 'end_turn' }
+    },
+  }
+
+  const events = await collect(
+    runRuntimeTurn({
+      provider,
+      signal: new AbortController().signal,
+      initialMessages: [{ role: 'user', content: 'answer here' }],
+      rebuildMessages: () => [{ role: 'user', content: 'answer here' }],
+      runToolBatch: async () => ({ cancelled: false, completedTools: [] }),
+    }),
+  )
+
+  assert.equal(calls, 2)
+  assert.deepEqual(
+    events.find(e => e.type === 'continuation_nudge'),
+    { type: 'continuation_nudge', attempt: 1, reason: 'reasoning_only' },
+  )
+  assert.ok(seenMessages[1]!.some(message =>
+    message.role === 'user'
+    && typeof message.content === 'string'
+    && /no user-visible answer/.test(message.content),
+  ))
+  assert.ok(events.some(e =>
+    e.type === 'assistant_message_committed' && e.text === 'Here is the visible answer.',
   ))
   assert.deepEqual(events.at(-1), { type: 'done', finishedNormally: true })
 })
@@ -907,7 +953,7 @@ test('looksLikePrivateContinuityWorkspaceCreationIntent detects wrong MEMORY/SOU
 
 test('looksLikeContinuationIntent returns false on completion markers', () => {
   assert.equal(
-    looksLikeContinuationIntent("I'll update it. All set — let me know if anything else is needed."),
+    looksLikeContinuationIntent("I'll update it. All set - let me know if anything else is needed."),
     false,
   )
   assert.equal(looksLikeContinuationIntent('Done.'), false)

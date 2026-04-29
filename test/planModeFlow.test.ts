@@ -78,7 +78,7 @@ test('mode policy keeps plan, default, and accept-edits distinct', () => {
   assert.equal(acceptEdits.exposesToolKind('delete'), true)
   assert.equal(acceptEdits.autoAllowToolKind('edit'), true)
   assert.equal(acceptEdits.autoAllowToolKind('private-continuity-edit'), false)
-  assert.equal(acceptEdits.autoAllowToolKind('private-continuity-read'), false)
+  assert.equal(acceptEdits.autoAllowToolKind('private-continuity-read'), true)
   assert.equal(acceptEdits.autoAllowToolKind('delete'), false)
   assert.equal(acceptEdits.autoAllowToolKind('bash'), false)
 })

@@ -7,17 +7,19 @@ import type { EthagentConfig, EthagentIdentity } from '../../storage/config.js'
 import { IdentitySummary } from './IdentitySummary.js'
 
 export const LOCAL_DATA_MANAGEMENT_COPY = [
-  'Private markdown lives locally in SOUL.md and MEMORY.md, with SKILLS.md as public metadata.',
-  'Save snapshot and publish encrypts private markdown, pins it to IPFS, and refreshes public discovery metadata.',
-  'Unlink active agent only removes the selected agent from this device; markdown, chats, tokens, and IPFS pins stay.',
-  'ethagent reset wipes local identity metadata, markdown vaults, sessions, prompt history, rewind history, permissions, and stored credentials.',
-  'ethagent reset preserves installed local LLM assets and does not delete onchain tokens or IPFS-pinned snapshots.',
+  'SOUL.md and MEMORY.md are private local continuity files.',
+  'SKILLS.md is public discovery metadata, edited locally and published to IPFS.',
+  'Save snapshot and publish encrypts private markdown, pins it to IPFS, and updates tokenURI metadata.',
+  'Unlink active agent only removes the selected agent from this device.',
+  'ethagent reset wipes local identity metadata, markdown vaults, sessions, history, permissions, and credentials.',
+  'ethagent reset keeps installed local LLM assets and cannot delete onchain tokens or IPFS pins.',
 ] as const
 
 type DataManagementScreenProps = {
   identity?: EthagentIdentity
   config?: EthagentConfig
   footer: React.ReactNode
+  onForgetLocalData: () => void
   onBack: () => void
 }
 
@@ -25,27 +27,31 @@ export const DataManagementScreen: React.FC<DataManagementScreenProps> = ({
   identity,
   config,
   footer,
+  onForgetLocalData,
   onBack,
 }) => (
   <Surface
-    title="Local Data"
-    subtitle="Review what can be wiped before using ethagent reset."
+    title="local data"
+    subtitle="review what reset changes on this machine."
     footer={footer}
   >
-    <IdentitySummary identity={identity} config={config} />
+    <IdentitySummary identity={identity} config={config} compact />
     <Box flexDirection="column" marginTop={1}>
       {LOCAL_DATA_MANAGEMENT_COPY.map(line => (
         <Text key={line} color={theme.dim}>- {line}</Text>
       ))}
     </Box>
     <Box flexDirection="column" marginTop={1}>
-      <Text color={theme.textSubtle}>Before reset: Alt+I {'->'} memory, persona, skills {'->'} save encrypted snapshot.</Text>
-      <Text color={theme.textSubtle}>Run from the terminal: ethagent reset</Text>
+      <Text color={theme.textSubtle}>before reset: use snapshots to publish local continuity.</Text>
+      <Text color={theme.textSubtle}>terminal: ethagent reset</Text>
     </Box>
     <Box marginTop={1}>
-      <Select<'back'>
-        options={[{ value: 'back', label: 'back to settings' }]}
-        onSubmit={onBack}
+      <Select<'unlink' | 'back'>
+        options={[
+          { value: 'unlink', label: 'unlink active agent', disabled: !identity },
+          { value: 'back', label: 'back' },
+        ]}
+        onSubmit={choice => choice === 'unlink' ? onForgetLocalData() : onBack()}
         onCancel={onBack}
       />
     </Box>

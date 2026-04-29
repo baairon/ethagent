@@ -8,6 +8,7 @@ import { runRuntimeTurn, type TurnEvent } from '../runtime/turn.js'
 import type { EthagentConfig } from '../storage/config.js'
 import type { SessionMessage } from '../storage/sessions.js'
 import type { SessionPermissionRule, ToolResult } from '../tools/contracts.js'
+import { readContinuityFiles, readPublicSkillsFile } from '../identity/continuity/storage.js'
 import type { MessageRow } from './MessageList.js'
 import {
   buildBaseMessages,
@@ -60,7 +61,7 @@ export type StreamingTurnResult = {
 }
 
 /**
- * runStreamingTurn — the UI adapter over runRuntimeTurn.
+ * runStreamingTurn - the UI adapter over runRuntimeTurn.
  *
  * Responsibilities (UI-only; logic lives in runtime/turn.ts):
  *   - translate runtime events into Ink MessageRow updates,
@@ -123,8 +124,9 @@ export async function runStreamingTurn(
 
   const mentionContextMessages = await buildFileMentionContextMessages(userText, getCwd())
 
-  const buildWorking = (): Message[] => [
+  const buildWorking = async (): Promise<Message[]> => [
     ...buildWorkingMessages(context, activeCheckpoint.turnId),
+    ...await buildIdentityContinuityContextMessages(getConfig()),
     ...mentionContextMessages,
   ]
 
@@ -200,7 +202,7 @@ export async function runStreamingTurn(
     flushStreamRows(true)
     updateRows(prev => {
       let next = finalizeStreamingRowsById(prev, assistantId, thinkingRowId, accumulated, thinkingContent)
-      // If we emitted tool_uses, strip the empty assistant text row — tool_use
+      // If we emitted tool_uses, strip the empty assistant text row - tool_use
       // rows replace it. If the assistant emitted no text at all (pure tool
       // turn), drop the empty row.
       if (assistantId && (hasPendingToolUse || accumulated.length === 0)) {
@@ -293,7 +295,7 @@ export async function runStreamingTurn(
     for await (const ev of runRuntimeTurn({
       provider,
       signal: controller.signal,
-      initialMessages: buildWorking(),
+      initialMessages: await buildWorking(),
       rebuildMessages: buildWorking,
       runToolBatch,
     })) {
@@ -386,7 +388,7 @@ async function handleEvent(ev: TurnEvent, ctx: EventHandlerContext): Promise<voi
     case 'iteration_start': {
       // Reset per-iteration scratch so each provider call gets a fresh
       // assistant row, accumulator, and hasPendingToolUse flag. Iteration 0
-      // is the initial stream — resetting before anything runs is a no-op,
+      // is the initial stream - resetting before anything runs is a no-op,
       // which is fine.
       ctx.resetIteration()
       return
@@ -431,7 +433,7 @@ async function handleEvent(ev: TurnEvent, ctx: EventHandlerContext): Promise<voi
       return
     }
     case 'assistant_message_committed': {
-      // End of a streaming round with no tool_use — finalize rows, persist
+      // End of a streaming round with no tool_use - finalize rows, persist
       // the assistant text, and hand it to the plan hook if in plan mode.
       ctx.finalizeStreamingRows()
       if (ev.text) {
@@ -567,7 +569,7 @@ function findRowIndexById(rows: MessageRow[], id: string): number {
 }
 
 // ---------------------------------------------------------------------------
-// File-mention context (unchanged from pre-Wave-2 — pure helper)
+// File-mention context (unchanged from pre-Wave-2 - pure helper)
 // ---------------------------------------------------------------------------
 
 async function buildFileMentionContextMessages(
@@ -605,6 +607,52 @@ async function buildFileMentionContextMessages(
       ].join('\n'),
     },
   ]
+}
+
+export async function buildIdentityContinuityContextMessages(
+  config: EthagentConfig,
+): Promise<Message[]> {
+  const identity = config.identity
+  if (!identity) return []
+
+  try {
+    const [privateFiles, publicSkills] = await Promise.all([
+      readContinuityFiles(identity),
+      readPublicSkillsFile(identity),
+    ])
+    return [{
+      role: 'system',
+      content: [
+        '<identity_continuity_files>',
+        'The active identity markdown files have been loaded automatically for this turn.',
+        'SOUL.md and MEMORY.md are private owner continuity; use them as standing context but do not quote them unless necessary.',
+        'SKILLS.md is public agent discovery metadata; it is a local working file whose published copy is referenced from onchain tokenURI metadata.',
+        '',
+        '<SOUL.md visibility="private">',
+        privateFiles['SOUL.md'].trimEnd(),
+        '</SOUL.md>',
+        '',
+        '<MEMORY.md visibility="private">',
+        privateFiles['MEMORY.md'].trimEnd(),
+        '</MEMORY.md>',
+        '',
+        '<SKILLS.md visibility="public">',
+        publicSkills.trimEnd(),
+        '</SKILLS.md>',
+        '</identity_continuity_files>',
+      ].join('\n'),
+    }]
+  } catch (err: unknown) {
+    return [{
+      role: 'system',
+      content: [
+        '<identity_continuity_files>',
+        `Automatic identity markdown load failed: ${(err as Error).message}`,
+        'If the user asks about continuity, surface this failure and route them to the identity hub.',
+        '</identity_continuity_files>',
+      ].join('\n'),
+    }]
+  }
 }
 
 function extractFileMentions(text: string): string[] {

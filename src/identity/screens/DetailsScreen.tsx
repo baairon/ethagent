@@ -9,19 +9,10 @@ import { IdentitySummary } from './IdentitySummary.js'
 type DetailsAction =
   | 'edit'
   | 'continuity'
-  | 'rebackup'
+  | 'snapshots'
   | 'copy'
   | 'storage-credential'
   | 'data-management'
-  | 'forget-local'
-
-type DetailsOption =
-  | DetailsAction
-  | 'profile-section'
-  | 'backup-section'
-  | 'values-section'
-  | 'storage-section'
-  | 'device-section'
 
 type DetailsScreenProps = {
   identity?: EthagentIdentity
@@ -37,10 +28,9 @@ type DetailsScreenProps = {
   onCloseCopyPicker: () => void
   onEditProfile: () => void
   onContinuity: () => void
-  onRebackup: () => void
+  onSnapshots: () => void
   onStorageCredential: () => void
   onDataManagement: () => void
-  onForgetLocalData: () => void
   onBack: () => void
 }
 
@@ -58,22 +48,21 @@ export const DetailsScreen: React.FC<DetailsScreenProps> = ({
   onCloseCopyPicker,
   onEditProfile,
   onContinuity,
-  onRebackup,
+  onSnapshots,
   onStorageCredential,
   onDataManagement,
-  onForgetLocalData,
   onBack,
 }) => {
   const subtitle = copyPicker
-    ? 'choose a saved agent value.'
-    : copyNotice ?? 'profile, memory, publishing, values, storage, device'
+    ? 'choose a value to copy.'
+    : copyNotice ?? 'identity, continuity, storage'
 
   const copyable = copyableIdentityFields(identity)
 
   if (copyPicker) {
     return (
-      <Surface title="Copy Agent Values" subtitle={subtitle} footer={footer}>
-        <IdentitySummary identity={identity} config={config} />
+      <Surface title="copy values" subtitle={subtitle} footer={footer}>
+        <IdentitySummary identity={identity} config={config} compact />
         <Box marginTop={1}>
           <Select<string>
             options={copyable.map(field => ({ value: field.label, label: field.label, hint: shortPreview(field.value) }))}
@@ -89,35 +78,28 @@ export const DetailsScreen: React.FC<DetailsScreenProps> = ({
   }
 
   const credentialLabel = jwtSaved ? 'pinning credential' : 'connect pinning'
-  const options: Array<SelectOption<DetailsOption>> = [
-    section('profile-section', 'Agent Profile'),
-    { value: 'edit', label: 'name and description', disabled: !canEditProfile, indent: 2 },
-    { value: 'continuity', label: 'memory, persona, skills', disabled: !identity, indent: 2 },
-    section('backup-section', 'Publishing'),
-    { value: 'rebackup', label: 'save snapshot and publish', disabled: !canRebackup, hint: 'encrypted private files plus public discovery', indent: 2 },
-    section('values-section', 'Copy Values'),
-    { value: 'copy', label: 'copy saved values', disabled: copyable.length === 0, indent: 2 },
-    section('storage-section', 'IPFS Storage'),
-    { value: 'storage-credential', label: credentialLabel, indent: 2 },
-    section('device-section', 'Device'),
-    { value: 'data-management', label: 'local data and reset', hint: 'what is stored and what reset wipes', indent: 2 },
-    { value: 'forget-local', label: 'unlink active agent', hint: 'keeps markdown, chats, token, and pinned backups', indent: 2 },
+  const options: Array<SelectOption<DetailsAction>> = [
+    { value: 'edit', label: 'profile', disabled: !canEditProfile },
+    { value: 'continuity', label: 'memory and persona', disabled: !identity },
+    { value: 'snapshots', label: 'snapshots', disabled: !identity },
+    { value: 'storage-credential', label: credentialLabel },
+    { value: 'copy', label: 'copy values', disabled: copyable.length === 0 },
+    { value: 'data-management', label: 'local data' },
   ]
 
   return (
-    <Surface title="Agent Settings" subtitle={subtitle} footer={footer}>
-      <IdentitySummary identity={identity} config={config} />
+    <Surface title="agent settings" subtitle={subtitle} footer={footer}>
+      <IdentitySummary identity={identity} config={config} compact />
       <Box marginTop={1}>
-        <Select<DetailsOption>
+        <Select<DetailsAction>
           options={options}
           onSubmit={choice => {
             if (choice === 'edit') return onEditProfile()
             if (choice === 'continuity') return onContinuity()
+            if (choice === 'snapshots') return onSnapshots()
             if (choice === 'copy') return onOpenCopyPicker()
-            if (choice === 'rebackup') return onRebackup()
             if (choice === 'storage-credential') return onStorageCredential()
             if (choice === 'data-management') return onDataManagement()
-            if (choice === 'forget-local') return onForgetLocalData()
           }}
           onCancel={onBack}
         />
@@ -129,14 +111,4 @@ export const DetailsScreen: React.FC<DetailsScreenProps> = ({
 function shortPreview(value: string): string {
   if (value.length <= 28) return value
   return `${value.slice(0, 14)}...${value.slice(-10)}`
-}
-
-function section(value: Extract<DetailsOption, `${string}-section`>, label: string): SelectOption<DetailsOption> {
-  return {
-    value,
-    label,
-    disabled: true,
-    role: 'section',
-    bold: true,
-  }
 }

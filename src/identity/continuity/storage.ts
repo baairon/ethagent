@@ -136,6 +136,26 @@ export async function continuityVaultStatus(identity: EthagentIdentity): Promise
   return { ready: soul && memory, files: ref }
 }
 
+export async function continuityWorkingTreeStatus(identity: EthagentIdentity): Promise<{
+  ready: boolean
+  newestLocalChangeAt?: string
+  localChangedAfterBackup: boolean
+}> {
+  const ref = continuityVaultRef(identity)
+  const stats = await Promise.all([
+    statIfExists(ref.soulPath),
+    statIfExists(ref.memoryPath),
+    statIfExists(ref.publicSkillsPath),
+  ])
+  const newestMs = Math.max(0, ...stats.flatMap(stat => stat ? [stat.mtimeMs] : []))
+  const backupMs = identity.backup?.createdAt ? Date.parse(identity.backup.createdAt) : Number.NaN
+  return {
+    ready: Boolean(stats[0] && stats[1]),
+    ...(newestMs > 0 ? { newestLocalChangeAt: new Date(newestMs).toISOString() } : {}),
+    localChangedAfterBackup: Number.isFinite(backupMs) ? newestMs > backupMs + 1000 : newestMs > 0,
+  }
+}
+
 export function continuityAgentSnapshot(identity: EthagentIdentity): ContinuityAgentSnapshot {
   const state = identity.state ?? {}
   return {
@@ -283,6 +303,14 @@ async function exists(file: string): Promise<boolean> {
     return true
   } catch {
     return false
+  }
+}
+
+async function statIfExists(file: string): Promise<import('node:fs').Stats | null> {
+  try {
+    return await fs.stat(file)
+  } catch {
+    return null
   }
 }
 

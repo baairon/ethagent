@@ -15,7 +15,7 @@ export function modePolicy(mode: PolicyMode): ModePolicy {
     return {
       mode,
       exposesToolKind: kind => kind === 'read' || kind === 'private-continuity-read',
-      autoAllowToolKind: () => false,
+      autoAllowToolKind: kind => kind === 'private-continuity-read',
       promptLabel: 'plan mode',
     }
   }
@@ -24,7 +24,7 @@ export function modePolicy(mode: PolicyMode): ModePolicy {
     return {
       mode,
       exposesToolKind: () => true,
-      autoAllowToolKind: kind => kind === 'read' || kind === 'edit' || kind === 'write',
+      autoAllowToolKind: kind => kind === 'read' || kind === 'edit' || kind === 'write' || kind === 'private-continuity-read',
       promptLabel: 'accept edits',
     }
   }
@@ -32,7 +32,7 @@ export function modePolicy(mode: PolicyMode): ModePolicy {
   return {
     mode,
     exposesToolKind: () => true,
-    autoAllowToolKind: () => false,
+    autoAllowToolKind: kind => kind === 'private-continuity-read',
     promptLabel: 'default chat',
   }
 }

@@ -4,10 +4,12 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import type { Provider, StreamEvent } from '../src/providers/contracts.js'
+import type { EthagentIdentity } from '../src/storage/config.js'
+import { writeContinuityFiles, writePublicSkillsFile } from '../src/identity/continuity/storage.js'
 import type { SessionMessage } from '../src/storage/sessions.js'
 import { toggleLatestReasoningRow, type MessageRow } from '../src/ui/MessageList.js'
 import { privateContinuityEditReviewFromToolResult } from '../src/ui/ChatScreen.js'
-import { runStreamingTurn } from '../src/ui/chatTurnOrchestrator.js'
+import { buildIdentityContinuityContextMessages, runStreamingTurn } from '../src/ui/chatTurnOrchestrator.js'
 
 const wait = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms))
 
@@ -30,6 +32,47 @@ test('private continuity edit review helper extracts the TUI popup target', () =
     file: 'MEMORY.md',
     filePath: 'C:\\Users\\bairo\\.ethagent\\continuity\\agent\\MEMORY.md',
     summary: 'append to Durable User Preferences in MEMORY.md',
+  })
+})
+
+test('identity continuity context auto-loads SOUL, MEMORY, and SKILLS markdown', async () => {
+  await withHome(async () => {
+    const identity: EthagentIdentity = {
+      source: 'erc8004',
+      address: '0x000000000000000000000000000000000000dEaD',
+      ownerAddress: '0x000000000000000000000000000000000000dEaD',
+      createdAt: '2026-04-21T00:00:00.000Z',
+      chainId: 11155111,
+      identityRegistryAddress: '0x0000000000000000000000000000000000000001',
+      agentId: '7',
+    }
+
+    await writeContinuityFiles(identity, {
+      'SOUL.md': '# Soul\nprivate persona\n',
+      'MEMORY.md': '# Memory\nprivate preference\n',
+    })
+    await writePublicSkillsFile(identity, '# Skills\npublic discovery\n')
+
+    const messages = await buildIdentityContinuityContextMessages({
+      version: 1,
+      provider: 'ollama',
+      model: 'qwen-test',
+      firstRunAt: '2026-04-21T00:00:00.000Z',
+      identity,
+    })
+
+    assert.equal(messages.length, 1)
+    const content = messages[0]!.content
+    assert.equal(typeof content, 'string')
+    if (typeof content !== 'string') throw new Error('expected string continuity context')
+    assert.match(content, /active identity markdown files have been loaded automatically/)
+    assert.match(content, /<SOUL\.md visibility="private">/)
+    assert.match(content, /private persona/)
+    assert.match(content, /<MEMORY\.md visibility="private">/)
+    assert.match(content, /private preference/)
+    assert.match(content, /<SKILLS\.md visibility="public">/)
+    assert.match(content, /public discovery/)
+    assert.match(content, /published copy is referenced from onchain tokenURI metadata/)
   })
 })
 
@@ -404,7 +447,7 @@ test('runStreamingTurn stops when model emits no tool_uses (model decides it is 
   assert.equal(result.finishedNormally, true)
   assert.equal(providerCalls, 1)
   assert.ok(rows.some(row => row.role === 'assistant' && /No changes needed/i.test(row.content)))
-  // No tool_requirement failure row — the model's decision is trusted
+  // No tool_requirement failure row - the model's decision is trusted
   assert.ok(rows.every(row => row.role !== 'tool_result' || row.name !== 'tool_requirement'))
 })
 
@@ -654,3 +697,20 @@ test('runStreamingTurn hides the reasoning cursor as soon as answer text starts'
 
   assert.equal(checkedAfterText, true)
 })
+
+async function withHome(fn: () => Promise<void>): Promise<void> {
+  const prevHome = process.env.HOME
+  const prevUserProfile = process.env.USERPROFILE
+  const home = await fs.mkdtemp(path.join(os.tmpdir(), 'ethagent-orch-home-'))
+  process.env.HOME = home
+  process.env.USERPROFILE = home
+  try {
+    await fn()
+  } finally {
+    if (prevHome === undefined) delete process.env.HOME
+    else process.env.HOME = prevHome
+    if (prevUserProfile === undefined) delete process.env.USERPROFILE
+    else process.env.USERPROFILE = prevUserProfile
+    await fs.rm(home, { recursive: true, force: true })
+  }
+}
