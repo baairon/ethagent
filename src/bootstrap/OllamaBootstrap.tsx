@@ -153,11 +153,11 @@ export const OllamaBootstrap: React.FC<Props> = ({ spec, onDone, onManual, onBac
   if (phase.kind === 'install-ask') {
     return (
       <Box flexDirection="column">
-        <Text color={theme.accentSecondary} bold>install ollama</Text>
-        <Text color={theme.dim}>ollama isn&apos;t installed yet. i can install it for you.</Text>
-        <Text color={theme.dim}>takes 1–3 minutes depending on your connection.</Text>
+        <Text color={theme.accentSecondary} bold>Install Ollama</Text>
+        <Text color={theme.dim}>Ollama isn&apos;t installed yet. I can install it for you.</Text>
+        <Text color={theme.dim}>Takes 1–3 minutes depending on your connection.</Text>
         {process.platform === 'win32'
-          ? <Text color={theme.dim}>a system prompt will appear — approve it to continue.</Text>
+          ? <Text color={theme.dim}>A system prompt will appear — approve it to continue.</Text>
           : null}
         <Box marginTop={1}>
           <Select<'install' | 'manual' | 'back'>
@@ -185,7 +185,7 @@ export const OllamaBootstrap: React.FC<Props> = ({ spec, onDone, onManual, onBac
   if (phase.kind === 'install-fail') {
     return (
       <Box flexDirection="column">
-        <Text color="#e87070">install failed: {phase.message}</Text>
+        <Text color="#e87070">Install failed: {phase.message}</Text>
         <Box marginTop={1}>
           <Select<'retry' | 'manual' | 'back'>
             options={[
@@ -212,7 +212,7 @@ export const OllamaBootstrap: React.FC<Props> = ({ spec, onDone, onManual, onBac
   if (phase.kind === 'serve-fail') {
     return (
       <Box flexDirection="column">
-        <Text color="#e87070">could not reach ollama on localhost:11434.</Text>
+        <Text color="#e87070">Could not reach Ollama on localhost:11434.</Text>
         <Box marginTop={1}>
           <Select<'retry' | 'manual' | 'back'>
             options={[
@@ -242,8 +242,8 @@ export const OllamaBootstrap: React.FC<Props> = ({ spec, onDone, onManual, onBac
     })
     return (
       <Box flexDirection="column">
-        <Text color={theme.accentSecondary} bold>pick a model</Text>
-        <Text color={theme.dim}>selecting an uninstalled model will pull it now.</Text>
+        <Text color={theme.accentSecondary} bold>Pick a model</Text>
+        <Text color={theme.dim}>Selecting an uninstalled model will pull it now.</Text>
         <Box marginTop={1}>
           <Select
             options={options}
@@ -270,10 +270,10 @@ export const OllamaBootstrap: React.FC<Props> = ({ spec, onDone, onManual, onBac
     const suffix = phase.total > 0 ? humanize(phase.completed) + ' / ' + humanize(phase.total) : undefined
     return (
       <Box flexDirection="column">
-        <Text color={theme.accentSecondary} bold>pulling {phase.name}</Text>
+        <Text color={theme.accentSecondary} bold>Pulling {phase.name}</Text>
         <Text color={theme.dim}>{phase.status}</Text>
         <ProgressBar progress={progress} suffix={suffix} />
-        <Text color={theme.dim}>ctrl+c to cancel</Text>
+        <Text color={theme.dim}>Ctrl+c to cancel</Text>
       </Box>
     )
   }
@@ -281,7 +281,7 @@ export const OllamaBootstrap: React.FC<Props> = ({ spec, onDone, onManual, onBac
   if (phase.kind === 'pull-fail') {
     return (
       <Box flexDirection="column">
-        <Text color="#e87070">pull failed: {phase.message}</Text>
+        <Text color="#e87070">Pull failed: {phase.message}</Text>
         <Box marginTop={1}>
           <Select<'retry' | 'pick' | 'back'>
             options={[
@@ -330,7 +330,7 @@ const InstallingView: React.FC<{ startedAt: number }> = ({ startedAt }) => {
     : 'this usually takes 1–3 minutes'
   return (
     <Box flexDirection="column">
-      <Text color={theme.accentSecondary} bold>installing ollama</Text>
+      <Text color={theme.accentSecondary} bold>Installing Ollama</Text>
       <Spinner label={`elapsed ${mm}:${ss}`} hint={hint} />
     </Box>
   )

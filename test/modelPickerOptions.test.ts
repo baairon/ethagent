@@ -30,6 +30,11 @@ function baseData(overrides: Partial<ModelPickerOptionsData> = {}): ModelPickerO
   return {
     daemonUp: true,
     models: [],
+    llamaCpp: {
+      binaryPresent: false,
+      serverUp: false,
+    },
+    hfModels: [],
     cloudKeys: {
       openai: true,
       anthropic: false,
@@ -190,6 +195,13 @@ test('picker hierarchy uses provider group labels without repeated provider pref
     currentModel: 'gpt-5.2',
   })
 
+  assert.equal(optionByValue(options, 'hdr:local').role, 'section')
+  assert.equal(optionByValue(options, 'hdr:local').label, 'local models')
+  assert.equal(optionByValue(options, 'hdr:local:ollama').role, 'group')
+  assert.equal(optionByValue(options, 'hdr:local:hf').role, 'group')
+  assert.equal(optionByValue(options, 'hf:download').label, 'add local model file')
+  assert.equal(optionByValue(options, 'hf:download').hint, 'paste a GGUF link')
+  assert.equal(options.some(option => option.value === 'local:uninstall'), false)
   assert.equal(optionByValue(options, 'hdr:cloud').role, 'section')
   assert.equal(optionByValue(options, 'hdr:cloud').bold, true)
   assert.equal(optionByValue(options, 'hdr:cloud:openai').role, 'group')
@@ -199,6 +211,69 @@ test('picker hierarchy uses provider group labels without repeated provider pref
   assert.equal(optionByValue(options, 'key:manage:openai').prefix, undefined)
   assert.equal(optionByValue(options, 'c:openai:gpt-5.2').labelColor, undefined)
   assert.equal(optionByValue(options, 'c:openai:gpt-5.2').label.startsWith('openai'), false)
+})
+
+test('Hugging Face picker shows installed models and link-only download action', () => {
+  const options = buildModelPickerOptions(baseData({
+    llamaCpp: {
+      binaryPresent: true,
+      serverUp: false,
+    },
+    hfModels: [{
+      id: 'org/model#model.Q4_K_M.gguf',
+      displayName: 'org/model / model.Q4_K_M.gguf',
+      sizeBytes: 4_200_000_000,
+      quantization: 'Q4_K_M',
+      risk: 'low',
+      task: 'chat/instruct',
+      status: 'ready',
+    }],
+  }), {
+    currentProvider: 'llamacpp' as ProviderId,
+    currentModel: 'org/model#model.Q4_K_M.gguf',
+  })
+
+  assert.equal(optionByValue(options, 'hdr:local:hf').label, 'added from links')
+  assert.match(optionByValue(options, 'hf:org/model#model.Q4_K_M.gguf').label, /\* org\/model \/ model\.Q4_K_M\.gguf - 4\.2 GB/)
+  assert.equal(optionByValue(options, 'hf:org/model#model.Q4_K_M.gguf').hint, undefined)
+  assert.equal(optionByValue(options, 'hf:download').label, 'add local model file')
+  assert.equal(optionByValue(options, 'local:uninstall').label, 'uninstall local model')
+  assert.equal(options.some(option => option.value.startsWith('catalog:huggingface')), false)
+})
+
+test('local uninstall action is available for Ollama models too', () => {
+  const options = buildModelPickerOptions(baseData({
+    models: [{ name: 'qwen2.5-coder:7b', sizeBytes: 4_700_000_000 }],
+  }), {
+    currentProvider: 'ollama' as ProviderId,
+    currentModel: 'qwen2.5-coder:7b',
+  })
+
+  assert.equal(optionByValue(options, 'local:uninstall').label, 'uninstall local model')
+})
+
+test('Hugging Face picker truncates long installed local model names', () => {
+  const id = 'very-long-org-name/very-long-model-name-with-extra-descriptors-GGUF#nested/path/model-name-with-a-long-context-and-quantization-label.Q4_K_M.gguf'
+  const options = buildModelPickerOptions(baseData({
+    hfModels: [{
+      id,
+      displayName: 'very-long-org-name/very-long-model-name-with-extra-descriptors-GGUF / model-name-with-a-long-context-and-quantization-label.Q4_K_M.gguf',
+      sizeBytes: 4_200_000_000,
+      quantization: 'Q4_K_M',
+      risk: 'low',
+      task: 'chat/instruct',
+      status: 'ready',
+    }],
+  }), {
+    currentProvider: 'ollama' as ProviderId,
+    currentModel: 'qwen2.5-coder:7b',
+  })
+
+  const label = optionByValue(options, `hf:${id}`).label
+  assert.ok(label.length < 100)
+  assert.match(label, / \/ /)
+  assert.match(label, /\.\.\./)
+  assert.doesNotMatch(label, /#/)
 })
 
 test('empty keyed cloud catalogs show no selectable model rows', () => {

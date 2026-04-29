@@ -5,8 +5,10 @@ import os from 'node:os'
 import path from 'node:path'
 import type { Provider, StreamEvent } from '../src/providers/contracts.js'
 import type { SessionMessage } from '../src/storage/sessions.js'
-import type { MessageRow } from '../src/ui/MessageList.js'
+import { toggleLatestReasoningRow, type MessageRow } from '../src/ui/MessageList.js'
 import { runStreamingTurn } from '../src/ui/chatTurnOrchestrator.js'
+
+const wait = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms))
 
 function makeContext(overrides: {
   cwd: string
@@ -466,4 +468,47 @@ test('runStreamingTurn persists assistant text before stopping', async () => {
   }))
 
   assert.ok(sessionMessages.some(m => m.role === 'assistant' && m.content === 'Done.'))
+})
+
+test('runStreamingTurn keeps reasoning collapsed and out of session history', async () => {
+  const cwd = await fs.mkdtemp(path.join(os.tmpdir(), 'ethagent-orch-'))
+  const sessionMessages: SessionMessage[] = []
+  const rows: MessageRow[] = []
+
+  const provider: Provider = {
+    id: 'ollama',
+    model: 'qwen-test',
+    supportsTools: true,
+    async *complete(): AsyncIterable<StreamEvent> {
+      yield { type: 'thinking', delta: 'First step. ' }
+      await wait(5)
+      yield { type: 'thinking', delta: 'Second step.' }
+      yield { type: 'text', delta: 'Done.' }
+      yield { type: 'done', stopReason: 'end_turn' }
+    },
+  }
+
+  await runStreamingTurn(makeContext({
+    cwd,
+    provider,
+    userText: 'think then answer',
+    sessionMessages,
+    rows,
+    mode: 'chat',
+  }))
+
+  const reasoning = rows.find((row): row is Extract<MessageRow, { role: 'thinking' }> => row.role === 'thinking')
+  assert.ok(reasoning)
+  assert.equal(reasoning.expanded, false)
+  assert.equal(reasoning.streaming, false)
+  assert.equal(reasoning.content, 'First step. Second step.')
+  assert.ok(rows.some(row => row.role === 'assistant' && row.content === 'Done.'))
+  assert.ok(sessionMessages.every(message =>
+    message.role !== 'assistant' || !message.content.includes('First step'),
+  ))
+
+  const expanded = toggleLatestReasoningRow(rows)
+  const expandedReasoning = expanded.find((row): row is Extract<MessageRow, { role: 'thinking' }> => row.role === 'thinking')
+  assert.ok(expandedReasoning)
+  assert.equal(expandedReasoning.expanded, true)
 })

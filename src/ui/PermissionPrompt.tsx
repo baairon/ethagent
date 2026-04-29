@@ -19,7 +19,7 @@ export const PermissionPrompt: React.FC<PermissionPromptProps> = ({ request, onD
       title={request.title}
       subtitle={request.subtitle}
       tone={request.kind === 'bash' && request.warning ? 'error' : 'primary'}
-      footer="Enter confirms. Esc denies."
+      footer="enter confirms · esc denies"
     >
       {request.kind === 'edit' || request.kind === 'write' || request.kind === 'delete' ? (
         <Box flexDirection="column" marginBottom={1}>

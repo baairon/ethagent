@@ -1,10 +1,30 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import fs from 'node:fs/promises'
+import os from 'node:os'
+import path from 'node:path'
 import {
+  appendSessionMessage,
+  clearAllSessions,
   latestUserMessageCorrectsToolState,
+  listSessions,
   sessionMessagesToProviderMessages,
   type SessionMessage,
 } from '../src/storage/sessions.js'
+
+async function withTempHome(fn: (home: string) => Promise<void>): Promise<void> {
+  const prevHome = process.env.HOME
+  const prevUserProfile = process.env.USERPROFILE
+  const home = await fs.mkdtemp(path.join(os.tmpdir(), 'ethagent-sessions-'))
+  process.env.HOME = home
+  process.env.USERPROFILE = home
+  try {
+    await fn(home)
+  } finally {
+    process.env.HOME = prevHome
+    process.env.USERPROFILE = prevUserProfile
+  }
+}
 
 test('sessionMessagesToProviderMessages omits orphaned historical tool uses', () => {
   const messages: SessionMessage[] = [
@@ -195,4 +215,29 @@ test('latestUserMessageCorrectsToolState accepts terse user corrections', () => 
     { role: 'assistant', content: 'I am now in the identity directory.', createdAt: '2026-04-21T00:00:01.000Z' },
     { role: 'user', content: 'u didnt cage it', createdAt: '2026-04-21T00:00:02.000Z' },
   ]), true)
+})
+
+test('clearAllSessions removes saved chat logs and session metadata', async () => {
+  await withTempHome(async home => {
+    const createdAt = '2026-04-28T00:00:00.000Z'
+    await appendSessionMessage('session-a', { role: 'user', content: 'hello', createdAt }, {
+      cwd: home,
+      provider: 'ollama',
+      model: 'qwen',
+    })
+    await appendSessionMessage('session-b', { role: 'user', content: 'again', createdAt }, {
+      cwd: home,
+      provider: 'ollama',
+      model: 'qwen',
+    })
+
+    assert.equal((await listSessions()).length, 2)
+
+    const result = await clearAllSessions()
+    assert.equal(result.sessionFiles, 2)
+    assert.equal(result.metadataFiles, 2)
+    assert.deepEqual(await listSessions(), [])
+
+    assert.deepEqual(await clearAllSessions(), { sessionFiles: 0, metadataFiles: 0 })
+  })
 })

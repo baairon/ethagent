@@ -64,7 +64,7 @@ export const PermissionsView: React.FC<PermissionsViewProps> = ({
 
   if (state.kind === 'error') {
     return (
-      <Surface title="Permissions" tone="muted" footer="Esc closes.">
+      <Surface title="Permissions" tone="muted" footer="esc closes">
         <Text color={theme.dim}>{state.message}</Text>
       </Surface>
     )
@@ -72,7 +72,7 @@ export const PermissionsView: React.FC<PermissionsViewProps> = ({
 
   if (state.rules.length === 0) {
     return (
-      <Surface title="Permissions" tone="muted" footer="Esc closes.">
+      <Surface title="Permissions" tone="muted" footer="esc closes">
         <Text color={theme.dim}>No saved permission rules for this project.</Text>
       </Surface>
     )
@@ -82,7 +82,7 @@ export const PermissionsView: React.FC<PermissionsViewProps> = ({
     <Surface
       title="Permissions"
       subtitle="Saved rules for this project. Enter removes the selected rule."
-      footer="Enter removes. Esc closes."
+      footer="enter removes · esc closes"
     >
       <Select
         options={options}

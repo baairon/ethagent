@@ -2,6 +2,7 @@ import React from 'react'
 import { Box, Text } from 'ink'
 import type { ContextUsage } from '../runtime/compaction.js'
 import { theme } from './theme.js'
+import { formatModelDisplayName } from './modelDisplay.js'
 
 type StatusBarProps = {
   provider: string
@@ -20,10 +21,11 @@ const SessionStatusInner: React.FC<StatusBarProps> = ({
   startedAt,
   contextUsage,
 }) => {
+  const displayModel = formatModelDisplayName(provider, model, { maxLength: 24 })
   return (
     <Box flexDirection="row">
       <Text color={theme.dim}>
-        {provider} - {model} - {turns} {turns === 1 ? 'turn' : 'turns'} - ~{formatTokens(approxTokens)} tokens - Context {contextUsage.percent}% (~{formatTokens(contextUsage.usedTokens)} / {formatTokens(contextUsage.windowTokens)}) - {formatElapsed(Date.now() - startedAt)}
+        {provider} · {displayModel} · {turns} {turns === 1 ? 'turn' : 'turns'} · ~{formatTokens(approxTokens)} tokens · Context {contextUsage.percent}% (~{formatTokens(contextUsage.usedTokens)} / {formatTokens(contextUsage.windowTokens)}) · {formatElapsed(Date.now() - startedAt)}
       </Text>
     </Box>
   )

@@ -6,7 +6,7 @@ import { ProgressBar } from './ProgressBar.js'
 export type MessageRow =
   | { role: 'user'; id: string; content: string }
   | { role: 'assistant'; id: string; content: string; liveTail?: string; streaming?: boolean }
-  | { role: 'thinking'; id: string; content: string; liveTail?: string; streaming?: boolean }
+  | { role: 'thinking'; id: string; content: string; liveTail?: string; streaming?: boolean; expanded?: boolean }
   | { role: 'tool_use'; id: string; name: string; summary: string; input?: string }
   | { role: 'tool_result'; id: string; name: string; summary: string; content: string; isError?: boolean }
   | { role: 'note'; id: string; kind: 'info' | 'error' | 'dim'; content: string }
@@ -45,6 +45,22 @@ const MessageListInner: React.FC<MessageListProps> = ({ rows }) => (
 
 export const MessageList = React.memo(MessageListInner)
 
+export function toggleLatestReasoningRow(rows: MessageRow[]): MessageRow[] {
+  let index = -1
+  for (let cursor = rows.length - 1; cursor >= 0; cursor -= 1) {
+    if (rows[cursor]?.role === 'thinking') {
+      index = cursor
+      break
+    }
+  }
+  if (index === -1) return rows
+  const row = rows[index]
+  if (!row || row.role !== 'thinking') return rows
+  const next = rows.slice()
+  next[index] = { ...row, expanded: !row.expanded }
+  return next
+}
+
 const RowViewInner: React.FC<{ row: MessageRow }> = ({ row }) => {
   if (row.role === 'user') {
     const lines = row.content.length === 0 ? [''] : row.content.split('\n')
@@ -69,12 +85,28 @@ const RowViewInner: React.FC<{ row: MessageRow }> = ({ row }) => {
   }
 
   if (row.role === 'thinking') {
-    const preview = summarizeThinking(row.liveTail || row.content)
+    const text = reasoningText(row)
+    const preview = summarizeThinking(text)
+    if (row.expanded) {
+      return (
+        <Box flexDirection="column" marginTop={1} borderStyle="round" borderColor={theme.accentPeach} paddingX={1}>
+          <Text>
+            <Text color={theme.accentPeach} bold>v reasoning</Text>
+            <Text color={theme.dim}>  alt+t collapse</Text>
+            {row.streaming ? <ThinkingCursor active hasPreview /> : null}
+          </Text>
+          <ReasoningBody content={text} streaming={row.streaming} />
+        </Box>
+      )
+    }
     return (
-      <Box marginTop={1}>
+      <Box flexDirection="column" marginTop={1} borderStyle="round" borderColor={theme.accentPeach} paddingX={1}>
         <Text>
-          <Text color={theme.accentPeach}>{'> '}</Text>
-          {preview ? <Text color={theme.dim}>{preview}</Text> : null}
+          <Text color={theme.accentPeach} bold>{'> reasoning'}</Text>
+          <Text color={theme.dim}>  alt+t inspect</Text>
+        </Text>
+        <Text color={theme.textSubtle}>
+          {preview || 'thinking...'}
           {row.streaming ? <ThinkingCursor active hasPreview={Boolean(preview)} /> : null}
         </Text>
       </Box>
@@ -130,6 +162,24 @@ const RowViewInner: React.FC<{ row: MessageRow }> = ({ row }) => {
 }
 
 const RowView = React.memo(RowViewInner)
+
+const ReasoningBody: React.FC<{ content: string; streaming?: boolean }> = ({ content, streaming }) => {
+  const lines = useMemo(() => {
+    const normalized = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+    return normalized.length === 0 ? [''] : normalized.split('\n')
+  }, [content])
+
+  return (
+    <Box flexDirection="column">
+      {lines.map((line, index) => (
+        <Text key={index} color={theme.textSubtle}>
+          {line || ' '}
+          {streaming && index === lines.length - 1 ? <ThinkingCursor active hasPreview={line.length > 0} /> : null}
+        </Text>
+      ))}
+    </Box>
+  )
+}
 
 const AssistantBody: React.FC<{ content: string; liveTail?: string; streaming?: boolean }> = ({
   content,
@@ -456,4 +506,8 @@ function summarizeThinking(text: string): string {
   if (!normalized) return ''
   if (normalized.length <= 120) return normalized
   return `${normalized.slice(0, 117)}...`
+}
+
+function reasoningText(row: Extract<MessageRow, { role: 'thinking' }>): string {
+  return [row.content, row.liveTail ?? ''].filter(Boolean).join('')
 }

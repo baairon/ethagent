@@ -287,6 +287,7 @@ export async function runStreamingTurn(
         setAccumulated: text => { accumulated = text },
         getAccumulated: () => accumulated,
         setThinkingContent: text => { thinkingContent = text },
+        getThinkingContent: () => thinkingContent,
         setThinkingRowId: id => { thinkingRowId = id },
         getThinkingRowId: () => thinkingRowId,
         markPendingToolUse: () => { hasPendingToolUse = true },
@@ -334,6 +335,7 @@ type EventHandlerContext = {
   setAccumulated: (text: string) => void
   getAccumulated: () => string
   setThinkingContent: (text: string) => void
+  getThinkingContent: () => string
   setThinkingRowId: (id: string | null) => void
   getThinkingRowId: () => string | null
   markPendingToolUse: () => void
@@ -374,7 +376,7 @@ async function handleEvent(ev: TurnEvent, ctx: EventHandlerContext): Promise<voi
       return
     }
     case 'thinking': {
-      const current = ctx.pendingThinkingTextRef.current ?? ''
+      const current = ctx.getThinkingContent()
       const appended = current + ev.delta
       ctx.setThinkingContent(appended)
       if (ctx.getThinkingRowId() === null) {
@@ -388,6 +390,7 @@ async function handleEvent(ev: TurnEvent, ctx: EventHandlerContext): Promise<voi
             content: '',
             liveTail: appended,
             streaming: true,
+            expanded: false,
           },
         ])
       }

@@ -100,7 +100,9 @@ export function estimateMessageRowHeight(row: MessageRow, columns = 80): number 
     case 'assistant':
       return 1 + wrappedLineCount([row.content, row.liveTail ?? ''].filter(Boolean).join('\n'), contentWidth)
     case 'thinking':
-      return 2
+      return row.expanded
+        ? 3 + wrappedLineCount([row.content, row.liveTail ?? ''].filter(Boolean).join('\n'), contentWidth)
+        : 3 + wrappedLineCount(reasoningPreview(row), contentWidth)
     case 'tool_use':
       return 3 + (row.input ? wrappedLineCount(row.input, contentWidth) : 0)
     case 'tool_result':
@@ -110,6 +112,13 @@ export function estimateMessageRowHeight(row: MessageRow, columns = 80): number 
     case 'progress':
       return 4
   }
+}
+
+function reasoningPreview(row: Extract<MessageRow, { role: 'thinking' }>): string {
+  const normalized = [row.content, row.liveTail ?? ''].filter(Boolean).join('').replace(/\s+/g, ' ').trim()
+  if (!normalized) return 'thinking...'
+  if (normalized.length <= 120) return normalized
+  return `${normalized.slice(0, 117)}...`
 }
 
 function wrappedLineCount(text: string, width: number): number {

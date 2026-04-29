@@ -51,6 +51,19 @@ test('/model with no args requests the model picker overlay', async () => {
   assert.equal(requested, true)
 })
 
+test('/hf download opens the model picker without exposing a remote catalog', async () => {
+  let requested = false
+  const result = await dispatchSlash('/hf download https://huggingface.co/org/model-GGUF', context({
+    onModelPickerRequest: () => { requested = true },
+  }))
+
+  assert.equal(result?.kind, 'note')
+  if (result?.kind !== 'note') return
+  assert.equal(requested, true)
+  assert.match(result.text, /add local model file/)
+  assert.doesNotMatch(result.text, /catalog/i)
+})
+
 test('/identity load opens the identity hub with the requested action', async () => {
   const requests: unknown[] = []
 

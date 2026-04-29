@@ -18,7 +18,7 @@ export type Step =
   | { kind: 'create-registry'; name: string; description: string; resolution: RegistryResolution; error?: string }
   | { kind: 'create-signing'; name: string; description: string; registry: Erc8004RegistryConfig; pinataJwt?: string }
   | { kind: 'create-storage'; name: string; description: string; registry: Erc8004RegistryConfig; error?: string; pinataJwt?: string }
-  | { kind: 'restore-owner'; purpose?: RestorePurpose; initialOwnerHandle?: string; mode?: 'choose' | 'manual' }
+  | { kind: 'restore-owner'; purpose?: RestorePurpose }
   | { kind: 'restore-wallet'; purpose?: RestorePurpose }
   | { kind: 'restore-network'; ownerHandle: string; purpose?: RestorePurpose }
   | { kind: 'restore-registry'; ownerHandle: string; error?: string; purpose?: RestorePurpose }
@@ -95,7 +95,7 @@ export function identityHubReducer(state: Step, action: Action): Step {
     case 'fetched':
       return action.step
     case 'startRestore':
-      return { kind: 'restore-owner' }
+      return { kind: 'restore-wallet' }
     case 'openDetails':
       return { kind: 'details' }
     case 'startForgetIdentity':
@@ -138,9 +138,9 @@ function backStep(from: Step): Step {
     case 'restore-wallet':
       return { kind: 'restore-owner', purpose: from.purpose }
     case 'restore-network':
-      return { kind: 'restore-owner', purpose: from.purpose, initialOwnerHandle: from.ownerHandle, mode: 'manual' }
+      return { kind: 'restore-owner', purpose: from.purpose }
     case 'restore-registry':
-      return { kind: 'restore-owner', purpose: from.purpose, initialOwnerHandle: from.ownerHandle, mode: 'manual' }
+      return { kind: 'restore-network', ownerHandle: from.ownerHandle, purpose: from.purpose }
     case 'restore-discovering':
       return { kind: 'restore-network', ownerHandle: from.ownerHandle, purpose: from.purpose }
     case 'restore-token-id':

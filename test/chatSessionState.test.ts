@@ -42,6 +42,24 @@ test('resolveModelSelection switches non-ollama providers with the selected mode
   assert.match(result.notice, /anthropic key saved/i)
 })
 
+test('resolveModelSelection switches to a local Hugging Face model with the default local base URL', () => {
+  const result = resolveModelSelection(
+    { kind: 'llamacpp', model: 'org/model#model.Q4_K_M.gguf' },
+    baseConfig,
+    {
+      defaultBaseUrlFor: provider => provider === 'llamacpp' ? 'http://localhost:8080/v1' : undefined,
+      defaultModelFor: () => 'unused',
+    },
+  )
+
+  assert.equal(result.kind, 'switch')
+  if (result.kind !== 'switch') return
+  assert.equal(result.config.provider, 'llamacpp')
+  assert.equal(result.config.model, 'org/model#model.Q4_K_M.gguf')
+  assert.equal(result.config.baseUrl, 'http://localhost:8080/v1')
+  assert.match(result.notice, /local Hugging Face model ready/i)
+})
+
 test('resolveModelSelection preserves an explicit cloud model when provider is unchanged', () => {
   const current: EthagentConfig = {
     ...baseConfig,

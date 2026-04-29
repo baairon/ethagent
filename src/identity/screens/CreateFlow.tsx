@@ -1,5 +1,5 @@
 import React from 'react'
-import { Text } from 'ink'
+import { Box, Text } from 'ink'
 import { Surface } from '../../ui/Surface.js'
 import { Select } from '../../ui/Select.js'
 import { TextInput } from '../../ui/TextInput.js'
@@ -56,13 +56,15 @@ export const CreateFlow: React.FC<CreateFlowProps> = ({
 
   if (step.kind === 'replace-confirm') {
     return (
-      <Surface title="create a new agent?" footer="enter selects · esc back">
-        <Text color={theme.dim}>
-          your current agent stays in your wallet and remains loadable.
-        </Text>
-        <Text color={theme.dim}>
-          this mints a new agent to this wallet and uses it on this machine.
-        </Text>
+      <Surface title="Create a New Agent?" footer="enter selects · esc back">
+        <Box flexDirection="column" marginBottom={1}>
+          <Text color={theme.dim}>
+            Your current agent stays in your wallet and remains loadable.
+          </Text>
+          <Text color={theme.dim}>
+            This mints a new agent to this wallet and uses it on this machine.
+          </Text>
+        </Box>
         <Select<'replace' | 'back'>
           options={[
             { value: 'back', label: 'keep the current agent' },
@@ -80,7 +82,7 @@ export const CreateFlow: React.FC<CreateFlowProps> = ({
 
   if (step.kind === 'create-name') {
     return (
-      <Surface title="name your agent" subtitle={indicator} footer="enter continues · esc back">
+      <Surface title="Name Your Agent" subtitle={indicator} footer="enter continues · esc back">
         {step.error ? <Text color="#e87070">{step.error}</Text> : null}
         <TextInput
           key="agent-name"
@@ -95,8 +97,8 @@ export const CreateFlow: React.FC<CreateFlowProps> = ({
 
   if (step.kind === 'create-description') {
     return (
-      <Surface title="describe your agent" subtitle={indicator} footer="enter continues · esc back">
-        <Text color={theme.dim}>optional. one short sentence is enough.</Text>
+      <Surface title="Describe Your Agent" subtitle={indicator} footer="enter continues · esc back">
+        <Text color={theme.dim}>Optional. One short sentence is enough.</Text>
         <TextInput
           key="agent-description"
           placeholder="description"
@@ -110,7 +112,7 @@ export const CreateFlow: React.FC<CreateFlowProps> = ({
   if (step.kind === 'create-preflight') {
     return (
       <BusyScreen
-        title="getting ready"
+        title="Getting Ready"
         subtitle={indicator}
         label="checking IPFS storage and chain..."
         onCancel={onBack}
@@ -121,11 +123,11 @@ export const CreateFlow: React.FC<CreateFlowProps> = ({
   if (step.kind === 'create-registry') {
     return (
       <Surface
-        title={`${networkLabel(step.resolution.network)} agent registry`}
-        subtitle={step.error ?? 'paste the agent registry address for this network.'}
+        title={`${step.resolution.network ? networkLabel(step.resolution.network).charAt(0).toUpperCase() + networkLabel(step.resolution.network).slice(1) : ''} Agent Registry`}
+        subtitle={step.error ?? 'Paste the agent registry address for this network.'}
         footer="enter continues · esc back"
       >
-        <Text color={theme.dim}>rpc defaults to {step.resolution.defaultRpcUrl}</Text>
+        <Text color={theme.dim}>RPC defaults to {step.resolution.defaultRpcUrl}</Text>
         <TextInput
           key={`create-registry-${step.resolution.network}`}
           placeholder="0x registry address"
@@ -147,8 +149,8 @@ export const CreateFlow: React.FC<CreateFlowProps> = ({
   if (step.kind === 'create-signing') {
     return (
       <WalletApprovalScreen
-        title="approve in wallet"
-        subtitle="one browser flow signs, saves the IPFS backup, and submits the token transaction."
+        title="Approve in Wallet"
+        subtitle="One browser flow signs, saves the IPFS backup, and submits the token transaction."
         walletSession={walletSession}
         label="waiting for wallet approval..."
         onCancel={onBack}
@@ -158,15 +160,15 @@ export const CreateFlow: React.FC<CreateFlowProps> = ({
 
   return (
     <Surface
-      title="connect IPFS storage"
-      subtitle={step.error ?? 'save a Pinata JWT so ethagent can pin encrypted state to IPFS.'}
+      title="Connect IPFS Storage"
+      subtitle={step.error ?? 'Save a Pinata JWT so ethagent can pin encrypted state to IPFS.'}
       footer="enter continues · esc back"
     >
       <Text>
-        <Text color={theme.dim}>paste your Pinata JWT. get one at </Text>
+        <Text color={theme.dim}>Paste your Pinata JWT. Get one at </Text>
         <Text color={theme.accentPrimary} underline>{PINATA_API_KEYS_URL}</Text>
       </Text>
-      <Text color={theme.dim}>saved encrypted on this device · used only for IPFS pinning</Text>
+      <Text color={theme.dim}>Saved encrypted on this device · used only for IPFS pinning</Text>
       <TextInput
         key="create-storage"
         isSecret

@@ -1,16 +1,38 @@
 import { defaultModelFor, type ProviderId } from '../storage/config.js'
 import { type ModelCatalogEntry, type ModelCatalogResult } from '../models/catalog.js'
+import type { HfRisk, HfTask } from '../models/huggingface.js'
+import type { SpecSnapshot } from '../bootstrap/runtimeDetection.js'
 import { contextWindowInfo } from '../runtime/compaction.js'
 import { type SelectOption } from './Select.js'
+import { formatLocalHfModelDisplayName, formatModelDisplayName } from './modelDisplay.js'
 
-export type CloudProviderId = Exclude<ProviderId, 'ollama'>
+export type CloudProviderId = Exclude<ProviderId, 'ollama' | 'llamacpp'>
 
 export const MODEL_PICKER_CLOUD_PROVIDERS: CloudProviderId[] = ['openai', 'anthropic', 'gemini']
+export const LOCAL_MODEL_LINK_HINT = 'paste a Hugging Face model link'
+export const LOCAL_MODEL_LINK_EXAMPLE = 'e.g. https://huggingface.co/Qwen/Qwen2.5-Coder-7B-Instruct-GGUF'
+
+export type LocalHfPickerModel = {
+  id: string
+  displayName: string
+  sizeBytes: number
+  quantization?: string
+  risk: HfRisk
+  task: HfTask
+  status: 'ready' | 'incomplete'
+}
 
 export type ModelPickerOptionsData = {
   daemonUp: boolean
   daemonError?: string
   models: Array<{ name: string; sizeBytes: number }>
+  llamaCpp: {
+    binaryPresent: boolean
+    serverUp: boolean
+    error?: string
+  }
+  hfModels: LocalHfPickerModel[]
+  machineSpec?: SpecSnapshot
   cloudKeys: Partial<Record<ProviderId, boolean>>
   cloudCatalogs: Partial<Record<ProviderId, ModelCatalogResult>>
 }
@@ -36,11 +58,12 @@ export function buildModelPickerOptions(
 ): SelectOption<string>[] {
   const options: SelectOption<string>[] = []
 
-  options.push(sectionOption('hdr:local', 'local / ollama'))
+  options.push(sectionOption('hdr:local', 'local models'))
+  options.push(groupOption('hdr:local:ollama', 'ollama'))
   if (!data.daemonUp) {
-    options.push(noticeOption('hdr:local-off', data.daemonError ?? 'daemon not running'))
+    options.push(noticeOption('hdr:local-off', data.daemonError ?? 'daemon not running', CHILD_INDENT))
   } else if (data.models.length === 0) {
-    options.push(noticeOption('hdr:no-models', 'no models installed - pull one with /pull <name>'))
+    options.push(noticeOption('hdr:no-models', 'no models installed - pull one with /pull <name>', CHILD_INDENT))
   } else {
     const models = orderModelsForContextFit(
       'ollama',
@@ -51,11 +74,43 @@ export function buildModelPickerOptions(
     for (const model of models) {
       const active = context.currentProvider === 'ollama' && model === context.currentModel
       const size = formatSize(modelSizes.get(model) ?? 0)
+      const displayName = formatModelDisplayName('ollama', model, { maxLength: 54 })
       options.push(rowOption(
         `ol:${model}`,
-        contextFitLabel('ollama', model, `${active ? '* ' : '  '}${model}${size ? ` - ${size}` : ''}`, context.contextFit),
+        contextFitLabel('ollama', model, `${active ? '* ' : '  '}${displayName}${size ? ` - ${size}` : ''}`, context.contextFit),
       ))
     }
+  }
+  options.push(utilityOption('qwen-catalog', 'view catalog', 'browse Qwen model sizes'))
+
+  options.push(groupOption('hdr:local:hf', 'added from links'))
+  if (data.hfModels.length === 0) {
+    options.push(noticeOption('hdr:hf-empty', 'no downloaded files', CHILD_INDENT))
+  } else {
+    const models = orderModelsForContextFit(
+      'llamacpp',
+      data.hfModels.map(model => model.id),
+      context.contextFit,
+    )
+    const byId = new Map(data.hfModels.map(model => [model.id, model]))
+    for (const id of models) {
+      const model = byId.get(id)
+      if (!model) continue
+      const active = context.currentProvider === 'llamacpp' && id === context.currentModel
+      const size = formatSize(model.sizeBytes)
+      const displayName = formatLocalHfModelDisplayName(id, {
+        displayName: model.displayName,
+        maxLength: 46,
+      })
+      options.push(rowOption(
+        `hf:${id}`,
+        contextFitLabel('llamacpp', id, `${active ? '* ' : '  '}${displayName}${size ? ` - ${size}` : ''}`, context.contextFit),
+      ))
+    }
+  }
+  options.push(utilityOption('hf:download', 'add local model file', LOCAL_MODEL_LINK_HINT))
+  if (data.hfModels.length > 0 || data.models.length > 0) {
+    options.push(utilityOption('local:uninstall', 'uninstall local model'))
   }
 
   options.push(sectionOption('hdr:cloud', 'cloud'))
@@ -83,9 +138,10 @@ export function buildModelPickerOptions(
     }
     for (const model of models) {
       const active = context.currentProvider === provider && context.currentModel === model
+      const displayName = formatModelDisplayName(provider, model, { maxLength: 58 })
       options.push(rowOption(
         `c:${provider}:${model}`,
-        contextFitLabel(provider, model, `${model}${active ? '  *' : ''}`, context.contextFit),
+        contextFitLabel(provider, model, `${displayName}${active ? '  *' : ''}`, context.contextFit),
       ))
     }
     options.push(utilityOption(`catalog:${provider}`, 'full catalog'))
@@ -191,19 +247,21 @@ function noticeOption(value: string, label: string, indent = 0): SelectOption<st
   }
 }
 
-function rowOption(value: string, label: string): SelectOption<string> {
+function rowOption(value: string, label: string, hint?: string): SelectOption<string> {
   return {
     value,
     label,
+    hint,
     role: 'option',
     indent: CHILD_INDENT,
   }
 }
 
-function utilityOption(value: string, label: string): SelectOption<string> {
+function utilityOption(value: string, label: string, hint?: string): SelectOption<string> {
   return {
     value,
     label,
+    hint,
     role: 'utility',
     indent: CHILD_INDENT,
   }

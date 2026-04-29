@@ -10,6 +10,7 @@ type ConversationStackProps = {
   bottomVariant?: 'prompt' | 'overlay'
   bottom: React.ReactNode
   status?: React.ReactNode
+  sessionKey: number
 }
 
 export const ConversationStack: React.FC<ConversationStackProps> = ({
@@ -19,11 +20,12 @@ export const ConversationStack: React.FC<ConversationStackProps> = ({
   bottomVariant = 'prompt',
   bottom,
   status,
+  sessionKey,
 }) => {
   return (
     <Box flexDirection="column" padding={1}>
       {header}
-      <TranscriptView rows={rows} active={transcriptActive} bottomVariant={bottomVariant} />
+      <TranscriptView key={`transcript-${sessionKey}`} rows={rows} active={transcriptActive} bottomVariant={bottomVariant} />
       <Box marginTop={1} width="100%">
         {bottom}
       </Box>

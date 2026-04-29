@@ -31,8 +31,8 @@ export const ForgetIdentityScreen: React.FC<ForgetIdentityScreenProps> = ({
   onCancel,
 }) => (
   <Surface
-    title="remove agent from this device?"
-    subtitle="token, backups, and sessions stay intact."
+    title="Remove Agent From This Device?"
+    subtitle="Token, backups, and sessions stay intact."
     footer={footer}
   >
     <IdentitySummary identity={identity} config={config} />

@@ -13,7 +13,7 @@ type NetworkScreenProps = {
 }
 
 export const NetworkScreen: React.FC<NetworkScreenProps> = ({ subtitle, footer, onSelect, onCancel }) => (
-  <Surface title="network" subtitle={subtitle} footer={footer}>
+  <Surface title="Network" subtitle={subtitle} footer={footer}>
     <Select<SelectableNetwork>
       options={SELECTABLE_NETWORKS.map(network => ({
         value: network,

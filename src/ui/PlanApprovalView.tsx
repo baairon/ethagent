@@ -18,25 +18,25 @@ export const PLAN_APPROVAL_OPTIONS: Array<{
   title: string
   detail: (contextLabel: string) => string
 }> = [
-  {
-    value: 'apply',
-    label: 'Yes, implement this plan',
-    title: 'Switch to Accept Edits and start coding.',
-    detail: contextLabel => `Same conversation. ${contextLabel}.`,
-  },
-  {
-    value: 'apply-summary',
-    label: 'Yes, start a new conversation',
-    title: 'Summarize context and start coding.',
-    detail: () => 'Keeps this conversation active and carries summary plus plan.',
-  },
-  {
-    value: 'continue',
-    label: 'No, stay in Plan mode',
-    title: 'Continue planning with the model.',
-    detail: () => 'No files will be changed.',
-  },
-]
+    {
+      value: 'apply',
+      label: 'Yes, implement this plan',
+      title: 'Switch to Accept Edits and start coding.',
+      detail: contextLabel => `Same conversation. ${contextLabel}.`,
+    },
+    {
+      value: 'apply-summary',
+      label: 'Yes, start a new conversation',
+      title: 'Summarize context and start coding.',
+      detail: () => 'Keeps this conversation active and carries summary plus plan.',
+    },
+    {
+      value: 'continue',
+      label: 'No, stay in Plan mode',
+      title: 'Continue planning with the model.',
+      detail: () => 'No files will be changed.',
+    },
+  ]
 
 export const PlanApprovalView: React.FC<PlanApprovalViewProps> = ({
   contextLabel,

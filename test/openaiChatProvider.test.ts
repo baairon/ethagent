@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { OpenAIChatProvider } from '../src/providers/openai-chat.js'
+import { OpenAIChatProvider, toWireMessages } from '../src/providers/openai-chat.js'
 import type { StreamEvent } from '../src/providers/contracts.js'
 
 test('OpenAIChatProvider finalizes collected tool calls even when finish_reason is stop', async () => {
@@ -55,4 +55,39 @@ test('OpenAIChatProvider finalizes collected tool calls even when finish_reason 
   } finally {
     globalThis.fetch = originalFetch
   }
+})
+
+test('toWireMessages keeps system content in one leading message', () => {
+  const messages = toWireMessages([
+    { role: 'system', content: 'base instructions' },
+    { role: 'user', content: 'hello' },
+    { role: 'system', content: 'correction context' },
+    { role: 'assistant', content: 'hi' },
+  ])
+
+  assert.equal(messages[0]?.role, 'system')
+  assert.equal(messages[0]?.content, 'base instructions\n\ncorrection context')
+  assert.deepEqual(messages.map(message => message.role), ['system', 'user', 'assistant'])
+})
+
+test('toWireMessages preserves tool call and result wire shapes while moving systems', () => {
+  const messages = toWireMessages([
+    { role: 'user', content: 'list files' },
+    { role: 'assistant', content: [{ type: 'tool_use', id: 'tool-1', name: 'list_directory', input: { path: '.' } }] },
+    { role: 'system', content: 'late system context' },
+    { role: 'user', content: [{ type: 'tool_result', toolUseId: 'tool-1', content: 'README.md' }] },
+  ])
+
+  assert.deepEqual(messages.map(message => message.role), ['system', 'user', 'assistant', 'tool'])
+  assert.equal(messages[0]?.content, 'late system context')
+  assert.deepEqual(messages[2]?.tool_calls, [{
+    id: 'tool-1',
+    type: 'function',
+    function: {
+      name: 'list_directory',
+      arguments: '{"path":"."}',
+    },
+  }])
+  assert.equal(messages[3]?.tool_call_id, 'tool-1')
+  assert.equal(messages[3]?.content, 'README.md')
 })

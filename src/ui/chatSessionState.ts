@@ -4,6 +4,7 @@ import type { SessionMode } from '../runtime/sessionMode.js'
 import type { MessageRow } from './MessageList.js'
 import type { ModelPickerSelection } from './ModelPicker.js'
 import { sessionMessagesToRows } from './chatScreenUtils.js'
+import { formatModelDisplayName } from './modelDisplay.js'
 
 export type ModelSelectionResolution =
   | { kind: 'noop' }
@@ -42,7 +43,24 @@ export function resolveModelSelection(
         model: selection.model,
         baseUrl: currentConfig.baseUrl ?? defaults.defaultBaseUrlFor('ollama'),
       },
-      notice: `now using ${selection.model}.`,
+      notice: `now using ${formatModelDisplayName('ollama', selection.model, { maxLength: 64 })}.`,
+      tone: 'info',
+    }
+  }
+
+  if (selection.kind === 'llamacpp') {
+    if (selection.model === currentConfig.model && currentConfig.provider === 'llamacpp') {
+      return { kind: 'noop' }
+    }
+    return {
+      kind: 'switch',
+      config: {
+        ...currentConfig,
+        provider: 'llamacpp',
+        model: selection.model,
+        baseUrl: defaults.defaultBaseUrlFor('llamacpp'),
+      },
+      notice: `local Hugging Face model ready. now using ${formatModelDisplayName('llamacpp', selection.model, { maxLength: 64 })}.`,
       tone: 'info',
     }
   }
@@ -62,7 +80,7 @@ export function resolveModelSelection(
   return {
     kind: 'switch',
     config: nextConfig,
-    notice: `${selection.keyJustSet ? `${selection.provider} key saved.` : `${selection.provider} ready.`} now using ${nextConfig.provider} · ${nextConfig.model}.`,
+    notice: `${selection.keyJustSet ? `${selection.provider} key saved.` : `${selection.provider} ready.`} now using ${nextConfig.provider} - ${formatModelDisplayName(nextConfig.provider, nextConfig.model, { maxLength: 64 })}.`,
     tone: 'dim',
   }
 }

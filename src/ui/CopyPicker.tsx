@@ -37,7 +37,7 @@ export const CopyPicker: React.FC<CopyPickerProps> = ({ turnText, turnLabel, onD
     <Surface
       title={`Copy From ${turnLabel}`}
       subtitle="Choose the full reply or an extracted segment."
-      footer="Enter copies. Esc closes."
+      footer="enter copies · esc closes"
     >
       <Select<number>
         options={options}

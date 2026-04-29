@@ -5,10 +5,12 @@ import { Select, type SelectOption } from './Select.js'
 import { Spinner } from './Spinner.js'
 import { Surface } from './Surface.js'
 import { listSessions, type SessionSummary } from '../storage/sessions.js'
+import { useAppInput } from '../input/AppInputProvider.js'
 
 type ResumeViewProps = {
   currentSessionId: string
   onResume: (sessionId: string) => void
+  onClearAll: () => void | Promise<void>
   onCancel: () => void
 }
 
@@ -16,9 +18,20 @@ type State =
   | { kind: 'loading' }
   | { kind: 'error'; message: string }
   | { kind: 'ready'; sessions: SessionSummary[] }
+  | { kind: 'confirmClear'; sessions: SessionSummary[]; error?: string }
+  | { kind: 'clearing'; sessions: SessionSummary[] }
 
-export const ResumeView: React.FC<ResumeViewProps> = ({ currentSessionId, onResume, onCancel }) => {
+export const CLEAR_ALL_SESSIONS_VALUE = '__clear_all_sessions__'
+
+export const ResumeView: React.FC<ResumeViewProps> = ({ currentSessionId, onResume, onClearAll, onCancel }) => {
   const [state, setState] = useState<State>({ kind: 'loading' })
+
+  // Allow ESC to close the view during loading / error states
+  // (Select handles ESC only when it's rendered in the 'ready' state)
+  const escActive = state.kind === 'loading' || state.kind === 'error' || (state.kind === 'ready' && state.sessions.length === 0)
+  useAppInput((_input, key) => {
+    if (key.escape) onCancel()
+  }, { isActive: escActive })
 
   useEffect(() => {
     let cancelled = false
@@ -45,15 +58,54 @@ export const ResumeView: React.FC<ResumeViewProps> = ({ currentSessionId, onResu
 
   if (state.kind === 'error') {
     return (
-      <Surface title="Resume Session" tone="muted" footer="Esc closes.">
+      <Surface title="Resume Session" tone="muted" footer="esc closes">
         <Text color={theme.dim}>{state.message}</Text>
+      </Surface>
+    )
+  }
+
+  if (state.kind === 'confirmClear') {
+    return (
+      <Surface
+        title="Clear All Chat Logs?"
+        subtitle={`${state.sessions.length} saved session${state.sessions.length === 1 ? '' : 's'} will be removed.`}
+        tone="error"
+        footer="enter selects · esc returns to resume"
+      >
+        <Box flexDirection="column" marginBottom={1}>
+          <Text color={theme.dim}>Removes saved chats and resume context from this machine.</Text>
+          <Text color={theme.dim}>Config, identities, keys, and local models stay.</Text>
+          {state.error ? <Text color="#e87070">{state.error}</Text> : null}
+        </Box>
+        <Select<'back' | 'clear'>
+          options={[
+            { value: 'back', label: 'back to sessions' },
+            { value: 'clear', label: 'clear all chat logs', hint: 'cannot be undone' },
+          ]}
+          onSubmit={choice => {
+            if (choice === 'back') {
+              setState({ kind: 'ready', sessions: state.sessions })
+              return
+            }
+            void clearAll(state.sessions, onClearAll, setState)
+          }}
+          onCancel={() => setState({ kind: 'ready', sessions: state.sessions })}
+        />
+      </Surface>
+    )
+  }
+
+  if (state.kind === 'clearing') {
+    return (
+      <Surface title="Clearing Chat Logs" subtitle="Removing saved chats and resume context.">
+        <Spinner label="clearing sessions..." />
       </Surface>
     )
   }
 
   if (state.sessions.length === 0) {
     return (
-      <Surface title="Resume Session" tone="muted" footer="Esc closes.">
+      <Surface title="Resume Session" tone="muted" footer="esc closes">
         <Text color={theme.dim}>No prior sessions to resume.</Text>
       </Surface>
     )
@@ -65,7 +117,7 @@ export const ResumeView: React.FC<ResumeViewProps> = ({ currentSessionId, onResu
     <Surface
       title="Resume Session"
       subtitle="Grouped by project, then working directory."
-      footer="Enter resumes. Esc closes."
+      footer="enter resumes · esc closes"
     >
       <Box flexDirection="column" marginBottom={1}>
         <Text color={theme.dim}>Recent projects</Text>
@@ -74,14 +126,20 @@ export const ResumeView: React.FC<ResumeViewProps> = ({ currentSessionId, onResu
         options={options}
         initialIndex={findInitialIndex(options, currentSessionId)}
         maxVisible={14}
-        onSubmit={onResume}
+        onSubmit={value => {
+          if (value === CLEAR_ALL_SESSIONS_VALUE) {
+            setState({ kind: 'confirmClear', sessions: state.sessions })
+            return
+          }
+          onResume(value)
+        }}
         onCancel={onCancel}
       />
     </Surface>
   )
 }
 
-function buildResumeOptions(
+export function buildResumeOptions(
   sessions: SessionSummary[],
   currentSessionId: string,
 ): Array<SelectOption<string>> {
@@ -94,6 +152,19 @@ function buildResumeOptions(
   }
 
   const options: Array<SelectOption<string>> = []
+  const manageSpacer: SelectOption<string> = {
+    value: 'separator:spacer',
+    label: '',
+    disabled: true,
+  }
+
+  const clearOption: SelectOption<string> = {
+    value: CLEAR_ALL_SESSIONS_VALUE,
+    label: 'clear all chat logs',
+    hint: 'removes saved chats and resume context',
+    role: 'utility',
+  }
+
   const orderedGroups = [...groups.values()].sort((left, right) => right[0]!.mtimeMs - left[0]!.mtimeMs)
 
   for (const group of orderedGroups) {
@@ -135,13 +206,30 @@ function buildResumeOptions(
     }
   }
 
+  // Utility section sits below all session groups with a visual gap
+  options.push(manageSpacer)
+  options.push(clearOption)
+
   return options
 }
 
 function findInitialIndex(options: Array<SelectOption<string>>, currentSessionId: string): number {
   const currentIndex = options.findIndex(option => option.value === currentSessionId)
   if (currentIndex >= 0) return currentIndex
-  return Math.max(0, options.findIndex(option => !option.disabled))
+  return Math.max(0, options.findIndex(option => !option.disabled && option.value !== CLEAR_ALL_SESSIONS_VALUE))
+}
+
+async function clearAll(
+  sessions: SessionSummary[],
+  onClearAll: () => void | Promise<void>,
+  setState: (state: State) => void,
+): Promise<void> {
+  setState({ kind: 'clearing', sessions })
+  try {
+    await onClearAll()
+  } catch (err: unknown) {
+    setState({ kind: 'confirmClear', sessions, error: (err as Error).message })
+  }
 }
 
 function compressProjectPath(input: string): string {

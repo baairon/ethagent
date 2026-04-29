@@ -275,12 +275,7 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
         }}
         onLoad={() => {
           setCopyNotice(null)
-          if (!identity) {
-            setStep({ kind: 'restore-owner', purpose: 'restore' })
-            return
-          }
-          const ownerHandle = identity.ownerAddress ?? identity.address
-          setStep({ kind: 'restore-owner', purpose: 'switch', initialOwnerHandle: ownerHandle })
+          setStep({ kind: 'restore-wallet', purpose: identity ? 'switch' : 'restore' })
         }}
         onBackupNow={() => triggerRebackup({ kind: 'menu' })}
         onDetails={() => setStep({ kind: 'details' })}
@@ -334,7 +329,7 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
   if (step.kind === 'create-network') {
     return (
       <NetworkScreen
-        subtitle="choose where to create this agent."
+        subtitle="Choose where to create this agent."
         footer={footer}
         onSelect={(network: SelectableNetwork) => {
           setStep({ kind: 'create-preflight', name: step.name, description: step.description, network })
@@ -347,7 +342,7 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
   if (step.kind === 'restore-network') {
     return (
       <NetworkScreen
-        subtitle="choose a network to search for your agents."
+        subtitle="Choose a network to search for your agents."
         footer={footer}
         onSelect={(network: SelectableNetwork) => {
           try {
@@ -368,14 +363,9 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
         step={step}
         config={config}
         walletSession={walletSession}
-        onSetStep={setStep}
         onConnectWallet={() => {
           const purpose = step.kind === 'restore-owner' ? step.purpose : undefined
           setStep({ kind: 'restore-wallet', purpose })
-        }}
-        onOwnerSubmit={ownerHandle => {
-          const purpose = step.kind === 'restore-owner' ? step.purpose : undefined
-          setStep({ kind: 'restore-network', ownerHandle, purpose })
         }}
         onRestoreRegistrySubmit={async value => {
           if (step.kind !== 'restore-registry') return
@@ -520,8 +510,8 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
   if (step.kind === 'rebackup-signing') {
     return (
       <WalletApprovalScreen
-        title="approve back up"
-        subtitle="one browser flow signs, saves the IPFS backup, and updates tokenURI."
+        title="Approve Back Up"
+        subtitle="One browser flow signs, saves the IPFS backup, and updates tokenURI."
         walletSession={walletSession}
         label="waiting for wallet approval..."
         onCancel={() => setStep({ kind: 'details' })}
@@ -549,8 +539,8 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
   if (step.kind === 'restore-wallet') {
     return (
       <WalletApprovalScreen
-        title="connect wallet"
-        subtitle="select the wallet that owns the agent you want to load."
+        title="Connect Wallet"
+        subtitle="Select the wallet that owns the agent you want to load."
         walletSession={walletSession}
         label="waiting for wallet..."
         onCancel={back}
@@ -602,6 +592,6 @@ function initialStepForAction(
   config: EthagentConfig | undefined,
 ): Step {
   if (action === 'create') return config?.identity ? { kind: 'replace-confirm', next: 'create' } : { kind: 'create-name' }
-  if (action === 'load') return { kind: 'restore-owner', purpose: config?.identity ? 'switch' : 'restore' }
+  if (action === 'load') return { kind: 'restore-wallet', purpose: config?.identity ? 'switch' : 'restore' }
   return { kind: 'menu' }
 }

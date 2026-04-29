@@ -51,6 +51,7 @@ type ChatBottomPaneProps = {
   handleModelPick: (sel: ModelPickerSelection) => void | Promise<void>
   handleModelPickerCancel: () => void
   handleResumePick: (id: string) => void | Promise<void>
+  handleResumeClearAll: () => void | Promise<void>
   identityOverlay: IdentityOverlayState | null
   handleIdentityResult: (result: IdentityHubResult) => void
   handleRestoreConversation: (turnId: string) => void
@@ -89,6 +90,7 @@ export function ChatBottomPane({
   handleModelPick,
   handleModelPickerCancel,
   handleResumePick,
+  handleResumeClearAll,
   identityOverlay,
   handleIdentityResult,
   handleRestoreConversation,
@@ -123,6 +125,7 @@ export function ChatBottomPane({
       <ResumeView
         currentSessionId={sessionId}
         onResume={handleResumePick}
+        onClearAll={handleResumeClearAll}
         onCancel={() => setOverlay('none')}
       />
     )
