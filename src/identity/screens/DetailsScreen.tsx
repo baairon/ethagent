@@ -58,7 +58,7 @@ export const DetailsScreen: React.FC<DetailsScreenProps> = ({
 
   if (copyPicker) {
     return (
-      <Surface title="copy agent values" subtitle={subtitle} footer={footer}>
+      <Surface title="Copy Agent Values" subtitle={subtitle} footer={footer}>
         <IdentitySummary identity={identity} config={config} />
         <Box marginTop={1}>
           <Select<string>
@@ -84,7 +84,7 @@ export const DetailsScreen: React.FC<DetailsScreenProps> = ({
   ]
 
   return (
-    <Surface title="manage agent" subtitle={subtitle} footer={footer}>
+    <Surface title="Manage Agent" subtitle={subtitle} footer={footer}>
       <IdentitySummary identity={identity} config={config} />
       <Box marginTop={1}>
         <Select<DetailsAction>

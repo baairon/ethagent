@@ -7,6 +7,7 @@ export const ACTIONS = [
   'chat:modelPicker',
   'chat:identityHub',
   'chat:cycleMode',
+  'chat:toggleReasoning',
 ] as const
 
 export type Action = (typeof ACTIONS)[number]

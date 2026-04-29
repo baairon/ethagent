@@ -1,6 +1,7 @@
 import { listInstalled } from '../bootstrap/ollama.js'
 import { defaultModelFor, type EthagentConfig, type ProviderId } from '../storage/config.js'
 import { getKey } from '../storage/secrets.js'
+import { loadLocalHfModels } from './huggingface.js'
 
 export type ModelCatalogSource = 'installed' | 'discovered' | 'fallback'
 
@@ -23,6 +24,7 @@ type DiscoverDeps = {
   fetchImpl?: typeof fetch
   loadKey?: (provider: ProviderId) => Promise<string | null>
   listOllama?: () => Promise<Array<{ name: string; sizeBytes?: number }>>
+  listHfLocal?: () => Promise<Array<{ id: string; displayName: string }>>
   now?: () => number
 }
 
@@ -62,6 +64,24 @@ export async function discoverProviderModels(
           provider,
           id: model.name,
           label: model.name,
+          source: 'installed' as const,
+        }))),
+      }
+    } catch (err: unknown) {
+      return fallbackResult(config, (err as Error).message)
+    }
+  }
+
+  if (provider === 'llamacpp') {
+    try {
+      const installed = await (deps.listHfLocal ?? (() => loadLocalHfModels()))()
+      return {
+        provider,
+        status: 'ok',
+        entries: dedupeEntries(installed.map(model => ({
+          provider,
+          id: model.id,
+          label: model.displayName,
           source: 'installed' as const,
         }))),
       }

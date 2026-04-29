@@ -93,7 +93,7 @@ const AppRoot: React.FC<{ setExitCode: (code: number) => void }> = ({ setExitCod
   if (phase.kind === 'loading') {
     return (
       <Box padding={1}>
-        <Text color={theme.dim}>preparing session...</Text>
+        <Text color={theme.dim}>Preparing session...</Text>
       </Box>
     )
   }
@@ -108,14 +108,14 @@ const AppRoot: React.FC<{ setExitCode: (code: number) => void }> = ({ setExitCod
   if (phase.kind === 'cancelled') {
     return (
       <Box padding={1}>
-        <Text color={theme.dim}>setup cancelled.</Text>
+        <Text color={theme.dim}>Setup cancelled.</Text>
       </Box>
     )
   }
   if (phase.kind === 'error') {
     return (
       <Box padding={1}>
-        <Text color="#e87070">error: {phase.message}</Text>
+        <Text color="#e87070">Error: {phase.message}</Text>
       </Box>
     )
   }

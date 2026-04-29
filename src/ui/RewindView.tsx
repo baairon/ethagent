@@ -78,7 +78,7 @@ export const RewindView: React.FC<RewindViewProps> = ({
 
   if (state.kind === 'loading') {
     return (
-      <Surface title="rewind" subtitle="loading checkpoints...">
+      <Surface title="Rewind" subtitle="loading checkpoints...">
         <Spinner label="loading rewind history..." />
       </Surface>
     )
@@ -86,7 +86,7 @@ export const RewindView: React.FC<RewindViewProps> = ({
 
   if (state.kind === 'error') {
     return (
-      <Surface title="rewind" tone="muted" footer="esc closes.">
+      <Surface title="Rewind" tone="muted" footer="esc closes">
         <Text color={theme.dim}>{state.message}</Text>
       </Surface>
     )
@@ -94,8 +94,8 @@ export const RewindView: React.FC<RewindViewProps> = ({
 
   if (state.entries.length === 0) {
     return (
-      <Surface title="rewind" tone="muted" footer="esc closes.">
-        <Text color={theme.dim}>no managed edits are available to rewind in this workspace.</Text>
+      <Surface title="Rewind" tone="muted" footer="esc closes">
+        <Text color={theme.dim}>No managed edits are available to rewind in this workspace.</Text>
       </Surface>
     )
   }
@@ -182,9 +182,9 @@ export const RewindView: React.FC<RewindViewProps> = ({
   }
 
   return (
-    <Surface
-      title="rewind"
-      subtitle={buildSubtitle(state.stage, selectedEntry.relativePath)}
+      <Surface
+        title="Rewind"
+        subtitle={buildSubtitle(state.stage, selectedEntry.relativePath)}
       footer={buildFooter(state.stage, state.restoring)}
     >
       {state.stage === 'files' ? (
@@ -327,7 +327,7 @@ const ActionPreview: React.FC<{
           : 'restore only the selected file checkpoint.'}
     </Text>
     {!canRestoreConversation ? (
-      <Text color={theme.dim}>conversation restore is only available for checkpoints from the current session.</Text>
+      <Text color={theme.dim}>Conversation restore is only available for checkpoints from the current session.</Text>
     ) : null}
     <Text color={theme.textSubtle}>{previewContent(entry.previousContent)}</Text>
   </Box>

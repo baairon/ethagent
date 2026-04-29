@@ -20,11 +20,11 @@ export const EditProfileFlow: React.FC<EditProfileFlowProps> = ({ step, onNameSu
     const currentName = readStateString(step.identity.state, 'name')
     return (
       <Surface
-        title="rename your agent"
-        subtitle="this updates the public registration metadata too."
+        title="Rename Agent Identity"
+        subtitle="This updates the public registration metadata too."
         footer={footerHint('enter continues · esc back')}
       >
-        <Text color={theme.dim}>currently: {currentName || '(unnamed)'}</Text>
+        <Text color={theme.dim}>Currently: {currentName || '(unnamed)'}</Text>
         <TextInput
           key="edit-profile-name"
           initialValue={currentName}
@@ -40,11 +40,11 @@ export const EditProfileFlow: React.FC<EditProfileFlowProps> = ({ step, onNameSu
   const currentDescription = readStateString(step.identity.state, 'description')
   return (
     <Surface
-      title="describe your agent"
-      subtitle="leave blank to clear it."
+      title="Describe Agent Identity"
+      subtitle="Leave blank to clear it."
       footer={footerHint('enter saves · esc back')}
     >
-      <Text color={theme.dim}>currently: {currentDescription || '(no description)'}</Text>
+      <Text color={theme.dim}>Currently: {currentDescription || '(no description)'}</Text>
       <TextInput
         key="edit-profile-description"
         initialValue={currentDescription}

@@ -1,16 +1,16 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { validateOwnerHandleInput } from '../src/identity/screens/RestoreFlow.js'
+import { identityHubReducer, type Step } from '../src/identity/identityHubReducer.js'
 
-test('restore owner input accepts Ethereum addresses and ENS names', () => {
-  assert.equal(validateOwnerHandleInput('0x000000000000000000000000000000000000dEaD'), null)
-  assert.equal(validateOwnerHandleInput('bairon.eth'), null)
-  assert.equal(validateOwnerHandleInput('sub.name.eth'), null)
-})
+test('restore flow starts with wallet connection instead of manual owner entry', () => {
+  const fromMenu = identityHubReducer({ kind: 'menu' }, { type: 'startRestore' })
+  assert.deepEqual(fromMenu, { kind: 'restore-wallet' })
 
-test('restore owner input rejects arbitrary text before network search', () => {
-  assert.equal(validateOwnerHandleInput('name'), 'enter a valid Ethereum address or ENS name')
-  assert.equal(validateOwnerHandleInput('0x123'), 'enter a valid Ethereum address or ENS name')
-  assert.equal(validateOwnerHandleInput('name.com'), 'enter a valid Ethereum address or ENS name')
-  assert.equal(validateOwnerHandleInput('-bad.eth'), 'enter a valid Ethereum address or ENS name')
+  const network: Step = {
+    kind: 'restore-network',
+    ownerHandle: '0x000000000000000000000000000000000000dEaD',
+    purpose: 'switch',
+  }
+  const back = identityHubReducer(network, { type: 'back', from: network })
+  assert.deepEqual(back, { kind: 'restore-owner', purpose: 'switch' })
 })

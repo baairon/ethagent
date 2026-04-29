@@ -4,7 +4,7 @@ import os from 'node:os'
 import { z } from 'zod'
 import { atomicWriteText } from './atomicWrite.js'
 
-export const PROVIDERS = ['ollama', 'openai', 'anthropic', 'gemini'] as const
+export const PROVIDERS = ['ollama', 'llamacpp', 'openai', 'anthropic', 'gemini'] as const
 export type ProviderId = (typeof PROVIDERS)[number]
 
 export const SELECTABLE_NETWORKS = ['mainnet', 'arbitrum', 'base', 'optimism', 'polygon'] as const
@@ -109,10 +109,12 @@ export function defaultModelFor(provider: ProviderId): string {
     case 'anthropic': return 'claude-sonnet-4-5'
     case 'gemini':    return 'gemini-2.0-flash'
     case 'ollama':    return 'qwen2.5-coder:7b'
+    case 'llamacpp':  return 'huggingface-link'
   }
 }
 
 export function defaultBaseUrlFor(provider: ProviderId): string | undefined {
   if (provider === 'ollama') return 'http://localhost:11434/v1'
+  if (provider === 'llamacpp') return 'http://localhost:8080/v1'
   return undefined
 }

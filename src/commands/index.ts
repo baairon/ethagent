@@ -1,6 +1,7 @@
 import type { EthagentConfig, ProviderId } from '../storage/config.js'
 import { defaultBaseUrlFor, getConfigPath, saveConfig } from '../storage/config.js'
 import { isDaemonUp, listInstalled, pullModel, type PullProgress } from '../bootstrap/ollama.js'
+import { detectLlamaCpp } from '../bootstrap/llamacpp.js'
 import { detectSpec } from '../bootstrap/runtimeDetection.js'
 import { hasKey } from '../storage/secrets.js'
 import {
@@ -8,6 +9,7 @@ import {
   getIdentityStatus,
 } from '../storage/identity.js'
 import { discoverProviderModels, type ModelCatalogResult } from '../models/catalog.js'
+import { getLocalHfCacheDir, loadLocalHfModels } from '../models/huggingface.js'
 import { copyToClipboard } from '../utils/clipboard.js'
 import { parseSegments } from '../utils/markdownSegments.js'
 import { exportSessionMarkdown } from '../storage/sessionExport.js'
@@ -17,6 +19,7 @@ import path from 'node:path'
 import { setCwd } from '../runtime/cwd.js'
 import type { SessionMode } from '../runtime/sessionMode.js'
 import type { ContextUsage } from '../runtime/compaction.js'
+import { formatModelDisplayName } from '../ui/modelDisplay.js'
 
 export type IdentityRequestAction =
   | 'manage'
@@ -122,7 +125,7 @@ const COMMANDS: CommandSpec[] = [
     name: 'cd',
     requiresArgs: true,
     enterBehavior: 'fill',
-    summary: 'change working directory Â· /cd <path>',
+    summary: 'change working directory · /cd <path>',
     run: async (args, ctx) => {
       const target = args.trim()
       if (!target) return { kind: 'note', variant: 'error', text: 'usage: /cd <path>' }
@@ -162,6 +165,23 @@ const COMMANDS: CommandSpec[] = [
         return { kind: 'note', text: ['installed models:', ...lines].join('\n') }
       }
 
+      if (ctx.config.provider === 'llamacpp') {
+        const installed = await loadLocalHfModels()
+        if (installed.length === 0) {
+          return {
+            kind: 'note',
+            text: 'no local model files downloaded. open Alt+P and choose "add local model file".',
+          }
+        }
+        const lines = installed.map(m => {
+          const marker = m.id === ctx.config.model ? '*' : ' '
+          const q = m.quantization ? ` ${m.quantization}` : ''
+          const displayName = formatModelDisplayName('llamacpp', m.id, { displayName: m.displayName, maxLength: 64 })
+          return `${marker} ${displayName}${q}  ${formatBytes(m.sizeBytes)}  ${m.risk}`
+        })
+        return { kind: 'note', text: ['installed Hugging Face models:', ...lines].join('\n') }
+      }
+
       const catalog = await discoverProviderModels(ctx.config)
       return {
         kind: 'note',
@@ -192,6 +212,15 @@ const COMMANDS: CommandSpec[] = [
             text: `'${name}' isn't installed. try /pull ${name} first.`,
           }
         }
+      } else if (ctx.config.provider === 'llamacpp') {
+        const installed = await loadLocalHfModels()
+        if (!installed.some(m => m.id === name)) {
+          return {
+            kind: 'note',
+            variant: 'error',
+            text: `'${name}' is not downloaded. open Alt+P and choose "add local model file".`,
+          }
+        }
       } else {
         const catalog = await discoverProviderModels(ctx.config)
         if (catalog.status === 'ok' && !catalog.entries.some(entry => entry.id === name)) {
@@ -209,7 +238,7 @@ const COMMANDS: CommandSpec[] = [
       }
       await saveConfig(next)
       ctx.onReplaceConfig(next)
-      return { kind: 'note', text: `now using ${next.provider} · ${name}.` }
+      return { kind: 'note', text: `now using ${next.provider} - ${formatModelDisplayName(next.provider, name, { maxLength: 64 })}.` }
     },
   },
   {
@@ -227,6 +256,12 @@ const COMMANDS: CommandSpec[] = [
       void runPull(name, progressId, signal, ctx)
       return { kind: 'handled' }
     },
+  },
+  {
+    name: 'hf',
+    enterBehavior: 'fill',
+    summary: 'local model files - /hf [installed|download <link>]',
+    run: async (args, ctx) => runHuggingFace(args, ctx),
   },
   {
     name: 'resume',
@@ -343,18 +378,60 @@ const COMMANDS: CommandSpec[] = [
     name: 'doctor',
     summary: 'spec, config, daemon status, key presence',
     run: async (_args, ctx) => {
-      const [spec, daemonUp, keys, identity] = await Promise.all([
+      const [spec, daemonUp, keys, identity, llamaCpp, hfModels] = await Promise.all([
         detectSpec(),
         isDaemonUp(),
         Promise.all(
           (['openai', 'anthropic', 'gemini'] as ProviderId[]).map(async p => [p, await hasKey(p)] as const),
         ),
         getIdentityStatus(ctx.config),
+        detectLlamaCpp(),
+        loadLocalHfModels(),
       ])
-      return { kind: 'note', text: renderDoctor(spec, daemonUp, keys, identity, ctx) }
+      return { kind: 'note', text: renderDoctor(spec, daemonUp, keys, identity, ctx, llamaCpp, hfModels.length) }
     },
   },
 ]
+
+async function runHuggingFace(args: string, ctx: SlashContext): Promise<SlashResult> {
+  const tokens = args.trim().split(/\s+/).filter(Boolean)
+  const sub = tokens[0]?.toLowerCase() ?? ''
+
+  if (!sub || sub === 'installed') {
+    const installed = await loadLocalHfModels()
+    if (installed.length === 0) {
+      return {
+        kind: 'note',
+        variant: 'dim',
+        text: 'no local model files downloaded. press Alt+P and choose "add local model file".',
+      }
+    }
+    const lines = installed.map(model => {
+      const marker = model.id === ctx.config.model && ctx.config.provider === 'llamacpp' ? '*' : ' '
+      const displayName = formatModelDisplayName('llamacpp', model.id, { displayName: model.displayName, maxLength: 64 })
+      return `${marker} ${displayName}  ${formatBytes(model.sizeBytes)}  ${model.risk}`
+    })
+    return { kind: 'note', text: ['installed Hugging Face models:', ...lines].join('\n') }
+  }
+
+  if (sub === 'download' || sub === 'model') {
+    const link = tokens.slice(1).join(' ')
+    ctx.onModelPickerRequest()
+    return {
+      kind: 'note',
+      variant: 'dim',
+      text: link
+        ? `Alt+P opened. choose "add local model file" and paste: ${link}`
+        : 'Alt+P opened. choose "add local model file" and paste the model URL or repo id.',
+    }
+  }
+
+  return {
+    kind: 'note',
+    variant: 'error',
+    text: 'usage: /hf [installed|download <huggingface.co link or repo id>]',
+  }
+}
 
 async function runIdentity(args: string, ctx: SlashContext): Promise<SlashResult> {
   const tokens = args.trim().split(/\s+/).filter(Boolean)
@@ -478,9 +555,10 @@ function renderStatus(ctx: SlashContext): string {
   const minutes = Math.floor(elapsedMs / 60000)
   const seconds = Math.floor((elapsedMs % 60000) / 1000)
   const elapsed = minutes > 0 ? `${minutes}m${seconds.toString().padStart(2, '0')}s` : `${seconds}s`
+  const displayModel = formatModelDisplayName(ctx.config.provider, ctx.config.model, { maxLength: 72 })
   return [
     `provider   ${ctx.config.provider}`,
-    `model      ${ctx.config.model}`,
+    `model      ${displayModel}`,
     `cwd        ${ctx.cwd}`,
     `session    ${ctx.sessionId.slice(0, 8)}`,
     'state      active',
@@ -502,7 +580,7 @@ function renderContext(ctx: SlashContext): string {
         : 'Context has comfortable room.'
   return [
     'context usage:',
-    `  model      ${ctx.config.provider} - ${ctx.config.model}`,
+    `  model      ${ctx.config.provider} - ${formatModelDisplayName(ctx.config.provider, ctx.config.model, { maxLength: 72 })}`,
     `  used       ~${usage.usedTokens} / ${usage.windowTokens} tokens (${usage.percent}%)`,
     `  free       ~${free} tokens`,
     `  estimate   ${usage.confidence} (${usage.source})`,
@@ -518,17 +596,22 @@ function renderDoctor(
   keys: ReadonlyArray<readonly [ProviderId, boolean]>,
   identity: Awaited<ReturnType<typeof getIdentityStatus>>,
   ctx: SlashContext,
+  llamaCpp: Awaited<ReturnType<typeof detectLlamaCpp>>,
+  hfModelCount: number,
 ): string {
   const lines: string[] = ['diagnostics:']
   lines.push(`  platform   ${spec.platform}/${spec.arch}${spec.isAppleSilicon ? ' (apple silicon)' : ''}`)
   lines.push(`  ram        ${formatGB(spec.effectiveRamBytes)}${spec.gpuVramBytes ? ` · vram ${formatGB(spec.gpuVramBytes)}` : ''}`)
   lines.push(`  ollama     ${spec.hasOllama ? spec.ollamaVersion ?? 'installed' : 'not installed'} · daemon ${daemonUp ? 'up' : 'down'}`)
   lines.push(`  models     ${spec.installedModels.length} installed`)
+  lines.push(`  local run  ${llamaCpp.binaryPresent ? 'installed' : 'not installed'} - server ${llamaCpp.serverUp ? 'up' : 'down'}`)
+  lines.push(`  hf models  ${hfModelCount} downloaded`)
   lines.push('')
   lines.push('config:')
   lines.push(`  provider   ${ctx.config.provider}`)
-  lines.push(`  model      ${ctx.config.model}`)
+  lines.push(`  model      ${formatModelDisplayName(ctx.config.provider, ctx.config.model, { maxLength: 72 })}`)
   if (ctx.config.baseUrl) lines.push(`  baseUrl    ${ctx.config.baseUrl}`)
+  if (ctx.config.provider === 'llamacpp') lines.push(`  hf cache   ${getLocalHfCacheDir()}`)
   lines.push(`  path       ${getConfigPath()}`)
   lines.push('')
   lines.push('keys:')
@@ -555,13 +638,14 @@ function renderModelCatalog(catalog: ModelCatalogResult, currentModel: string): 
   const lines = catalog.entries.map(entry => {
     const marker = entry.id === currentModel ? '*' : ' '
     const suffix = entry.source === 'fallback' ? '  fallback' : ''
-    return `${marker} ${entry.id}${suffix}`
+    return `${marker} ${formatModelDisplayName(catalog.provider, entry.id, { maxLength: 72 })}${suffix}`
   })
   return [title, ...lines].join('\n')
 }
 
 function baseUrlForModelSwitch(config: EthagentConfig): string | undefined {
   if (config.provider === 'ollama') return config.baseUrl ?? defaultBaseUrlFor('ollama')
+  if (config.provider === 'llamacpp') return config.baseUrl ?? defaultBaseUrlFor('llamacpp')
   if (config.provider === 'openai') return config.baseUrl
   return undefined
 }

@@ -34,10 +34,10 @@ export const MenuScreen: React.FC<MenuScreenProps> = ({
   onSkip,
   onCancel,
 }) => {
-  const title = mode === 'first-run' ? 'set up your agent' : 'your agent'
+  const title = mode === 'first-run' ? 'Set Up Agent Identity' : 'Agent Identity'
   const subtitle = mode === 'first-run'
-    ? 'create a portable agent or load one you already own.'
-    : 'back up, switch, or start a new one.'
+    ? 'Create a portable agent or load one you already own.'
+    : 'Back up, switch, or start a new one.'
 
   const options: Array<{ value: Action; label: string; hint?: string; disabled?: boolean }> = identity
     ? [

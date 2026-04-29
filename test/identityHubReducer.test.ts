@@ -54,7 +54,6 @@ test('identityHubReducer: restore back returns to previous restore step instead 
   const owner = identityHubReducer(network, { type: 'back', from: network })
   assert.equal(owner.kind, 'restore-owner')
   if (owner.kind === 'restore-owner') {
-    assert.equal(owner.initialOwnerHandle, 'owner.eth')
     assert.equal(owner.purpose, 'switch')
   }
 

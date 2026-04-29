@@ -42,15 +42,15 @@ export const StorageCredentialScreen: React.FC<StorageCredentialScreenProps> = (
   if (step.kind === 'storage-credential-input') {
     return (
       <Surface
-        title="IPFS storage credential"
-        subtitle={step.error ?? 'save the token ethagent uses to pin encrypted state.'}
+        title="IPFS Storage Credential"
+        subtitle={step.error ?? 'Save the token ethagent uses to pin encrypted state.'}
         footer={footer}
       >
         <Text>
-          <Text color={theme.dim}>paste your Pinata JWT. get one at </Text>
+          <Text color={theme.dim}>Paste your Pinata JWT. Get one at </Text>
           <Text color={theme.accentPrimary} underline>{PINATA_API_KEYS_URL}</Text>
         </Text>
-        <Text color={theme.dim}>stored encrypted on this device. used only for IPFS pinning.</Text>
+        <Text color={theme.dim}>Stored encrypted on this device. Used only for IPFS pinning.</Text>
         <TextInput
           key="storage-credential-input"
           isSecret
@@ -73,8 +73,8 @@ export const StorageCredentialScreen: React.FC<StorageCredentialScreenProps> = (
   if (step.kind === 'storage-credential-forget-confirm') {
     return (
       <Surface
-        title="forget IPFS storage credential?"
-        subtitle="this only removes the local token used for pinning."
+        title="Forget IPFS Storage Credential?"
+        subtitle="This only removes the local token used for pinning."
         footer={footer}
       >
         <Box flexDirection="column">
@@ -98,8 +98,8 @@ export const StorageCredentialScreen: React.FC<StorageCredentialScreenProps> = (
 
   return (
     <Surface
-      title="IPFS storage credential"
-      subtitle="controls whether ethagent can pin encrypted state from this machine."
+      title="IPFS Storage Credential"
+      subtitle="Controls whether ethagent can pin encrypted state from this machine."
       footer={footer}
     >
       <Box marginTop={1}>

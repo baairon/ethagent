@@ -59,3 +59,12 @@ test('message row height estimate accounts for wrapped transcript content', () =
 
   assert.equal(estimateMessageRowHeight(row, 32), 5)
 })
+
+test('expanded reasoning rows account for full content height', () => {
+  const collapsed: MessageRow = { role: 'thinking', id: 't', content: 'a'.repeat(180), expanded: false }
+  const expanded: MessageRow = { ...collapsed, expanded: true }
+
+  const collapsedHeight = estimateMessageRowHeight(collapsed, 32)
+  assert.ok(collapsedHeight > 2)
+  assert.ok(estimateMessageRowHeight(expanded, 32) > collapsedHeight)
+})

@@ -17,15 +17,15 @@ type RebackupStorageScreenProps = {
 
 export const RebackupStorageScreen: React.FC<RebackupStorageScreenProps> = ({ step, footer, onSubmit, onCancel }) => (
   <Surface
-    title="connect IPFS storage"
-    subtitle={step.error ?? 'save a Pinata JWT so ethagent can pin encrypted state to IPFS.'}
+    title="Connect IPFS Storage"
+    subtitle={step.error ?? 'Save a Pinata JWT so ethagent can pin encrypted state to IPFS.'}
     footer={footer}
   >
     <Text>
-      <Text color={theme.dim}>paste your Pinata JWT. get one at </Text>
+      <Text color={theme.dim}>Paste your Pinata JWT. Get one at </Text>
       <Text color={theme.accentPrimary} underline>{PINATA_API_KEYS_URL}</Text>
     </Text>
-    <Text color={theme.dim}>saved encrypted on this device · used only for IPFS pinning</Text>
+    <Text color={theme.dim}>Saved encrypted on this device · used only for IPFS pinning</Text>
     <TextInput
       key="rebackup-storage"
       isSecret

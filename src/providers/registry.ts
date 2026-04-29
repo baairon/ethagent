@@ -10,7 +10,7 @@ import { anthropicTools, openAITools } from '../tools/registry.js'
 import { openAIBaseUrlFor } from '../models/catalog.js'
 
 export function isLocalProvider(provider: string): boolean {
-  return provider === 'ollama'
+  return provider === 'ollama' || provider === 'llamacpp'
 }
 
 export function createProvider(config: EthagentConfig, options: { mode?: SessionMode } = {}): Provider {
@@ -22,6 +22,14 @@ export function createProvider(config: EthagentConfig, options: { mode?: Session
         model: config.model,
         baseUrl: config.baseUrl ?? defaultBaseUrlFor('ollama') ?? 'http://localhost:11434/v1',
         apiKey: 'ollama',
+        tools: openAITools(mode),
+      })
+    case 'llamacpp':
+      return new OpenAIChatProvider({
+        id: 'llamacpp',
+        model: config.model,
+        baseUrl: config.baseUrl ?? defaultBaseUrlFor('llamacpp') ?? 'http://localhost:8080/v1',
+        apiKey: 'llamacpp',
         tools: openAITools(mode),
       })
     case 'openai':

@@ -10,7 +10,7 @@ export const IdentitySummary: React.FC<{
 }> = ({ identity, config }) => {
   if (!identity) {
     return (
-      <Text color={theme.dim}>no agent yet. create or load one.</Text>
+      <Text color={theme.dim}>No agent yet. Create or load one.</Text>
     )
   }
 

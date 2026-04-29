@@ -4,6 +4,8 @@ import { BrandSplash as Splash } from '../ui/BrandSplash.js'
 import { Select } from '../ui/Select.js'
 import { TextInput } from '../ui/TextInput.js'
 import { theme } from '../ui/theme.js'
+import { ModelPicker, type ModelPickerSelection } from '../ui/ModelPicker.js'
+import { formatModelDisplayName } from '../ui/modelDisplay.js'
 import { detectSpec, type SpecSnapshot } from './runtimeDetection.js'
 import { recommendModel } from './modelRecommendation.js'
 import { OllamaBootstrap } from './OllamaBootstrap.js'
@@ -25,6 +27,7 @@ type Step =
   | { kind: 'choose-path'; spec: SpecSnapshot }
   | { kind: 'ollama-setup'; spec: SpecSnapshot }
   | { kind: 'ollama-manual'; spec: SpecSnapshot }
+  | { kind: 'hf-setup'; spec: SpecSnapshot }
   | { kind: 'cloud-provider' }
   | { kind: 'cloud-key'; provider: ProviderId; error?: string }
   | { kind: 'cloud-key-saving'; provider: ProviderId }
@@ -44,6 +47,7 @@ const STATUS: Record<string, string> = {
   'choose-path':       'first-run setup · choose how to run',
   'ollama-setup':      'first-run setup · ollama',
   'ollama-manual':     'first-run setup · ollama manual',
+  'hf-setup':          'first-run setup · local model file',
   'cloud-provider':    'first-run setup · pick a cloud provider',
   'cloud-key':         'first-run setup · paste API key',
   'cloud-key-saving':  'first-run setup · storing key',
@@ -213,14 +217,16 @@ export const FirstRun: React.FC<FirstRunProps> = ({ onComplete, onCancel }) => {
           </Text>
           <Text color={theme.dim}>recommended: {recommended.model}</Text>
         </Box>
-        <Select<'cloud' | 'ollama'>
+        <Select<'cloud' | 'ollama' | 'hf'>
           label="how do you want to run?"
           options={[
             { value: 'cloud',  label: 'cloud API', hint: 'anthropic, openai, or gemini' },
-            { value: 'ollama', label: 'local ollama', hint: 'offline, runs on your machine' },
+            { value: 'ollama', label: 'local ollama', hint: 'offline, managed by ollama' },
+            { value: 'hf',     label: 'local model file', hint: 'download a GGUF model from Hugging Face' },
           ]}
           onSubmit={choice => {
             if (choice === 'cloud') goTo({ kind: 'cloud-provider' })
+            else if (choice === 'hf') goTo({ kind: 'hf-setup', spec })
             else goTo({ kind: 'ollama-setup', spec })
           }}
           onCancel={onCancel}
@@ -280,6 +286,30 @@ export const FirstRun: React.FC<FirstRunProps> = ({ onComplete, onCancel }) => {
           onCancel={goBack}
         />
         {hint(true)}
+      </Box>
+    )
+  }
+
+  if (step.kind === 'hf-setup') {
+    const modelPickerConfig: EthagentConfig = withFirstRunIdentity({
+      version: 1,
+      provider: 'llamacpp',
+      model: defaultModelFor('llamacpp'),
+      baseUrl: defaultBaseUrlFor('llamacpp'),
+      firstRunAt: new Date().toISOString(),
+    })
+    return (
+      <Box flexDirection="column" padding={1}>
+        <Splash tipLine={STATUS['hf-setup']} />
+        <ModelPicker
+          currentConfig={modelPickerConfig}
+          currentProvider="llamacpp"
+          currentModel={modelPickerConfig.model}
+          onPick={(selection: ModelPickerSelection) => {
+            goTo({ kind: 'saving', config: configFromModelPickerSelection(selection, modelPickerConfig) })
+          }}
+          onCancel={goBack}
+        />
       </Box>
     )
   }
@@ -410,13 +440,38 @@ export const FirstRun: React.FC<FirstRunProps> = ({ onComplete, onCancel }) => {
   if (step.kind === 'done') {
     return (
       <Box flexDirection="column" padding={1}>
-        <Splash tipLine={`ready · ${step.config.provider} · ${step.config.model}`} />
+        <Splash tipLine={`ready - ${step.config.provider} - ${formatModelDisplayName(step.config.provider, step.config.model, { maxLength: 48 })}`} />
         <Text color={theme.accentSecondary}>all set.</Text>
       </Box>
     )
   }
 
   return null
+}
+
+function configFromModelPickerSelection(selection: ModelPickerSelection, base: EthagentConfig): EthagentConfig {
+  if (selection.kind === 'ollama') {
+    return {
+      ...base,
+      provider: 'ollama',
+      model: selection.model,
+      baseUrl: defaultBaseUrlFor('ollama'),
+    }
+  }
+  if (selection.kind === 'llamacpp') {
+    return {
+      ...base,
+      provider: 'llamacpp',
+      model: selection.model,
+      baseUrl: defaultBaseUrlFor('llamacpp'),
+    }
+  }
+  return {
+    ...base,
+    provider: selection.provider,
+    model: selection.model,
+    baseUrl: undefined,
+  }
 }
 
 function formatGB(bytes: number): string {

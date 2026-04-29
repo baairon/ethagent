@@ -49,6 +49,11 @@ export type SessionWriteContext = {
   mode?: SessionMode
 }
 
+export type ClearAllSessionsResult = {
+  sessionFiles: number
+  metadataFiles: number
+}
+
 const SessionMetadataSchemaVersion = 1
 
 export function getSessionsDir(): string {
@@ -195,6 +200,39 @@ export async function listSessions(limit = 50): Promise<SessionSummary[]> {
     .filter((value): value is SessionSummary => value !== null)
     .sort((a, b) => b.mtimeMs - a.mtimeMs)
     .slice(0, limit)
+}
+
+export async function clearAllSessions(): Promise<ClearAllSessionsResult> {
+  const dir = getSessionsDir()
+  let files: string[]
+  try {
+    files = await fs.readdir(dir)
+  } catch (err: unknown) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+      return { sessionFiles: 0, metadataFiles: 0 }
+    }
+    throw err
+  }
+
+  let sessionFiles = 0
+  let metadataFiles = 0
+  for (const file of files) {
+    const isSession = file.endsWith('.jsonl')
+    const isMetadata = file.endsWith('.meta.json')
+    if (!isSession && !isMetadata) continue
+
+    const target = path.join(dir, file)
+    const relative = path.relative(dir, target)
+    if (relative.startsWith('..') || path.isAbsolute(relative)) {
+      throw new Error(`refusing to delete session path outside storage: ${file}`)
+    }
+
+    await fs.rm(target, { force: true })
+    if (isSession) sessionFiles += 1
+    else metadataFiles += 1
+  }
+
+  return { sessionFiles, metadataFiles }
 }
 
 export type ProviderMessageProjectionOptions = {

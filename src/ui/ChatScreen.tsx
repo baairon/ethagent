@@ -15,7 +15,8 @@ import {
 import { theme } from './theme.js'
 import { BrandSplash } from './BrandSplash.js'
 import { SessionStatus, formatTokens } from './SessionStatus.js'
-import { type MessageRow } from './MessageList.js'
+import { formatModelDisplayName } from './modelDisplay.js'
+import { toggleLatestReasoningRow, type MessageRow } from './MessageList.js'
 import { ConversationStack } from './ConversationStack.js'
 import { ModelPicker, type ModelPickerSelection } from './ModelPicker.js'
 import type { ModelPickerContextFit } from './modelPickerOptions.js'
@@ -25,6 +26,7 @@ import { useCancelRequest } from '../hooks/useCancelRequest.js'
 import { useExitOnCtrlC } from '../hooks/useExitOnCtrlC.js'
 import {
   appendSessionMessage,
+  clearAllSessions,
   ensureSessionMetadata,
   loadSession,
   loadSessionMetadata,
@@ -200,6 +202,10 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
     },
     [],
   )
+
+  const toggleLatestReasoning = useCallback(() => {
+    setRows(toggleLatestReasoningRow)
+  }, [])
 
   const replaceConfig = useCallback(
     (next: EthagentConfig) => {
@@ -838,6 +844,12 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
   )
 
   useKeybinding(
+    'chat:toggleReasoning',
+    () => { if (overlay === 'none') toggleLatestReasoning() },
+    { context: 'Chat', isActive: overlay === 'none' },
+  )
+
+  useKeybinding(
     'chat:cycleMode',
     () => {
       if (overlay !== 'none') return
@@ -946,6 +958,17 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
       }
     },
     [clearContextLimit, clearPendingPlan, cwd, pushNote, refreshVisibleStats, replaceConfig],
+  )
+
+  const handleResumeClearAll = useCallback(
+    async () => {
+      await clearAllSessions()
+      clearTranscript()
+      overlayRef.current = 'none'
+      setOverlay('none')
+      pushNote('cleared saved chat logs and resume context from this machine.', 'dim')
+    },
+    [clearTranscript, pushNote],
   )
 
   const handleIdentityResult = useCallback(
@@ -1179,7 +1202,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
     })
   }, [overlay, projectedUsageForInput, pullInFlight, pushNote, queuedInputs, runStream, showContextLimitForPrompt, streaming])
 
-  const contextLine = `${config.provider} · ${config.model} · ${compressHome(cwd)}`
+  const contextLine = `${config.provider} · ${formatModelDisplayName(config.provider, config.model, { maxLength: 24 })} · ${compressHome(cwd)}`
   const tipLine = streaming
     ? 'tip: you can keep typing and press enter to queue the next message · shift+enter for newline'
     : 'tip: type /help to get started · shift+enter for newline'
@@ -1197,6 +1220,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
         ? theme.accentPeach
         : theme.accentMint
   const exitHint = exitState.pending ? 'ctrl+c again to quit' : null
+  const hasReasoningRows = rows.some(row => row.role === 'thinking')
   const footerRight = (
     <Box flexDirection="row">
       {exitHint ? (
@@ -1218,7 +1242,9 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
           <Text color={theme.dim}> · </Text>
         </>
       )}
-      <Text color={theme.dim}>esc cancels · alt+p model · alt+i identity</Text>
+      <Text color={theme.dim}>
+        {`esc cancels · alt+p model · alt+i identity${hasReasoningRows ? ' · alt+t reasoning' : ''}`}
+      </Text>
     </Box>
   )
   return (
@@ -1249,6 +1275,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
           handleModelPick={handleModelPick}
           handleModelPickerCancel={handleModelPickerCancel}
           handleResumePick={handleResumePick}
+          handleResumeClearAll={handleResumeClearAll}
           identityOverlay={identityOverlay}
           handleIdentityResult={handleIdentityResult}
           handleRestoreConversation={handleRestoreConversation}
@@ -1276,6 +1303,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
           contextUsage={activeContextUsage}
         />
       )}
+      sessionKey={sessionKey}
     />
   )
 }

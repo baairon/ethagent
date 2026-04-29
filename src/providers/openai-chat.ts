@@ -87,7 +87,7 @@ export class OpenAIChatProvider implements Provider {
 
   async *complete(messages: Message[], signal: AbortSignal): AsyncIterable<StreamEvent> {
     const apiKey = await this.resolveApiKey()
-    if (!apiKey && this.id !== 'ollama') {
+    if (!apiKey && this.id !== 'ollama' && this.id !== 'llamacpp') {
       const error = new ProviderError(`missing API key for ${this.id} (/doctor to verify)`)
       yield { type: 'error', message: error.message }
       return
@@ -218,7 +218,7 @@ export class OpenAIChatProvider implements Provider {
 
 }
 
-function toWireMessages(messages: Message[]): Array<Record<string, unknown>> {
+export function toWireMessages(messages: Message[]): Array<Record<string, unknown>> {
   const out: Array<Record<string, unknown>> = []
 
   for (const message of messages) {
@@ -260,7 +260,31 @@ function toWireMessages(messages: Message[]): Array<Record<string, unknown>> {
     out.push({ role: message.role, content: messageTextContent(message) })
   }
 
-  return out
+  return normalizeSystemMessages(out)
+}
+
+function normalizeSystemMessages(messages: Array<Record<string, unknown>>): Array<Record<string, unknown>> {
+  const systemContents: string[] = []
+  const nonSystem: Array<Record<string, unknown>> = []
+
+  for (const message of messages) {
+    if (message.role === 'system') {
+      if (typeof message.content === 'string' && message.content.length > 0) {
+        systemContents.push(message.content)
+      }
+      continue
+    }
+    nonSystem.push(message)
+  }
+
+  if (systemContents.length === 0) return nonSystem
+  return [
+    {
+      role: 'system',
+      content: systemContents.join('\n\n'),
+    },
+    ...nonSystem,
+  ]
 }
 
 function isTextBlock(block: MessageContentBlock): block is Extract<MessageContentBlock, { type: 'text' }> {

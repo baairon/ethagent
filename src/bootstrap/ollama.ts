@@ -17,6 +17,8 @@ export type PullProgress = {
   digest?: string
 }
 
+type FetchImpl = typeof fetch
+
 async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: number): Promise<Response | null> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeoutMs)
@@ -207,4 +209,38 @@ export async function* pullModel(
   } finally {
     try { reader.releaseLock() } catch { void 0 }
   }
+}
+
+export async function deleteModel(
+  name: string,
+  host: string = DEFAULT_HOST,
+  fetchImpl: FetchImpl = fetch,
+): Promise<void> {
+  const response = await fetchImpl(`${host}/api/delete`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: name }),
+  })
+  if (response.ok) return
+  const detail = await readErrorDetail(response)
+  if (response.status === 404) throw new Error(`Ollama model is not installed: ${name}`)
+  if (response.status === 409 || /in use|running|busy/i.test(detail)) {
+    throw new Error('that Ollama model is currently in use. stop it and try uninstall again.')
+  }
+  throw new Error(`Ollama uninstall failed: ${detail || `HTTP ${response.status}`}`)
+}
+
+async function readErrorDetail(response: Response): Promise<string> {
+  try {
+    const data = await response.json() as { error?: unknown; message?: unknown }
+    if (typeof data.error === 'string') return data.error
+    if (typeof data.message === 'string') return data.message
+  } catch {
+    try {
+      return await response.text()
+    } catch {
+      return ''
+    }
+  }
+  return ''
 }

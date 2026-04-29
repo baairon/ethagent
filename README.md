@@ -19,7 +19,8 @@ On first run, ethagent creates or restores an ERC-8004 agent with the browser wa
 
 - Mint or load an ERC-8004 agent token.
 - Back up encrypted state to IPFS and refresh the tokenURI.
-- Switch between OpenAI, Anthropic, Gemini, and local Ollama models.
+- Switch between OpenAI, Anthropic, Gemini, local Ollama models, and link-downloaded Hugging Face GGUF models.
+- Download Hugging Face models by link with safety review, machine-aware GGUF recommendation, and local runner startup.
 - Resume, rewind, compact, export, and diagnose local sessions.
 
 Your memory is encrypted for the wallet that authorized each backup. If the ERC-8004 token is transferred, the new holder can see public token metadata and backup CIDs, but cannot decrypt prior private memory without an explicit re-encryption handoff.
