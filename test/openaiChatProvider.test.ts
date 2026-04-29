@@ -57,6 +57,35 @@ test('OpenAIChatProvider finalizes collected tool calls even when finish_reason 
   }
 })
 
+test('OpenAIChatProvider includes local provider and base URL in fetch errors', async () => {
+  const originalFetch = globalThis.fetch
+  globalThis.fetch = (async () => {
+    throw new TypeError('fetch failed')
+  }) as typeof fetch
+
+  try {
+    const provider = new OpenAIChatProvider({
+      id: 'llamacpp',
+      model: 'org/model#model.gguf',
+      baseUrl: 'http://localhost:8080/v1',
+      apiKey: 'llamacpp',
+      maxRetries: 0,
+    })
+    const events: StreamEvent[] = []
+    for await (const event of provider.complete([{ role: 'user', content: 'hello' }], new AbortController().signal)) {
+      events.push(event)
+    }
+
+    const error = events.find(event => event.type === 'error')
+    assert.ok(error)
+    assert.match(error.message, /llamacpp/)
+    assert.match(error.message, /http:\/\/localhost:8080\/v1/)
+    assert.match(error.message, /fetch failed/)
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
 test('toWireMessages keeps system content in one leading message', () => {
   const messages = toWireMessages([
     { role: 'system', content: 'base instructions' },

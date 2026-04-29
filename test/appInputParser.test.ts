@@ -51,8 +51,8 @@ test('parseAppInput flushes a lone escape as escape instead of paste', () => {
   assert.equal(result.events[0]?.isPasted, false)
 })
 
-test('parseAppInput parses arrows, alt keys, ctrl keys, and shift enter', () => {
-  const { events } = parseChunks(['\x1b[A', '\x1bp', '\x03', '\x1b[13;2u', '\x1b[27;2;13~'])
+test('parseAppInput parses arrows, alt keys, ctrl keys, shift enter, and page scroll keys', () => {
+  const { events } = parseChunks(['\x1b[A', '\x1bp', '\x03', '\x1b[13;2u', '\x1b[27;2;13~', '\x1b[5~', '\x1b[6~'])
 
   assert.equal(events[0]?.key.upArrow, true)
   assert.equal(events[1]?.input, 'p')
@@ -63,6 +63,8 @@ test('parseAppInput parses arrows, alt keys, ctrl keys, and shift enter', () => 
   assert.equal(events[3]?.key.shift, true)
   assert.equal(events[4]?.key.return, true)
   assert.equal(events[4]?.key.shift, true)
+  assert.equal(events[5]?.key.pageUp, true)
+  assert.equal(events[6]?.key.pageDown, true)
 })
 
 test('parseAppInput decodes tab from CSI-u and modify-other-keys', () => {

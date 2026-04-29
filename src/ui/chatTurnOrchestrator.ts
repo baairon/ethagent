@@ -12,7 +12,6 @@ import type { MessageRow } from './MessageList.js'
 import {
   buildBaseMessages,
   createTurnCheckpoint,
-  splitStreamingContent,
   type TurnCheckpoint,
 } from './chatScreenUtils.js'
 
@@ -48,6 +47,7 @@ export type TurnOrchestratorContext = {
     mode: ReturnType<typeof toPermissionMode>,
   ) => Promise<ExecuteToolResult>
   applySessionRule: (rule?: SessionPermissionRule, persistRule?: boolean) => Promise<void>
+  preflightProvider?: () => Promise<{ ok: true } | { ok: false; message: string }>
   onPlanReady?: (plan: string) => void
   pendingAssistantTextRef: MutableRef<string | null>
   pendingThinkingTextRef: MutableRef<string | null>
@@ -93,6 +93,7 @@ export async function runStreamingTurn(
     persistTurnMessage,
     executeTool,
     applySessionRule,
+    preflightProvider,
     onPlanReady,
     pendingAssistantTextRef,
     pendingThinkingTextRef,
@@ -132,6 +133,7 @@ export async function runStreamingTurn(
   let accumulated = ''
   let thinkingContent = ''
   let thinkingRowId: string | null = null
+  let thinkingCursorActive = false
   let assistantId: string | null = null
   let hasPendingToolUse = false
 
@@ -139,8 +141,19 @@ export async function runStreamingTurn(
     accumulated = ''
     thinkingContent = ''
     thinkingRowId = null
+    thinkingCursorActive = false
     assistantId = null
     hasPendingToolUse = false
+  }
+
+  const stopThinkingCursor = () => {
+    if (!thinkingRowId || !thinkingCursorActive) return
+    thinkingCursorActive = false
+    updateRows(prev => prev.map(row =>
+      row.id === thinkingRowId && row.role === 'thinking'
+        ? { ...row, showCursor: false }
+        : row,
+    ))
   }
 
   const ensureAssistantRow = (): string => {
@@ -159,19 +172,13 @@ export async function runStreamingTurn(
       const nextAssistant = pendingAssistantTextRef.current
       const nextThinking = pendingThinkingTextRef.current
       if (nextAssistant === null && nextThinking === null) return
-      updateRows(prev =>
-        prev.map(r => {
-          if (nextAssistant !== null && assistantId && r.id === assistantId && r.role === 'assistant') {
-            const next = splitStreamingContent(nextAssistant)
-            return { ...r, content: next.committed, liveTail: next.liveTail }
-          }
-          if (nextThinking !== null && thinkingRowId && r.id === thinkingRowId && r.role === 'thinking') {
-            const next = splitStreamingContent(nextThinking)
-            return { ...r, content: next.committed, liveTail: next.liveTail }
-          }
-          return r
-        }),
-      )
+      updateRows(prev => updateStreamingRows(
+        prev,
+        assistantId,
+        thinkingRowId,
+        nextAssistant,
+        nextThinking,
+      ))
       pendingAssistantTextRef.current = null
       pendingThinkingTextRef.current = null
     }
@@ -192,15 +199,7 @@ export async function runStreamingTurn(
   const finalizeStreamingRows = () => {
     flushStreamRows(true)
     updateRows(prev => {
-      let next = prev.map(r => {
-        if (assistantId && r.id === assistantId && r.role === 'assistant') {
-          return { ...r, content: accumulated || r.content, liveTail: undefined, streaming: false }
-        }
-        if (thinkingRowId && r.id === thinkingRowId && r.role === 'thinking') {
-          return { ...r, content: thinkingContent || r.content, liveTail: undefined, streaming: false }
-        }
-        return r
-      })
+      let next = finalizeStreamingRowsById(prev, assistantId, thinkingRowId, accumulated, thinkingContent)
       // If we emitted tool_uses, strip the empty assistant text row — tool_use
       // rows replace it. If the assistant emitted no text at all (pure tool
       // turn), drop the empty row.
@@ -269,6 +268,27 @@ export async function runStreamingTurn(
     }
   }
 
+  if (preflightProvider) {
+    let preflight: { ok: true } | { ok: false; message: string }
+    try {
+      preflight = await preflightProvider()
+    } catch (err: unknown) {
+      preflight = {
+        ok: false,
+        message: `provider preflight failed: ${(err as Error).message || 'unknown error'}`,
+      }
+    }
+    if (!preflight.ok) {
+      pushNote(preflight.message, 'error')
+      setStreaming(false)
+      setActiveCheckpoint(undefined)
+      return {
+        finishedNormally: false,
+        cancelled: controller.signal.aborted,
+      }
+    }
+  }
+
   try {
     for await (const ev of runRuntimeTurn({
       provider,
@@ -284,11 +304,13 @@ export async function runStreamingTurn(
         finalizeStreamingRows,
         discardStreamingRows,
         resetIteration,
+        stopThinkingCursor,
         setAccumulated: text => { accumulated = text },
         getAccumulated: () => accumulated,
         setThinkingContent: text => { thinkingContent = text },
         getThinkingContent: () => thinkingContent,
         setThinkingRowId: id => { thinkingRowId = id },
+        markThinkingCursorActive: () => { thinkingCursorActive = true },
         getThinkingRowId: () => thinkingRowId,
         markPendingToolUse: () => { hasPendingToolUse = true },
         updateRows,
@@ -332,12 +354,14 @@ type EventHandlerContext = {
   finalizeStreamingRows: () => void
   discardStreamingRows: () => void
   resetIteration: () => void
+  stopThinkingCursor: () => void
   setAccumulated: (text: string) => void
   getAccumulated: () => string
   setThinkingContent: (text: string) => void
   getThinkingContent: () => string
   setThinkingRowId: (id: string | null) => void
   getThinkingRowId: () => string | null
+  markThinkingCursorActive: () => void
   markPendingToolUse: () => void
   updateRows: (updater: (prev: MessageRow[]) => MessageRow[]) => void
   pushNote: (text: string, kind?: 'info' | 'error' | 'dim') => void
@@ -368,6 +392,7 @@ async function handleEvent(ev: TurnEvent, ctx: EventHandlerContext): Promise<voi
       return
     }
     case 'text': {
+      ctx.stopThinkingCursor()
       ctx.ensureAssistantRow()
       const next = ctx.getAccumulated() + ev.delta
       ctx.setAccumulated(next)
@@ -382,6 +407,7 @@ async function handleEvent(ev: TurnEvent, ctx: EventHandlerContext): Promise<voi
       if (ctx.getThinkingRowId() === null) {
         const id = ctx.nextRowId()
         ctx.setThinkingRowId(id)
+        ctx.markThinkingCursorActive()
         ctx.updateRows(prev => [
           ...prev,
           {
@@ -391,6 +417,7 @@ async function handleEvent(ev: TurnEvent, ctx: EventHandlerContext): Promise<voi
             liveTail: appended,
             streaming: true,
             expanded: false,
+            showCursor: true,
           },
         ])
       }
@@ -474,6 +501,69 @@ async function handleEvent(ev: TurnEvent, ctx: EventHandlerContext): Promise<voi
     case 'tool_use_delta':
       return
   }
+}
+
+function updateStreamingRows(
+  rows: MessageRow[],
+  assistantId: string | null,
+  thinkingRowId: string | null,
+  assistantText: string | null,
+  thinkingText: string | null,
+): MessageRow[] {
+  let next: MessageRow[] | null = null
+  if (assistantId && assistantText !== null) {
+    const index = findRowIndexById(rows, assistantId)
+    const row = rows[index]
+    if (row?.role === 'assistant') {
+      next = next ?? rows.slice()
+      next[index] = { ...row, content: assistantText, liveTail: '' }
+    }
+  }
+  const source = next ?? rows
+  if (thinkingRowId && thinkingText !== null) {
+    const index = findRowIndexById(source, thinkingRowId)
+    const row = source[index]
+    if (row?.role === 'thinking') {
+      next = next ?? rows.slice()
+      next[index] = { ...row, content: thinkingText, liveTail: '' }
+    }
+  }
+  return next ?? rows
+}
+
+function finalizeStreamingRowsById(
+  rows: MessageRow[],
+  assistantId: string | null,
+  thinkingRowId: string | null,
+  assistantText: string,
+  thinkingText: string,
+): MessageRow[] {
+  let next: MessageRow[] | null = null
+  if (assistantId) {
+    const index = findRowIndexById(rows, assistantId)
+    const row = rows[index]
+    if (row?.role === 'assistant') {
+      next = next ?? rows.slice()
+      next[index] = { ...row, content: assistantText || row.content, liveTail: undefined, streaming: false }
+    }
+  }
+  const source = next ?? rows
+  if (thinkingRowId) {
+    const index = findRowIndexById(source, thinkingRowId)
+    const row = source[index]
+    if (row?.role === 'thinking') {
+      next = next ?? rows.slice()
+      next[index] = { ...row, content: thinkingText || row.content, liveTail: undefined, streaming: false, showCursor: false }
+    }
+  }
+  return next ?? rows
+}
+
+function findRowIndexById(rows: MessageRow[], id: string): number {
+  for (let index = rows.length - 1; index >= 0; index -= 1) {
+    if (rows[index]?.id === id) return index
+  }
+  return -1
 }
 
 // ---------------------------------------------------------------------------

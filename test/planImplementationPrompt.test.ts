@@ -1,6 +1,9 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { buildPlanImplementationPrompt, buildPlanTransferSeedMessages } from '../src/ui/ChatScreen.js'
+import {
+  buildPlanImplementationPrompt,
+  buildPlanTransferSeedMessages,
+} from '../src/ui/ChatScreen.js'
 import { PLAN_APPROVAL_OPTIONS } from '../src/ui/PlanApprovalView.js'
 import { CONTEXT_LIMIT_OPTIONS } from '../src/ui/ContextLimitView.js'
 

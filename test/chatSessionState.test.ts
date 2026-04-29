@@ -118,6 +118,29 @@ test('buildResumedSessionState restores cwd, mode, config, and transcript rows',
   assert.equal(resumed.rows.at(-1)?.role, 'note')
 })
 
+test('buildResumedSessionState keeps every resumed transcript row visible to the renderer', () => {
+  let rowId = 0
+  const messages: SessionMessage[] = Array.from({ length: 450 }, (_, index) => ({
+    role: index % 2 === 0 ? 'user' : 'assistant',
+    content: `message ${index}`,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    turnId: `turn-${Math.floor(index / 2)}`,
+  }))
+
+  const resumed = buildResumedSessionState({
+    messages,
+    metadata: null,
+    fallbackCwd: 'C:/fallback',
+    currentConfig: baseConfig,
+    nextRowId: () => `row-${++rowId}`,
+  })
+
+  assert.equal(resumed.rows.length, messages.length + 1)
+  assert.equal(resumed.rows[0]?.role, 'user')
+  assert.equal(resumed.rows[0]?.id, 'row-1')
+  assert.equal(resumed.rows.at(-1)?.role, 'note')
+})
+
 test('restoreConversationState truncates to the first matching turn boundary', () => {
   const messages: SessionMessage[] = [
     { role: 'user', content: 'first', createdAt: '2026-01-01T00:00:00.000Z', turnId: 'turn-a' },

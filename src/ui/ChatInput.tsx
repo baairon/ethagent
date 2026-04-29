@@ -55,6 +55,10 @@ const PASTE_FLUSH_LIMIT = 4096
 const MIN_INPUT_VIEWPORT_LINES = 3
 const PROMPT_FOOTER_LINES = 5
 const MAX_INLINE_PASTE_LINES = 2
+const STACK_HORIZONTAL_PADDING = 2
+const INPUT_BORDER_WIDTH = 2
+const INPUT_HORIZONTAL_PADDING = 4
+const PROMPT_PREFIX_WIDTH = 2
 
 export const ChatInput: React.FC<PromptInputProps> = ({
   onSubmit,
@@ -287,7 +291,7 @@ export const ChatInput: React.FC<PromptInputProps> = ({
     applyBuffer(next.buffer)
   }, [applyBuffer, applyHistoryState, history])
 
-  const wrapWidth = Math.max(20, columns - 8)
+  const wrapWidth = inputWrapWidth(columns)
   const maxVisibleInputLines = Math.max(MIN_INPUT_VIEWPORT_LINES, Math.floor(rows / 2) - PROMPT_FOOTER_LINES)
 
   useAppInput((input, key, event) => {
@@ -601,7 +605,7 @@ type RenderedInputViewport = {
   visibleLineCount: number
 }
 
-function renderWithCursor(
+export function renderWithCursor(
   value: string,
   cursor: number,
   showCursor: boolean,
@@ -618,7 +622,7 @@ function renderWithCursor(
       lines: visibleLines.map((line, i) => ({
         visualLineIndex: window.start + i,
         node: (
-          <Text color={theme.text} wrap="truncate">
+          <Text color={theme.text} wrap="wrap">
             {value.slice(line.start, line.end) || ' '}
           </Text>
         ),
@@ -636,7 +640,7 @@ function renderWithCursor(
       if (visualLineIndex !== cursorLine) {
         return {
           visualLineIndex,
-          node: <Text color={theme.text} wrap="truncate">{text || ' '}</Text>,
+          node: <Text color={theme.text} wrap="wrap">{text || ' '}</Text>,
         }
       }
       const column = Math.max(0, Math.min(cursor - line.start, text.length))
@@ -646,7 +650,7 @@ function renderWithCursor(
       return {
         visualLineIndex,
         node: (
-          <Text color={theme.text} wrap="truncate">
+          <Text color={theme.text} wrap="wrap">
             {before}
             <Text backgroundColor={theme.accentMint} color="#08110c">{atChar}</Text>
             {after}
@@ -658,6 +662,15 @@ function renderWithCursor(
     hiddenBelow: lines.length - window.end,
     visibleLineCount: Math.max(1, visibleLines.length),
   }
+}
+
+export function inputWrapWidth(columns: number): number {
+  const fixedChromeWidth =
+    STACK_HORIZONTAL_PADDING
+    + INPUT_BORDER_WIDTH
+    + INPUT_HORIZONTAL_PADDING
+    + PROMPT_PREFIX_WIDTH
+  return Math.max(1, Math.floor(columns) - fixedChromeWidth)
 }
 
 function isFallbackPasteInput(input: string): boolean {

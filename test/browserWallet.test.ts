@@ -155,14 +155,10 @@ test('browser wallet account requests return the connected address without a sig
   assert.equal(result.account, '0x000000000000000000000000000000000000dEaD')
 })
 
-test('wallet preview assets stay outside shipped wallet assets', () => {
-  const index = readFileSync('test/manual/wallet-preview/index.html', 'utf8')
-  const tweaks = readFileSync('test/manual/wallet-preview/tweaks-panel.jsx', 'utf8')
+test('shipped wallet page does not depend on removed manual preview assets', () => {
   const wallet = readFileSync('src/identity/wallet-page/wallet.html', 'utf8')
 
-  assert.match(index, /src="wallet\.html"/)
-  assert.match(index, /src="tweaks-panel\.jsx"/)
-  assert.match(tweaks, /function TweaksPanel/)
-  assert.match(tweaks, /function useTweaks/)
   assert.doesNotMatch(wallet, /tweaks-panel/)
+  assert.doesNotMatch(wallet, /wallet-preview/)
+  assert.doesNotMatch(wallet, /test\/manual/)
 })
