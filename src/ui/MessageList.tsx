@@ -6,7 +6,7 @@ import { ProgressBar } from './ProgressBar.js'
 export type MessageRow =
   | { role: 'user'; id: string; content: string }
   | { role: 'assistant'; id: string; content: string; liveTail?: string; streaming?: boolean }
-  | { role: 'thinking'; id: string; content: string; liveTail?: string; streaming?: boolean; expanded?: boolean }
+  | { role: 'thinking'; id: string; content: string; liveTail?: string; streaming?: boolean; expanded?: boolean; showCursor?: boolean }
   | { role: 'tool_use'; id: string; name: string; summary: string; input?: string }
   | { role: 'tool_result'; id: string; name: string; summary: string; content: string; isError?: boolean }
   | { role: 'note'; id: string; kind: 'info' | 'error' | 'dim'; content: string }
@@ -37,6 +37,9 @@ type InlineToken =
   | { kind: 'italic'; text: string }
   | { kind: 'code'; text: string }
 
+const MAX_RENDERED_MESSAGE_CHARS = 12_000
+const MAX_RENDERED_REASONING_CHARS = 10_000
+
 const MessageListInner: React.FC<MessageListProps> = ({ rows }) => (
   <Box flexDirection="column">
     {rows.map(row => <RowView key={row.id} row={row} />)}
@@ -63,9 +66,13 @@ export function toggleLatestReasoningRow(rows: MessageRow[]): MessageRow[] {
 
 const RowViewInner: React.FC<{ row: MessageRow }> = ({ row }) => {
   if (row.role === 'user') {
-    const lines = row.content.length === 0 ? [''] : row.content.split('\n')
+    const display = clipTextForDisplay(row.content, MAX_RENDERED_MESSAGE_CHARS)
+    const lines = display.text.length === 0 ? [''] : display.text.split('\n')
     return (
       <Box flexDirection="column" marginTop={1}>
+        {display.omittedChars > 0 ? (
+          <Text color={theme.dim}>{`  ${display.omittedChars} earlier characters omitted`}</Text>
+        ) : null}
         {lines.map((line, i) => (
           <Text key={i}>
             <Text color={i === 0 ? theme.accentMint : theme.dim}>{i === 0 ? '> ' : '  '}</Text>
@@ -87,27 +94,28 @@ const RowViewInner: React.FC<{ row: MessageRow }> = ({ row }) => {
   if (row.role === 'thinking') {
     const text = reasoningText(row)
     const preview = summarizeThinking(text)
+    const borderColor = reasoningBorderColor(row)
+    const showCursor = reasoningCursorVisible(row)
     if (row.expanded) {
       return (
-        <Box flexDirection="column" marginTop={1} borderStyle="round" borderColor={theme.accentPeach} paddingX={1}>
+        <Box flexDirection="column" marginTop={1} borderStyle="round" borderColor={borderColor} paddingX={1}>
           <Text>
-            <Text color={theme.accentPeach} bold>v reasoning</Text>
-            <Text color={theme.dim}>  alt+t collapse</Text>
-            {row.streaming ? <ThinkingCursor active hasPreview /> : null}
+            <Text color={theme.accentPeach} bold>reasoning</Text>
+            <Text color={theme.dim}> · expanded · Alt+T collapse</Text>
           </Text>
-          <ReasoningBody content={text} streaming={row.streaming} />
+          <ReasoningBody content={text} showCursor={showCursor} />
         </Box>
       )
     }
     return (
-      <Box flexDirection="column" marginTop={1} borderStyle="round" borderColor={theme.accentPeach} paddingX={1}>
+      <Box flexDirection="column" marginTop={1} borderStyle="round" borderColor={borderColor} paddingX={1}>
         <Text>
-          <Text color={theme.accentPeach} bold>{'> reasoning'}</Text>
-          <Text color={theme.dim}>  alt+t inspect</Text>
+          <Text color={theme.accentPeach} bold>reasoning</Text>
+          <Text color={theme.dim}> · collapsed · Alt+T inspect</Text>
         </Text>
         <Text color={theme.textSubtle}>
           {preview || 'thinking...'}
-          {row.streaming ? <ThinkingCursor active hasPreview={Boolean(preview)} /> : null}
+          {showCursor ? <ThinkingCursor active hasPreview={Boolean(preview)} /> : null}
         </Text>
       </Box>
     )
@@ -163,18 +171,33 @@ const RowViewInner: React.FC<{ row: MessageRow }> = ({ row }) => {
 
 const RowView = React.memo(RowViewInner)
 
-const ReasoningBody: React.FC<{ content: string; streaming?: boolean }> = ({ content, streaming }) => {
+export function reasoningBorderColor(row: Extract<MessageRow, { role: 'thinking' }>): string {
+  return row.streaming ? theme.accentPeach : theme.border
+}
+
+export function reasoningCursorVisible(row: Extract<MessageRow, { role: 'thinking' }>): boolean {
+  return Boolean(row.streaming && row.showCursor)
+}
+
+const ReasoningBody: React.FC<{ content: string; showCursor?: boolean }> = ({ content, showCursor }) => {
+  const display = useMemo(
+    () => clipTextForDisplay(content, MAX_RENDERED_REASONING_CHARS),
+    [content],
+  )
   const lines = useMemo(() => {
-    const normalized = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+    const normalized = display.text.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
     return normalized.length === 0 ? [''] : normalized.split('\n')
-  }, [content])
+  }, [display.text])
 
   return (
     <Box flexDirection="column">
+      {display.omittedChars > 0 ? (
+        <Text color={theme.dim}>{`${display.omittedChars} earlier reasoning characters omitted`}</Text>
+      ) : null}
       {lines.map((line, index) => (
         <Text key={index} color={theme.textSubtle}>
           {line || ' '}
-          {streaming && index === lines.length - 1 ? <ThinkingCursor active hasPreview={line.length > 0} /> : null}
+          {showCursor && index === lines.length - 1 ? <ThinkingCursor active hasPreview={line.length > 0} /> : null}
         </Text>
       ))}
     </Box>
@@ -186,22 +209,26 @@ const AssistantBody: React.FC<{ content: string; liveTail?: string; streaming?: 
   liveTail,
   streaming,
 }) => {
-  const committedBlocks = useMemo(() => parseMarkdownBlocks(content), [content])
-  const tailBlocks = useMemo(() => parseMarkdownBlocks(liveTail ?? ''), [liveTail])
+  const fullText = liveTail ? content + liveTail : content
+  const display = useMemo(
+    () => clipTextForDisplay(fullText, MAX_RENDERED_MESSAGE_CHARS),
+    [fullText],
+  )
+  const blocks = useMemo(() => parseMarkdownBlocks(display.text), [display.text])
 
   return (
     <Box flexDirection="column">
-      {committedBlocks.map((block, index) => (
-        <MarkdownBlockView key={`committed-${index}`} block={block} streaming={false} />
-      ))}
-      {tailBlocks.map((block, index) => (
+      {display.omittedChars > 0 ? (
+        <Text color={theme.dim}>{`${display.omittedChars} earlier characters omitted`}</Text>
+      ) : null}
+      {blocks.map((block, index) => (
         <MarkdownBlockView
-          key={`tail-${index}`}
+          key={index}
           block={block}
-          streaming={streaming && index === tailBlocks.length - 1}
+          streaming={streaming && index === blocks.length - 1}
         />
       ))}
-      {streaming && committedBlocks.length === 0 && tailBlocks.length === 0 ? (
+      {streaming && blocks.length === 0 ? (
         <Text color={theme.accentSecondary}>
           <StreamCursor active />
         </Text>
@@ -216,7 +243,9 @@ const MarkdownBlockView: React.FC<{ block: MarkdownBlock; streaming?: boolean }>
       block.level === 1 ? theme.accentPrimary : block.level === 2 ? theme.accentSecondary : theme.accentMint
     return (
       <Box flexDirection="column" marginTop={1}>
-        <Text color={color} bold>{block.text}</Text>
+        <Text>
+          <InlineText text={block.text} color={color} bold />
+        </Text>
       </Box>
     )
   }
@@ -278,7 +307,7 @@ const MarkdownBlockView: React.FC<{ block: MarkdownBlock; streaming?: boolean }>
   )
 }
 
-const InlineText: React.FC<{ text: string; color: string }> = ({ text, color }) => {
+const InlineText: React.FC<{ text: string; color: string; bold?: boolean }> = ({ text, color, bold }) => {
   const tokens = useMemo(() => parseInlineTokens(text), [text])
   return (
     <>
@@ -305,7 +334,7 @@ const InlineText: React.FC<{ text: string; color: string }> = ({ text, color }) 
           )
         }
         return (
-          <Text key={index} color={color}>
+          <Text key={index} color={color} bold={bold}>
             {token.text}
           </Text>
         )
@@ -473,20 +502,21 @@ function codeLineColor(lang: string | null, line: string): string {
 
 function parseInlineTokens(text: string): InlineToken[] {
   const tokens: InlineToken[] = []
+  const source = normalizeInlineDisplayText(text)
   const pattern = /(`[^`\n]+`|\*\*[^*\n]+?\*\*|__[^_\n]+?__|\*[^*\n]+?\*|_[^_\n]+?_)/g
   let lastIndex = 0
   let match: RegExpExecArray | null
 
-  while ((match = pattern.exec(text)) !== null) {
+  while ((match = pattern.exec(source)) !== null) {
     if (match.index > lastIndex) {
-      tokens.push({ kind: 'text', text: text.slice(lastIndex, match.index) })
+      tokens.push({ kind: 'text', text: cleanPlainInlineText(source.slice(lastIndex, match.index)) })
     }
 
     const token = match[0]
     if ((token.startsWith('**') && token.endsWith('**')) || (token.startsWith('__') && token.endsWith('__'))) {
-      tokens.push({ kind: 'bold', text: token.slice(2, -2) })
+      tokens.push({ kind: 'bold', text: cleanPlainInlineText(token.slice(2, -2)) })
     } else if ((token.startsWith('*') && token.endsWith('*')) || (token.startsWith('_') && token.endsWith('_'))) {
-      tokens.push({ kind: 'italic', text: token.slice(1, -1) })
+      tokens.push({ kind: 'italic', text: cleanPlainInlineText(token.slice(1, -1)) })
     } else if (token.startsWith('`') && token.endsWith('`')) {
       tokens.push({ kind: 'code', text: token.slice(1, -1) })
     }
@@ -494,20 +524,49 @@ function parseInlineTokens(text: string): InlineToken[] {
     lastIndex = match.index + token.length
   }
 
-  if (lastIndex < text.length || tokens.length === 0) {
-    tokens.push({ kind: 'text', text: text.slice(lastIndex) })
+  if (lastIndex < source.length || tokens.length === 0) {
+    tokens.push({ kind: 'text', text: cleanPlainInlineText(source.slice(lastIndex)) })
   }
 
-  return tokens
+  return tokens.filter(token => token.text.length > 0)
+}
+
+function normalizeInlineDisplayText(text: string): string {
+  return text
+    .replace(/\\\(/g, '')
+    .replace(/\\\)/g, '')
+    .replace(/\\\[/g, '')
+    .replace(/\\\]/g, '')
+    .replace(/\$\$([^$]+)\$\$/g, '$1')
+    .replace(/\$([^$\n]+)\$/g, '$1')
+    .replace(/\\([{}[\]()])/g, '$1')
+    .replace(/\/([{}])/g, '$1')
+}
+
+function cleanPlainInlineText(text: string): string {
+  return text.replace(/\*+/g, '')
 }
 
 function summarizeThinking(text: string): string {
-  const normalized = text.replace(/\s+/g, ' ').trim()
+  const sample = text.length > 1000 ? text.slice(-1000) : text
+  const normalized = sample.replace(/\s+/g, ' ').trim()
   if (!normalized) return ''
-  if (normalized.length <= 120) return normalized
-  return `${normalized.slice(0, 117)}...`
+  const prefix = text.length > sample.length ? '...' : ''
+  if (normalized.length + prefix.length <= 120) return `${prefix}${normalized}`
+  return `${prefix}${normalized.slice(Math.max(0, normalized.length - (120 - prefix.length)))}`
+}
+
+function clipTextForDisplay(text: string, maxChars: number): { text: string; omittedChars: number } {
+  if (text.length <= maxChars) return { text, omittedChars: 0 }
+  const rawStart = Math.max(0, text.length - maxChars)
+  const newline = text.indexOf('\n', rawStart)
+  const start = newline >= 0 && newline - rawStart <= 240 ? newline + 1 : rawStart
+  return {
+    text: text.slice(start),
+    omittedChars: start,
+  }
 }
 
 function reasoningText(row: Extract<MessageRow, { role: 'thinking' }>): string {
-  return [row.content, row.liveTail ?? ''].filter(Boolean).join('')
+  return row.liveTail ? row.content + row.liveTail : row.content
 }

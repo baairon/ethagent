@@ -66,6 +66,14 @@ export type TranscriptTailSelection<T> = {
   hiddenCount: number
 }
 
+export type TranscriptWindowSelection<T> = {
+  rows: T[]
+  hiddenBefore: number
+  hiddenAfter: number
+  totalLines: number
+  maxScrollOffset: number
+}
+
 export function selectTailRowsForViewport<T>(
   rows: T[],
   maxLines: number,
@@ -89,6 +97,113 @@ export function selectTailRowsForViewport<T>(
   return {
     rows: rows.slice(firstVisible),
     hiddenCount: firstVisible,
+  }
+}
+
+export function selectRowsForScrollOffset<T>(
+  rows: T[],
+  maxLines: number,
+  scrollOffsetFromTail: number,
+  estimateHeight: (row: T) => number,
+): TranscriptWindowSelection<T> {
+  if (rows.length === 0) {
+    return { rows: [], hiddenBefore: 0, hiddenAfter: 0, totalLines: 0, maxScrollOffset: 0 }
+  }
+
+  const budget = Math.max(1, Math.floor(maxLines))
+  const heights = rows.map(row => Math.max(1, estimateHeight(row)))
+  const offsets = buildLineOffsets(heights)
+  const totalLines = offsets[offsets.length - 1] ?? 0
+  const maxScrollOffset = Math.max(0, totalLines - budget)
+  const scrollOffset = clampLine(scrollOffsetFromTail, maxScrollOffset)
+  const startLine = Math.max(0, totalLines - budget - scrollOffset)
+
+  return selectRowsForLineWindow(rows, offsets, budget, startLine, totalLines, maxScrollOffset)
+}
+
+export function selectRowsForScrollTop<T>(
+  rows: T[],
+  maxLines: number,
+  scrollTopLine: number,
+  estimateHeight: (row: T) => number,
+): TranscriptWindowSelection<T> {
+  if (rows.length === 0) {
+    return { rows: [], hiddenBefore: 0, hiddenAfter: 0, totalLines: 0, maxScrollOffset: 0 }
+  }
+
+  const budget = Math.max(1, Math.floor(maxLines))
+  const heights = rows.map(row => Math.max(1, estimateHeight(row)))
+  const offsets = buildLineOffsets(heights)
+  const totalLines = offsets[offsets.length - 1] ?? 0
+  const maxScrollOffset = Math.max(0, totalLines - budget)
+  const startLine = clampLine(scrollTopLine, maxScrollOffset)
+
+  return selectRowsForLineWindow(rows, offsets, budget, startLine, totalLines, maxScrollOffset)
+}
+
+export function promptScrollTopForPageUp(
+  rows: MessageRow[],
+  offsets: number[],
+  scrollTopLine: number,
+  maxScrollTop: number,
+  followTail: boolean,
+): number {
+  const promptStarts = promptScrollTops(rows, offsets)
+  if (promptStarts.length === 0) return clampLine(scrollTopLine, maxScrollTop)
+  if (followTail) return clampLine(promptStarts[promptStarts.length - 1]!, maxScrollTop)
+
+  const currentLine = clampLine(scrollTopLine, maxScrollTop)
+  for (let index = promptStarts.length - 1; index >= 0; index -= 1) {
+    const line = promptStarts[index]!
+    if (line < currentLine) return clampLine(line, maxScrollTop)
+  }
+  return 0
+}
+
+export function promptScrollTopForPageDown(
+  rows: MessageRow[],
+  offsets: number[],
+  scrollTopLine: number,
+  maxScrollTop: number,
+): number {
+  const promptStarts = promptScrollTops(rows, offsets)
+  if (promptStarts.length === 0) return clampLine(scrollTopLine, maxScrollTop)
+
+  const currentLine = clampLine(scrollTopLine, maxScrollTop)
+  const next = promptStarts.find(line => line > currentLine)
+  return next === undefined ? maxScrollTop : clampLine(next, maxScrollTop)
+}
+
+function promptScrollTops(rows: MessageRow[], offsets: number[]): number[] {
+  const starts: number[] = []
+  for (let index = 0; index < rows.length; index += 1) {
+    if (rows[index]?.role === 'user') starts.push(offsets[index] ?? 0)
+  }
+  return starts
+}
+
+function selectRowsForLineWindow<T>(
+  rows: T[],
+  offsets: number[],
+  budget: number,
+  startLine: number,
+  totalLines: number,
+  maxScrollOffset: number,
+): TranscriptWindowSelection<T> {
+  const endLine = Math.min(totalLines, startLine + budget)
+
+  const startIndex = Math.min(rows.length - 1, findRowIndexAtLine(offsets, startLine))
+  const lastVisibleLine = Math.max(startLine, endLine - 1)
+  const endIndex = endLine >= totalLines
+    ? rows.length
+    : Math.min(rows.length, findRowIndexAtLine(offsets, lastVisibleLine) + 1)
+
+  return {
+    rows: rows.slice(startIndex, endIndex),
+    hiddenBefore: startIndex,
+    hiddenAfter: rows.length - endIndex,
+    totalLines,
+    maxScrollOffset,
   }
 }
 

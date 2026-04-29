@@ -28,6 +28,7 @@ type Options = {
   apiKey?: string
   loadApiKey?: () => Promise<string | null>
   tools?: OpenAIToolDefinition[]
+  maxRetries?: number
 }
 
 type ChatChunk = {
@@ -74,6 +75,7 @@ export class OpenAIChatProvider implements Provider {
   private readonly apiKey: string
   private readonly loadApiKey?: () => Promise<string | null>
   private readonly tools: OpenAIToolDefinition[]
+  private readonly maxRetries?: number
 
   constructor(opts: Options) {
     this.id = opts.id
@@ -82,6 +84,7 @@ export class OpenAIChatProvider implements Provider {
     this.apiKey = opts.apiKey ?? ''
     this.loadApiKey = opts.loadApiKey
     this.tools = opts.tools ?? []
+    this.maxRetries = opts.maxRetries
     this.supportsTools = this.tools.length > 0
   }
 
@@ -112,10 +115,10 @@ export class OpenAIChatProvider implements Provider {
           stream: true,
           stream_options: { include_usage: true },
         }),
-      }, { signal })
+      }, { signal, maxRetries: this.maxRetries })
     } catch (err: unknown) {
       if (signal.aborted) return
-      const message = (err as Error).message || 'network error'
+      const message = providerNetworkErrorMessage(this.id, this.baseUrl, err)
       yield { type: 'error', message }
       return
     }
@@ -181,7 +184,7 @@ export class OpenAIChatProvider implements Provider {
       }
     } catch (err: unknown) {
       if (signal.aborted) return
-      yield { type: 'error', message: (err as Error).message || 'stream error' }
+      yield { type: 'error', message: providerNetworkErrorMessage(this.id, this.baseUrl, err, 'stream error') }
       return
     }
 
@@ -357,6 +360,17 @@ function normalizeFinishReason(reason: string): DoneStopReason {
   if (reason === 'length') return 'max_tokens'
   if (reason === 'stop_sequence') return 'stop_sequence'
   return 'unknown'
+}
+
+function providerNetworkErrorMessage(
+  provider: ProviderId,
+  baseUrl: string,
+  err: unknown,
+  fallback = 'network error',
+): string {
+  const message = (err as Error).message || fallback
+  if (provider !== 'ollama' && provider !== 'llamacpp') return message
+  return `${provider} request failed at ${baseUrl}: ${message}`
 }
 
 function repairJsonObject(input: string): string | undefined {

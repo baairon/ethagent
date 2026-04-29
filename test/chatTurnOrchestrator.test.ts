@@ -17,6 +17,8 @@ function makeContext(overrides: {
   sessionMessages: SessionMessage[]
   rows: MessageRow[]
   mode?: 'chat' | 'accept-edits' | 'plan'
+  notes?: Array<{ text: string; kind: 'info' | 'error' | 'dim' }>
+  preflightProvider?: () => Promise<{ ok: true } | { ok: false; message: string }>
   executeTool?: (name: string, input: Record<string, unknown>) => Promise<{ result: { ok: boolean; summary: string; content: string } }>
 }) {
   return {
@@ -45,7 +47,9 @@ function makeContext(overrides: {
     updateRows: (updater: (prev: MessageRow[]) => MessageRow[]) => {
       overrides.rows.splice(0, overrides.rows.length, ...updater(overrides.rows))
     },
-    pushNote: () => {},
+    pushNote: (text: string, kind: 'info' | 'error' | 'dim' = 'info') => {
+      overrides.notes?.push({ text, kind })
+    },
     persistTurnMessage: async (message: SessionMessage) => {
       overrides.sessionMessages.push(message)
     },
@@ -58,6 +62,7 @@ function makeContext(overrides: {
           throw new Error(`unexpected tool call: ${name}`)
         },
     applySessionRule: async () => {},
+    preflightProvider: overrides.preflightProvider,
     pendingAssistantTextRef: { current: null },
     pendingThinkingTextRef: { current: null },
     streamFlushTimerRef: { current: null },
@@ -200,6 +205,86 @@ test('runStreamingTurn executes direct cd requests without asking the model', as
   assert.equal(toolCalls, 1)
   assert.ok(sessionMessages.some(m => m.role === 'tool_use' && m.name === 'change_directory'))
   assert.ok(rows.some(row => row.role === 'tool_result' && row.name === 'change_directory'))
+})
+
+test('runStreamingTurn proceeds to provider after successful preflight', async () => {
+  const cwd = await fs.mkdtemp(path.join(os.tmpdir(), 'ethagent-orch-'))
+  const sessionMessages: SessionMessage[] = []
+  const rows: MessageRow[] = []
+  let providerCalls = 0
+  let preflightCalls = 0
+
+  const provider: Provider = {
+    id: 'llamacpp',
+    model: 'org/model#model.gguf',
+    supportsTools: true,
+    async *complete(): AsyncIterable<StreamEvent> {
+      providerCalls += 1
+      yield { type: 'text', delta: 'Ready.' }
+      yield { type: 'done', stopReason: 'end_turn' }
+    },
+  }
+
+  const result = await runStreamingTurn(makeContext({
+    cwd,
+    provider,
+    userText: 'hello local model',
+    sessionMessages,
+    rows,
+    mode: 'chat',
+    preflightProvider: async () => {
+      preflightCalls += 1
+      return { ok: true }
+    },
+  }))
+
+  assert.equal(result.finishedNormally, true)
+  assert.equal(preflightCalls, 1)
+  assert.equal(providerCalls, 1)
+  assert.ok(rows.some(row => row.role === 'assistant' && row.content === 'Ready.'))
+})
+
+test('runStreamingTurn skips provider call when preflight fails', async () => {
+  const cwd = await fs.mkdtemp(path.join(os.tmpdir(), 'ethagent-orch-'))
+  const sessionMessages: SessionMessage[] = []
+  const rows: MessageRow[] = []
+  const notes: Array<{ text: string; kind: 'info' | 'error' | 'dim' }> = []
+  let providerCalls = 0
+
+  const provider: Provider = {
+    id: 'llamacpp',
+    model: 'org/model#model.gguf',
+    supportsTools: true,
+    async *complete(): AsyncIterable<StreamEvent> {
+      providerCalls += 1
+      yield { type: 'text', delta: 'should not stream' }
+      yield { type: 'done', stopReason: 'end_turn' }
+    },
+  }
+
+  const result = await runStreamingTurn(makeContext({
+    cwd,
+    provider,
+    userText: 'hello local model',
+    sessionMessages,
+    rows,
+    notes,
+    mode: 'chat',
+    preflightProvider: async () => ({
+      ok: false,
+      message: 'local runner is not reachable; failed to start org/model / model.gguf: runner missing',
+    }),
+  }))
+
+  assert.equal(result.finishedNormally, false)
+  assert.equal(providerCalls, 0)
+  assert.ok(notes.some(note =>
+    note.kind === 'error' &&
+    /local runner is not reachable/.test(note.text),
+  ))
+  assert.ok(rows.every(row =>
+    row.role !== 'assistant' || !row.content.includes('should not stream'),
+  ))
 })
 
 test('runStreamingTurn suppresses unverified state claims during corrective nudges', async () => {
@@ -501,6 +586,7 @@ test('runStreamingTurn keeps reasoning collapsed and out of session history', as
   assert.ok(reasoning)
   assert.equal(reasoning.expanded, false)
   assert.equal(reasoning.streaming, false)
+  assert.equal(reasoning.showCursor, false)
   assert.equal(reasoning.content, 'First step. Second step.')
   assert.ok(rows.some(row => row.role === 'assistant' && row.content === 'Done.'))
   assert.ok(sessionMessages.every(message =>
@@ -511,4 +597,37 @@ test('runStreamingTurn keeps reasoning collapsed and out of session history', as
   const expandedReasoning = expanded.find((row): row is Extract<MessageRow, { role: 'thinking' }> => row.role === 'thinking')
   assert.ok(expandedReasoning)
   assert.equal(expandedReasoning.expanded, true)
+})
+
+test('runStreamingTurn hides the reasoning cursor as soon as answer text starts', async () => {
+  const cwd = await fs.mkdtemp(path.join(os.tmpdir(), 'ethagent-orch-'))
+  const sessionMessages: SessionMessage[] = []
+  const rows: MessageRow[] = []
+  let checkedAfterText = false
+
+  const provider: Provider = {
+    id: 'ollama',
+    model: 'qwen-test',
+    supportsTools: true,
+    async *complete(): AsyncIterable<StreamEvent> {
+      yield { type: 'thinking', delta: 'Thinking.' }
+      yield { type: 'text', delta: 'Answer.' }
+      const reasoning = rows.find((row): row is Extract<MessageRow, { role: 'thinking' }> => row.role === 'thinking')
+      assert.ok(reasoning)
+      assert.equal(reasoning.showCursor, false)
+      checkedAfterText = true
+      yield { type: 'done', stopReason: 'end_turn' }
+    },
+  }
+
+  await runStreamingTurn(makeContext({
+    cwd,
+    provider,
+    userText: 'think then answer',
+    sessionMessages,
+    rows,
+    mode: 'chat',
+  }))
+
+  assert.equal(checkedAfterText, true)
 })

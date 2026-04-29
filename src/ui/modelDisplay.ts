@@ -30,12 +30,15 @@ export function formatLocalHfModelDisplayName(
   const maxLength = options.maxLength ?? DEFAULT_MODEL_DISPLAY_MAX
   const parsed = parseLocalHfModelId(modelId)
   const label = options.displayName?.trim()
-    || (parsed ? friendlyFilename(parsed.filename) : modelId)
-  if (!parsed && !label.includes(HF_SEPARATOR)) return truncateMiddle(label, maxLength)
+  if (label) {
+    const parts = splitLocalHfDisplayName(label)
+    if (parts) return formatRepoAndFile(parts.repoId, parts.filename, maxLength)
+    if (parsed) return formatRepoAndFile(parsed.repoId, parsed.filename, maxLength)
+    return truncateMiddle(label, maxLength)
+  }
 
-  const parts = splitLocalHfDisplayName(label)
-  if (!parts) return truncateMiddle(label, maxLength)
-  return formatRepoAndFile(parts.repoId, parts.filename, maxLength)
+  if (parsed) return formatRepoAndFile(parsed.repoId, parsed.filename, maxLength)
+  return truncateMiddle(modelId, maxLength)
 }
 
 export function truncateMiddle(value: string, maxLength: number): string {

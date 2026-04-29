@@ -46,7 +46,7 @@ import {
 import { defaultBaseUrlFor, defaultModelFor, saveConfig } from '../storage/config.js'
 import { getCwd as getRuntimeCwd, setCwd as setRuntimeCwd, syncCwdFromProcess } from '../runtime/cwd.js'
 import { executeToolWithPermissions } from '../runtime/toolExecution.js'
-import { nextSessionMode, sessionModeLabel, type PermissionMode, toPermissionMode, type SessionMode } from '../runtime/sessionMode.js'
+import { nextSessionMode, sessionModeLabel, type PermissionMode, type SessionMode } from '../runtime/sessionMode.js'
 import type {
   PermissionDecision,
   PermissionRequest,
@@ -63,6 +63,7 @@ import { setTokenIdentity, getIdentityStatus } from '../storage/identity.js'
 import type { IdentityHubResult } from '../identity/IdentityHub.js'
 import { buildResumedSessionState, resolveModelSelection, restoreConversationState } from './chatSessionState.js'
 import { runStreamingTurn } from './chatTurnOrchestrator.js'
+import { ensureLlamaCppRunnerReady } from './llamacppPreflight.js'
 import type { PlanApprovalAction } from './PlanApprovalView.js'
 import type { ContextLimitAction } from './ContextLimitView.js'
 
@@ -196,16 +197,20 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
     }
   }, [])
 
+  const updateRows = useCallback((updater: (prev: MessageRow[]) => MessageRow[]) => {
+    setRows(prev => updater(prev))
+  }, [])
+
   const pushNote = useCallback(
     (text: string, kind: 'info' | 'error' | 'dim' = 'info') => {
-      setRows(prev => [...prev, { role: 'note', id: nextRowId(), kind, content: text }])
+      updateRows(prev => [...prev, { role: 'note', id: nextRowId(), kind, content: text }])
     },
-    [],
+    [updateRows],
   )
 
   const toggleLatestReasoning = useCallback(() => {
-    setRows(toggleLatestReasoningRow)
-  }, [])
+    updateRows(toggleLatestReasoningRow)
+  }, [updateRows])
 
   const replaceConfig = useCallback(
     (next: EthagentConfig) => {
@@ -348,15 +353,15 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
     const controller = new AbortController()
     const progressId = nextRowId()
     pullsRef.current.set(progressId, controller)
-    setRows(prev => [
+    updateRows(prev => [
       ...prev,
       { role: 'progress', id: progressId, title: `pulling ${name}`, progress: 0, status: 'starting...' },
     ])
     return { progressId, signal: controller.signal }
-  }, [])
+  }, [updateRows])
 
   const updatePull = useCallback((progressId: string, event: PullProgress) => {
-    setRows(prev =>
+    updateRows(prev =>
       prev.map(row => {
         if (row.id !== progressId || row.role !== 'progress') return row
         const progress =
@@ -370,11 +375,11 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
         return { ...row, progress, status: event.status || row.status, suffix }
       }),
     )
-  }, [])
+  }, [updateRows])
 
   const finishPull = useCallback((progressId: string, model: string, error?: string) => {
     pullsRef.current.delete(progressId)
-    setRows(prev => {
+    updateRows(prev => {
       const filtered = prev.filter(row => row.id !== progressId)
       const note: MessageRow = error
         ? {
@@ -394,7 +399,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
           }
       return [...filtered, note]
     })
-  }, [])
+  }, [updateRows])
 
   const runCompaction = useCallback(
     async (): Promise<boolean> => {
@@ -485,8 +490,8 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
 
   const assistantTurns = useCallback((): string[] => {
     const out: string[] = []
-    for (const row of rowsRef.current) {
-      if (row.role === 'assistant' && row.content) out.push(row.content)
+    for (const message of sessionMessagesRef.current) {
+      if (message.role === 'assistant' && message.content) out.push(message.content)
     }
     return out
   }, [])
@@ -629,11 +634,12 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
         getSessionMessages: () => sessionMessagesRef.current,
         setActiveCheckpoint: checkpoint => { activeCheckpointRef.current = checkpoint },
         setStreaming,
-        updateRows: setRows,
+        updateRows,
         pushNote,
         persistTurnMessage: message => persistSessionMessage(attachActiveTurn(message)),
         executeTool,
         applySessionRule,
+        preflightProvider: () => ensureLlamaCppRunnerReady(configRef.current),
         onPlanReady: plan => {
           planCandidate = {
             text: plan,
@@ -666,7 +672,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
         setOverlay('planApproval')
       }
     },
-    [applySessionRule, attachActiveTurn, executeTool, mode, persistSessionMessage, pushNote, refreshVisibleStats],
+    [applySessionRule, attachActiveTurn, executeTool, mode, persistSessionMessage, pushNote, refreshVisibleStats, updateRows],
   )
 
   const pullInFlight = pullsRef.current.size > 0
@@ -1212,6 +1218,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
     return []
   }, [pullInFlight])
 
+  const exitHint = exitState.pending ? 'ctrl+c again to quit' : null
   const runtimeModeLabel = sessionModeLabel(mode)
   const modeColor =
     mode === 'plan'
@@ -1219,8 +1226,6 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
       : mode === 'accept-edits'
         ? theme.accentPeach
         : theme.accentMint
-  const exitHint = exitState.pending ? 'ctrl+c again to quit' : null
-  const hasReasoningRows = rows.some(row => row.role === 'thinking')
   const footerRight = (
     <Box flexDirection="row">
       {exitHint ? (
@@ -1243,13 +1248,14 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
         </>
       )}
       <Text color={theme.dim}>
-        {`esc cancels · alt+p model · alt+i identity${hasReasoningRows ? ' · alt+t reasoning' : ''}`}
+        {'esc cancels · pgup/pgdn scroll · alt+p model · alt+i identity'}
       </Text>
     </Box>
   )
+  const header = <BrandSplash contextLine={contextLine} tipLine={tipLine} />
   return (
     <ConversationStack
-      header={<BrandSplash key={`splash-${sessionKey}`} contextLine={contextLine} tipLine={tipLine} />}
+      header={header}
       rows={rows}
       transcriptActive={overlay === 'none'}
       bottomVariant={overlay === 'none' ? 'prompt' : 'overlay'}

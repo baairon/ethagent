@@ -9,7 +9,7 @@ import { formatLocalHfModelDisplayName, formatModelDisplayName } from './modelDi
 export type CloudProviderId = Exclude<ProviderId, 'ollama' | 'llamacpp'>
 
 export const MODEL_PICKER_CLOUD_PROVIDERS: CloudProviderId[] = ['openai', 'anthropic', 'gemini']
-export const LOCAL_MODEL_LINK_HINT = 'paste a Hugging Face model link'
+export const LOCAL_MODEL_LINK_HINT = 'paste a GGUF link'
 export const LOCAL_MODEL_LINK_EXAMPLE = 'e.g. https://huggingface.co/Qwen/Qwen2.5-Coder-7B-Instruct-GGUF'
 
 export type LocalHfPickerModel = {
