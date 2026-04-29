@@ -541,7 +541,7 @@ function renderHelp(): string {
     'slash commands:',
     ...lines,
     '',
-    'shortcuts: esc cancels · ctrl+c twice exits · alt+p swap model · shift+tab mode.',
+    'shortcuts: esc cancels - ctrl+c twice exits - alt+p model - alt+i identity - shift+tab mode.',
   ].join('\n')
 }
 

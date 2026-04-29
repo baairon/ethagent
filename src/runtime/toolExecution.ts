@@ -33,6 +33,7 @@ export type ToolExecutorOptions = {
   input: Record<string, unknown>
   permissionMode: PermissionMode
   cwd: string
+  config?: EthagentConfig
   abortSignal?: AbortSignal
   checkpoint?: ToolExecutionContext['checkpoint']
   getPermissionRules: () => SessionPermissionRule[]
@@ -68,13 +69,14 @@ export async function executeToolWithPermissions(
       result: {
         ok: false,
         summary: `${options.name} rejected input`,
-        content: formatToolParseError(err),
+        content: formatToolParseError(err, options.name),
       },
     }
   }
 
   const context: ToolExecutionContext = {
     workspaceRoot: options.cwd,
+    config: options.config,
     abortSignal: options.abortSignal,
     checkpoint: options.checkpoint,
     changeDirectory: next => {
@@ -96,7 +98,11 @@ export async function executeToolWithPermissions(
     }
   }
 
-  if (options.permissionMode === 'plan' && request.kind !== 'read') {
+  if (
+    options.permissionMode === 'plan' &&
+    request.kind !== 'read' &&
+    request.kind !== 'private-continuity-read'
+  ) {
     return {
       result: {
         ok: false,
@@ -125,7 +131,7 @@ export async function executeToolWithPermissions(
   }
 
   const rule = buildPermissionRule(decision, request)
-  const persistRule = shouldPersistPermissionDecision(decision)
+  const persistRule = rule !== undefined && shouldPersistPermissionDecision(decision)
 
   try {
     const result = await tool.execute(parsedInput, context)
@@ -143,7 +149,19 @@ export async function executeToolWithPermissions(
   }
 }
 
-function formatToolParseError(err: unknown): string {
+function formatToolParseError(err: unknown, toolName?: string): string {
+  const withToolHint = (message: string): string => {
+    if (toolName !== 'propose_private_continuity_edit') return message
+    return [
+      message,
+      'private continuity edit input requires `file` plus one complete edit mode.',
+      'The tool resolves the identity vault path; do not search workspace folders for SOUL.md or MEMORY.md.',
+      'For new memory/preferences, use {"file":"MEMORY.md","appendToSection":"Durable User Preferences","appendText":"- User preference or memory note."}',
+      'For persona or standing behavior, use {"file":"SOUL.md","appendToSection":"Persona","appendText":"- Persona or standing behavior note."}',
+      'Do not call propose_private_continuity_edit with empty input or file-only input.',
+    ].filter(Boolean).join('\n')
+  }
+
   if (err instanceof ZodError) {
     const missing: string[] = []
     const invalid: string[] = []
@@ -160,10 +178,10 @@ function formatToolParseError(err: unknown): string {
     const parts: string[] = []
     if (missing.length > 0) parts.push(`missing required fields: ${missing.join(', ')}`)
     if (invalid.length > 0) parts.push(`invalid fields: ${invalid.join('; ')}`)
-    return parts.join('\n') || 'tool input did not match the required schema'
+    return withToolHint(parts.join('\n') || 'tool input did not match the required schema')
   }
 
-  return (err as Error).message || 'tool input did not match the required schema'
+  return withToolHint((err as Error).message || 'tool input did not match the required schema')
 }
 
 // ---------------------------------------------------------------------------

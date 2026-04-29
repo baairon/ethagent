@@ -48,9 +48,11 @@ test('buildPlanTransferSeedMessages carries summary and approved plan into a new
 
   assert.equal(messages.length, 2)
   assert.equal(messages[0]?.role, 'user')
-  assert.match(String(messages[0]?.content), /Planning context summary from conversation session-/)
+  assert.equal(messages[0]?.synthetic, true)
+  assert.match(String(messages[0]?.content), /Planning handoff from session-/)
   assert.match(String(messages[0]?.content), /Important planning context/)
   assert.equal(messages[1]?.role, 'user')
+  assert.equal(messages[1]?.synthetic, true)
   assert.match(String(messages[1]?.content), /Approved plan to implement/)
   assert.match(String(messages[1]?.content), /Run tests/)
 })

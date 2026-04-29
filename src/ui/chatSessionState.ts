@@ -20,8 +20,11 @@ export type ResumedSessionState = {
   config: EthagentConfig | null
   mode: SessionMode
   rows: MessageRow[]
+  promptHistory: string[]
   statusStartedAt: number
 }
+
+const MAX_PROMPT_HISTORY = 500
 
 export function resolveModelSelection(
   selection: ModelPickerSelection,
@@ -113,6 +116,7 @@ export function buildResumedSessionState(args: {
         content: formatResumeNote(args.metadata),
       },
     ],
+    promptHistory: promptHistoryFromSessionMessages(args.messages),
     statusStartedAt: Date.now(),
   }
 }
@@ -130,6 +134,7 @@ export function restoreConversationState(
 ): {
   messages: SessionMessage[]
   rows: MessageRow[]
+  promptHistory: string[]
   truncated: boolean
 } {
   const firstIndex = messages.findIndex(message => message.turnId === turnId)
@@ -141,6 +146,20 @@ export function restoreConversationState(
   return {
     messages: nextMessages,
     rows: sessionMessagesToRows(nextMessages, nextRowId),
+    promptHistory: promptHistoryFromSessionMessages(nextMessages),
     truncated: firstIndex >= 0,
   }
+}
+
+export function promptHistoryFromSessionMessages(messages: SessionMessage[]): string[] {
+  const prompts: string[] = []
+  for (const message of messages) {
+    if (message.role !== 'user') continue
+    if (message.synthetic) continue
+    const prompt = message.content.trim()
+    if (!prompt) continue
+    if (prompts[prompts.length - 1] === prompt) continue
+    prompts.push(prompt)
+  }
+  return prompts.slice(-MAX_PROMPT_HISTORY)
 }

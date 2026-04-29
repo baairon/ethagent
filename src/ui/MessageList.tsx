@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { Box, Text } from 'ink'
 import { theme } from './theme.js'
 import { ProgressBar } from './ProgressBar.js'
+import { Spinner } from './Spinner.js'
 
 export type MessageRow =
   | { role: 'user'; id: string; content: string }
@@ -18,6 +19,8 @@ export type MessageRow =
       status: string
       suffix?: string
       done?: boolean
+      indeterminate?: boolean
+      startedAt?: number
     }
 
 type MessageListProps = {
@@ -25,7 +28,7 @@ type MessageListProps = {
 }
 
 type MarkdownBlock =
-  | { kind: 'heading'; level: 1 | 2 | 3; text: string }
+  | { kind: 'heading'; level: 1 | 2 | 3 | 4 | 5 | 6; text: string }
   | { kind: 'paragraph'; text: string }
   | { kind: 'quote'; lines: string[] }
   | { kind: 'list'; ordered: boolean; items: string[] }
@@ -39,6 +42,7 @@ type InlineToken =
 
 const MAX_RENDERED_MESSAGE_CHARS = 12_000
 const MAX_RENDERED_REASONING_CHARS = 10_000
+const ASSISTANT_ACCENT = theme.accentMint
 
 const MessageListInner: React.FC<MessageListProps> = ({ rows }) => (
   <Box flexDirection="column">
@@ -49,11 +53,20 @@ const MessageListInner: React.FC<MessageListProps> = ({ rows }) => (
 export const MessageList = React.memo(MessageListInner)
 
 export function toggleLatestReasoningRow(rows: MessageRow[]): MessageRow[] {
+  return toggleReasoningRow(rows)
+}
+
+export function toggleReasoningRow(rows: MessageRow[], rowId?: string): MessageRow[] {
   let index = -1
-  for (let cursor = rows.length - 1; cursor >= 0; cursor -= 1) {
-    if (rows[cursor]?.role === 'thinking') {
-      index = cursor
-      break
+  if (rowId) {
+    index = rows.findIndex(row => row.id === rowId && row.role === 'thinking')
+  }
+  if (index === -1) {
+    for (let cursor = rows.length - 1; cursor >= 0; cursor -= 1) {
+      if (rows[cursor]?.role === 'thinking') {
+        index = cursor
+        break
+      }
     }
   }
   if (index === -1) return rows
@@ -163,13 +176,23 @@ const RowViewInner: React.FC<{ row: MessageRow }> = ({ row }) => {
   return (
     <Box flexDirection="column" marginTop={1}>
       <Text color={theme.accentMint} bold>{row.title}</Text>
-      <Text color={theme.dim}>{row.status}</Text>
-      <ProgressBar progress={row.progress} suffix={row.suffix} />
+      {row.indeterminate ? (
+        <ProgressSpinner row={row} />
+      ) : (
+        <>
+          <Text color={theme.dim}>{row.status}</Text>
+          <ProgressBar progress={row.progress} suffix={row.suffix} />
+        </>
+      )}
     </Box>
   )
 }
 
 const RowView = React.memo(RowViewInner)
+
+const ProgressSpinner: React.FC<{ row: Extract<MessageRow, { role: 'progress' }> }> = ({ row }) => {
+  return <Spinner active label={row.status} hint={row.suffix} startedAt={row.startedAt} />
+}
 
 export function reasoningBorderColor(row: Extract<MessageRow, { role: 'thinking' }>): string {
   return row.streaming ? theme.accentPeach : theme.border
@@ -229,7 +252,7 @@ const AssistantBody: React.FC<{ content: string; liveTail?: string; streaming?: 
         />
       ))}
       {streaming && blocks.length === 0 ? (
-        <Text color={theme.accentSecondary}>
+        <Text color={ASSISTANT_ACCENT}>
           <StreamCursor active />
         </Text>
       ) : null}
@@ -239,12 +262,10 @@ const AssistantBody: React.FC<{ content: string; liveTail?: string; streaming?: 
 
 const MarkdownBlockView: React.FC<{ block: MarkdownBlock; streaming?: boolean }> = ({ block, streaming = false }) => {
   if (block.kind === 'heading') {
-    const color =
-      block.level === 1 ? theme.accentPrimary : block.level === 2 ? theme.accentSecondary : theme.accentMint
     return (
       <Box flexDirection="column" marginTop={1}>
         <Text>
-          <InlineText text={block.text} color={color} bold />
+          <InlineText text={block.text} color={ASSISTANT_ACCENT} bold />
         </Text>
       </Box>
     )
@@ -255,7 +276,7 @@ const MarkdownBlockView: React.FC<{ block: MarkdownBlock; streaming?: boolean }>
       <Box flexDirection="column" marginTop={1}>
         {block.lines.map((line, index) => (
           <Text key={index}>
-            <Text color={theme.accentPeach}>| </Text>
+            <Text color={ASSISTANT_ACCENT}>| </Text>
             <InlineText text={line} color={theme.dim} />
           </Text>
         ))}
@@ -268,7 +289,7 @@ const MarkdownBlockView: React.FC<{ block: MarkdownBlock; streaming?: boolean }>
       <Box flexDirection="column" marginTop={1}>
         {block.items.map((item, index) => (
           <Text key={index}>
-            <Text color={theme.accentMint}>{block.ordered ? `${index + 1}. ` : '- '}</Text>
+            <Text color={ASSISTANT_ACCENT}>{block.ordered ? `${index + 1}. ` : '- '}</Text>
             <InlineText text={item} color={theme.text} />
           </Text>
         ))}
@@ -301,7 +322,7 @@ const MarkdownBlockView: React.FC<{ block: MarkdownBlock; streaming?: boolean }>
     <Box flexDirection="column" marginTop={1}>
       <Text>
         <InlineText text={block.text} color={theme.text} />
-        {streaming ? <Text color={theme.accentSecondary}> <StreamCursor active /></Text> : null}
+        {streaming ? <Text color={ASSISTANT_ACCENT}> <StreamCursor active /></Text> : null}
       </Text>
     </Box>
   )
@@ -314,21 +335,21 @@ const InlineText: React.FC<{ text: string; color: string; bold?: boolean }> = ({
       {tokens.map((token, index) => {
         if (token.kind === 'bold') {
           return (
-            <Text key={index} color={theme.accentNeutral} bold>
+            <Text key={index} color={ASSISTANT_ACCENT} bold>
               {token.text}
             </Text>
           )
         }
         if (token.kind === 'italic') {
           return (
-            <Text key={index} color={theme.accentInfo} italic>
+            <Text key={index} color={ASSISTANT_ACCENT} italic>
               {token.text}
             </Text>
           )
         }
         if (token.kind === 'code') {
           return (
-            <Text key={index} color={theme.accentPeach} backgroundColor="#202020">
+            <Text key={index} color={ASSISTANT_ACCENT} backgroundColor="#202020">
               {token.text}
             </Text>
           )
@@ -404,12 +425,12 @@ function parseMarkdownBlocks(markdown: string): MarkdownBlock[] {
       continue
     }
 
-    const heading = line.match(/^(#{1,3})\s+(.*)$/)
+    const heading = line.match(/^(#{1,6})\s+(.*)$/)
     if (heading) {
       const [, hashes = '#', headingText = ''] = heading
       blocks.push({
         kind: 'heading',
-        level: hashes.length as 1 | 2 | 3,
+        level: hashes.length as 1 | 2 | 3 | 4 | 5 | 6,
         text: headingText.trim(),
       })
       index += 1
@@ -452,7 +473,7 @@ function parseMarkdownBlocks(markdown: string): MarkdownBlock[] {
       const nextTrimmed = nextLine.trim()
       if (!nextTrimmed) break
       if (nextTrimmed.match(/^```([\w+-]*)\s*$/)) break
-      if (nextLine.match(/^(#{1,3})\s+(.*)$/)) break
+      if (nextLine.match(/^(#{1,6})\s+(.*)$/)) break
       if (/^>\s?/.test(nextTrimmed)) break
       if (nextTrimmed.match(/^\d+\.\s+(.*)$/) || nextTrimmed.match(/^[-*+]\s+(.*)$/)) break
       paragraph.push(nextLine)
@@ -465,38 +486,17 @@ function parseMarkdownBlocks(markdown: string): MarkdownBlock[] {
 }
 
 function codeAccent(lang: string | null): string {
-  switch ((lang ?? '').toLowerCase()) {
-    case 'ts':
-    case 'tsx':
-    case 'js':
-    case 'jsx':
-      return theme.accentInfo
-    case 'json':
-      return theme.accentPeach
-    case 'html':
-    case 'xml':
-      return theme.accentPrimary
-    case 'css':
-    case 'scss':
-      return theme.accentLavender
-    case 'bash':
-    case 'sh':
-    case 'zsh':
-    case 'powershell':
-      return theme.accentMint
-    default:
-      return theme.border
-  }
+  return ASSISTANT_ACCENT
 }
 
 function codeLineColor(lang: string | null, line: string): string {
   const trimmed = line.trim()
   if (!trimmed) return theme.textSubtle
-  if ((lang === 'json' || lang === 'jsonc') && /^["[{]/.test(trimmed)) return theme.accentPeach
+  if ((lang === 'json' || lang === 'jsonc') && /^["[{]/.test(trimmed)) return ASSISTANT_ACCENT
   if (/^(\/\/|#|\/\*|\*)/.test(trimmed)) return theme.dim
   if (/\b(function|const|let|return|if|else|class|export|import)\b/.test(trimmed)) return theme.text
-  if (/<\/?[A-Za-z]/.test(trimmed)) return theme.accentPrimary
-  if (/^[.#@]/.test(trimmed)) return theme.accentLavender
+  if (/<\/?[A-Za-z]/.test(trimmed)) return ASSISTANT_ACCENT
+  if (/^[.#@]/.test(trimmed)) return ASSISTANT_ACCENT
   return theme.textSubtle
 }
 

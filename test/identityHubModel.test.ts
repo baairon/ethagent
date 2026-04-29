@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { RegisterAgentPreflightError } from '../src/identity/erc8004.js'
 import { AgentStateOwnerMismatchError } from '../src/identity/backupEnvelope.js'
+import { LOCAL_DATA_MANAGEMENT_COPY } from '../src/identity/screens/DataManagementScreen.js'
 import { FORGET_LOCAL_AGENT_COPY } from '../src/identity/screens/ForgetIdentityScreen.js'
 import { STORAGE_CREDENTIAL_FORGET_COPY } from '../src/identity/screens/StorageCredentialScreen.js'
 import {
@@ -78,18 +79,19 @@ test('identity hub summary always shows the short state CID for the menu card', 
     },
   })
 
-  assert.deepEqual(rows.map(row => row.label), ['owner', 'token', 'network', 'state'])
+  assert.deepEqual(rows.map(row => row.label), ['owner', 'token', 'network', 'state', 'skills'])
   assert.equal(rows[3]?.value, 'bafybeigdy...3w6y7q')
   assert.equal(rows[0]?.value, '0x0000...dEaD')
 })
 
 test('identity hub summary collapses gracefully when no identity is loaded', () => {
   const rows = identitySummaryRows(undefined)
-  assert.deepEqual(rows.map(row => row.label), ['owner', 'token', 'network', 'state'])
+  assert.deepEqual(rows.map(row => row.label), ['owner', 'token', 'network', 'state', 'skills'])
   assert.equal(rows[0]?.value, 'not connected')
   assert.equal(rows[1]?.value, 'not created')
   assert.equal(rows[2]?.value, 'ethereum mainnet')
   assert.equal(rows[3]?.value, 'not saved yet')
+  assert.equal(rows[4]?.value, 'not published')
 })
 
 test('local agent removal confirmation keeps the device-only boundary explicit', () => {
@@ -98,7 +100,17 @@ test('local agent removal confirmation keeps the device-only boundary explicit',
   assert.doesNotMatch(copy, /legacy|obsolete|older installs/)
   assert.match(copy, /does not burn, transfer, or delete agent tokens/)
   assert.match(copy, /does not delete pinned IPFS backups/)
-  assert.match(copy, /sessions and chats stay/)
+  assert.match(copy, /does not delete SOUL\.md, MEMORY\.md, SKILLS\.md/)
+  assert.match(copy, /ethagent reset/)
+})
+
+test('local data management copy distinguishes local reset from remote identity records', () => {
+  const copy = LOCAL_DATA_MANAGEMENT_COPY.join('\n')
+  assert.match(copy, /Private markdown lives locally/)
+  assert.match(copy, /Save snapshot and publish encrypts private markdown/)
+  assert.match(copy, /ethagent reset wipes local identity metadata/)
+  assert.match(copy, /preserves installed local LLM assets/)
+  assert.match(copy, /does not delete onchain tokens or IPFS-pinned snapshots/)
 })
 
 test('storage credential confirmation distinguishes pinning control from identity cleanup', () => {
@@ -248,7 +260,7 @@ test('token candidate hint stays terse so wallets with many agents stay scannabl
   } as const
 
   assert.equal(tokenCandidateLabel(candidate), 'research agent')
-  assert.equal(tokenCandidateHint(candidate), 'token #45744 · base · backup 2026-04-25')
+  assert.equal(tokenCandidateHint(candidate), 'token #45744 - base - backup 2026-04-25')
   assert.doesNotMatch(tokenCandidateHint(candidate), /owner/)
   assert.doesNotMatch(tokenCandidateHint(candidate), /state/)
 })

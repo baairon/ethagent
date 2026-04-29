@@ -317,21 +317,13 @@ function humanize(bytes: number): string {
 }
 
 const InstallingView: React.FC<{ startedAt: number }> = ({ startedAt }) => {
-  const [now, setNow] = useState(Date.now())
-  useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 1000)
-    return () => clearInterval(timer)
-  }, [])
-  const elapsed = Math.max(0, Math.floor((now - startedAt) / 1000))
-  const mm = Math.floor(elapsed / 60).toString().padStart(1, '0')
-  const ss = (elapsed % 60).toString().padStart(2, '0')
   const hint = process.platform === 'win32'
     ? 'approve the system prompt if it appears'
     : 'this usually takes 1–3 minutes'
   return (
     <Box flexDirection="column">
       <Text color={theme.accentSecondary} bold>Installing Ollama</Text>
-      <Spinner label={`elapsed ${mm}:${ss}`} hint={hint} />
+      <Spinner label="installing" hint={hint} startedAt={startedAt} />
     </Box>
   )
 }

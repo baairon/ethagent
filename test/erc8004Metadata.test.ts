@@ -15,6 +15,7 @@ import {
   loadAgentRegistration,
   normalizeErc8004RegistryConfig,
   parseEthagentBackupPointer,
+  parseEthagentPublicDiscoveryPointer,
   preflightRegisterAgent,
   registeredAgentFromReceipt,
   withEthagentBackupPointer,
@@ -58,6 +59,37 @@ test('withEthagentBackupPointer preserves registration fields', () => {
 
   assert.equal(updated.name, 'agent')
   assert.equal((updated['x-ethagent'] as { backup: { cid: string } }).backup.cid, 'bafy-backup')
+})
+
+test('ethagent public discovery pointers are written to registration metadata and services', () => {
+  const updated = withEthagentBackupPointer(
+    { type: 'https://eips.ethereum.org/EIPS/eip-8004#registration-v1', name: 'agent' },
+    {
+      cid: 'bafy-private-snapshot',
+      envelopeVersion: 'ethagent-continuity-snapshot-v1',
+      createdAt: new Date(0).toISOString(),
+    },
+    {
+      skillsCid: 'bafy-skills',
+      agentCardCid: 'bafy-card',
+      updatedAt: new Date(0).toISOString(),
+    },
+  )
+  const pointer = parseEthagentPublicDiscoveryPointer(updated)
+  const ext = updated['x-ethagent'] as {
+    publicSkills: { cid: string; format: string }
+    agentCard: { cid: string; format: string }
+  }
+  const services = updated.services as Array<{ type: string; name?: string; url: string }>
+
+  assert.equal(pointer?.skillsCid, 'bafy-skills')
+  assert.equal(pointer?.agentCardCid, 'bafy-card')
+  assert.equal(ext.publicSkills.format, 'text/markdown')
+  assert.equal(ext.agentCard.format, 'application/json')
+  assert.ok(services.some(service => service.type === 'a2a' && service.url === 'ipfs://bafy-card'))
+  assert.ok(services.some(service => service.type === 'ipfs' && service.name === 'public-skills' && service.url === 'ipfs://bafy-skills'))
+  assert.equal(JSON.stringify(updated).includes('SOUL.md'), false)
+  assert.equal(JSON.stringify(updated).includes('MEMORY.md'), false)
 })
 
 test('encodeRegisterAgent encodes ERC-8004 register(string)', () => {

@@ -5,6 +5,7 @@ import {
   MAX_CONTINUATION_NUDGES,
   looksLikeContinuationIntent,
   looksLikeFakeToolProtocolText,
+  looksLikePrivateContinuityWorkspaceCreationIntent,
   looksLikeToolDelegationText,
   looksLikeToolCapabilityConfusion,
   looksLikeToolStateClaimWithoutTool,
@@ -169,6 +170,201 @@ test('runRuntimeTurn triggers a continuation nudge when model signals intent wit
   assert.ok(lastRebuilt.length >= 1)
   const done = events.at(-1)
   assert.deepEqual(done, { type: 'done', finishedNormally: true })
+})
+
+test('runRuntimeTurn gives a specific nudge for private continuity file creation prose', async () => {
+  const { provider, callsRef } = textProvider([
+    [
+      { type: 'text', delta: 'Let me create a MEMORY.md file with these preferences in a structured format.' },
+      { type: 'done', stopReason: 'end_turn' },
+    ],
+    [
+      {
+        type: 'tool_use_stop',
+        id: 'tool-1',
+        name: 'propose_private_continuity_edit',
+        input: {
+          file: 'MEMORY.md',
+          appendToSection: 'Durable User Preferences',
+          appendText: '- Prefers clean names over base collisions.',
+        },
+      },
+      { type: 'done', stopReason: 'tool_use' },
+    ],
+    [
+      { type: 'text', delta: 'Memory updated through the private continuity tool.' },
+      { type: 'done', stopReason: 'end_turn' },
+    ],
+  ])
+
+  const executedTools: string[] = []
+  const events = await collect(
+    runRuntimeTurn({
+      provider,
+      signal: new AbortController().signal,
+      initialMessages: [{ role: 'user', content: 'remember this preference' }],
+      rebuildMessages: () => [{ role: 'user', content: 'remember this preference' }],
+      runToolBatch: async pending => {
+        executedTools.push(...pending.map(t => t.name))
+        return {
+          cancelled: false,
+          completedTools: pending.map(t => ({
+            ...t,
+            cwd: '/tmp',
+            result: { ok: true, summary: 'updated memory', content: 'ok' },
+          })),
+        }
+      },
+    }),
+  )
+
+  assert.equal(callsRef.count, 3)
+  assert.deepEqual(executedTools, ['propose_private_continuity_edit'])
+  assert.deepEqual(
+    events.find(e => e.type === 'continuation_nudge'),
+    { type: 'continuation_nudge', attempt: 1, reason: 'private_continuity_tool' },
+  )
+})
+
+test('runRuntimeTurn nudges local models away from searching for private continuity files', async () => {
+  const { provider } = textProvider([
+    [
+      { type: 'text', delta: 'I need to check whether MEMORY.md exists in plans or the workspace before editing it.' },
+      { type: 'done', stopReason: 'end_turn' },
+    ],
+    [
+      {
+        type: 'tool_use_stop',
+        id: 'tool-1',
+        name: 'propose_private_continuity_edit',
+        input: {
+          file: 'MEMORY.md',
+          appendToSection: 'Durable User Preferences',
+          appendText: '- Prefers surgical private memory edits.',
+        },
+      },
+      { type: 'done', stopReason: 'tool_use' },
+    ],
+    [
+      { type: 'text', delta: 'Memory updated through the private continuity tool.' },
+      { type: 'done', stopReason: 'end_turn' },
+    ],
+  ])
+
+  const events = await collect(
+    runRuntimeTurn({
+      provider,
+      signal: new AbortController().signal,
+      initialMessages: [{ role: 'user', content: 'remember this preference' }],
+      rebuildMessages: () => [{ role: 'user', content: 'remember this preference' }],
+      runToolBatch: async pending => ({
+        cancelled: false,
+        completedTools: pending.map(t => ({
+          ...t,
+          cwd: '/tmp',
+          result: { ok: true, summary: 'updated memory', content: 'ok' },
+        })),
+      }),
+    }),
+  )
+
+  assert.deepEqual(
+    events.find(e => e.type === 'continuation_nudge'),
+    { type: 'continuation_nudge', attempt: 1, reason: 'private_continuity_tool' },
+  )
+})
+
+test('runRuntimeTurn repairs empty local private continuity tool input with a targeted retry nudge', async () => {
+  const { provider, callsRef } = textProvider([
+    [
+      {
+        type: 'tool_use_stop',
+        id: 'tool-empty',
+        name: 'propose_private_continuity_edit',
+        input: {},
+      },
+      { type: 'done', stopReason: 'tool_use' },
+    ],
+    [
+      {
+        type: 'tool_use_stop',
+        id: 'tool-valid',
+        name: 'propose_private_continuity_edit',
+        input: {
+          file: 'MEMORY.md',
+          appendToSection: 'Durable User Preferences',
+          appendText: '- Likes high-quality TUI polish.',
+        },
+      },
+      { type: 'done', stopReason: 'tool_use' },
+    ],
+    [
+      { type: 'text', delta: 'Memory updated through the private continuity tool.' },
+      { type: 'done', stopReason: 'end_turn' },
+    ],
+  ])
+
+  const executedInputs: Record<string, unknown>[] = []
+  const rebuilt: Message[][] = []
+  const events = await collect(
+    runRuntimeTurn({
+      provider,
+      signal: new AbortController().signal,
+      initialMessages: [{ role: 'user', content: 'remember my favorite things from this convo' }],
+      rebuildMessages: () => {
+        const messages: Message[] = [{ role: 'user', content: 'remember my favorite things from this convo' }]
+        rebuilt.push(messages)
+        return messages
+      },
+      runToolBatch: async pending => ({
+        cancelled: false,
+        completedTools: pending.map(t => {
+          executedInputs.push(t.input)
+          return {
+            ...t,
+            cwd: '/tmp',
+            result: Object.keys(t.input).length === 0
+              ? {
+                  ok: false,
+                  summary: 'propose_private_continuity_edit rejected input',
+                  content: 'missing required fields: file',
+                }
+              : {
+                  ok: true,
+                  summary: 'append to Durable User Preferences in MEMORY.md',
+                  content: 'updated local private continuity file',
+                },
+          }
+        }),
+      }),
+    }),
+  )
+
+  assert.equal(callsRef.count, 3)
+  assert.deepEqual(executedInputs, [
+    {},
+    {
+      file: 'MEMORY.md',
+      appendToSection: 'Durable User Preferences',
+      appendText: '- Likes high-quality TUI polish.',
+    },
+  ])
+  assert.deepEqual(
+    events.find(e => e.type === 'continuation_nudge'),
+    { type: 'continuation_nudge', attempt: 1, reason: 'private_continuity_tool_repair' },
+  )
+  assert.ok(rebuilt.length >= 1)
+  assert.ok(events.some(e =>
+    e.type === 'tool_executed'
+    && e.name === 'propose_private_continuity_edit'
+    && !e.result.ok,
+  ))
+  assert.ok(events.some(e =>
+    e.type === 'tool_executed'
+    && e.name === 'propose_private_continuity_edit'
+    && e.result.ok,
+  ))
+  assert.deepEqual(events.at(-1), { type: 'done', finishedNormally: true })
 })
 
 test('runRuntimeTurn converts bare Ollama JSON tool text into a real tool use', async () => {
@@ -692,6 +888,21 @@ test('looksLikeContinuationIntent detects short action-verb phrases', () => {
   assert.equal(looksLikeContinuationIntent("Now I'll create the file."), true)
   assert.equal(looksLikeContinuationIntent('Let me edit this.'), true)
   assert.equal(looksLikeContinuationIntent('Time to implement the fix.'), true)
+})
+
+test('looksLikePrivateContinuityWorkspaceCreationIntent detects wrong MEMORY/SOUL creation plans', () => {
+  assert.equal(
+    looksLikePrivateContinuityWorkspaceCreationIntent('Let me create a MEMORY.md file with these preferences.'),
+    true,
+  )
+  assert.equal(
+    looksLikePrivateContinuityWorkspaceCreationIntent('I will overwrite SOUL.md with a new scaffold.'),
+    true,
+  )
+  assert.equal(
+    looksLikePrivateContinuityWorkspaceCreationIntent('I will append to MEMORY.md using propose_private_continuity_edit.'),
+    false,
+  )
 })
 
 test('looksLikeContinuationIntent returns false on completion markers', () => {

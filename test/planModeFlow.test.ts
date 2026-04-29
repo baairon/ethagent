@@ -12,6 +12,44 @@ test('plan mode exposes only read tools to the model', () => {
   assert.ok(!planTools.includes('edit_file'))
   assert.ok(!planTools.includes('run_bash'))
   assert.ok(!planTools.includes('change_directory'))
+
+  const identityPlanTools = toolsForMode('plan', { hasIdentity: true }).map(tool => tool.name)
+  assert.ok(identityPlanTools.includes('read_private_continuity_file'))
+  assert.ok(!identityPlanTools.includes('propose_private_continuity_edit'))
+})
+
+test('private continuity edit tool is exposed only when an identity is linked', () => {
+  const withoutIdentity = toolsForMode('chat', { hasIdentity: false }).map(tool => tool.name)
+  assert.ok(!withoutIdentity.includes('propose_private_continuity_edit'))
+  assert.ok(!withoutIdentity.includes('read_private_continuity_file'))
+
+  const withIdentity = toolsForMode('chat', { hasIdentity: true }).map(tool => tool.name)
+  assert.ok(withIdentity.includes('propose_private_continuity_edit'))
+  assert.ok(withIdentity.includes('read_private_continuity_file'))
+})
+
+test('private continuity tools tell models not to locate vault markdown in the workspace', () => {
+  const tool = toolsForMode('chat', { hasIdentity: true })
+    .find(candidate => candidate.name === 'propose_private_continuity_edit')
+  assert.ok(tool)
+  assert.match(tool.description, /Do not call read_file, list_directory, or run_bash to locate these files/)
+  assert.match(tool.description, /this tool resolves the vault path/)
+  assert.match(tool.description, /For new memories or preferences/)
+  assert.match(JSON.stringify(tool.inputSchemaJson), /Use only the file name/)
+  assert.match(JSON.stringify(tool.inputSchemaJson), /Prefer this for new notes/)
+  assert.deepEqual(tool.inputSchemaJson.required, ['file'])
+  assert.equal(tool.inputSchemaJson.oneOf, undefined)
+  assert.match(JSON.stringify(tool.inputSchemaJson.properties), /appendToSection/)
+  assert.match(JSON.stringify(tool.inputSchemaJson.properties), /appendText/)
+  assert.match(JSON.stringify(tool.inputSchemaJson.properties), /oldText/)
+  assert.match(JSON.stringify(tool.inputSchemaJson.properties), /newText/)
+
+  const readTool = toolsForMode('chat', { hasIdentity: true })
+    .find(candidate => candidate.name === 'read_private_continuity_file')
+  assert.ok(readTool)
+  assert.match(readTool.description, /do not use workspace read_file/)
+  assert.match(readTool.description, /surgical removals/)
+  assert.match(JSON.stringify(readTool.inputSchemaJson.properties), /Use only the file name/)
 })
 
 test('provider support reflects mode-filtered tools', () => {
@@ -39,6 +77,8 @@ test('mode policy keeps plan, default, and accept-edits distinct', () => {
   assert.equal(acceptEdits.exposesToolKind('edit'), true)
   assert.equal(acceptEdits.exposesToolKind('delete'), true)
   assert.equal(acceptEdits.autoAllowToolKind('edit'), true)
+  assert.equal(acceptEdits.autoAllowToolKind('private-continuity-edit'), false)
+  assert.equal(acceptEdits.autoAllowToolKind('private-continuity-read'), false)
   assert.equal(acceptEdits.autoAllowToolKind('delete'), false)
   assert.equal(acceptEdits.autoAllowToolKind('bash'), false)
 })

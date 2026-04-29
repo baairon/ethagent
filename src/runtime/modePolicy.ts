@@ -14,7 +14,7 @@ export function modePolicy(mode: PolicyMode): ModePolicy {
   if (mode === 'plan') {
     return {
       mode,
-      exposesToolKind: kind => kind === 'read',
+      exposesToolKind: kind => kind === 'read' || kind === 'private-continuity-read',
       autoAllowToolKind: () => false,
       promptLabel: 'plan mode',
     }

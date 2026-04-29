@@ -6,9 +6,32 @@ import path from 'node:path'
 import type { Provider, StreamEvent } from '../src/providers/contracts.js'
 import type { SessionMessage } from '../src/storage/sessions.js'
 import { toggleLatestReasoningRow, type MessageRow } from '../src/ui/MessageList.js'
+import { privateContinuityEditReviewFromToolResult } from '../src/ui/ChatScreen.js'
 import { runStreamingTurn } from '../src/ui/chatTurnOrchestrator.js'
 
 const wait = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms))
+
+test('private continuity edit review helper extracts the TUI popup target', () => {
+  const review = privateContinuityEditReviewFromToolResult(
+    'propose_private_continuity_edit',
+    { file: 'memory.md' },
+    {
+      ok: true,
+      summary: 'append to Durable User Preferences in MEMORY.md',
+      content: [
+        'updated local private continuity file C:\\Users\\bairo\\.ethagent\\continuity\\agent\\MEMORY.md',
+        'review file: C:\\Users\\bairo\\.ethagent\\continuity\\agent\\MEMORY.md',
+        'save/publish later from Alt+I -> save snapshot and publish',
+      ].join('\n'),
+    },
+  )
+
+  assert.deepEqual(review, {
+    file: 'MEMORY.md',
+    filePath: 'C:\\Users\\bairo\\.ethagent\\continuity\\agent\\MEMORY.md',
+    summary: 'append to Durable User Preferences in MEMORY.md',
+  })
+})
 
 function makeContext(overrides: {
   cwd: string

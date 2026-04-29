@@ -49,6 +49,7 @@ function getRewindPath(): string {
 export async function recordRewindSnapshot(snapshot: RewindSnapshot): Promise<void> {
   await ensureConfigDir()
   const normalized = normalizeSnapshot(snapshot)
+  if (isIdentityMarkdownSnapshot(normalized)) return
   await fs.appendFile(getRewindPath(), `${JSON.stringify(normalized)}\n`, { encoding: 'utf8', mode: 0o600 })
 }
 
@@ -60,7 +61,10 @@ export async function rewindWorkspaceEdits(
   const snapshots = await loadSnapshots()
   const candidates = snapshots
     .map((snapshot, index) => ({ snapshot, index }))
-    .filter(entry => path.resolve(entry.snapshot.workspaceRoot) === normalizedWorkspaceRoot)
+    .filter(entry =>
+      path.resolve(entry.snapshot.workspaceRoot) === normalizedWorkspaceRoot &&
+      !isIdentityMarkdownSnapshot(entry.snapshot),
+    )
 
   if (candidates.length === 0) return { reverted: 0, files: [] }
 
@@ -120,6 +124,7 @@ export async function listRewindEntries(
   const offset = options.offset ?? 0
   const snapshots = await loadSnapshots()
   return snapshots
+    .filter(snapshot => !isIdentityMarkdownSnapshot(snapshot))
     .filter(snapshot => isSnapshotWithinScope(snapshot, normalizedWorkspaceRoot))
     .map(snapshot => toEntry(snapshot))
     .reverse()
@@ -137,6 +142,7 @@ export async function rewindWorkspaceEditsByEntryIds(
     .map((snapshot, index) => ({ snapshot, index }))
     .filter(entry =>
       path.resolve(entry.snapshot.workspaceRoot) === normalizedWorkspaceRoot &&
+      !isIdentityMarkdownSnapshot(entry.snapshot) &&
       selectedIds.has(entry.snapshot.id!),
     )
 
@@ -215,6 +221,23 @@ function isSnapshotWithinScope(snapshot: RewindSnapshot, scopeRoot: string): boo
   const relative = path.relative(scopeRoot, path.resolve(snapshot.filePath))
   return relative !== '' && !relative.startsWith('..') && !path.isAbsolute(relative)
 }
+
+function isIdentityMarkdownSnapshot(snapshot: RewindSnapshot): boolean {
+  const relativePath = (snapshot.relativePath ?? '').replaceAll('\\', '/').toLowerCase()
+  const basename = path.basename(snapshot.filePath).toLowerCase()
+  if (relativePath.startsWith('identity-vault/') && IDENTITY_MARKDOWN_FILES.has(basename)) return true
+
+  const continuityRoot = path.resolve(getConfigDir(), 'continuity')
+  const relativeToContinuity = path.relative(continuityRoot, path.resolve(snapshot.filePath))
+  return (
+    relativeToContinuity !== '' &&
+    !relativeToContinuity.startsWith('..') &&
+    !path.isAbsolute(relativeToContinuity) &&
+    IDENTITY_MARKDOWN_FILES.has(basename)
+  )
+}
+
+const IDENTITY_MARKDOWN_FILES = new Set(['soul.md', 'memory.md', 'skills.md'])
 
 function normalizeSnippet(input?: string): string {
   const normalized = (input ?? '').replace(/\s+/g, ' ').trim()

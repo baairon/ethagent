@@ -65,6 +65,8 @@ export type ContinuationNudgeReason =
   | 'tool_state_claim'
   | 'tool_protocol_fake'
   | 'tool_delegation'
+  | 'private_continuity_tool'
+  | 'private_continuity_tool_repair'
 
 const CONTINUATION_NUDGE_TEXT =
   'Continue with the task. Use the appropriate tools to proceed.'
@@ -80,6 +82,12 @@ const TOOL_PROTOCOL_FAKE_NUDGE_TEXT =
 
 const TOOL_DELEGATION_NUDGE_TEXT =
   'Do not ask the user to run native tools. You have access to the tools in this environment. Make exactly one native tool call now.'
+
+const PRIVATE_CONTINUITY_NUDGE_TEXT =
+  'SOUL.md and MEMORY.md are existing private identity-vault scaffold files. Do not search workspace folders, read plans/, create files, or overwrite them. If exact private text is needed for a surgical removal or targeted replacement, call read_private_continuity_file with {"file":"MEMORY.md"} or {"file":"SOUL.md"}. If the user wants private continuity changed, call propose_private_continuity_edit. For memory/preferences use {"file":"MEMORY.md","appendToSection":"Durable User Preferences","appendText":"- User preference or memory note."}. For persona use {"file":"SOUL.md","appendToSection":"Persona","appendText":"- Persona or standing behavior note."}.'
+
+const PRIVATE_CONTINUITY_REPAIR_NUDGE_TEXT =
+  'The previous propose_private_continuity_edit call had invalid or missing input. Retry the same native tool now with complete arguments. Do not answer in prose and do not search for markdown files. For memory/preferences use {"file":"MEMORY.md","appendToSection":"Durable User Preferences","appendText":"- User preference or memory note."}. For persona use {"file":"SOUL.md","appendToSection":"Persona","appendText":"- Persona or standing behavior note."}.'
 
 /**
  * TurnEvent - events emitted by the runtime turn loop. The UI layer subscribes
@@ -183,8 +191,10 @@ export type RuntimeTurnParams = {
  *   - No broad regex fallback tool parsing. A narrow Ollama/Qwen
  *     compatibility parser handles standalone JSON tool payloads only.
  *   - No duplicate-tool-call suppression. The model is allowed to repeat.
- *   - No forced-repair retries on tool input validation errors - errors go
- *     back to the model as tool_result(is_error) and the model decides.
+ *   - No broad forced-repair retries on tool input validation errors - errors
+ *     go back to the model as tool_result(is_error). Private continuity gets
+ *     one narrow local-model repair nudge because bad JSON there is common and
+ *     user-visible.
  */
 export async function* runRuntimeTurn(
   params: RuntimeTurnParams,
@@ -432,8 +442,55 @@ export async function* runRuntimeTurn(
       return
     }
 
+    const repairNudge = nextToolResultRepairNudge(provider, batch.completedTools)
+    if (repairNudge) {
+      if (continuationNudges < maxContinuationNudges) {
+        continuationNudges += 1
+        yield {
+          type: 'continuation_nudge',
+          attempt: continuationNudges,
+          reason: 'private_continuity_tool_repair',
+        }
+        workingMessages = [
+          ...rebuildMessages(),
+          { role: 'user', content: repairNudge },
+        ]
+        continue
+      }
+      yield {
+        type: 'error',
+        message: 'model called propose_private_continuity_edit with invalid input after corrective nudges',
+        discardAssistant: true,
+      }
+      yield { type: 'done', finishedNormally: false }
+      return
+    }
+
     workingMessages = rebuildMessages()
   }
+}
+
+function nextToolResultRepairNudge(
+  provider: Pick<Provider, 'id' | 'supportsTools'>,
+  completedTools: ExecutedToolUse[],
+): string | null {
+  if (!provider.supportsTools) return null
+  if (provider.id !== 'ollama' && provider.id !== 'llamacpp') return null
+  const failedPrivateEdit = completedTools.some(completed =>
+    completed.name === 'propose_private_continuity_edit'
+    && !completed.result.ok
+    && completed.result.summary === 'propose_private_continuity_edit rejected input',
+  )
+  if (failedPrivateEdit) return PRIVATE_CONTINUITY_REPAIR_NUDGE_TEXT
+
+  const failedWorkspacePrivateRead = completedTools.some(completed =>
+    completed.name === 'read_file'
+    && !completed.result.ok
+    && /read_private_continuity_file/.test(completed.result.content),
+  )
+  return failedWorkspacePrivateRead
+    ? 'The previous read_file call targeted private identity continuity markdown. Retry now with read_private_continuity_file and complete input such as {"file":"MEMORY.md"} or {"file":"SOUL.md"}. Do not search workspace folders.'
+    : null
 }
 
 export function parseLocalModelTextToolUse(
@@ -608,6 +665,13 @@ function nextNudge(
   provider: Pick<Provider, 'supportsTools'>,
   assistantText: string,
 ): { text: string; reason: ContinuationNudgeReason; keepAssistantContext: boolean } | null {
+  if (provider.supportsTools && looksLikePrivateContinuityWorkspaceCreationIntent(assistantText)) {
+    return {
+      text: PRIVATE_CONTINUITY_NUDGE_TEXT,
+      reason: 'private_continuity_tool',
+      keepAssistantContext: false,
+    }
+  }
   if (provider.supportsTools && looksLikeToolCapabilityConfusion(assistantText)) {
     return {
       text: TOOL_CAPABILITY_NUDGE_TEXT,
@@ -623,6 +687,16 @@ function nextNudge(
     }
   }
   return null
+}
+
+export function looksLikePrivateContinuityWorkspaceCreationIntent(text: string): boolean {
+  const lower = text.toLowerCase()
+  if (!/\b(soul|memory)\.md\b/.test(lower)) return false
+  return [
+    /\b(create|write|make|generate|scaffold|overwrite|replace|locate|find|search|read|check|inspect)\b.{0,100}\b(soul|memory)\.md\b/,
+    /\b(soul|memory)\.md\b.{0,100}\b(create|write|make|generate|scaffold|overwrite|replace|locate|find|search|read|check|inspect)\b/,
+    /\bplans?[\\/][^\s]*\b(soul|memory)\b/,
+  ].some(pattern => pattern.test(lower))
 }
 
 export function looksLikeToolCapabilityConfusion(text: string): boolean {
@@ -643,7 +717,7 @@ export function looksLikeFakeToolProtocolText(text: string): boolean {
   if (!lower.trim()) return false
 
   const toolNames = new Set(
-    [...lower.matchAll(/\b(change_directory|edit_file|list_directory|read_file|run_bash|write_file|delete_file)\b/g)]
+    [...lower.matchAll(/\b(change_directory|edit_file|propose_private_continuity_edit|read_private_continuity_file|list_directory|read_file|run_bash|write_file|delete_file)\b/g)]
       .map(match => match[1]),
   )
   if (toolNames.size < 2) return false
@@ -651,7 +725,7 @@ export function looksLikeFakeToolProtocolText(text: string): boolean {
   const codeBlock = /```|code\s*(?:-|:)?\s*block/.test(lower)
   const toolMenu = /\b(available tools|tool functions|functions are|tools are|native tools)\b/.test(lower)
   const actionIntent = /\b(let'?s|let me|i'?ll|i will|first|next)\b.{0,80}\b(list|read|inspect|execute|run|change|edit|write)\b/.test(lower)
-  const commaSeparatedTools = /(?:change_directory|edit_file|list_directory|read_file|run_bash|write_file|delete_file)(?:\s*,\s*|\s+){1,}/.test(lower)
+  const commaSeparatedTools = /(?:change_directory|edit_file|propose_private_continuity_edit|read_private_continuity_file|list_directory|read_file|run_bash|write_file|delete_file)(?:\s*,\s*|\s+){1,}/.test(lower)
 
   return (codeBlock || toolMenu || actionIntent) && commaSeparatedTools
 }
@@ -660,7 +734,7 @@ export function looksLikeToolDelegationText(text: string): boolean {
   const lower = text.toLowerCase()
   if (!lower.trim()) return false
 
-  const toolName = '(?:change_directory|edit_file|list_directory|read_file|run_bash|write_file|delete_file)'
+  const toolName = '(?:change_directory|edit_file|propose_private_continuity_edit|read_private_continuity_file|list_directory|read_file|run_bash|write_file|delete_file)'
   if (!new RegExp(`\\b${toolName}\\b`).test(lower)) return false
 
   const directToolRef = `(?:\`?${toolName}\`?|the\\s+\`?${toolName}\`?\\s+tool)`

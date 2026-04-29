@@ -1,5 +1,5 @@
 import type { ProviderId } from '../storage/config.js'
-import type { Message, MessageContentBlock, Provider, StreamEvent } from './contracts.js'
+import type { Message, MessageContentBlock, Provider, ProviderCompleteOptions, StreamEvent } from './contracts.js'
 import { ProviderError } from './contracts.js'
 import { providerErrorFromResponse } from './errors.js'
 import { iterSseFrames } from './sse.js'
@@ -88,7 +88,11 @@ export class OpenAIChatProvider implements Provider {
     this.supportsTools = this.tools.length > 0
   }
 
-  async *complete(messages: Message[], signal: AbortSignal): AsyncIterable<StreamEvent> {
+  async *complete(
+    messages: Message[],
+    signal: AbortSignal,
+    options: ProviderCompleteOptions = {},
+  ): AsyncIterable<StreamEvent> {
     const apiKey = await this.resolveApiKey()
     if (!apiKey && this.id !== 'ollama' && this.id !== 'llamacpp') {
       const error = new ProviderError(`missing API key for ${this.id} (/doctor to verify)`)
@@ -114,6 +118,7 @@ export class OpenAIChatProvider implements Provider {
           tool_choice: this.tools.length > 0 ? 'auto' : undefined,
           stream: true,
           stream_options: { include_usage: true },
+          max_tokens: options.maxTokens,
         }),
       }, { signal, maxRetries: this.maxRetries })
     } catch (err: unknown) {

@@ -51,6 +51,8 @@ const NON_PERSISTABLE_COMMANDS = new Set([
 const NATIVE_TOOL_COMMANDS = new Map([
   ['change_directory', 'Use the change_directory tool directly instead of passing change_directory to run_bash.'],
   ['edit_file', 'Use the edit_file tool directly instead of passing edit_file to run_bash.'],
+  ['propose_private_continuity_edit', 'Use the propose_private_continuity_edit tool directly instead of passing it to run_bash.'],
+  ['read_private_continuity_file', 'Use the read_private_continuity_file tool directly instead of passing it to run_bash.'],
   ['list_directory', 'Use the list_directory tool directly instead of passing list_directory to run_bash.'],
   ['read_file', 'Use the read_file tool directly instead of passing read_file to run_bash.'],
   ['run_bash', 'run_bash cannot run itself. Put an actual shell command in the command field.'],

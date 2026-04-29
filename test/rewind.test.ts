@@ -51,3 +51,38 @@ test('rewind entries stay scoped to the requested workspace and page in newest-f
   assert.equal(entries[1]?.relativePath.replaceAll('\\', '/'), 'a.txt')
   assert.ok(entries.every(entry => entry.workspaceRoot === path.resolve(workspaceA)))
 })
+
+test('rewind ignores identity vault markdown snapshots', async () => {
+  const home = await fs.mkdtemp(path.join(os.tmpdir(), 'ethagent-home-'))
+  process.env.HOME = home
+  process.env.USERPROFILE = home
+
+  const workspace = path.join(home, 'workspace')
+  const vault = path.join(home, '.ethagent', 'continuity', '1-registry-token')
+  const memoryPath = path.join(vault, 'MEMORY.md')
+  await fs.mkdir(workspace, { recursive: true })
+  await fs.mkdir(vault, { recursive: true })
+  await fs.writeFile(memoryPath, '# Memory\n\nafter\n', 'utf8')
+
+  const rewindDir = path.join(home, '.ethagent')
+  await fs.mkdir(rewindDir, { recursive: true })
+  await fs.writeFile(path.join(rewindDir, 'rewind.jsonl'), `${JSON.stringify({
+    workspaceRoot: workspace,
+    filePath: memoryPath,
+    relativePath: 'identity-vault/MEMORY.md',
+    existedBefore: true,
+    previousContent: '# Memory\n\nbefore\n',
+    createdAt: '2026-01-01T00:00:03.000Z',
+    promptSnippet: 'remember preference',
+    checkpointLabel: 'remember preference',
+  })}\n`, 'utf8')
+
+  const rewind = await import('../src/storage/rewind.js')
+
+  const entries = await rewind.listRewindEntries(workspace, { limit: 10 })
+  assert.equal(entries.length, 0)
+
+  const result = await rewind.rewindWorkspaceEdits(workspace, 1)
+  assert.equal(result.reverted, 0)
+  assert.equal(await fs.readFile(memoryPath, 'utf8'), '# Memory\n\nafter\n')
+})

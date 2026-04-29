@@ -2,6 +2,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { z } from 'zod'
 import { recordRewindSnapshot } from '../storage/rewind.js'
+import type { EthagentConfig } from '../storage/config.js'
 import type { Tool } from './contracts.js'
 import { resolveWorkspacePath } from './Read.js'
 
@@ -29,7 +30,7 @@ export const writeFileTool: Tool<typeof schema> = {
     return schema.parse(input)
   },
   async buildPermissionRequest(input, context) {
-    const prepared = await prepareWrite(input, context.workspaceRoot)
+    const prepared = await prepareWrite(input, context)
     return {
       kind: 'write',
       path: prepared.fullPath,
@@ -43,7 +44,7 @@ export const writeFileTool: Tool<typeof schema> = {
     }
   },
   async execute(input, context) {
-    const prepared = await prepareWrite(input, context.workspaceRoot)
+    const prepared = await prepareWrite(input, context)
     const rewindWarning = await tryRecordRewindSnapshot({
       workspaceRoot: context.workspaceRoot,
       filePath: prepared.fullPath,
@@ -70,14 +71,18 @@ export const writeFileTool: Tool<typeof schema> = {
   },
 }
 
-async function prepareWrite(input: z.infer<typeof schema>, workspaceRoot: string) {
+async function prepareWrite(
+  input: z.infer<typeof schema>,
+  context: { workspaceRoot: string; config?: EthagentConfig },
+) {
   assertSafeWritePath(input.path)
+  assertNotPrivateContinuityWorkspacePath(input.path, context.config, 'write_file')
   if (input.content.length === 0) {
     throw new Error('write_file content is empty; provide non-empty file contents')
   }
 
-  const fullPath = resolveWorkspacePath(workspaceRoot, input.path)
-  const relativePath = path.relative(workspaceRoot, fullPath) || path.basename(fullPath)
+  const fullPath = resolveWorkspacePath(context.workspaceRoot, input.path)
+  const relativePath = path.relative(context.workspaceRoot, fullPath) || path.basename(fullPath)
   const { before, existedBefore } = await readExistingFile(fullPath)
 
   return { fullPath, relativePath, before, existedBefore }
@@ -116,6 +121,19 @@ function assertSafeWritePath(requestedPath: string): void {
   if (/^(?:rm|del|erase|rmdir|remove-item|mkdir|type|cat|echo|copy|move|mv|cp)\b/i.test(trimmed)) {
     throw new Error('write_file path looks like a shell command; pass only the file path')
   }
+}
+
+function assertNotPrivateContinuityWorkspacePath(
+  requestedPath: string,
+  config: EthagentConfig | undefined,
+  toolName: string,
+): void {
+  if (!config?.identity) return
+  const basename = path.basename(requestedPath.replaceAll('\\', '/')).toUpperCase()
+  if (basename !== 'SOUL.MD' && basename !== 'MEMORY.MD') return
+  throw new Error(
+    `${toolName} must not create or overwrite ${basename}; use propose_private_continuity_edit to patch the existing identity-vault scaffold`,
+  )
 }
 
 function previewText(text: string, max = 700): string {

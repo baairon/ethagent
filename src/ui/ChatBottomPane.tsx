@@ -18,8 +18,13 @@ import { theme } from './theme.js'
 import { Spinner } from './Spinner.js'
 import { ContextLimitView, type ContextLimitAction } from './ContextLimitView.js'
 import type { ContextUsage } from '../runtime/compaction.js'
+import {
+  ContinuityEditReviewView,
+  type ContinuityEditReviewAction,
+  type ContinuityEditReviewState,
+} from './ContinuityEditReviewView.js'
 
-export type Overlay = 'none' | 'modelPicker' | 'resume' | 'rewind' | 'copyPicker' | 'permission' | 'permissions' | 'planApproval' | 'identity' | 'contextLimit'
+export type Overlay = 'none' | 'modelPicker' | 'resume' | 'rewind' | 'copyPicker' | 'permission' | 'permissions' | 'planApproval' | 'identity' | 'contextLimit' | 'continuityEditReview'
 export type CopyPickerState = { turnText: string; turnLabel: string } | null
 export type IdentityOverlayState = {
   initialAction: IdentityHubInitialAction | undefined
@@ -30,6 +35,11 @@ export type ContextLimitState = {
   prompt: string
 } | null
 
+export type BottomPaneActivity = {
+  label: string
+  hint?: string
+} | null
+
 type ChatBottomPaneProps = {
   overlay: Overlay
   config: EthagentConfig
@@ -38,11 +48,13 @@ type ChatBottomPaneProps = {
   currentSessionId: string
   copyPickerState: CopyPickerState
   contextLimitState: ContextLimitState
+  continuityEditReview: ContinuityEditReviewState | null
   modelPickerContextFit: ModelPickerContextFit | null
   permissionRequest: PermissionRequest | null
   history: string[]
   busy: boolean
   streaming: boolean
+  activity: BottomPaneActivity
   placeholderHints: string[]
   queuedInputs: string[]
   slashSuggestions: ReturnType<typeof getSlashSuggestions>
@@ -62,6 +74,8 @@ type ChatBottomPaneProps = {
   handlePlanApprovalCancel: () => void
   handleContextLimitAction: (action: ContextLimitAction) => void | Promise<void>
   handleContextLimitCancel: () => void
+  handleContinuityEditReviewAction: (action: ContinuityEditReviewAction) => void | Promise<void>
+  handleContinuityEditReviewCancel: () => void
   onPermissionRulesChanged: (rules: SessionPermissionRule[]) => void
   onConfigChange: (config: EthagentConfig) => void
   handleSubmit: (value: string) => void | Promise<void>
@@ -77,11 +91,13 @@ export function ChatBottomPane({
   currentSessionId,
   copyPickerState,
   contextLimitState,
+  continuityEditReview,
   modelPickerContextFit,
   permissionRequest,
   history,
   busy,
   streaming,
+  activity,
   placeholderHints,
   queuedInputs,
   slashSuggestions,
@@ -101,6 +117,8 @@ export function ChatBottomPane({
   handlePlanApprovalCancel,
   handleContextLimitAction,
   handleContextLimitCancel,
+  handleContinuityEditReviewAction,
+  handleContinuityEditReviewCancel,
   onPermissionRulesChanged,
   onConfigChange,
   handleSubmit,
@@ -214,9 +232,23 @@ export function ChatBottomPane({
     )
   }
 
+  if (overlay === 'continuityEditReview' && continuityEditReview) {
+    return (
+      <ContinuityEditReviewView
+        review={continuityEditReview}
+        onSelect={handleContinuityEditReviewAction}
+        onCancel={handleContinuityEditReviewCancel}
+      />
+    )
+  }
+
   return (
     <Box flexDirection="column" width="100%">
-      {streaming ? (
+      {activity ? (
+        <Box marginLeft={2} marginBottom={1}>
+          <Spinner active label={activity.label} hint={activity.hint} />
+        </Box>
+      ) : streaming ? (
         <Box marginLeft={2} marginBottom={1}>
           <Spinner active hint="esc to cancel" />
         </Box>

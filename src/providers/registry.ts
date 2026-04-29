@@ -15,6 +15,7 @@ export function isLocalProvider(provider: string): boolean {
 
 export function createProvider(config: EthagentConfig, options: { mode?: SessionMode } = {}): Provider {
   const mode = options.mode ?? 'chat'
+  const toolContext = { hasIdentity: Boolean(config.identity) }
   switch (config.provider) {
     case 'ollama':
       return new OpenAIChatProvider({
@@ -22,7 +23,7 @@ export function createProvider(config: EthagentConfig, options: { mode?: Session
         model: config.model,
         baseUrl: config.baseUrl ?? defaultBaseUrlFor('ollama') ?? 'http://localhost:11434/v1',
         apiKey: 'ollama',
-        tools: openAITools(mode),
+        tools: openAITools(mode, toolContext),
       })
     case 'llamacpp':
       return new OpenAIChatProvider({
@@ -30,7 +31,7 @@ export function createProvider(config: EthagentConfig, options: { mode?: Session
         model: config.model,
         baseUrl: config.baseUrl ?? defaultBaseUrlFor('llamacpp') ?? 'http://localhost:8080/v1',
         apiKey: 'llamacpp',
-        tools: openAITools(mode),
+        tools: openAITools(mode, toolContext),
       })
     case 'openai':
       return new OpenAIChatProvider({
@@ -38,10 +39,10 @@ export function createProvider(config: EthagentConfig, options: { mode?: Session
         model: config.model,
         baseUrl: openAIBaseUrlFor(config),
         loadApiKey: () => getKey('openai'),
-        tools: openAITools(mode),
+        tools: openAITools(mode, toolContext),
       })
     case 'anthropic':
-      return new AnthropicProvider({ model: config.model, tools: anthropicTools(mode) })
+      return new AnthropicProvider({ model: config.model, tools: anthropicTools(mode, toolContext) })
     case 'gemini':
       return new GeminiProvider({ model: config.model })
   }

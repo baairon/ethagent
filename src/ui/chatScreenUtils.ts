@@ -38,6 +38,7 @@ export function buildBaseMessages(
       model: config.model,
       provider: config.provider,
       hasTools,
+      hasIdentity: Boolean(config.identity),
       mode,
     })),
     ...correctionContext,

@@ -122,7 +122,7 @@ function hasEvidenceForClaim(kind: ToolClaimKind, evidence: ToolEvidence[]): boo
     case 'file_write':
       return hasSuccessfulTool(evidence, ['write_file'])
     case 'file_edit':
-      return hasSuccessfulTool(evidence, ['edit_file'])
+      return hasSuccessfulTool(evidence, ['edit_file', 'propose_private_continuity_edit'])
     case 'file_delete':
       return hasSuccessfulTool(evidence, ['delete_file'])
     case 'bash_run':

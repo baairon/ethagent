@@ -5,6 +5,7 @@ import {
   type Erc8004AgentCandidate,
 } from './erc8004.js'
 import { AgentStateOwnerMismatchError } from './backupEnvelope.js'
+import { ContinuitySnapshotOwnerMismatchError } from './continuity/envelope.js'
 import { resolveSelectedNetwork } from './registryConfig.js'
 
 export const PREFLIGHT_AGENT_URI = 'ipfs://bafybeigdyrztma2dbfczw7q6ooozbxlqzyw5r7w4f3qw2axvvxqg3w6y7q'
@@ -40,6 +41,13 @@ export function identityHubErrorView(err: unknown): IdentityHubErrorView {
       title: 'backup locked to another wallet',
       detail: `wallet ${shortAddress(err.currentOwner)} cannot read state encrypted for ${shortAddress(err.backupOwner)}.`,
       hint: 'Use the wallet that created this backup.',
+    }
+  }
+  if (err instanceof ContinuitySnapshotOwnerMismatchError) {
+    return {
+      title: 'continuity locked to another wallet',
+      detail: `wallet ${shortAddress(err.currentOwner)} cannot read SOUL.md or MEMORY.md encrypted for ${shortAddress(err.snapshotOwner)}.`,
+      hint: 'Use the wallet that created this continuity snapshot.',
     }
   }
   const message = err instanceof Error ? err.message : String(err)
@@ -103,7 +111,7 @@ export function tokenCandidateHint(candidate: Erc8004AgentCandidate): string {
     network,
     candidate.backup?.createdAt ? `backup ${formatDate(candidate.backup.createdAt)}` : null,
   ].filter((part): part is string => Boolean(part))
-  return parts.join(' · ')
+  return parts.join(' - ')
 }
 
 export function isCurrentAgentCandidate(
@@ -192,11 +200,13 @@ export function identitySummaryRows(
   const tokenValue = identity?.agentId ? `#${identity.agentId}` : 'not created'
   const chain = chainSummaryRow(config, identity)
   const stateValue = backup?.cid ? shortCid(backup.cid) : 'not saved yet'
+  const skillsValue = identity?.publicSkills?.cid ? shortCid(identity.publicSkills.cid) : 'not published'
   return [
     { label: 'owner', value: ownerValue, tone: identity ? 'ok' : 'dim' },
     { label: 'token', value: tokenValue, tone: identity?.agentId ? 'ok' : 'dim' },
     { label: 'network', value: chain.value, tone: chain.tone },
     { label: 'state', value: stateValue, tone: backup ? 'ok' : 'dim' },
+    { label: 'skills', value: skillsValue, tone: identity?.publicSkills?.cid ? 'ok' : 'dim' },
   ]
 }
 
@@ -218,6 +228,8 @@ export function identityDetailSections(
   const chain = chainSummaryRow(config, identity)
   const stateCid = backup?.cid ?? 'not saved yet'
   const registrationCid = identity?.metadataCid ?? 'not saved yet'
+  const publicSkillsCid = identity?.publicSkills?.cid ?? 'not published'
+  const agentCardCid = identity?.publicSkills?.agentCardCid ?? 'not published'
 
   return [
     {
@@ -238,6 +250,8 @@ export function identityDetailSections(
       title: 'Recovery',
       rows: [
         { label: 'state CID', value: stateCid, tone: backup?.cid ? 'ok' : 'dim' },
+        { label: 'skills CID', value: publicSkillsCid, tone: identity?.publicSkills?.cid ? 'ok' : 'dim' },
+        { label: 'agent card CID', value: agentCardCid, tone: identity?.publicSkills?.agentCardCid ? 'ok' : 'dim' },
         { label: 'storage', value: backup?.ipfsApiUrl ? storageLabel(backup.ipfsApiUrl) : 'not saved yet', tone: backup?.ipfsApiUrl ? 'ok' : 'dim' },
         { label: 'created', value: identity?.createdAt ? formatDate(identity.createdAt) : 'not created', tone: identity?.createdAt ? 'ok' : 'dim' },
         { label: 'last backup', value: backup?.createdAt ? formatDate(backup.createdAt) : 'never', tone: backup?.createdAt ? 'ok' : 'dim' },
@@ -256,6 +270,8 @@ export function copyableIdentityFields(identity?: EthagentIdentity): CopyableFie
   if (!identity) return []
   const fields: CopyableField[] = []
   if (identity.backup?.cid) fields.push({ label: 'state CID', value: identity.backup.cid })
+  if (identity.publicSkills?.cid) fields.push({ label: 'skills CID', value: identity.publicSkills.cid })
+  if (identity.publicSkills?.agentCardCid) fields.push({ label: 'agent card CID', value: identity.publicSkills.agentCardCid })
   if (identity.metadataCid) fields.push({ label: 'registration CID', value: identity.metadataCid })
   if (identity.agentUri) fields.push({ label: 'agent URI', value: identity.agentUri })
   const owner = identity.ownerAddress ?? identity.address

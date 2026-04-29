@@ -2,6 +2,7 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { z } from 'zod'
+import type { EthagentConfig } from '../storage/config.js'
 import type { Tool } from './contracts.js'
 
 const schema = z.object({
@@ -28,6 +29,7 @@ export const readTool: Tool<typeof schema> = {
     return schema.parse(input)
   },
   async buildPermissionRequest(input, context) {
+    assertNotPrivateContinuityWorkspacePath(input.path, context.config)
     const fullPath = resolveWorkspacePath(context.workspaceRoot, input.path)
     const relativePath = path.relative(context.workspaceRoot, fullPath) || path.basename(fullPath)
     return {
@@ -42,6 +44,7 @@ export const readTool: Tool<typeof schema> = {
     }
   },
   async execute(input, context) {
+    assertNotPrivateContinuityWorkspacePath(input.path, context.config)
     const fullPath = resolveWorkspacePath(context.workspaceRoot, input.path)
     const raw = await fs.readFile(fullPath, 'utf8')
     const lines = raw.replace(/\r\n/g, '\n').split('\n')
@@ -55,6 +58,18 @@ export const readTool: Tool<typeof schema> = {
       content: numbered,
     }
   },
+}
+
+function assertNotPrivateContinuityWorkspacePath(
+  requestedPath: string,
+  config: EthagentConfig | undefined,
+): void {
+  if (!config?.identity) return
+  const basename = path.basename(requestedPath.replaceAll('\\', '/')).toUpperCase()
+  if (basename !== 'SOUL.MD' && basename !== 'MEMORY.MD') return
+  throw new Error(
+    `read_file must not read ${basename} from the workspace; use read_private_continuity_file with file "${basename === 'SOUL.MD' ? 'SOUL.md' : 'MEMORY.md'}"`,
+  )
 }
 
 export function resolveWorkspacePath(workspaceRoot: string, requestedPath: string): string {

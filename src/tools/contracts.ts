@@ -1,6 +1,7 @@
 import { z } from 'zod'
+import type { EthagentConfig } from '../storage/config.js'
 
-export type ToolKind = 'read' | 'write' | 'edit' | 'delete' | 'bash' | 'cd'
+export type ToolKind = 'read' | 'write' | 'edit' | 'delete' | 'bash' | 'cd' | 'private-continuity-read' | 'private-continuity-edit'
 
 export type PermissionRequest =
   | {
@@ -31,6 +32,29 @@ export type PermissionRequest =
       subtitle: string
       before: string
       after: string
+      changeSummary: string
+    }
+  | {
+      kind: 'private-continuity-read'
+      path: string
+      relativePath: string
+      directoryPath: string
+      title: string
+      subtitle: string
+      file: 'SOUL.md' | 'MEMORY.md'
+      range: string
+    }
+  | {
+      kind: 'private-continuity-edit'
+      path: string
+      relativePath: string
+      directoryPath: string
+      title: string
+      subtitle: string
+      file: 'SOUL.md' | 'MEMORY.md'
+      before: string
+      after: string
+      diff: string
       changeSummary: string
     }
   | {
@@ -103,6 +127,7 @@ export type ToolResult =
 
 export type ToolExecutionContext = {
   workspaceRoot: string
+  config?: EthagentConfig
   abortSignal?: AbortSignal
   changeDirectory?: (next: string) => void
   checkpoint?: {
@@ -123,6 +148,9 @@ export type Tool<Input extends z.ZodTypeAny = z.ZodTypeAny> = {
     type: 'object'
     properties?: Record<string, unknown>
     required?: string[]
+    oneOf?: Array<Record<string, unknown>>
+    anyOf?: Array<Record<string, unknown>>
+    additionalProperties?: boolean
   }
   parse(input: Record<string, unknown>): z.infer<Input>
   buildPermissionRequest(input: z.infer<Input>, context: ToolExecutionContext): Promise<PermissionRequest>

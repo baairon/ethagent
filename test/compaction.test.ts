@@ -1,12 +1,16 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
+  buildCompactionSource,
+  compactTranscript,
   contextUsageFromTokens,
   microCompactSessionMessages,
   shouldConfirmContextUsage,
   shouldMicroCompact,
+  summarizeTranscriptLocally,
 } from '../src/runtime/compaction.js'
 import type { SessionMessage } from '../src/storage/sessions.js'
+import type { Message, Provider, StreamEvent } from '../src/providers/contracts.js'
 
 function userTurn(turnId: string, content: string, timeOffsetSeconds = 0): SessionMessage[] {
   const baseTs = new Date(Date.parse('2026-04-21T00:00:00.000Z') + timeOffsetSeconds * 1000).toISOString()
@@ -105,4 +109,61 @@ test('context usage is calculated against the active model window', () => {
 test('context confirmation uses percent without compacting automatically', () => {
   assert.equal(shouldConfirmContextUsage(contextUsageFromTokens(28_000, 'ollama', 'qwen2.5-coder:7b'), 90), false)
   assert.equal(shouldConfirmContextUsage(contextUsageFromTokens(30_000, 'ollama', 'qwen2.5-coder:7b'), 90), true)
+})
+
+test('local transcript summary preserves recent user and assistant context when provider compacting fails', () => {
+  const messages: Message[] = [
+    { role: 'system', content: 'system prompt' },
+    { role: 'user', content: 'Implement encrypted continuity snapshots.' },
+    { role: 'assistant', content: 'Added the envelope and tests.' },
+    { role: 'user', content: 'Fix /compact so it creates a new summarized conversation.' },
+  ]
+
+  const summary = summarizeTranscriptLocally(messages, 'summary too short')
+
+  assert.match(summary, /Provider summary was unavailable: summary too short/)
+  assert.match(summary, /Implement encrypted continuity snapshots/)
+  assert.match(summary, /Added the envelope and tests/)
+  assert.match(summary, /Fix \/compact/)
+  assert.doesNotMatch(summary, /system prompt/)
+})
+
+test('local compaction source bounds oversized transcripts before provider summarization', () => {
+  const messages: Message[] = [
+    { role: 'system', content: 'system prompt' },
+    ...Array.from({ length: 80 }, (_, index): Message => ({
+      role: index % 2 === 0 ? 'user' : 'assistant',
+      content: `message ${index} ${'x'.repeat(1200)}`,
+    })),
+  ]
+
+  const source = buildCompactionSource(messages, 'ollama')
+
+  assert.equal(source.compressed, true)
+  assert.ok(source.inputTokens <= 6_000)
+  assert.match(source.text, /Deterministic pre-summary/)
+  assert.match(source.text, /Recent transcript excerpts/)
+  assert.doesNotMatch(source.text, /system prompt/)
+})
+
+test('compactTranscript can be cancelled by the caller signal', async () => {
+  const controller = new AbortController()
+  const provider: Provider = {
+    id: 'ollama',
+    model: 'test',
+    supportsTools: false,
+    async *complete(_messages: Message[], signal: AbortSignal): AsyncIterable<StreamEvent> {
+      controller.abort()
+      if (signal.aborted) return
+      yield { type: 'text', delta: 'this should not finish' }
+    },
+  }
+
+  const result = await compactTranscript(provider, [
+    { role: 'user', content: 'please summarize' },
+    { role: 'assistant', content: 'working' },
+  ], { signal: controller.signal })
+
+  assert.equal(result.ok, false)
+  assert.equal(result.cancelled, true)
 })

@@ -1331,13 +1331,5 @@ async function probeOllama(): Promise<{ up: boolean; error?: string; models: Arr
 }
 
 const ElapsedSpinner: React.FC<{ startedAt: number; label: string }> = ({ startedAt, label }) => {
-  const [now, setNow] = useState(Date.now())
-  useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 1000)
-    return () => clearInterval(timer)
-  }, [])
-  const elapsed = Math.max(0, Math.floor((now - startedAt) / 1000))
-  const minutes = Math.floor(elapsed / 60)
-  const seconds = (elapsed % 60).toString().padStart(2, '0')
-  return <Spinner label={`${label} ${minutes}:${seconds}`} />
+  return <Spinner label={label} startedAt={startedAt} />
 }

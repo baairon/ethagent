@@ -2,11 +2,13 @@ import type { EthagentConfig, EthagentIdentity, SelectableNetwork } from '../sto
 import type { Erc8004AgentCandidate, Erc8004RegistryConfig } from './erc8004.js'
 import type { RegistryResolution } from './registryConfig.js'
 import type { AgentStateBackupEnvelope } from './backupEnvelope.js'
+import type { ContinuitySnapshotEnvelope } from './continuity/envelope.js'
 import type { IdentityHubErrorView } from './identityHubModel.js'
 
 export type RestorePurpose = 'restore' | 'switch'
 export type DetailsView = Extract<Step, { kind: 'details' }>
 export type ProfileUpdates = { name?: string; description?: string }
+export type RestorableBackupEnvelope = AgentStateBackupEnvelope | ContinuitySnapshotEnvelope
 
 export type Step =
   | { kind: 'menu' }
@@ -26,12 +28,17 @@ export type Step =
   | { kind: 'restore-token-id'; ownerHandle: string; registry: Erc8004RegistryConfig; error?: string; purpose?: RestorePurpose }
   | { kind: 'restore-select-token'; ownerHandle: string; registry: Erc8004RegistryConfig; candidates: Erc8004AgentCandidate[]; purpose?: RestorePurpose }
   | { kind: 'restore-fetching'; cid: string; apiUrl: string; candidate: Erc8004AgentCandidate; purpose?: RestorePurpose }
-  | { kind: 'restore-authorizing'; cid: string; apiUrl: string; envelope: AgentStateBackupEnvelope; candidate: Erc8004AgentCandidate; purpose?: RestorePurpose }
+  | { kind: 'restore-authorizing'; cid: string; apiUrl: string; envelope: RestorableBackupEnvelope; candidate: Erc8004AgentCandidate; purpose?: RestorePurpose }
   | { kind: 'rebackup-signing'; identity: EthagentIdentity; registry: Erc8004RegistryConfig; pinataJwt?: string; profileUpdates?: ProfileUpdates }
   | { kind: 'rebackup-storage'; identity: EthagentIdentity; registry: Erc8004RegistryConfig; error?: string; pinataJwt?: string; profileUpdates?: ProfileUpdates }
+  | { kind: 'continuity-dashboard'; notice?: string }
+  | { kind: 'continuity-private'; notice?: string }
+  | { kind: 'continuity-public'; notice?: string }
+  | { kind: 'continuity-unlocking'; identity: EthagentIdentity }
   | { kind: 'edit-profile-name'; identity: EthagentIdentity; registry: Erc8004RegistryConfig }
   | { kind: 'edit-profile-description'; identity: EthagentIdentity; registry: Erc8004RegistryConfig; name: string }
   | { kind: 'forget-confirm' }
+  | { kind: 'data-management' }
   | { kind: 'storage-credential' }
   | { kind: 'storage-credential-input'; error?: string }
   | { kind: 'storage-credential-forget-confirm' }
@@ -157,11 +164,18 @@ function backStep(from: Step): Step {
     case 'rebackup-signing':
     case 'rebackup-storage':
       return { kind: 'details' }
+    case 'continuity-dashboard':
+      return { kind: 'details' }
+    case 'continuity-private':
+    case 'continuity-public':
+    case 'continuity-unlocking':
+      return { kind: 'continuity-dashboard' }
     case 'edit-profile-name':
       return { kind: 'details' }
     case 'edit-profile-description':
       return { kind: 'edit-profile-name', identity: from.identity, registry: from.registry }
     case 'forget-confirm':
+    case 'data-management':
     case 'storage-credential':
     case 'storage-credential-input':
     case 'storage-credential-forget-confirm':

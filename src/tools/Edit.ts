@@ -2,6 +2,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { z } from 'zod'
 import { recordRewindSnapshot } from '../storage/rewind.js'
+import type { EthagentConfig } from '../storage/config.js'
 import type { Tool } from './contracts.js'
 import { applyRequestedEdit } from './editUtils.js'
 import { resolveWorkspacePath } from './Read.js'
@@ -17,13 +18,13 @@ const schema = z.object({
 export const editTool: Tool<typeof schema> = {
   name: 'edit_file',
   kind: 'edit',
-  description: 'Edit a text file. Provide oldText and newText for a targeted replacement, or just newText to write the entire file contents.',
+  description: 'Edit a workspace text file. Provide oldText and newText for targeted replacement, or just newText only for ordinary whole-file workspace edits. Do not use for private SOUL.md or MEMORY.md when an identity is linked; use propose_private_continuity_edit instead.',
   inputSchema: schema,
   inputSchemaJson: {
     type: 'object',
     properties: {
       path: { type: 'string', description: 'Path to the file to edit.' },
-      oldText: { type: 'string', description: 'Exact text to find and replace. Omit to write the entire file.' },
+      oldText: { type: 'string', description: 'Exact text to find and replace. Prefer this for existing files. Omit only for ordinary whole-file workspace edits.' },
       newText: { type: 'string', description: 'Replacement text, or entire file contents if oldText is omitted.' },
       replaceAll: { type: 'boolean', description: 'Replace every exact oldText match. Prefer false unless you are certain.' },
     },
@@ -86,8 +87,9 @@ async function tryRecordRewindSnapshot(
   }
 }
 
-async function prepareEdit(input: z.infer<typeof schema>, context: { workspaceRoot: string }) {
+async function prepareEdit(input: z.infer<typeof schema>, context: { workspaceRoot: string; config?: EthagentConfig }) {
   assertSafeEditPath(input.path)
+  assertNotPrivateContinuityWorkspacePath(input.path, context.config, 'edit_file')
   const fullPath = resolveWorkspacePath(context.workspaceRoot, input.path)
   await assertEditableFileTarget(fullPath)
   const { content: before, existed } = await readOptionalTextFile(fullPath)
@@ -133,6 +135,19 @@ function assertSafeEditPath(requestedPath: string): void {
   if (/^(?:rm|del|erase|rmdir|remove-item|mkdir|type|cat|echo|copy|move|mv|cp)\b/i.test(trimmed)) {
     throw new Error('edit_file path looks like a shell command; pass only the file path')
   }
+}
+
+function assertNotPrivateContinuityWorkspacePath(
+  requestedPath: string,
+  config: EthagentConfig | undefined,
+  toolName: string,
+): void {
+  if (!config?.identity) return
+  const basename = path.basename(requestedPath.replaceAll('\\', '/')).toUpperCase()
+  if (basename !== 'SOUL.MD' && basename !== 'MEMORY.MD') return
+  throw new Error(
+    `${toolName} must not create or overwrite ${basename}; use propose_private_continuity_edit to patch the existing identity-vault scaffold`,
+  )
 }
 
 async function readOptionalTextFile(fullPath: string): Promise<{ content: string; existed: boolean }> {

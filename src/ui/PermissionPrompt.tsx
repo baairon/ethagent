@@ -12,15 +12,41 @@ type PermissionPromptProps = {
 }
 
 export const PermissionPrompt: React.FC<PermissionPromptProps> = ({ request, onDecision, onCancel }) => {
-  const options = useMemo(() => buildOptions(request), [request])
+  const options = useMemo(() => permissionOptionsForRequest(request), [request])
 
   return (
     <Surface
       title={request.title}
       subtitle={request.subtitle}
       tone={request.kind === 'bash' && request.warning ? 'error' : 'primary'}
-      footer="enter confirms · esc denies"
+      footer="enter confirms - esc denies"
     >
+      {request.kind === 'private-continuity-edit' ? (
+        <Box flexDirection="column" marginBottom={1}>
+          <Text color={theme.accentPeach}>{request.changeSummary}</Text>
+          <Text color={theme.textSubtle}>
+            Not reversible by /rewind. A private identity-history snapshot is saved before the edit is applied.
+          </Text>
+          <Box marginTop={1}>
+            <Text color={theme.textSubtle}>target</Text>
+          </Box>
+          <Text color={theme.text}>{request.file}</Text>
+          <Box marginTop={1}>
+            <Text color={theme.accentPrimary}>diff</Text>
+          </Box>
+          <Text color={theme.text}>{request.diff}</Text>
+        </Box>
+      ) : null}
+      {request.kind === 'private-continuity-read' ? (
+        <Box flexDirection="column" marginBottom={1}>
+          <Text color={theme.accentPeach}>read private {request.file}</Text>
+          <Text color={theme.textSubtle}>This reveals private identity continuity to the model for this turn.</Text>
+          <Box marginTop={1}>
+            <Text color={theme.textSubtle}>range</Text>
+          </Box>
+          <Text color={theme.text}>{request.range}</Text>
+        </Box>
+      ) : null}
       {request.kind === 'edit' || request.kind === 'write' || request.kind === 'delete' ? (
         <Box flexDirection="column" marginBottom={1}>
           <Text color={theme.accentPeach}>{request.changeSummary}</Text>
@@ -44,7 +70,7 @@ export const PermissionPrompt: React.FC<PermissionPromptProps> = ({ request, onD
   )
 }
 
-function buildOptions(request: PermissionRequest): Array<{ value: PermissionDecision; label: string; hint?: string; disabled?: boolean }> {
+export function permissionOptionsForRequest(request: PermissionRequest): Array<{ value: PermissionDecision; label: string; hint?: string; disabled?: boolean }> {
   if (request.kind === 'bash') {
     return [
       { value: 'allow-once', label: 'allow once', hint: 'approve only this command execution' },
@@ -68,6 +94,20 @@ function buildOptions(request: PermissionRequest): Array<{ value: PermissionDeci
     return [
       { value: 'allow-once', label: 'delete this file', hint: 'approve this deletion only' },
       { value: 'deny', label: 'deny', hint: 'keep the file unchanged' },
+    ]
+  }
+
+  if (request.kind === 'private-continuity-read') {
+    return [
+      { value: 'allow-once', label: 'allow once', hint: `read ${request.file}` },
+      { value: 'deny', label: 'deny', hint: 'keep private continuity hidden' },
+    ]
+  }
+
+  if (request.kind === 'private-continuity-edit') {
+    return [
+      { value: 'allow-once', label: 'approve once', hint: `apply this edit to ${request.file}` },
+      { value: 'deny', label: 'deny', hint: 'keep private continuity unchanged' },
     ]
   }
 

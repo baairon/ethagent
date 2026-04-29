@@ -37,6 +37,12 @@ const IdentitySchema = z.object({
     metadataCid: z.string().min(1).optional(),
     txHash: z.string().regex(/^0x[a-fA-F0-9]+$/).optional(),
   }).optional(),
+  publicSkills: z.object({
+    cid: z.string().min(1).optional(),
+    agentCardCid: z.string().min(1).optional(),
+    updatedAt: z.string().optional(),
+    status: z.enum(['pinned', 'failed', 'unknown']).optional(),
+  }).optional(),
 })
 
 const ConfigSchema = z.object({

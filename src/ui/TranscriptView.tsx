@@ -20,6 +20,7 @@ type TranscriptViewProps = {
   rows: MessageRow[]
   active?: boolean
   bottomVariant?: 'prompt' | 'overlay'
+  onVisibleReasoningIdsChange?: (ids: string[]) => void
 }
 
 const PROMPT_RESERVED_LINES = 11
@@ -27,7 +28,12 @@ const OVERLAY_RESERVED_LINES = 16
 const MIN_TRANSCRIPT_LINES = 6
 const MAX_TRANSCRIPT_LINES = 120
 
-export const TranscriptView: React.FC<TranscriptViewProps> = ({ rows, active = true, bottomVariant = 'prompt' }) => {
+export const TranscriptView: React.FC<TranscriptViewProps> = ({
+  rows,
+  active = true,
+  bottomVariant = 'prompt',
+  onVisibleReasoningIdsChange,
+}) => {
   const { stdout } = useStdout()
   const columns = stdout.columns ?? process.stdout.columns ?? 80
   const terminalRows = stdout.rows ?? process.stdout.rows ?? 24
@@ -68,10 +74,20 @@ export const TranscriptView: React.FC<TranscriptViewProps> = ({ rows, active = t
     ),
     [columns, maxLines, resolvedViewportState, rows],
   )
+  const visibleReasoningIds = useMemo(
+    () => selection.rows
+      .filter((row): row is Extract<MessageRow, { role: 'thinking' }> => row.role === 'thinking')
+      .map(row => row.id),
+    [selection.rows],
+  )
 
   useEffect(() => {
     setViewportState(prev => sameViewportState(prev, resolvedViewportState) ? prev : resolvedViewportState)
   }, [resolvedViewportState])
+
+  useEffect(() => {
+    onVisibleReasoningIdsChange?.(visibleReasoningIds)
+  }, [onVisibleReasoningIdsChange, visibleReasoningIds])
 
   useAppInput((_input, key) => {
     if (key.pageUp) {
@@ -117,7 +133,7 @@ export const TranscriptView: React.FC<TranscriptViewProps> = ({ rows, active = t
       <MessageList rows={selection.rows} />
       {selection.hiddenAfter > 0 ? (
         <Text color={theme.dim}>
-          {`  ${selection.hiddenAfter} later message${selection.hiddenAfter === 1 ? '' : 's'} below - PgDn to return`}
+          {`  ${selection.hiddenAfter} later message${selection.hiddenAfter === 1 ? '' : 's'} below · pgdn to return`}
         </Text>
       ) : null}
     </Box>
