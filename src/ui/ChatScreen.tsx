@@ -1149,17 +1149,17 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
       if (action === 'save-publish') {
         const status = await getIdentityStatus(configRef.current)
         setIdentityOverlay({
-          initialAction: 'settings',
+          initialAction: 'save-snapshot',
           existing: status ? { address: status.address } : null,
         })
         overlayRef.current = 'identity'
         setOverlay('identity')
-        pushNote('Agent Settings opened. Choose "save snapshot and publish" to pin the reviewed markdown.', 'dim')
+        pushNote('opening snapshot approval.', 'dim')
         return
       }
       overlayRef.current = 'none'
       setOverlay('none')
-      pushNote('Later: Alt+I -> memory, persona, skills -> save encrypted snapshot.', 'dim')
+      pushNote('snapshot not published yet.', 'dim')
     },
     [continuityEditReview, pushNote],
   )
@@ -1168,7 +1168,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
     setContinuityEditReview(null)
     overlayRef.current = 'none'
     setOverlay('none')
-    pushNote('Later: Alt+I -> memory, persona, skills -> save encrypted snapshot.', 'dim')
+    pushNote('snapshot not published yet.', 'dim')
   }, [pushNote])
 
   const handleCopyDone = useCallback(

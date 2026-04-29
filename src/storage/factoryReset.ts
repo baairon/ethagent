@@ -91,18 +91,18 @@ export async function runFactoryReset(options: { clearSecrets?: boolean } = {}):
 
 export function formatFactoryResetPlan(plan: FactoryResetPlan): string {
   return [
-    'ethagent factory reset',
+    'ethagent reset',
     '',
-    'This deletes local ethagent data on this machine:',
+    'will delete:',
     ...formatPaths(plan.deletePaths, plan.configDir),
     '',
-    'It preserves installed local LLM assets:',
+    'will keep:',
     ...plan.preservedDescriptions.map(item => `  - ${item}`),
     '',
-    'It cannot delete remote identity records:',
+    'not touched:',
     ...plan.remoteDescriptions.map(item => `  - ${item}`),
     '',
-    'Private markdown files, sessions, credentials, permissions, and rewind history are deleted.',
+    'type confirm to reset this machine.',
   ].join('\n')
 }
 

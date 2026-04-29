@@ -13,9 +13,11 @@ type ProviderTurnEvent =
   | { type: 'tool_use_start'; id: string; name: string }
   | { type: 'tool_use_delta'; id: string; delta: string }
   | { type: 'tool_use_stop'; id: string; name: string; input: Record<string, unknown> }
-  | { type: 'done' }
+  | { type: 'done'; stopReason?: TurnStopReason }
   | { type: 'error'; message: string }
   | { type: 'cancelled' }
+
+type TurnStopReason = 'end_turn' | 'tool_use' | 'max_tokens' | 'stop_sequence' | 'unknown'
 
 async function* runProviderTurn(
   provider: Provider,
@@ -46,7 +48,7 @@ function normalize(event: StreamEvent): ProviderTurnEvent {
     case 'tool_use_start': return event
     case 'tool_use_delta': return event
     case 'tool_use_stop': return event
-    case 'done': return { type: 'done' }
+    case 'done': return { type: 'done', stopReason: event.stopReason }
     case 'error': return { type: 'error', message: event.message }
   }
 }
@@ -67,6 +69,7 @@ export type ContinuationNudgeReason =
   | 'tool_delegation'
   | 'private_continuity_tool'
   | 'private_continuity_tool_repair'
+  | 'reasoning_only'
 
 const CONTINUATION_NUDGE_TEXT =
   'Continue with the task. Use the appropriate tools to proceed.'
@@ -88,6 +91,9 @@ const PRIVATE_CONTINUITY_NUDGE_TEXT =
 
 const PRIVATE_CONTINUITY_REPAIR_NUDGE_TEXT =
   'The previous propose_private_continuity_edit call had invalid or missing input. Retry the same native tool now with complete arguments. Do not answer in prose and do not search for markdown files. For memory/preferences use {"file":"MEMORY.md","appendToSection":"Durable User Preferences","appendText":"- User preference or memory note."}. For persona use {"file":"SOUL.md","appendToSection":"Persona","appendText":"- Persona or standing behavior note."}.'
+
+const REASONING_ONLY_NUDGE_TEXT =
+  'You produced private reasoning but no user-visible answer. Answer the user now in visible text. Do not continue only with reasoning.'
 
 /**
  * TurnEvent - events emitted by the runtime turn loop. The UI layer subscribes
@@ -120,7 +126,7 @@ export type TurnEvent =
   | { type: 'local_tool_recovery' }
   | { type: 'error'; message: string; discardAssistant?: boolean }
   | { type: 'cancelled' }
-  | { type: 'done'; finishedNormally: boolean }
+  | { type: 'done'; finishedNormally: boolean; stopReason?: TurnStopReason }
 
 export type PendingToolUse = {
   id: string
@@ -157,7 +163,7 @@ export type ToolBatchRunner = (
  * system-prompt composition, and file-mention context completely outside the
  * loop - the loop only cares about "give me the next prompt window".
  */
-export type RebuildMessages = () => Message[]
+export type RebuildMessages = () => Message[] | Promise<Message[]>
 
 export type RuntimeTurnParams = {
   provider: Provider
@@ -217,7 +223,7 @@ export async function* runRuntimeTurn(
   while (true) {
     if (signal.aborted) {
       yield { type: 'cancelled' }
-      yield { type: 'done', finishedNormally: false }
+      yield doneEvent(false)
       return
     }
 
@@ -228,6 +234,8 @@ export async function* runRuntimeTurn(
     const pendingToolUses: PendingToolUse[] = []
     let errored = false
     let cancelled = false
+    let thinkingSeen = false
+    let stopReason: TurnStopReason = 'unknown'
 
     try {
       for await (const ev of runProviderTurn(provider, workingMessages, signal)) {
@@ -235,6 +243,7 @@ export async function* runRuntimeTurn(
           assistantText += ev.delta
           yield { type: 'text', delta: ev.delta }
         } else if (ev.type === 'thinking') {
+          thinkingSeen = true
           yield { type: 'thinking', delta: ev.delta }
         } else if (ev.type === 'tool_use_start') {
           yield { type: 'tool_use_start', id: ev.id, name: ev.name }
@@ -256,6 +265,7 @@ export async function* runRuntimeTurn(
           cancelled = true
           break
         } else if (ev.type === 'done') {
+          stopReason = ev.stopReason ?? 'unknown'
           break
         }
       }
@@ -270,12 +280,12 @@ export async function* runRuntimeTurn(
 
     if (signal.aborted || cancelled) {
       yield { type: 'cancelled' }
-      yield { type: 'done', finishedNormally: false }
+      yield doneEvent(false, stopReason)
       return
     }
 
     if (errored) {
-      yield { type: 'done', finishedNormally: false }
+      yield doneEvent(false, stopReason)
       return
     }
 
@@ -306,7 +316,7 @@ export async function* runRuntimeTurn(
           reason: 'tool_protocol_fake',
         }
         workingMessages = [
-          ...rebuildMessages(),
+          ...await rebuildMessages(),
           { role: 'user', content: TOOL_PROTOCOL_FAKE_NUDGE_TEXT },
         ]
         continue
@@ -316,7 +326,7 @@ export async function* runRuntimeTurn(
         message: 'model printed tool names instead of making a tool call',
         discardAssistant: true,
       }
-      yield { type: 'done', finishedNormally: false }
+      yield doneEvent(false, stopReason)
       return
     }
 
@@ -329,7 +339,7 @@ export async function* runRuntimeTurn(
           reason: 'tool_delegation',
         }
         workingMessages = [
-          ...rebuildMessages(),
+          ...await rebuildMessages(),
           { role: 'user', content: TOOL_DELEGATION_NUDGE_TEXT },
         ]
         continue
@@ -339,7 +349,7 @@ export async function* runRuntimeTurn(
         message: 'model asked the user to run a tool instead of making a tool call',
         discardAssistant: true,
       }
-      yield { type: 'done', finishedNormally: false }
+      yield doneEvent(false, stopReason)
       return
     }
 
@@ -358,7 +368,7 @@ export async function* runRuntimeTurn(
           // This prevents the model from reinforcing its own false claims
           // on subsequent iterations within the same turn.
           workingMessages = [
-            ...rebuildMessages(),
+            ...await rebuildMessages(),
             {
               role: 'user',
               content:
@@ -374,13 +384,35 @@ export async function* runRuntimeTurn(
           message: 'model claimed workspace state without matching tool evidence',
           discardAssistant: true,
         }
-        yield { type: 'done', finishedNormally: false }
+        yield doneEvent(false, stopReason)
         return
       }
     }
 
     // No tool work: model decided this turn is over (modulo continuation nudge).
     if (pendingToolUses.length === 0) {
+      if (!assistantText && thinkingSeen) {
+        if (continuationNudges < maxContinuationNudges) {
+          continuationNudges += 1
+          yield {
+            type: 'continuation_nudge',
+            attempt: continuationNudges,
+            reason: 'reasoning_only',
+          }
+          workingMessages = [
+            ...await rebuildMessages(),
+            { role: 'user', content: REASONING_ONLY_NUDGE_TEXT },
+          ]
+          continue
+        }
+        yield {
+          type: 'error',
+          message: 'model produced reasoning but no visible answer',
+        }
+        yield doneEvent(false, stopReason)
+        return
+      }
+
       const nudge = nextNudge(provider, assistantText)
       if (assistantText && continuationNudges < maxContinuationNudges && nudge) {
         continuationNudges += 1
@@ -390,7 +422,7 @@ export async function* runRuntimeTurn(
           reason: nudge.reason,
         }
         workingMessages = [
-          ...rebuildMessages(),
+          ...await rebuildMessages(),
           ...(nudge.keepAssistantContext ? [{ role: 'assistant' as const, content: assistantText }] : []),
           { role: 'user', content: nudge.text },
         ]
@@ -401,7 +433,7 @@ export async function* runRuntimeTurn(
           type: 'error',
           message: 'model refused available tools after corrective nudges',
         }
-        yield { type: 'done', finishedNormally: false }
+        yield doneEvent(false, stopReason)
         return
       }
 
@@ -409,7 +441,7 @@ export async function* runRuntimeTurn(
         yield { type: 'assistant_message_committed', text: assistantText }
       }
 
-      yield { type: 'done', finishedNormally: true }
+      yield doneEvent(true, stopReason)
       return
     }
 
@@ -438,7 +470,7 @@ export async function* runRuntimeTurn(
 
     if (batch.cancelled || signal.aborted) {
       yield { type: 'cancelled' }
-      yield { type: 'done', finishedNormally: false }
+      yield doneEvent(false, stopReason)
       return
     }
 
@@ -452,7 +484,7 @@ export async function* runRuntimeTurn(
           reason: 'private_continuity_tool_repair',
         }
         workingMessages = [
-          ...rebuildMessages(),
+          ...await rebuildMessages(),
           { role: 'user', content: repairNudge },
         ]
         continue
@@ -462,12 +494,19 @@ export async function* runRuntimeTurn(
         message: 'model called propose_private_continuity_edit with invalid input after corrective nudges',
         discardAssistant: true,
       }
-      yield { type: 'done', finishedNormally: false }
+      yield doneEvent(false, stopReason)
       return
     }
 
-    workingMessages = rebuildMessages()
+    workingMessages = await rebuildMessages()
   }
+}
+
+function doneEvent(finishedNormally: boolean, stopReason?: TurnStopReason): Extract<TurnEvent, { type: 'done' }> {
+  if (stopReason && stopReason !== 'end_turn' && stopReason !== 'unknown') {
+    return { type: 'done', finishedNormally, stopReason }
+  }
+  return { type: 'done', finishedNormally }
 }
 
 function nextToolResultRepairNudge(

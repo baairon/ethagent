@@ -4,6 +4,7 @@ import {
   writePreparedPrivateContinuityEdit,
 } from '../identity/continuity/privateEdit.js'
 import { recordPrivateContinuityHistorySnapshot } from '../identity/continuity/history.js'
+import { readContinuityFiles, readPublicSkillsFile } from '../identity/continuity/storage.js'
 import type { Tool } from './contracts.js'
 
 const schema = z.object({
@@ -119,12 +120,18 @@ export const privateContinuityEditTool: Tool<typeof schema> = {
   },
   async execute(input, context) {
     const prepared = await preparePrivateContinuityEdit(input, context.config)
+    const [previousFiles, previousPublicSkills] = await Promise.all([
+      readContinuityFiles(prepared.identity),
+      readPublicSkillsFile(prepared.identity),
+    ])
     await recordPrivateContinuityHistorySnapshot({
       identity: prepared.identity,
       file: prepared.file,
       filePath: prepared.fullPath,
       existedBefore: prepared.existedBefore,
       previousContent: prepared.previousContent,
+      previousFiles,
+      previousPublicSkills,
       changeSummary: prepared.changeSummary,
       createdAt: new Date().toISOString(),
       sessionId: context.checkpoint?.sessionId,
@@ -139,8 +146,8 @@ export const privateContinuityEditTool: Tool<typeof schema> = {
       content: [
         `updated local private continuity file ${prepared.fullPath}`,
         `review file: ${prepared.fullPath}`,
-        'open from Alt+I -> memory, persona, skills -> private memory files',
-        'save/publish later from Alt+I -> save snapshot and publish',
+        'open from identity hub, memory and persona',
+        'publish from identity hub snapshots',
         'previous version saved to private identity history; /rewind does not restore identity markdown',
       ].join('\n'),
     }

@@ -36,6 +36,7 @@ import {
   renderPublicSkillsMarkdown,
   serializeAgentCard,
 } from './continuity/publicSkills.js'
+import { recordPublishedContinuitySnapshot } from './continuity/snapshots.js'
 import { addToIpfs, catFromIpfs, DEFAULT_IPFS_API_URL, isPinataUploadUrl, type IpfsAddResult } from './ipfs.js'
 import {
   AgentTokenIdRequiredError,
@@ -261,6 +262,7 @@ export async function runCreateSigning(
     ...defaultContinuityFiles(nextIdentity),
     'SKILLS.md': result.prepared.publicSkillsMarkdown,
   })
+  await recordPublishedContinuitySnapshot({ identity: nextIdentity, label: 'initial published snapshot' }).catch(() => null)
   await callbacks.onIdentityComplete(nextIdentity, `ERC-8004 agent registered - #${registered.agentId.toString()}`)
 }
 
@@ -651,6 +653,7 @@ export async function runRebackupSigning(
   if (result.prepared.markdownScaffold) {
     await writeIdentityMarkdownScaffold(nextIdentity, result.prepared.markdownScaffold)
   }
+  await recordPublishedContinuitySnapshot({ identity: nextIdentity, label: 'published encrypted snapshot' }).catch(() => null)
   const completionMessage = step.profileUpdates ? 'profile updated and backup saved' : 'agent backup saved'
   await callbacks.onIdentityComplete(nextIdentity, completionMessage)
 }
@@ -671,8 +674,9 @@ export async function runContinuityUnlock(
   const identity = step.identity
   const ownerAddress = getAddress(identity.ownerAddress ?? identity.address)
   const chainId = identity.chainId ?? identity.backup?.chainId ?? 1
-  if (identity.backup?.cid) {
-    const raw = await catFromIpfs(identity.backup.ipfsApiUrl ?? DEFAULT_IPFS_API_URL, identity.backup.cid)
+  const snapshotCid = step.cid ?? identity.backup?.cid
+  if (snapshotCid) {
+    const raw = await catFromIpfs(identity.backup?.ipfsApiUrl ?? DEFAULT_IPFS_API_URL, snapshotCid)
     const envelope = parseRestorableEnvelope(raw)
     if (isContinuitySnapshotEnvelope(envelope)) {
       assertContinuitySnapshotOwner(envelope, ownerAddress)
@@ -684,7 +688,10 @@ export async function runContinuityUnlock(
       })
       const payload = restoreContinuitySnapshotEnvelope({ envelope, walletSignature: wallet.signature })
       await writeContinuityFiles({ ...identity, state: payload.state }, payload.files)
-      callbacks.onStep({ kind: 'continuity-private', notice: 'private files restored from encrypted IPFS snapshot.' })
+      await restorePublishedPublicSkills(identity, identity.backup?.ipfsApiUrl ?? DEFAULT_IPFS_API_URL, step.publicSkillsCid)
+      callbacks.onStep(step.returnTo === 'snapshots'
+        ? { kind: 'continuity-snapshots', notice: 'published snapshot restored locally. review, then publish when ready.' }
+        : { kind: 'continuity-private', notice: 'private files restored from encrypted IPFS snapshot.' })
       return
     }
     assertAgentStateBackupOwner(envelope, ownerAddress)
@@ -705,7 +712,9 @@ export async function runContinuityUnlock(
     void wallet.signature
   }
   await ensureContinuityFiles(identity)
-  callbacks.onStep({ kind: 'continuity-private', notice: 'local private working files are ready on this machine.' })
+  callbacks.onStep(step.returnTo === 'snapshots'
+    ? { kind: 'continuity-snapshots', notice: 'local private working files are ready on this machine.' }
+    : { kind: 'continuity-private', notice: 'local private working files are ready on this machine.' })
 }
 
 function deriveAgentName(identity: EthagentIdentity): string {

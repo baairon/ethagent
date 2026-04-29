@@ -1,9 +1,13 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import type { EthagentIdentity } from '../../storage/config.js'
+import { atomicWriteText } from '../../storage/atomicWrite.js'
+import type { ContinuityFiles } from './envelope.js'
 import {
   continuityVaultRef,
   ensureContinuityVault,
+  writePublicSkillsFile,
+  writeContinuityFiles,
   type PrivateContinuityFile,
 } from './storage.js'
 
@@ -15,6 +19,8 @@ export type PrivateContinuityHistorySnapshot = {
   filePath: string
   existedBefore: boolean
   previousContent: string
+  previousFiles?: ContinuityFiles
+  previousPublicSkills?: string
   changeSummary: string
   identity: {
     address: string
@@ -35,6 +41,8 @@ export type RecordPrivateContinuityHistoryInput = {
   filePath: string
   existedBefore: boolean
   previousContent: string
+  previousFiles?: ContinuityFiles
+  previousPublicSkills?: string
   changeSummary: string
   createdAt?: string
   sessionId?: string
@@ -60,6 +68,8 @@ export async function recordPrivateContinuityHistorySnapshot(
     filePath: path.resolve(input.filePath),
     existedBefore: input.existedBefore,
     previousContent: input.previousContent,
+    ...(input.previousFiles ? { previousFiles: input.previousFiles } : {}),
+    ...(input.previousPublicSkills !== undefined ? { previousPublicSkills: input.previousPublicSkills } : {}),
     changeSummary: input.changeSummary,
     identity: {
       address: input.identity.address,
@@ -105,7 +115,39 @@ export async function listPrivateContinuityHistory(
   return snapshots.reverse().slice(0, limit)
 }
 
+export async function restorePrivateContinuityHistorySnapshot(
+  identity: EthagentIdentity,
+  snapshotId: string,
+): Promise<PrivateContinuityHistorySnapshot> {
+  const snapshot = (await listPrivateContinuityHistory(identity, 500))
+    .find(item => item.id === snapshotId)
+  if (!snapshot) throw new Error('private continuity checkpoint was not found')
+
+  if (snapshot.previousFiles) {
+    await writeContinuityFiles(identity, snapshot.previousFiles)
+    if (snapshot.previousPublicSkills !== undefined) {
+      await writePublicSkillsFile(identity, snapshot.previousPublicSkills)
+    }
+    return snapshot
+  }
+
+  await ensureContinuityVault(identity)
+  if (snapshot.existedBefore) {
+    await atomicWriteText(snapshot.filePath, normalizeMarkdown(snapshot.previousContent), { mode: 0o600 })
+  } else {
+    await fs.rm(snapshot.filePath, { force: true })
+  }
+  if (snapshot.previousPublicSkills !== undefined) {
+    await writePublicSkillsFile(identity, snapshot.previousPublicSkills)
+  }
+  return snapshot
+}
+
 function normalizeSnippet(input: string): string {
   const normalized = input.replace(/\s+/g, ' ').trim()
   return normalized.length <= 120 ? normalized : `${normalized.slice(0, 117)}...`
+}
+
+function normalizeMarkdown(value: string): string {
+  return value.endsWith('\n') ? value : `${value}\n`
 }

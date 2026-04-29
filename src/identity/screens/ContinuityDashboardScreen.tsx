@@ -7,7 +7,7 @@ import type { EthagentConfig, EthagentIdentity } from '../../storage/config.js'
 import { IdentitySummary } from './IdentitySummary.js'
 import { shortCid } from '../identityHubModel.js'
 
-type DashboardAction = 'private' | 'public' | 'back'
+type DashboardAction = 'private' | 'public' | 'snapshots' | 'back'
 type PrivateAction = 'restore' | 'soul' | 'memory' | 'backup' | 'back'
 type PublicAction = 'skills' | 'publish' | 'back'
 
@@ -23,7 +23,8 @@ type CommonProps = {
 export const ContinuityDashboardScreen: React.FC<CommonProps & {
   onPrivate: () => void
   onPublic: () => void
-}> = ({ identity, config, ready, notice, footer, onPrivate, onPublic, onBack }) => (
+  onSnapshots: () => void
+}> = ({ identity, config, ready, notice, footer, onPrivate, onPublic, onSnapshots, onBack }) => (
   <Surface title="Memory & Persona" subtitle={notice ?? continuitySubtitle(identity, ready)} footer={footer}>
     <IdentitySummary identity={identity} config={config} />
     <ContinuityRows identity={identity} ready={ready} />
@@ -32,11 +33,13 @@ export const ContinuityDashboardScreen: React.FC<CommonProps & {
         options={[
           { value: 'private', label: 'private memory files', hint: 'restore, inspect, and back up SOUL.md and MEMORY.md' },
           { value: 'public', label: 'public discovery', hint: 'inspect SKILLS.md and publish agent-readable metadata' },
+          { value: 'snapshots', label: 'snapshots', hint: 'status, history, and restore points' },
           { value: 'back', label: 'back' },
         ]}
         onSubmit={choice => {
           if (choice === 'private') return onPrivate()
           if (choice === 'public') return onPublic()
+          if (choice === 'snapshots') return onSnapshots()
           return onBack()
         }}
         onCancel={onBack}

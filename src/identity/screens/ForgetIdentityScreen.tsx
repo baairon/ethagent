@@ -32,11 +32,11 @@ export const ForgetIdentityScreen: React.FC<ForgetIdentityScreenProps> = ({
   onCancel,
 }) => (
   <Surface
-    title="Unlink Active Agent?"
-    subtitle="Markdown, chats, token, and backups stay intact."
+    title="unlink active agent?"
+    subtitle="markdown, chats, token, and backups stay intact."
     footer={footer}
   >
-    <IdentitySummary identity={identity} config={config} />
+    <IdentitySummary identity={identity} config={config} compact />
     <Box flexDirection="column" marginTop={1}>
       {FORGET_LOCAL_AGENT_COPY.map(line => (
         <Text key={line} color={theme.dim}>- {line}</Text>

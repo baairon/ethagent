@@ -17,6 +17,14 @@ import {
   writePublicSkillsFile,
   writeContinuityFiles,
 } from '../src/identity/continuity/storage.js'
+import {
+  recordPrivateContinuityHistorySnapshot,
+  restorePrivateContinuityHistorySnapshot,
+} from '../src/identity/continuity/history.js'
+import {
+  listPublishedContinuitySnapshots,
+  recordPublishedContinuitySnapshot,
+} from '../src/identity/continuity/snapshots.js'
 import type { EthagentIdentity } from '../src/storage/config.js'
 
 const identity: EthagentIdentity = {
@@ -146,6 +154,73 @@ test('public skills file hydrates from a published fallback without overwriting 
     assert.equal(second, '# Local Skills\nedited locally\n')
     assert.equal(await readPublicSkillsFile(identity), '# Local Skills\nedited locally\n')
     assert.equal(fallbackReads, 1)
+  })
+})
+
+test('private continuity history restore restores the full markdown checkpoint', async () => {
+  await withHome(async () => {
+    const ref = continuityVaultRef(identity)
+    await writeContinuityFiles(identity, {
+      'SOUL.md': '# Old Soul\nprivate soul\n',
+      'MEMORY.md': '# Old Memory\nprivate memory\n',
+    })
+    await writePublicSkillsFile(identity, '# Old Skills\npublic skills\n')
+
+    const snapshot = await recordPrivateContinuityHistorySnapshot({
+      identity,
+      file: 'MEMORY.md',
+      filePath: ref.memoryPath,
+      existedBefore: true,
+      previousContent: '# Old Memory\nprivate memory\n',
+      previousFiles: await readContinuityFiles(identity),
+      previousPublicSkills: await readPublicSkillsFile(identity),
+      changeSummary: 'append private memory',
+      createdAt: '2026-04-21T00:00:00.000Z',
+    })
+
+    await writeContinuityFiles(identity, {
+      'SOUL.md': '# New Soul\nchanged soul\n',
+      'MEMORY.md': '# New Memory\nchanged memory\n',
+    })
+    await writePublicSkillsFile(identity, '# New Skills\nchanged skills\n')
+
+    await restorePrivateContinuityHistorySnapshot(identity, snapshot.id)
+
+    assert.deepEqual(await readContinuityFiles(identity), {
+      'SOUL.md': '# Old Soul\nprivate soul\n',
+      'MEMORY.md': '# Old Memory\nprivate memory\n',
+    })
+    assert.equal(await readPublicSkillsFile(identity), '# Old Skills\npublic skills\n')
+  })
+})
+
+test('published snapshot list enriches current entries with public skills metadata', async () => {
+  await withHome(async () => {
+    const publishedIdentity: EthagentIdentity = {
+      ...identity,
+      backup: {
+        cid: 'bafybackup',
+        createdAt: '2026-04-21T00:00:00.000Z',
+        envelopeVersion: 'ethagent.continuity.v1',
+        ipfsApiUrl: 'https://ipfs.example',
+        status: 'pinned',
+      },
+    }
+    await recordPublishedContinuitySnapshot({ identity: publishedIdentity, label: 'legacy snapshot' })
+
+    const list = await listPublishedContinuitySnapshots({
+      ...publishedIdentity,
+      publicSkills: {
+        cid: 'bafyskills',
+        agentCardCid: 'bafycard',
+        status: 'pinned',
+      },
+    })
+
+    assert.equal(list.length, 1)
+    assert.equal(list[0]!.cid, 'bafybackup')
+    assert.equal(list[0]!.publicSkillsCid, 'bafyskills')
+    assert.equal(list[0]!.agentCardCid, 'bafycard')
   })
 })
 

@@ -234,6 +234,28 @@
     .result-row .label { color: var(--dim); margin-right: 0.5rem; }
     .result-row .value { color: var(--text); }
 
+    .tx-summary {
+      margin-top: 0.85rem;
+      padding-left: 1.875rem;
+      display: grid;
+      grid-template-columns: max-content minmax(0, 1fr);
+      gap: 0.42rem 0.75rem;
+      max-width: 48rem;
+    }
+    .tx-summary[hidden] { display: none; }
+    .tx-key {
+      color: var(--dim);
+      font-size: 11.5px;
+      line-height: 1.25;
+    }
+    .tx-value {
+      color: var(--text);
+      font-size: 11.5px;
+      line-height: 1.25;
+      overflow-wrap: anywhere;
+    }
+    .tx-value.muted { color: var(--subtle); }
+
   </style>
 </head>
 <body>
@@ -253,6 +275,8 @@
       <p class="status-line"><span class="marker" id="status-marker">[ ]</span><span id="status-text">connecting to your wallet…</span></p>
       <p class="status-hint" id="status-hint">open your wallet extension if it doesn't pop up automatically.</p>
     </div>
+
+    <div class="tx-summary" id="tx-summary" hidden></div>
 
     <div id="error-block-slot"></div>
 
@@ -511,6 +535,7 @@
       message: 'ethagent identity proof for 0x9F2a…BC4e',
     };
     const CLOSE_DELAY_MS = 1800;
+    const TX_CLOSE_DELAY_MS = 8500;
     const CANCEL_CLOSE_DELAY_MS = 3200;
     const WALLET_PROVIDER_WAIT_MS = 3000;
     const WALLET_PROVIDER_POLL_MS = 100;
@@ -566,6 +591,18 @@
       if (addr.length <= 14) return addr;
       return addr.slice(0, 6) + glyphs.ellipsis + addr.slice(-4);
     }
+    function isTransactionFlow() {
+      return config.kind === 'transaction' || config.kind === 'sign-transaction';
+    }
+    function dataSizeLabel(data) {
+      if (!data || typeof data !== 'string' || !data.startsWith('0x')) return glyphs.emDash;
+      return Math.max(0, Math.ceil((data.length - 2) / 2)) + ' bytes';
+    }
+    function transactionActionLabel() {
+      if (config.kind === 'sign-transaction') return 'publish identity snapshot';
+      if (config.kind === 'transaction') return 'submit transaction';
+      return 'wallet request';
+    }
 
     const card = document.getElementById('card');
     const promptText = document.getElementById('prompt-text');
@@ -580,6 +617,7 @@
     const statusText = document.getElementById('status-text');
     const statusHint = document.getElementById('status-hint');
     const errorSlot = document.getElementById('error-block-slot');
+    const txSummary = document.getElementById('tx-summary');
     const approve = document.getElementById('approve');
     const cancel = document.getElementById('cancel');
     let announcedEthereum = null;
@@ -745,6 +783,7 @@
       errorSlot.innerHTML = '';
       statusBlock.style.display = 'flex';
       setTabTitle(tabTitleForState(state));
+      renderTransactionSummary(payload);
       switch (state) {
         case 'connecting':
           setStatus('[ ]', 'connecting to your wallet…', 'open your wallet extension if it does not pop up automatically.', true);
@@ -784,7 +823,9 @@
               ? 'signed · returning to ethagent'
               : 'submitted · returning to ethagent';
           if (payload.txHash) {
-            statusHint.innerHTML = '<span class="result-row"><span class="label">tx</span><span class="value">'+escapeHtml(payload.txHash)+'</span></span>';
+            statusHint.textContent = isTransactionFlow()
+              ? 'transaction submitted. this tab will close after you can read the hash.'
+              : 'this tab will close shortly.';
           } else {
             statusHint.textContent = 'this tab will close shortly.';
           }
@@ -795,6 +836,29 @@
           renderError(payload);
           break;
       }
+    }
+
+    function renderTransactionSummary(payload) {
+      if (!isTransactionFlow()) {
+        txSummary.hidden = true;
+        txSummary.innerHTML = '';
+        return;
+      }
+      const tx = payload.tx || config.tx || {};
+      const rows = [
+        ['action', transactionActionLabel()],
+        ['network', chainLabel(config.chainIdHex)],
+        ['wallet', shortAddr(payload.account || config.expectedAccount)],
+        ['registry', shortAddr(tx.to)],
+        ['data', dataSizeLabel(tx.data)],
+      ];
+      if (payload.txHash) rows.push(['tx hash', payload.txHash]);
+      txSummary.innerHTML = rows.map(([key, value]) =>
+        '<span class="tx-key">'+escapeHtml(key)+'</span>'+
+        '<span class="tx-value'+(value === glyphs.emDash ? ' muted' : '')+'">'+escapeHtml(value)+'</span>'
+      ).join('');
+      txSummary.hidden = false;
+      requestAnimationFrame(sizeRules);
     }
 
     function renderError(payload) {
@@ -874,23 +938,23 @@
         if (config.kind === 'sign-transaction') {
           const prepared = config.message ? { message: config.message } : await post('/prepare', { account });
           showPreparedMessage(prepared.message);
-          setState('approve-sign');
+          setState('approve-sign', { account });
           const signature = await walletRequest('personal_sign', [prepared.message, account]);
-          setState('preparing-transaction');
+          setState('preparing-transaction', { account });
           const txPayload = await post('/prepare-transaction', { account, message: prepared.message, signature });
-          setState('approve-transaction');
+          setState('approve-transaction', { account, tx: txPayload.tx });
           const tx = txPayload.tx || {};
           const txHash = await walletRequest('eth_sendTransaction', [{ from:account, to:tx.to, data:tx.data, value:tx.value }]);
-          setState('submitting');
+          setState('submitting', { account, tx, txHash });
           await post('/complete', { account, txHash });
-          setState('done', { txHash }); closeSoon(); return;
+          setState('done', { account, tx, txHash }); closeSoon(TX_CLOSE_DELAY_MS); return;
         }
         if (config.kind === 'transaction') {
-          setState('approve');
+          setState('approve', { account, tx: config.tx });
           const txHash = await walletRequest('eth_sendTransaction', [{ from:account, to:config.tx.to, data:config.tx.data, value:config.tx.value }]);
-          setState('submitting');
+          setState('submitting', { account, tx: config.tx, txHash });
           await post('/complete', { account, txHash });
-          setState('done', { txHash }); closeSoon(); return;
+          setState('done', { account, tx: config.tx, txHash }); closeSoon(TX_CLOSE_DELAY_MS); return;
         }
         throw new Error('Unknown wallet request type.');
       } catch (err) {
