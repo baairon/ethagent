@@ -103,7 +103,7 @@ export async function runStreamingTurn(
   if (mode === 'accept-edits') {
     pushNote(
       provider.supportsTools
-        ? 'accept-edits mode: read and edit tools will auto-allow. bash still prompts.'
+        ? 'accept-edits mode: workspace reads/edits auto-allow. private continuity edits and bash still prompt.'
         : 'accept-edits mode selected, but the current provider does not support tools yet.',
       'dim',
     )

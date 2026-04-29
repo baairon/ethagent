@@ -199,23 +199,29 @@ type SpinnerProps = {
   label?: string
   verb?: string
   color?: string
+  startedAt?: number
+  showElapsed?: boolean
 }
 
 const FRAMES = ['.', 'o', 'O', 'o']
 
 export const Spinner: React.FC<SpinnerProps> = ({
   active = true,
-  hint,
+  hint: rawHint,
   label,
   verb,
   color = theme.accentSecondary,
+  startedAt,
+  showElapsed = true,
 }) => {
   const stickyVerbRef = useRef<string | null>(null)
+  const internalStartedAtRef = useRef<number>(Date.now())
   const [frame, setFrame] = useState(0)
 
   useEffect(() => {
     if (!active) {
       stickyVerbRef.current = null
+      internalStartedAtRef.current = Date.now()
       return
     }
 
@@ -223,6 +229,11 @@ export const Spinner: React.FC<SpinnerProps> = ({
       stickyVerbRef.current = verb ?? pickVerb()
     }
   }, [active, verb, label])
+
+  useEffect(() => {
+    if (!active) return
+    internalStartedAtRef.current = startedAt ?? Date.now()
+  }, [active, startedAt, label, verb])
 
   useEffect(() => {
     if (!active) return
@@ -237,6 +248,9 @@ export const Spinner: React.FC<SpinnerProps> = ({
   const autoLabel = stickyVerbRef.current ?? verb ?? 'thinking'
   const text = label ?? `${autoLabel}…`
   const glyph = FRAMES[frame] ?? 'o'
+  const elapsed = showElapsed ? formatElapsedSeconds(Date.now() - (startedAt ?? internalStartedAtRef.current)) : null
+  const renderedHint = [rawHint, elapsed].filter(Boolean).join(' · ')
+  const hint = renderedHint
 
   return (
     <Text>
@@ -245,4 +259,11 @@ export const Spinner: React.FC<SpinnerProps> = ({
       {hint ? <Text color={theme.dim}> · {hint}</Text> : null}
     </Text>
   )
+}
+
+function formatElapsedSeconds(milliseconds: number): string {
+  const seconds = Math.max(0, Math.floor(milliseconds / 1000))
+  if (seconds < 60) return `${seconds}s`
+  const minutes = Math.floor(seconds / 60)
+  return `${minutes}:${(seconds % 60).toString().padStart(2, '0')}`
 }

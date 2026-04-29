@@ -64,6 +64,15 @@ test('/hf download opens the model picker without exposing a remote catalog', as
   assert.doesNotMatch(result.text, /catalog/i)
 })
 
+test('/help lists the identity shortcut in the shortcuts footer', async () => {
+  const result = await dispatchSlash('/help', context())
+
+  assert.equal(result?.kind, 'note')
+  if (result?.kind !== 'note') return
+  assert.match(result.text, /alt\+i identity/)
+  assert.match(result.text, /alt\+p model/)
+})
+
 test('/identity load opens the identity hub with the requested action', async () => {
   const requests: unknown[] = []
 

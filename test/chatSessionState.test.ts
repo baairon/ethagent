@@ -1,6 +1,11 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { buildResumedSessionState, resolveModelSelection, restoreConversationState } from '../src/ui/chatSessionState.js'
+import {
+  buildResumedSessionState,
+  promptHistoryFromSessionMessages,
+  resolveModelSelection,
+  restoreConversationState,
+} from '../src/ui/chatSessionState.js'
 import type { EthagentConfig } from '../src/storage/config.js'
 import type { SessionMessage } from '../src/storage/sessions.js'
 
@@ -116,6 +121,29 @@ test('buildResumedSessionState restores cwd, mode, config, and transcript rows',
   assert.equal(resumed.config?.provider, 'anthropic')
   assert.equal(resumed.config?.model, 'claude-sonnet-4-5')
   assert.equal(resumed.rows.at(-1)?.role, 'note')
+  assert.deepEqual(resumed.promptHistory, ['make a file'])
+})
+
+test('buildResumedSessionState hydrates prompt history from the resumed conversation only', () => {
+  let rowId = 0
+  const messages: SessionMessage[] = [
+    { role: 'user', content: 'first prompt', createdAt: '2026-01-01T00:00:00.000Z', turnId: 'turn-1' },
+    { role: 'assistant', content: 'done', createdAt: '2026-01-01T00:00:01.000Z', turnId: 'turn-1' },
+    { role: 'user', content: 'second prompt', createdAt: '2026-01-01T00:00:02.000Z', turnId: 'turn-2' },
+    { role: 'tool_result', version: 2, toolUseId: 'tool-1', name: 'read_file', content: 'ignored', createdAt: '2026-01-01T00:00:03.000Z', turnId: 'turn-2' },
+    { role: 'user', content: 'second prompt', createdAt: '2026-01-01T00:00:04.000Z', turnId: 'turn-3' },
+    { role: 'user', content: 'third prompt', createdAt: '2026-01-01T00:00:05.000Z', turnId: 'turn-4' },
+  ]
+
+  const resumed = buildResumedSessionState({
+    messages,
+    metadata: null,
+    fallbackCwd: 'C:/fallback',
+    currentConfig: baseConfig,
+    nextRowId: () => `row-${++rowId}`,
+  })
+
+  assert.deepEqual(resumed.promptHistory, ['first prompt', 'second prompt', 'third prompt'])
 })
 
 test('buildResumedSessionState keeps every resumed transcript row visible to the renderer', () => {
@@ -156,4 +184,42 @@ test('restoreConversationState truncates to the first matching turn boundary', (
   assert.equal(restored.messages.length, 2)
   assert.equal(restored.messages[0]?.turnId, 'turn-a')
   assert.equal(restored.rows.length, 2)
+  assert.deepEqual(restored.promptHistory, ['first'])
+})
+
+test('promptHistoryFromSessionMessages keeps only the latest prompt window', () => {
+  const messages: SessionMessage[] = Array.from({ length: 505 }, (_, index) => ({
+    role: 'user',
+    content: `prompt ${index}`,
+    createdAt: '2026-01-01T00:00:00.000Z',
+  }))
+
+  const history = promptHistoryFromSessionMessages(messages)
+
+  assert.equal(history.length, 500)
+  assert.equal(history[0], 'prompt 5')
+  assert.equal(history.at(-1), 'prompt 504')
+})
+
+test('promptHistoryFromSessionMessages skips synthetic handoff context', () => {
+  const messages: SessionMessage[] = [
+    {
+      role: 'user',
+      synthetic: true,
+      content: 'Conversation handoff from abcdef12:\n\nlarge summary',
+      createdAt: '2026-01-01T00:00:00.000Z',
+    },
+    {
+      role: 'assistant',
+      content: 'Ready to continue from this summary.',
+      createdAt: '2026-01-01T00:00:01.000Z',
+    },
+    {
+      role: 'user',
+      content: 'real prompt',
+      createdAt: '2026-01-01T00:00:02.000Z',
+    },
+  ]
+
+  assert.deepEqual(promptHistoryFromSessionMessages(messages), ['real prompt'])
 })

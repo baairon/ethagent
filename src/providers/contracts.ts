@@ -37,11 +37,15 @@ export type StreamEvent =
   | { type: 'done'; inputTokens?: number; outputTokens?: number; stopReason?: 'end_turn' | 'tool_use' | 'max_tokens' | 'stop_sequence' | 'unknown' }
   | { type: 'error'; message: string }
 
+export type ProviderCompleteOptions = {
+  maxTokens?: number
+}
+
 export interface Provider {
   readonly id: ProviderId
   readonly model: string
   readonly supportsTools: boolean
-  complete(messages: Message[], signal: AbortSignal): AsyncIterable<StreamEvent>
+  complete(messages: Message[], signal: AbortSignal, options?: ProviderCompleteOptions): AsyncIterable<StreamEvent>
 }
 
 export class ProviderError extends Error {

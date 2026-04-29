@@ -109,6 +109,12 @@ export type EthagentBackupPointer = {
   agentAddress?: Address
 }
 
+export type EthagentPublicDiscoveryPointer = {
+  skillsCid?: string
+  agentCardCid?: string
+  updatedAt?: string
+}
+
 export type Erc8004AgentCandidate = {
   ownerAddress: Address
   chainId: number
@@ -120,6 +126,7 @@ export type Erc8004AgentCandidate = {
   name?: string
   description?: string
   backup?: EthagentBackupPointer
+  publicDiscovery?: EthagentPublicDiscoveryPointer
   registration: Record<string, unknown> | null
 }
 
@@ -374,12 +381,31 @@ export function parseEthagentBackupPointer(registration: Record<string, unknown>
   }
 }
 
+export function parseEthagentPublicDiscoveryPointer(registration: Record<string, unknown> | null): EthagentPublicDiscoveryPointer | null {
+  if (!registration) return null
+  const ext = objectField(registration, 'x-ethagent') ?? objectField(registration, 'ethagent')
+  const publicSkills = ext ? objectField(ext, 'publicSkills') : null
+  const agentCard = ext ? objectField(ext, 'agentCard') : null
+  const skillsCid = publicSkills ? stringField(publicSkills, 'cid') : undefined
+  const agentCardCid = agentCard ? stringField(agentCard, 'cid') : undefined
+  const updatedAt = (publicSkills ? stringField(publicSkills, 'updatedAt') : undefined)
+    ?? (agentCard ? stringField(agentCard, 'updatedAt') : undefined)
+  if (!skillsCid && !agentCardCid) return null
+  return {
+    ...(skillsCid ? { skillsCid } : {}),
+    ...(agentCardCid ? { agentCardCid } : {}),
+    ...(updatedAt ? { updatedAt } : {}),
+  }
+}
+
 export function withEthagentBackupPointer(
   registration: Record<string, unknown> | null,
   backup: EthagentBackupPointer,
+  publicDiscovery?: EthagentPublicDiscoveryPointer,
 ): Record<string, unknown> {
   const next: Record<string, unknown> = registration ? { ...registration } : {}
   const prior = objectField(next, 'x-ethagent') ?? {}
+  const updatedAt = publicDiscovery?.updatedAt ?? backup.createdAt
   next['x-ethagent'] = {
     ...prior,
     version: 1,
@@ -389,6 +415,23 @@ export function withEthagentBackupPointer(
       ...(backup.envelopeVersion ? { envelopeVersion: backup.envelopeVersion } : {}),
       ...(backup.createdAt ? { createdAt: backup.createdAt } : {}),
     },
+    ...(publicDiscovery?.skillsCid ? {
+      publicSkills: {
+        cid: publicDiscovery.skillsCid,
+        format: 'text/markdown',
+        ...(updatedAt ? { updatedAt } : {}),
+      },
+    } : {}),
+    ...(publicDiscovery?.agentCardCid ? {
+      agentCard: {
+        cid: publicDiscovery.agentCardCid,
+        format: 'application/json',
+        ...(updatedAt ? { updatedAt } : {}),
+      },
+    } : {}),
+  }
+  if (publicDiscovery) {
+    next.services = withPublicDiscoveryServices(next.services, publicDiscovery)
   }
   return next
 }
@@ -641,6 +684,7 @@ async function loadOwnedAgentCandidate(args: DiscoverOwnedAgentsArgs & {
     fetchImpl: args.fetchImpl,
   }).catch(() => ({ metadataCid: cidFromUri(agentUri), registration: null }))
   const parsed = parseEthagentBackupPointer(loaded.registration)
+  const publicDiscovery = parseEthagentPublicDiscoveryPointer(loaded.registration)
   return {
     ownerAddress: args.ownerAddress,
     chainId: args.chainId,
@@ -652,6 +696,7 @@ async function loadOwnedAgentCandidate(args: DiscoverOwnedAgentsArgs & {
     name: stringField(loaded.registration, 'name'),
     description: stringField(loaded.registration, 'description'),
     backup: parsed ?? undefined,
+    publicDiscovery: publicDiscovery ?? undefined,
     registration: loaded.registration,
   }
 }
@@ -775,6 +820,34 @@ function objectField(input: Record<string, unknown>, key: string): Record<string
 function stringField(input: Record<string, unknown> | null, key: string): string | undefined {
   const value = input?.[key]
   return typeof value === 'string' && value.length > 0 ? value : undefined
+}
+
+function withPublicDiscoveryServices(input: unknown, publicDiscovery: EthagentPublicDiscoveryPointer): unknown[] {
+  const prior = Array.isArray(input) ? input.filter(item => item && typeof item === 'object') : []
+  const services = [...prior] as unknown[]
+  if (publicDiscovery.agentCardCid) {
+    pushUniqueService(services, {
+      type: 'a2a',
+      url: `ipfs://${publicDiscovery.agentCardCid}`,
+    })
+  }
+  if (publicDiscovery.skillsCid) {
+    pushUniqueService(services, {
+      type: 'ipfs',
+      name: 'public-skills',
+      url: `ipfs://${publicDiscovery.skillsCid}`,
+    })
+  }
+  return services
+}
+
+function pushUniqueService(services: unknown[], service: Record<string, string>): void {
+  const duplicate = services.some(item => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return false
+    const obj = item as Record<string, unknown>
+    return obj.type === service.type && obj.url === service.url && obj.name === service.name
+  })
+  if (!duplicate) services.push(service)
 }
 
 function cleanRpcError(err: unknown): string {

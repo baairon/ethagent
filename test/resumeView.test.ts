@@ -33,3 +33,22 @@ test('resume options expose a clear all chat logs action', () => {
   assert.match(clear.hint ?? '', /saved chats/)
   assert.ok(options.some(option => option.value === 'session-1'))
 })
+
+test('resume options show short session id without an explicit id label', () => {
+  const options = buildResumeOptions([
+    session({
+      id: 'abcdef1234567890',
+      turnCount: 64,
+      compactedFromSessionId: 'source1234567890',
+    }),
+  ], 'different-session')
+
+  const option = options.find(candidate => candidate.value === 'abcdef1234567890')
+  assert.ok(option)
+  assert.match(option.hint ?? '', /64 turns/)
+  assert.match(option.hint ?? '', /abcdef12/)
+  assert.match(option.hint ?? '', /summary from source12/)
+  assert.doesNotMatch(option.hint ?? '', /\bid\b/i)
+  assert.match(option.hint ?? '', / · /)
+  assert.doesNotMatch(option.hint ?? '', / - /)
+})

@@ -73,6 +73,7 @@ test('identityHubReducer: details subviews back to settings, then hub', () => {
 
   assert.equal(identityHubReducer({ kind: 'details' }, { type: 'back', from: { kind: 'details' } }).kind, 'menu')
   assert.equal(identityHubReducer({ kind: 'forget-confirm' }, { type: 'back', from: { kind: 'forget-confirm' } }).kind, 'details')
+  assert.equal(identityHubReducer({ kind: 'data-management' }, { type: 'back', from: { kind: 'data-management' } }).kind, 'details')
   assert.equal(identityHubReducer({ kind: 'storage-credential-input' }, { type: 'back', from: { kind: 'storage-credential-input' } }).kind, 'details')
 })
 

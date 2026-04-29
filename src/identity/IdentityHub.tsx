@@ -4,7 +4,7 @@ import { theme } from '../ui/theme.js'
 import { type EthagentConfig, type EthagentIdentity, type SelectableNetwork } from '../storage/config.js'
 import { clearIdentity, setTokenIdentity } from '../storage/identity.js'
 import { copyToClipboard } from '../utils/clipboard.js'
-import { DEFAULT_IPFS_API_URL } from './ipfs.js'
+import { catFromIpfs, DEFAULT_IPFS_API_URL } from './ipfs.js'
 import { hasPinataJwt, clearPinataJwt, savePinataJwt } from './pinataJwt.js'
 import { registryConfigFromConfig } from './registryConfig.js'
 import { identityHubErrorView, isRegistrationPreflightError, pinataErrorText } from './identityHubModel.js'
@@ -23,9 +23,12 @@ import {
   runRebackupPreflight,
   runRebackupSigning,
   runRebackupStorageSubmit,
+  runContinuityUnlock,
   isAgentTokenIdRequiredError,
   type EffectCallbacks,
 } from './identityHubEffects.js'
+import { continuityVaultRef, continuityVaultStatus, ensurePublicSkillsFile } from './continuity/storage.js'
+import { openFileInEditor } from './continuity/editor.js'
 import type { BrowserWalletReady } from './browserWallet.js'
 import { MenuScreen } from './screens/MenuScreen.js'
 import { CreateFlow } from './screens/CreateFlow.js'
@@ -38,7 +41,13 @@ import { RebackupStorageScreen } from './screens/RebackupStorageScreen.js'
 import { BusyScreen } from './screens/BusyScreen.js'
 import { EditProfileFlow } from './screens/EditProfileFlow.js'
 import { ForgetIdentityScreen } from './screens/ForgetIdentityScreen.js'
+import { DataManagementScreen } from './screens/DataManagementScreen.js'
 import { StorageCredentialScreen } from './screens/StorageCredentialScreen.js'
+import {
+  ContinuityDashboardScreen,
+  PrivateContinuityScreen,
+  PublicSkillsScreen,
+} from './screens/ContinuityDashboardScreen.js'
 import { chainIdForNetwork, erc8004ConfigForSupportedChain, type Erc8004RegistryConfig } from './erc8004.js'
 
 const MIN_BUSY_ERROR_MS = 2000
@@ -77,7 +86,7 @@ type IdentityHubProps = {
   onConfigChange?: (config: EthagentConfig) => void
 }
 
-export type IdentityHubInitialAction = 'create' | 'load'
+export type IdentityHubInitialAction = 'create' | 'load' | 'settings'
 
 export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialAction, onComplete, onConfigChange }) => {
   const identity = config?.identity
@@ -85,6 +94,7 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
   const [walletSession, setWalletSession] = useState<BrowserWalletReady | null>(null)
   const [jwtSaved, setJwtSaved] = useState<boolean>(false)
   const [copyNotice, setCopyNotice] = useState<string | null>(null)
+  const [continuityReady, setContinuityReady] = useState<boolean>(false)
   const canRebackup = Boolean(identity?.agentId && (identity?.identityRegistryAddress || config?.erc8004?.identityRegistryAddress))
 
   const setStep = (s: Step) => dispatch({ type: 'preflightResolved', step: s })
@@ -99,6 +109,19 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
   }, [step.kind])
 
   useEffect(() => { setCopyNotice(null) }, [step.kind])
+
+  useEffect(() => {
+    let cancelled = false
+    if (!identity) {
+      setContinuityReady(false)
+      return
+    }
+    if (!step.kind.startsWith('continuity') && step.kind !== 'details' && step.kind !== 'menu') return
+    continuityVaultStatus(identity)
+      .then(status => { if (!cancelled) setContinuityReady(status.ready) })
+      .catch(() => { if (!cancelled) setContinuityReady(false) })
+    return () => { cancelled = true }
+  }, [identity, step.kind])
 
   const completeTokenIdentity = async (nextIdentity: EthagentIdentity, message: string): Promise<void> => {
     if (mode === 'first-run' || !config) {
@@ -259,7 +282,42 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
     return () => { cancelled = true }
   }, [step])
 
-  const footer = <Text color={theme.dim}>enter select · esc back</Text>
+  useEffect(() => {
+    if (step.kind !== 'continuity-unlocking') return
+    let cancelled = false
+    runContinuityUnlock(step, callbacks)
+      .then(() => {
+        if (!cancelled) setContinuityReady(true)
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) handleStepError(err, { kind: 'continuity-private' })
+      })
+    return () => { cancelled = true }
+  }, [step])
+
+  const openContinuityFile = async (kind: 'soul' | 'memory' | 'skills'): Promise<void> => {
+    if (!identity) return
+    try {
+      if (kind === 'skills') {
+        await ensurePublicSkillsFile(identity, {
+          fallback: () => readPublishedPublicSkills(identity),
+        })
+      }
+      const ref = continuityVaultRef(identity)
+      const file = kind === 'soul' ? ref.soulPath : kind === 'memory' ? ref.memoryPath : ref.publicSkillsPath
+      const result = await openFileInEditor(file)
+      const message = result.ok
+        ? `opened ${kind === 'soul' ? 'SOUL.md' : kind === 'memory' ? 'MEMORY.md' : 'SKILLS.md'} with ${result.method}.`
+        : `open failed: ${result.error}`
+      setStep(kind === 'skills'
+        ? { kind: 'continuity-public', notice: message }
+        : { kind: 'continuity-private', notice: message })
+    } catch (err: unknown) {
+      errorStep(err, kind === 'skills' ? { kind: 'continuity-public' } : { kind: 'continuity-private' })
+    }
+  }
+
+  const footer = <Text color={theme.dim}>enter select - esc back</Text>
 
   if (step.kind === 'menu') {
     return (
@@ -421,9 +479,71 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
           }
           setStep({ kind: 'edit-profile-name', identity, registry })
         }}
+        onContinuity={() => setStep({ kind: 'continuity-dashboard' })}
         onRebackup={() => triggerRebackup({ kind: 'details' })}
         onStorageCredential={() => setStep({ kind: 'storage-credential' })}
+        onDataManagement={() => setStep({ kind: 'data-management' })}
         onForgetLocalData={() => setStep({ kind: 'forget-confirm' })}
+        onBack={back}
+      />
+    )
+  }
+
+  if (step.kind === 'data-management') {
+    return (
+      <DataManagementScreen
+        identity={identity}
+        config={config}
+        footer={footer}
+        onBack={back}
+      />
+    )
+  }
+
+  if (step.kind === 'continuity-dashboard') {
+    return (
+      <ContinuityDashboardScreen
+        identity={identity}
+        config={config}
+        ready={continuityReady}
+        notice={step.notice}
+        footer={footer}
+        onPrivate={() => setStep({ kind: 'continuity-private' })}
+        onPublic={() => setStep({ kind: 'continuity-public' })}
+        onBack={back}
+      />
+    )
+  }
+
+  if (step.kind === 'continuity-private') {
+    return (
+      <PrivateContinuityScreen
+        identity={identity}
+        config={config}
+        ready={continuityReady}
+        notice={step.notice}
+        canBackup={canRebackup}
+        footer={footer}
+        onRestore={() => { if (identity) setStep({ kind: 'continuity-unlocking', identity }) }}
+        onOpenSoul={() => { void openContinuityFile('soul') }}
+        onOpenMemory={() => { void openContinuityFile('memory') }}
+        onBackup={() => triggerRebackup({ kind: 'continuity-private' })}
+        onBack={back}
+      />
+    )
+  }
+
+  if (step.kind === 'continuity-public') {
+    return (
+      <PublicSkillsScreen
+        identity={identity}
+        config={config}
+        ready={continuityReady}
+        notice={step.notice}
+        canPublish={canRebackup && continuityReady}
+        footer={footer}
+        onOpenSkills={() => { void openContinuityFile('skills') }}
+        onPublish={() => triggerRebackup({ kind: 'continuity-public' })}
         onBack={back}
       />
     )
@@ -495,7 +615,7 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
               onComplete({
                 kind: 'updated',
                 config: nextConfig,
-                message: 'removed agent from this device. sessions were kept.',
+                message: 'unlinked active agent. markdown, chats, token, and pinned backups were kept.',
               })
             } catch (err: unknown) {
               errorStep(err, { kind: 'forget-confirm' })
@@ -510,11 +630,23 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
   if (step.kind === 'rebackup-signing') {
     return (
       <WalletApprovalScreen
-        title="Approve Back Up"
-        subtitle="One browser flow signs, saves the IPFS backup, and updates tokenURI."
+        title="Approve Encrypted Snapshot"
+        subtitle="One browser flow signs, saves the encrypted SOUL/MEMORY snapshot, and updates tokenURI."
         walletSession={walletSession}
         label="waiting for wallet approval..."
         onCancel={() => setStep({ kind: 'details' })}
+      />
+    )
+  }
+
+  if (step.kind === 'continuity-unlocking') {
+    return (
+      <WalletApprovalScreen
+        title="Restore Memory & Persona"
+        subtitle="Wallet approval decrypts the encrypted snapshot into local SOUL.md and MEMORY.md working files."
+        walletSession={walletSession}
+        label="waiting for wallet approval..."
+        onCancel={() => setStep({ kind: 'continuity-private' })}
       />
     )
   }
@@ -573,6 +705,15 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
   return null
 }
 
+async function readPublishedPublicSkills(identity: EthagentIdentity): Promise<string> {
+  const cid = identity.publicSkills?.cid
+  if (!cid) throw new Error('no published public skills CID')
+  return new TextDecoder().decode(await catFromIpfs(
+    identity.backup?.ipfsApiUrl ?? DEFAULT_IPFS_API_URL,
+    cid,
+  ))
+}
+
 function isCreateStep(step: Step): step is Extract<Step, { kind: 'replace-confirm' | 'create-name' | 'create-description' | 'create-preflight' | 'create-registry' | 'create-signing' | 'create-storage' }> {
   return step.kind === 'replace-confirm'
     || step.kind === 'create-name'
@@ -593,5 +734,6 @@ function initialStepForAction(
 ): Step {
   if (action === 'create') return config?.identity ? { kind: 'replace-confirm', next: 'create' } : { kind: 'create-name' }
   if (action === 'load') return { kind: 'restore-wallet', purpose: config?.identity ? 'switch' : 'restore' }
+  if (action === 'settings') return config?.identity ? { kind: 'details' } : { kind: 'menu' }
   return { kind: 'menu' }
 }

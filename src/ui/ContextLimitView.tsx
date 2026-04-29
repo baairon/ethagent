@@ -77,7 +77,7 @@ export const ContextLimitView: React.FC<ContextLimitViewProps> = ({
       <Text color={theme.textSubtle}>{`Pending: ${promptPreview || '(empty)'}`}</Text>
       <Box flexDirection="column" marginTop={1}>
         {CONTEXT_LIMIT_OPTIONS.map((option, index) => (
-          <Text key={option.action} color={index === selected ? theme.accentPrimary : theme.dim}>
+          <Text key={option.action} color={index === selected ? theme.accentPrimary : theme.text}>
             {index === selected ? '> ' : '  '}
             {option.label}
             <Text color={theme.dim}>{` - ${option.detail}`}</Text>

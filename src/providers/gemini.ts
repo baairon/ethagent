@@ -1,5 +1,5 @@
 import { getKey } from '../storage/secrets.js'
-import type { Message, Provider, StreamEvent } from './contracts.js'
+import type { Message, Provider, ProviderCompleteOptions, StreamEvent } from './contracts.js'
 import { ProviderError } from './contracts.js'
 import { providerErrorFromResponse } from './errors.js'
 import { iterSseFrames } from './sse.js'
@@ -34,7 +34,11 @@ export class GeminiProvider implements Provider {
     this.model = opts.model
   }
 
-  async *complete(messages: Message[], signal: AbortSignal): AsyncIterable<StreamEvent> {
+  async *complete(
+    messages: Message[],
+    signal: AbortSignal,
+    options: ProviderCompleteOptions = {},
+  ): AsyncIterable<StreamEvent> {
     const apiKey = await getKey('gemini')
     if (!apiKey) {
       const error = new ProviderError('missing API key for gemini (/doctor to verify)')
@@ -42,7 +46,7 @@ export class GeminiProvider implements Provider {
       return
     }
 
-    const payload = buildGeminiPayload(messages)
+    const payload = buildGeminiPayload(messages, options)
     const modelName = this.model.replace(/^models\//, '')
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelName)}:streamGenerateContent?alt=sse&key=${encodeURIComponent(apiKey)}`
 
@@ -109,13 +113,16 @@ export class GeminiProvider implements Provider {
   }
 }
 
-function buildGeminiPayload(messages: Message[]): {
+function buildGeminiPayload(messages: Message[], options: ProviderCompleteOptions = {}): {
   contents: Array<{
     role: 'user' | 'model'
     parts: Array<{ text: string }>
   }>
   systemInstruction?: {
     parts: Array<{ text: string }>
+  }
+  generationConfig?: {
+    maxOutputTokens?: number
   }
 } {
   const systemParts: string[] = []
@@ -140,5 +147,6 @@ function buildGeminiPayload(messages: Message[]): {
   return {
     contents,
     systemInstruction: systemParts.length > 0 ? { parts: [{ text: systemParts.join('\n\n') }] } : undefined,
+    generationConfig: options.maxTokens ? { maxOutputTokens: options.maxTokens } : undefined,
   }
 }

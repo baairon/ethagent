@@ -198,10 +198,16 @@ export function buildResumeOptions(
       const summaryHint = session.compactedFromSessionId
         ? `summary from ${session.compactedFromSessionId.slice(0, 8)}`
         : null
+      const hintParts = [
+        `${session.turnCount} turn${session.turnCount === 1 ? '' : 's'}`,
+        formatRelative(session.mtimeMs),
+        session.id.slice(0, 8),
+        summaryHint,
+      ].filter(Boolean)
       options.push({
         value: session.id,
         label,
-        hint: `${session.turnCount} turn${session.turnCount === 1 ? '' : 's'} - ${formatRelative(session.mtimeMs)}${summaryHint ? ` - ${summaryHint}` : ''}`,
+        hint: hintParts.join(' · '),
       })
     }
   }

@@ -8,6 +8,7 @@ export type SystemPromptContext = {
   model: string
   provider: string
   hasTools: boolean
+  hasIdentity?: boolean
   mode?: SessionMode
 }
 
@@ -32,7 +33,7 @@ function buildToolEnabledPrompt(ctx: SystemPromptContext): string {
         ...(ctx.mode === 'plan'
           ? [
               '**PLAN MODE ACTIVE**: Inspect only and produce an implementation plan; do NOT edit files, run shell commands, or change directories.',
-              'Use read-only tools to understand the workspace, then return a concise plan with target files, implementation steps, risks, and validation.',
+              'Use read-only tools to understand the workspace. If private continuity inspection is needed and an identity is linked, use `read_private_continuity_file`; then return a concise plan with target files, implementation steps, risks, and validation.',
               '**CRITICAL**: Do NOT claim changes were made. Do NOT output tool calls for mutating tools.',
             ]
           : [
@@ -40,7 +41,9 @@ function buildToolEnabledPrompt(ctx: SystemPromptContext): string {
               'If the user asks you to create, edit, save, or run something, DO IT with the tools. Do NOT just provide manual instructions.',
             ]),
         ...(ctx.mode === 'accept-edits'
-          ? ['**ACCEPT-EDITS MODE ACTIVE**: File reads and edits may be auto-approved; bash commands still require explicit user approval.']
+          ? [ctx.hasIdentity
+              ? '**ACCEPT-EDITS MODE ACTIVE**: File reads and workspace edits may be auto-approved; private continuity reads/edits and bash commands still require explicit user approval.'
+              : '**ACCEPT-EDITS MODE ACTIVE**: File reads and workspace edits may be auto-approved; bash commands still require explicit user approval.']
           : []),
         "**NO HALLUCINATIONS**: Do NOT claim you checked, ran, or verified anything unless you actually did. Report failures and skipped verification plainly.",
         'Do NOT invent file contents, tool outputs, URLs, APIs, commands, or project structure.',
@@ -73,13 +76,25 @@ function buildToolEnabledPrompt(ctx: SystemPromptContext): string {
         'Prefer targeted `read_file` and `edit_file` calls over general `run_bash` operations when both solve the task.',
         ...(ctx.mode === 'plan'
           ? [
-              'Only read/list tools are available in plan mode.',
+              'Only read/list tools and permission-gated private continuity reads are available in plan mode.',
               'When the plan is complete, stop. The terminal will ask the user to proceed.',
             ]
           : [
               'Use `change_directory` for navigation. Do not use `run_bash` for simple `cd`.',
               'Use `list_directory` to discover local paths.',
               'Use `edit_file` to mutate. For precise changes, provide `oldText` and `newText`. To replace entirely, provide only `newText`.',
+              ...(ctx.hasIdentity
+                ? [
+                    'SOUL.md and MEMORY.md are existing scaffolded private identity files in the identity vault, not normal workspace files.',
+                    'They are not stored in plans/ and should not be discovered with workspace `list_directory` or `read_file`; private continuity tools resolve the vault path.',
+                    'When exact private continuity text is needed for surgical removal or targeted replacement, call `read_private_continuity_file` with `file: "MEMORY.md"` or `file: "SOUL.md"` first.',
+                    'When the user wants memory, persona, preferences, or private identity continuity changed, call `propose_private_continuity_edit`; do NOT create, overwrite, or patch SOUL.md/MEMORY.md with `write_file` or `edit_file`.',
+                    'For private continuity, edit the existing scaffold and build on top of it: prefer `appendToSection`+`appendText` for new notes or use `oldText`+`newText` for targeted replacement. Never omit the edit anchor, never create a new file, and never replace the whole file.',
+                    'If the user asks to remember preferences or facts, call exactly one private continuity append such as `{"file":"MEMORY.md","appendToSection":"Durable User Preferences","appendText":"- User preference or durable memory."}`.',
+                    'If the user asks to change persona or standing behavior, call exactly one private continuity append such as `{"file":"SOUL.md","appendToSection":"Persona","appendText":"- Persona or standing behavior."}`.',
+                    'Do not edit public skills metadata directly; suggest SKILLS.md changes in chat for the user to apply or publish manually.',
+                  ]
+                : ['No agent identity is linked in this session. Do not attempt private identity continuity edits; ask the user to create or load an agent first.']),
               'Use `run_bash` **only** when true shell execution is necessary.',
               '**CWD CONTINUITY**: The working directory below is authoritative. After `change_directory` succeeds, use the new path as the base for subsequent actions.',
               'Do not lag behind the CWD. Edit/read relative to the *current* working directory.',
@@ -97,7 +112,14 @@ function buildToolEnabledPrompt(ctx: SystemPromptContext): string {
             '**PROTOCOL**: Emit tool calls in the native tool-call protocol. Do NOT describe the call in prose first, and do NOT print a JSON blob inside markdown as a substitute for an actual tool call.',
             '**NO FAKE COMPLETIONS**: NEVER claim you have updated or created a file if you have not used the edit tools. Talk is cheap, use the tools.',
             'One tool call per response when a tool is needed. Wait for the tool result before deciding the next step.',
-            'For targeted edits with `oldText`, copy the text verbatim from the most recent `read_file` output. For full file writes, omit `oldText` and provide just `newText` with the complete content.',
+            ...(ctx.hasIdentity
+              ? [
+                  'For private SOUL.md or MEMORY.md inspection, do not search project folders. Call `read_private_continuity_file` with `file: "SOUL.md"` or `file: "MEMORY.md"`.',
+                  'For private SOUL.md or MEMORY.md changes, call `propose_private_continuity_edit` with `file: "SOUL.md"` or `file: "MEMORY.md"` and an in-place append/replacement payload.',
+                  'Never call `propose_private_continuity_edit` with `{}` or only `file`. For memory/preferences include `appendToSection: "Durable User Preferences"` and a non-empty `appendText`; for persona include `appendToSection: "Persona"` and a non-empty `appendText`.',
+                ]
+              : []),
+            'For targeted private continuity edits with `oldText`, copy the text verbatim from the most recent `read_private_continuity_file` output. For workspace targeted edits, copy from the most recent `read_file` output.',
             'Do NOT emit `<|im_start|>`, `<|im_end|>`, or other chat-template tokens as visible prose.',
           ],
         )]

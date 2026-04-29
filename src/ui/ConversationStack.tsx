@@ -11,6 +11,7 @@ type ConversationStackProps = {
   bottom: React.ReactNode
   status?: React.ReactNode
   sessionKey: number
+  onVisibleReasoningIdsChange?: (ids: string[]) => void
 }
 
 export const ConversationStack: React.FC<ConversationStackProps> = ({
@@ -21,11 +22,18 @@ export const ConversationStack: React.FC<ConversationStackProps> = ({
   bottom,
   status,
   sessionKey,
+  onVisibleReasoningIdsChange,
 }) => {
   return (
     <Box flexDirection="column" padding={1}>
       {header}
-      <TranscriptView key={`transcript-${sessionKey}`} rows={rows} active={transcriptActive} bottomVariant={bottomVariant} />
+      <TranscriptView
+        key={`transcript-${sessionKey}`}
+        rows={rows}
+        active={transcriptActive}
+        bottomVariant={bottomVariant}
+        onVisibleReasoningIdsChange={onVisibleReasoningIdsChange}
+      />
       <Box marginTop={1} width="100%">
         {bottom}
       </Box>

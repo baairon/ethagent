@@ -10,7 +10,8 @@ import { FirstRun } from './bootstrap/FirstRun.js'
 import { ChatScreen } from './ui/ChatScreen.js'
 import { KeybindingProvider } from './keybindings/KeybindingProvider.js'
 import { AppInputProvider, useAppInput } from './input/AppInputProvider.js'
-import { loadConfig, deleteConfig, getConfigPath, type EthagentConfig } from './storage/config.js'
+import { loadConfig, type EthagentConfig } from './storage/config.js'
+import { runResetCommand } from './cliReset.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -29,20 +30,15 @@ function printHelp(): void {
     'ethagent: privacy-first AI agent with a portable Ethereum identity',
     '',
     'usage:',
-    '  ethagent           start the agent (first run triggers setup)',
-    '  ethagent reset     wipe config (keys kept)',
-    '  ethagent --version print version',
-    '  ethagent --help    print this help',
+    '  ethagent             start the agent (first run triggers setup)',
+    '  ethagent reset       factory reset local data (local LLMs kept)',
+    '  ethagent reset --yes run reset without the confirm prompt',
+    '  ethagent --version   print version',
+    '  ethagent --help      print this help',
     '',
     'inside the agent, type /help for slash commands.',
   ]
   for (const line of lines) process.stdout.write(line + '\n')
-}
-
-async function runResetCommand(): Promise<number> {
-  await deleteConfig()
-  process.stdout.write(`config removed: ${getConfigPath()}\n`)
-  return 0
 }
 
 type AppPhase =
@@ -173,7 +169,7 @@ async function main(): Promise<number> {
 
   switch (cmd) {
     case 'reset':
-      return runResetCommand()
+      return runResetCommand(rest)
     case 'preview':
       return runPreviewCommand(rest[0])
     default:

@@ -19,6 +19,7 @@ export type IdentityStatus = {
   createdAt: string
   backend: KeyBackend | 'browser-wallet'
   backup?: EthagentIdentity['backup']
+  publicSkills?: EthagentIdentity['publicSkills']
   source?: EthagentIdentity['source']
   agentId?: string
   chainId?: number
@@ -33,6 +34,7 @@ export async function getIdentityStatus(config?: EthagentConfig): Promise<Identi
       createdAt: resolved.identity.createdAt,
       backend: 'browser-wallet',
       backup: resolved.identity.backup,
+      publicSkills: resolved.identity.publicSkills,
       source: resolved.identity.source,
       agentId: resolved.identity.agentId,
       chainId: resolved.identity.chainId,
@@ -46,6 +48,7 @@ export async function getIdentityStatus(config?: EthagentConfig): Promise<Identi
     createdAt: resolved.identity.createdAt,
     backend,
     backup: resolved.identity.backup,
+    publicSkills: resolved.identity.publicSkills,
     source: resolved.identity.source,
     chainId: resolved.identity.chainId,
   }

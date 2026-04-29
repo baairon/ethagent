@@ -1,5 +1,5 @@
 import { getKey } from '../storage/secrets.js'
-import type { Message, MessageContentBlock, Provider, StreamEvent } from './contracts.js'
+import type { Message, MessageContentBlock, Provider, ProviderCompleteOptions, StreamEvent } from './contracts.js'
 import { ProviderError } from './contracts.js'
 import { providerErrorFromResponse } from './errors.js'
 import { iterSseEvents } from './sse.js'
@@ -63,7 +63,11 @@ export class AnthropicProvider implements Provider {
     this.supportsTools = this.tools.length > 0
   }
 
-  async *complete(messages: Message[], signal: AbortSignal): AsyncIterable<StreamEvent> {
+  async *complete(
+    messages: Message[],
+    signal: AbortSignal,
+    options: ProviderCompleteOptions = {},
+  ): AsyncIterable<StreamEvent> {
     const apiKey = await getKey('anthropic')
     if (!apiKey) {
       const error = new ProviderError('missing API key for anthropic (/doctor to verify)')
@@ -85,7 +89,7 @@ export class AnthropicProvider implements Provider {
         },
         body: JSON.stringify({
           model: this.model,
-          max_tokens: DEFAULT_MAX_TOKENS,
+          max_tokens: options.maxTokens ?? DEFAULT_MAX_TOKENS,
           stream: true,
           system,
           messages: conversation,

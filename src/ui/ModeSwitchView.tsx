@@ -19,7 +19,7 @@ export const ModeSwitchView: React.FC<ModeSwitchViewProps> = ({ currentMode, onS
     <Surface
       title="Session Mode"
       subtitle="Choose how the agent should behave for the next turns."
-      footer="enter switches mode · esc closes"
+      footer="enter switches mode - esc closes"
     >
       <Box flexDirection="column" marginBottom={1}>
         <Text color={theme.dim}>Current mode: {labelForMode(currentMode)}</Text>
@@ -34,17 +34,19 @@ function buildOptions(currentMode: SessionMode): Array<SelectOption<SessionMode>
     {
       value: 'chat',
       label: 'Default Chat',
-      hint: currentMode === 'chat' ? 'current · normal prompting with permission prompts' : 'normal prompting with permission prompts',
+      hint: currentMode === 'chat' ? 'current - normal prompting with permission prompts' : 'normal prompting with permission prompts',
     },
     {
       value: 'plan',
       label: 'Plan Mode',
-      hint: currentMode === 'plan' ? 'current · inspection only, no mutating tools' : 'inspection only, no mutating tools',
+      hint: currentMode === 'plan' ? 'current - inspection only, no mutating tools' : 'inspection only, no mutating tools',
     },
     {
       value: 'accept-edits',
       label: 'Accept Edits',
-      hint: currentMode === 'accept-edits' ? 'current · reads/edits auto-allow, bash still prompts' : 'reads/edits auto-allow, bash still prompts',
+      hint: currentMode === 'accept-edits'
+        ? 'current - workspace edits auto-allow, private continuity prompts'
+        : 'workspace edits auto-allow, private continuity prompts',
     },
   ]
 }

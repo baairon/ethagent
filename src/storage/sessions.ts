@@ -12,9 +12,9 @@ import {
 } from '../runtime/toolClaimGuards.js'
 
 export type SessionMessage =
-  | { version?: 2; role: 'user'; content: string; createdAt: string; turnId?: string }
-  | { version?: 2; role: 'assistant'; content: string; createdAt: string; model?: string; usage?: { in?: number; out?: number }; turnId?: string }
-  | { version?: 2; role: 'system'; content: string; createdAt: string; turnId?: string }
+  | { version?: 2; role: 'user'; content: string; createdAt: string; turnId?: string; synthetic?: boolean }
+  | { version?: 2; role: 'assistant'; content: string; createdAt: string; model?: string; usage?: { in?: number; out?: number }; turnId?: string; synthetic?: boolean }
+  | { version?: 2; role: 'system'; content: string; createdAt: string; turnId?: string; synthetic?: boolean }
   | { version: 2; role: 'tool_use'; toolUseId: string; name: string; input: Record<string, unknown>; createdAt: string; turnId?: string }
   | { version: 2; role: 'tool_result'; toolUseId: string; name: string; content: string; isError?: boolean; createdAt: string; turnId?: string }
 
@@ -360,7 +360,7 @@ async function summarizeSession(id: string): Promise<SessionSummary | null> {
 
   const messages = await loadSession(id)
   if (messages.length === 0) return null
-  const firstUser = messages.find(m => m.role === 'user')
+  const firstUser = messages.find(isNonSyntheticUserMessage)
   if (!firstUser) return null
 
   const inferredCwd = getCwd()
@@ -373,9 +373,15 @@ async function summarizeSession(id: string): Promise<SessionSummary | null> {
     workspaceRoot: inferredCwd,
     lastCwd: inferredCwd,
     firstUserMessage: firstUser.content.slice(0, 120),
-    turnCount: messages.filter(m => m.role === 'user').length,
+    turnCount: messages.filter(isNonSyntheticUserMessage).length,
   }
   return toSummary(fallback, full, stat.mtimeMs)
+}
+
+function isNonSyntheticUserMessage(
+  message: SessionMessage,
+): message is Extract<SessionMessage, { role: 'user' }> {
+  return message.role === 'user' && !message.synthetic
 }
 
 async function updateSessionMetadata(
@@ -393,8 +399,8 @@ async function updateSessionMetadata(
     provider: context.provider ?? current.provider,
     model: context.model ?? current.model,
     mode: context.mode ?? current.mode,
-    firstUserMessage: current.firstUserMessage || (message.role === 'user' ? message.content.slice(0, 120) : ''),
-    turnCount: current.turnCount + (message.role === 'user' ? 1 : 0),
+    firstUserMessage: current.firstUserMessage || (message.role === 'user' && !message.synthetic ? message.content.slice(0, 120) : ''),
+    turnCount: current.turnCount + (message.role === 'user' && !message.synthetic ? 1 : 0),
   }
   await writeSessionMetadata(next)
 }

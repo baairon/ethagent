@@ -77,22 +77,25 @@ export function Select<T>({
     <Box flexDirection="column">
       {label ? <Text color={theme.dim}>{label}</Text> : null}
       {hasAbove ? (
-        <Text color={theme.dim}>{`↑ ${windowStart} earlier item${windowStart === 1 ? '' : 's'}`}</Text>
+        <Text color={theme.dim}>{`^ ${windowStart} earlier item${windowStart === 1 ? '' : 's'}`}</Text>
       ) : null}
       {visibleOptions.map((option, visibleIndex) => {
         const absoluteIndex = windowStart + visibleIndex
         const isActive = absoluteIndex === index
-        const cursor = option.disabled ? ' ' : isActive ? '›' : ' '
+        const cursor = option.disabled ? ' ' : isActive ? '>' : ' '
         const prefix = option.prefix ? `${option.prefix} ` : ''
         const isUtility = option.role === 'utility'
+        const isSection = option.role === 'section' || option.role === 'group'
         const prefixColor = option.disabled
           ? option.labelColor ?? theme.border
           : isActive
             ? theme.accentPrimary
             : option.labelColor ?? theme.dim
-        const labelColor = isActive && !option.disabled
-          ? isUtility ? theme.text : theme.accentPrimary
-          : option.labelColor ?? (option.disabled ? theme.dim : isUtility ? theme.textSubtle : theme.text)
+        const labelColor = isSection
+          ? option.labelColor ?? theme.dim
+          : isActive && !option.disabled
+            ? isUtility ? theme.text : theme.accentPrimary
+            : option.labelColor ?? (option.disabled ? theme.dim : isUtility ? theme.textSubtle : theme.text)
         const hintColor = isActive && !option.disabled
           ? theme.textSubtle
           : option.hintColor ?? theme.dim
@@ -105,7 +108,7 @@ export function Select<T>({
               <Text color={labelColor} bold={bold}>{option.label}</Text>
             </Box>
             {option.hint ? (
-              <Box marginLeft={2}>
+              <Box marginLeft={2 + (option.indent ?? 0)}>
                 <Text color={hintColor}>{option.hint}</Text>
               </Box>
             ) : null}
@@ -113,7 +116,7 @@ export function Select<T>({
         )
       })}
       {hasBelow ? (
-        <Text color={theme.dim}>{`↓ ${options.length - windowEnd} more item${options.length - windowEnd === 1 ? '' : 's'}`}</Text>
+        <Text color={theme.dim}>{`v ${options.length - windowEnd} more item${options.length - windowEnd === 1 ? '' : 's'}`}</Text>
       ) : null}
     </Box>
   )
