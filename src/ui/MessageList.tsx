@@ -101,7 +101,7 @@ const RowViewInner: React.FC<{ row: MessageRow }> = ({ row }) => {
         <Box flexDirection="column" marginTop={1} borderStyle="round" borderColor={borderColor} paddingX={1}>
           <Text>
             <Text color={theme.accentPeach} bold>reasoning</Text>
-            <Text color={theme.dim}> · expanded · Alt+T collapse</Text>
+            <Text color={theme.dim}> · expanded · alt+t collapse</Text>
           </Text>
           <ReasoningBody content={text} showCursor={showCursor} />
         </Box>
@@ -111,7 +111,7 @@ const RowViewInner: React.FC<{ row: MessageRow }> = ({ row }) => {
       <Box flexDirection="column" marginTop={1} borderStyle="round" borderColor={borderColor} paddingX={1}>
         <Text>
           <Text color={theme.accentPeach} bold>reasoning</Text>
-          <Text color={theme.dim}> · collapsed · Alt+T inspect</Text>
+          <Text color={theme.dim}> · collapsed · alt+t inspect</Text>
         </Text>
         <Text color={theme.textSubtle}>
           {preview || 'thinking...'}
