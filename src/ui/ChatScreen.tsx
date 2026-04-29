@@ -1248,7 +1248,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
         </>
       )}
       <Text color={theme.dim}>
-        {'esc cancels · pgup/pgdn scroll · alt+p model · alt+i identity'}
+        {'pgup/pgdn scroll · alt+p model · alt+i identity'}
       </Text>
     </Box>
   )
