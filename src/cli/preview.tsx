@@ -1,5 +1,5 @@
 import React from 'react'
-import { render } from 'ink'
+import { Box, render } from 'ink'
 import { BrandSplash } from '../ui/BrandSplash.js'
 
 /**
@@ -7,7 +7,11 @@ import { BrandSplash } from '../ui/BrandSplash.js'
  * in the top border, no technical details at the bottom, and exits.
  */
 export async function runPreviewCommand(): Promise<number> {
-  const instance = render(<BrandSplash />)
+  const instance = render(
+    <Box flexDirection="column" marginY={1}>
+      <BrandSplash />
+    </Box>,
+  )
   // Give Ink one tick to paint, then unmount cleanly.
   await new Promise<void>(resolve => setTimeout(resolve, 50))
   instance.unmount()
