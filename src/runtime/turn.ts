@@ -395,13 +395,6 @@ export async function* runRuntimeTurn(
     // No tool work: model decided this turn is over (modulo continuation nudge).
     if (pendingToolUses.length === 0) {
       if (!assistantText && thinkingSeen) {
-        // After a successful tool batch the model gets one shot to summarize.
-        // If it only produced reasoning, that is acceptable — the tool
-        // results are already in the session and speak for themselves.
-        if (hadToolsLastRound) {
-          yield doneEvent(true, stopReason)
-          return
-        }
         if (continuationNudges < maxContinuationNudges) {
           continuationNudges += 1
           yield {

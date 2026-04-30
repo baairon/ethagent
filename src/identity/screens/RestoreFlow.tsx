@@ -17,6 +17,7 @@ import { WalletApprovalScreen } from './WalletApprovalScreen.js'
 import { BusyScreen } from './BusyScreen.js'
 import type { BrowserWalletReady } from '../browserWallet.js'
 import type { EthagentConfig } from '../../storage/config.js'
+import type { RestoreProgress } from '../identityHubEffects.js'
 
 type RestoreStep = Exclude<Extract<Step, { kind: `restore-${string}` }>, { kind: 'restore-wallet' | 'restore-network' }>
 
@@ -24,6 +25,7 @@ type RestoreFlowProps = {
   step: RestoreStep
   config?: EthagentConfig
   walletSession: BrowserWalletReady | null
+  restoreProgress: RestoreProgress | null
   onConnectWallet: () => void
   onRestoreRegistrySubmit: (value: string) => void
   onTokenIdSubmit: (value: string) => void
@@ -37,6 +39,7 @@ export const RestoreFlow: React.FC<RestoreFlowProps> = ({
   step,
   config,
   walletSession,
+  restoreProgress,
   onConnectWallet,
   onRestoreRegistrySubmit,
   onTokenIdSubmit,
@@ -164,6 +167,15 @@ export const RestoreFlow: React.FC<RestoreFlowProps> = ({
   }
 
   if (step.kind === 'restore-authorizing') {
+    if (restoreProgress) {
+      return (
+        <BusyScreen
+          title={isSwitch ? 'Switching Agent Identity' : 'Restoring Your Agent'}
+          subtitle="wallet signature received"
+          label={restoreProgress.label}
+        />
+      )
+    }
     return (
       <WalletApprovalScreen
         title={isSwitch ? 'Approve Switch' : 'Approve Restore'}

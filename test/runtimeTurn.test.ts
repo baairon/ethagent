@@ -413,6 +413,55 @@ test('runRuntimeTurn retries when the provider emits reasoning with no visible a
   assert.deepEqual(events.at(-1), { type: 'done', finishedNormally: true })
 })
 
+test('runRuntimeTurn retries reasoning-only output after a tool batch', async () => {
+  const { provider, callsRef } = textProvider([
+    [
+      {
+        type: 'tool_use_stop',
+        id: 'tool-1',
+        name: 'list_directory',
+        input: {},
+      },
+      { type: 'done', stopReason: 'tool_use' },
+    ],
+    [
+      { type: 'thinking', delta: 'The visible summary was trapped in reasoning.' },
+      { type: 'done', stopReason: 'end_turn' },
+    ],
+    [
+      { type: 'text', delta: 'Visible summary after listing files.' },
+      { type: 'done', stopReason: 'end_turn' },
+    ],
+  ])
+
+  const events = await collect(
+    runRuntimeTurn({
+      provider,
+      signal: new AbortController().signal,
+      initialMessages: [{ role: 'user', content: 'list files' }],
+      rebuildMessages: () => [{ role: 'user', content: 'list files' }],
+      runToolBatch: async pending => ({
+        cancelled: false,
+        completedTools: pending.map(t => ({
+          ...t,
+          cwd: '/tmp',
+          result: { ok: true, summary: 'listed .', content: 'README.md' },
+        })),
+      }),
+    }),
+  )
+
+  assert.equal(callsRef.count, 3)
+  assert.deepEqual(
+    events.find(e => e.type === 'continuation_nudge'),
+    { type: 'continuation_nudge', attempt: 1, reason: 'reasoning_only' },
+  )
+  assert.ok(events.some(e =>
+    e.type === 'assistant_message_committed' && e.text === 'Visible summary after listing files.',
+  ))
+  assert.deepEqual(events.at(-1), { type: 'done', finishedNormally: true })
+})
+
 test('runRuntimeTurn converts bare local JSON tool text into a real tool use', async () => {
   const { provider, callsRef } = textProvider([
     [
