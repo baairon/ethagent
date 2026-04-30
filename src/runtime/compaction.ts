@@ -60,6 +60,12 @@ export function contextWindow(model: string): number {
 export function contextWindowInfo(provider: string, model: string): ContextWindowInfo {
   const lower = model.toLowerCase()
   const providerLower = provider.toLowerCase()
+  if (lower.startsWith('qwen3:4b') || lower.startsWith('qwen3:30b') || lower.startsWith('qwen3:235b')) {
+    return { tokens: 256_000, confidence: 'inferred', source: 'qwen3 long-context tag' }
+  }
+  if (lower.includes('qwen3')) {
+    return { tokens: 40_000, confidence: 'inferred', source: 'qwen3 default' }
+  }
   if (lower.includes('qwen')) {
     return { tokens: 32_768, confidence: 'inferred', source: 'qwen default' }
   }
@@ -354,7 +360,7 @@ function oneLine(text: string, limit: number): string {
 }
 
 function isLocalProviderId(providerId: Provider['id']): boolean {
-  return providerId === 'ollama' || providerId === 'llamacpp'
+  return providerId === 'llamacpp'
 }
 
 function formatCompactionMessage(message: Message, index: number, limit: number): string {

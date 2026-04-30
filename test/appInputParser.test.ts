@@ -6,7 +6,7 @@ import {
   createAppInputParseState,
   parseAppInput,
   type AppInputEvent,
-} from '../src/input/appInputParser.js'
+} from '../src/app/input/appInputParser.js'
 
 test('parseAppInput emits one pasted event for complete bracketed paste', () => {
   const { events } = parseChunks([`${BRACKETED_PASTE_START}hello\nthere${BRACKETED_PASTE_END}`])

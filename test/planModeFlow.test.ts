@@ -1,9 +1,9 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { getSlashSuggestions } from '../src/commands/index.js'
-import { buildSystemPrompt } from '../src/prompts/systemPrompt.js'
+import { getSlashSuggestions } from '../src/chat/commands.js'
+import { buildSystemPrompt } from '../src/runtime/systemPrompt.js'
 import { createProvider } from '../src/providers/registry.js'
-import { modePolicy } from '../src/runtime/modePolicy.js'
+import { modePolicy } from '../src/runtime/sessionMode.js'
 import { toolsForMode } from '../src/tools/registry.js'
 
 test('plan mode exposes only read tools to the model', () => {
@@ -55,8 +55,8 @@ test('private continuity tools tell models not to locate vault markdown in the w
 test('provider support reflects mode-filtered tools', () => {
   const config = {
     version: 1 as const,
-    provider: 'ollama' as const,
-    model: 'qwen-test',
+    provider: 'llamacpp' as const,
+    model: 'org/model#model.gguf',
     firstRunAt: '2026-04-21T00:00:00.000Z',
   }
   assert.equal(createProvider(config, { mode: 'plan' }).supportsTools, true)
@@ -86,8 +86,8 @@ test('mode policy keeps plan, default, and accept-edits distinct', () => {
 test('plan mode prompt tells the model to plan instead of mutate', () => {
   const prompt = buildSystemPrompt({
     cwd: '/tmp/project',
-    model: 'qwen-test',
-    provider: 'ollama',
+    model: 'org/model#model.gguf',
+    provider: 'llamacpp',
     hasTools: true,
     mode: 'plan',
   })

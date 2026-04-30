@@ -3,9 +3,9 @@ import assert from 'node:assert/strict'
 import {
   estimateGgufMachineFit,
   recommendGgufFile,
-} from '../src/bootstrap/modelRecommendation.js'
+} from '../src/models/modelRecommendation.js'
 import type { HuggingFaceRepoInfo } from '../src/models/huggingface.js'
-import type { SpecSnapshot } from '../src/bootstrap/runtimeDetection.js'
+import type { SpecSnapshot } from '../src/models/runtimeDetection.js'
 
 function spec(overrides: Partial<SpecSnapshot> = {}): SpecSnapshot {
   return {
@@ -16,10 +16,6 @@ function spec(overrides: Partial<SpecSnapshot> = {}): SpecSnapshot {
     effectiveRamBytes: 16 * 1024 * 1024 * 1024,
     isAppleSilicon: false,
     gpuVramBytes: null,
-    hasOllama: false,
-    ollamaVersion: null,
-    ollamaDaemonUp: false,
-    installedModels: [],
     ...overrides,
   }
 }
@@ -52,6 +48,7 @@ test('GGUF recommendation prefers the balanced file that fits modest RAM', () =>
   assert.equal(recommendation?.file.filename, 'model.Q4_K_M.gguf')
   assert.equal(recommendation?.fit, 'fits')
 })
+
 
 test('GGUF recommendation uses larger quantization on high VRAM machines', () => {
   const info = repo([

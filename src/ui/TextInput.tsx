@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { Box, Text } from 'ink'
 import { theme } from './theme.js'
-import { useAppInput } from '../input/AppInputProvider.js'
+import { useAppInput } from '../app/input/AppInputProvider.js'
 
 type TextInputProps = {
   label?: string

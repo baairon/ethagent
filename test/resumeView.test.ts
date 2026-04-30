@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { buildResumeOptions, CLEAR_ALL_SESSIONS_VALUE } from '../src/ui/ResumeView.js'
+import { buildResumeOptions, CLEAR_ALL_SESSIONS_VALUE } from '../src/chat/ResumeView.js'
 import type { SessionSummary } from '../src/storage/sessions.js'
 
 function session(overrides: Partial<SessionSummary> = {}): SessionSummary {
@@ -11,8 +11,8 @@ function session(overrides: Partial<SessionSummary> = {}): SessionSummary {
     projectRoot: 'C:/repo',
     workspaceRoot: 'C:/repo',
     lastCwd: 'C:/repo',
-    provider: 'ollama',
-    model: 'qwen',
+    provider: 'llamacpp',
+    model: 'org/model#model.gguf',
     firstUserMessage: 'hello',
     turnCount: 1,
     path: 'C:/home/.ethagent/sessions/session-1.jsonl',

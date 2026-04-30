@@ -52,7 +52,7 @@ export async function createFactoryResetPlan(): Promise<FactoryResetPlan> {
       'local model registry local-models.json',
       'llama.cpp runner assets under runners/',
       'local runner path config local-runner.json',
-      'external Ollama/package-installed models outside ~/.ethagent',
+      'external package-installed runtimes outside ~/.ethagent',
     ],
     remoteDescriptions: [
       'ERC-8004 tokens and onchain records',

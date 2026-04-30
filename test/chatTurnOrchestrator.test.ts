@@ -3,13 +3,13 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
-import type { Provider, StreamEvent } from '../src/providers/contracts.js'
-import type { EthagentIdentity } from '../src/storage/config.js'
+import type { Message, Provider, StreamEvent } from '../src/providers/contracts.js'
+import type { EthagentConfig, EthagentIdentity } from '../src/storage/config.js'
 import { writeContinuityFiles, writePublicSkillsFile } from '../src/identity/continuity/storage.js'
 import type { SessionMessage } from '../src/storage/sessions.js'
-import { toggleLatestReasoningRow, type MessageRow } from '../src/ui/MessageList.js'
-import { privateContinuityEditReviewFromToolResult } from '../src/ui/ChatScreen.js'
-import { buildIdentityContinuityContextMessages, runStreamingTurn } from '../src/ui/chatTurnOrchestrator.js'
+import { toggleLatestReasoningRow, type MessageRow } from '../src/chat/MessageList.js'
+import { privateContinuityEditReviewFromToolResult } from '../src/chat/ChatScreen.js'
+import { buildIdentityContinuityContextMessages, runStreamingTurn } from '../src/chat/chatTurnOrchestrator.js'
 
 const wait = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms))
 
@@ -55,7 +55,7 @@ test('identity continuity context auto-loads SOUL, MEMORY, and SKILLS markdown',
 
     const messages = await buildIdentityContinuityContextMessages({
       version: 1,
-      provider: 'ollama',
+      provider: 'llamacpp',
       model: 'qwen-test',
       firstRunAt: '2026-04-21T00:00:00.000Z',
       identity,
@@ -66,6 +66,9 @@ test('identity continuity context auto-loads SOUL, MEMORY, and SKILLS markdown',
     assert.equal(typeof content, 'string')
     if (typeof content !== 'string') throw new Error('expected string continuity context')
     assert.match(content, /active identity markdown files have been loaded automatically/)
+    assert.match(content, /SOUL\.md is private owner continuity and is the authoritative persona/)
+    assert.match(content, /MEMORY\.md is private owner continuity for durable preferences/)
+    assert.match(content, /Apply SOUL\.md and MEMORY\.md over generic ethagent identity\/style/)
     assert.match(content, /<SOUL\.md visibility="private">/)
     assert.match(content, /private persona/)
     assert.match(content, /<MEMORY\.md visibility="private">/)
@@ -73,6 +76,81 @@ test('identity continuity context auto-loads SOUL, MEMORY, and SKILLS markdown',
     assert.match(content, /<SKILLS\.md visibility="public">/)
     assert.match(content, /public discovery/)
     assert.match(content, /published copy is referenced from onchain tokenURI metadata/)
+  })
+})
+
+test('runStreamingTurn places identity continuity before conversation history', async () => {
+  await withHome(async () => {
+    const cwd = await fs.mkdtemp(path.join(os.tmpdir(), 'ethagent-orch-'))
+    const identity: EthagentIdentity = {
+      source: 'erc8004',
+      address: '0x000000000000000000000000000000000000dEaD',
+      ownerAddress: '0x000000000000000000000000000000000000dEaD',
+      createdAt: '2026-04-21T00:00:00.000Z',
+      chainId: 11155111,
+      identityRegistryAddress: '0x0000000000000000000000000000000000000001',
+      agentId: '8',
+    }
+    await writeContinuityFiles(identity, {
+      'SOUL.md': '# Soul\nactive persona marker\n',
+      'MEMORY.md': '# Memory\ndurable memory marker\n',
+    })
+    await writePublicSkillsFile(identity, '# Skills\npublic skills marker\n')
+
+    const sessionMessages: SessionMessage[] = [{
+      role: 'assistant',
+      content: 'prior answer',
+      createdAt: '2026-04-20T00:00:00.000Z',
+    }]
+    const rows: MessageRow[] = []
+    let capturedMessages: Message[] = []
+    const provider: Provider = {
+      id: 'llamacpp',
+      model: 'qwen-test',
+      supportsTools: true,
+      async *complete(messages): AsyncIterable<StreamEvent> {
+        capturedMessages = messages
+        yield { type: 'text', delta: 'hello' }
+        yield { type: 'done', stopReason: 'end_turn' }
+      },
+    }
+
+    await runStreamingTurn(makeContext({
+      cwd,
+      provider,
+      userText: 'hello identity',
+      sessionMessages,
+      rows,
+      mode: 'chat',
+      config: {
+        version: 1,
+        provider: 'llamacpp',
+        model: 'qwen-test',
+        firstRunAt: '2026-04-21T00:00:00.000Z',
+        identity,
+      },
+    }))
+
+    const continuityIndex = capturedMessages.findIndex(message =>
+      message.role === 'system' &&
+      typeof message.content === 'string' &&
+      message.content.includes('<identity_continuity_files>'),
+    )
+    const priorAssistantIndex = capturedMessages.findIndex(message =>
+      message.role === 'assistant' &&
+      typeof message.content === 'string' &&
+      message.content.includes('prior answer'),
+    )
+    const userIndex = capturedMessages.findIndex(message =>
+      message.role === 'user' &&
+      typeof message.content === 'string' &&
+      message.content.includes('hello identity'),
+    )
+
+    assert.equal(capturedMessages[0]?.role, 'system')
+    assert.ok(continuityIndex > 0)
+    assert.ok(priorAssistantIndex > continuityIndex)
+    assert.ok(userIndex > continuityIndex)
   })
 })
 
@@ -86,6 +164,7 @@ function makeContext(overrides: {
   notes?: Array<{ text: string; kind: 'info' | 'error' | 'dim' }>
   preflightProvider?: () => Promise<{ ok: true } | { ok: false; message: string }>
   executeTool?: (name: string, input: Record<string, unknown>) => Promise<{ result: { ok: boolean; summary: string; content: string } }>
+  config?: EthagentConfig
 }) {
   return {
     provider: overrides.provider,
@@ -99,9 +178,9 @@ function makeContext(overrides: {
       return () => `row-${++id}`
     })(),
     nowIso: () => '2026-04-21T00:00:00.000Z',
-    getConfig: () => ({
+    getConfig: () => overrides.config ?? ({
       version: 1 as const,
-      provider: 'ollama' as const,
+      provider: 'llamacpp' as const,
       model: 'qwen-test',
       firstRunAt: '2026-04-21T00:00:00.000Z',
     }),
@@ -142,7 +221,7 @@ test('runStreamingTurn completes a single tool call and loops back for model sum
   let providerCalls = 0
 
   const provider: Provider = {
-    id: 'ollama',
+    id: 'llamacpp',
     model: 'qwen-test',
     supportsTools: true,
     async *complete(): AsyncIterable<StreamEvent> {
@@ -182,7 +261,7 @@ test('runStreamingTurn completes a single tool call and loops back for model sum
   assert.ok(rows.some(row => row.role === 'assistant' && /Created hello\.txt/i.test(row.content)))
 })
 
-test('runStreamingTurn executes Ollama JSON tool text without persisting fake assistant text', async () => {
+test('runStreamingTurn executes local JSON tool text without persisting fake assistant text', async () => {
   const cwd = await fs.mkdtemp(path.join(os.tmpdir(), 'ethagent-orch-'))
   const sessionMessages: SessionMessage[] = []
   const rows: MessageRow[] = []
@@ -190,7 +269,7 @@ test('runStreamingTurn executes Ollama JSON tool text without persisting fake as
   let toolCalls = 0
 
   const provider: Provider = {
-    id: 'ollama',
+    id: 'llamacpp',
     model: 'qwen-test',
     supportsTools: true,
     async *complete(): AsyncIterable<StreamEvent> {
@@ -242,7 +321,7 @@ test('runStreamingTurn executes direct cd requests without asking the model', as
   let toolCalls = 0
 
   const provider: Provider = {
-    id: 'ollama',
+    id: 'llamacpp',
     model: 'qwen-test',
     supportsTools: true,
     async *complete(): AsyncIterable<StreamEvent> {
@@ -361,7 +440,7 @@ test('runStreamingTurn suppresses unverified state claims during corrective nudg
   let toolCalls = 0
 
   const provider: Provider = {
-    id: 'ollama',
+    id: 'llamacpp',
     model: 'qwen-test',
     supportsTools: true,
     async *complete(): AsyncIterable<StreamEvent> {
@@ -422,7 +501,7 @@ test('runStreamingTurn stops when model emits no tool_uses (model decides it is 
   let providerCalls = 0
 
   const provider: Provider = {
-    id: 'ollama',
+    id: 'llamacpp',
     model: 'qwen-test',
     supportsTools: true,
     async *complete(): AsyncIterable<StreamEvent> {
@@ -458,7 +537,7 @@ test('runStreamingTurn feeds tool errors back to model as tool_results', async (
   let providerCalls = 0
 
   const provider: Provider = {
-    id: 'ollama',
+    id: 'llamacpp',
     model: 'qwen-test',
     supportsTools: true,
     async *complete(): AsyncIterable<StreamEvent> {
@@ -512,7 +591,7 @@ test('runStreamingTurn handles multi-tool round and loops correctly', async () =
   let providerCalls = 0
 
   const provider: Provider = {
-    id: 'ollama',
+    id: 'llamacpp',
     model: 'qwen-test',
     supportsTools: true,
     async *complete(): AsyncIterable<StreamEvent> {
@@ -566,7 +645,7 @@ test('runStreamingTurn allows advisory text-only response without enforcement fa
   let providerCalls = 0
 
   const provider: Provider = {
-    id: 'ollama',
+    id: 'llamacpp',
     model: 'qwen-test',
     supportsTools: true,
     async *complete(): AsyncIterable<StreamEvent> {
@@ -600,7 +679,7 @@ test('runStreamingTurn persists assistant text before stopping', async () => {
   const rows: MessageRow[] = []
 
   const provider: Provider = {
-    id: 'ollama',
+    id: 'llamacpp',
     model: 'qwen-test',
     supportsTools: true,
     async *complete(): AsyncIterable<StreamEvent> {
@@ -627,7 +706,7 @@ test('runStreamingTurn keeps reasoning collapsed and out of session history', as
   const rows: MessageRow[] = []
 
   const provider: Provider = {
-    id: 'ollama',
+    id: 'llamacpp',
     model: 'qwen-test',
     supportsTools: true,
     async *complete(): AsyncIterable<StreamEvent> {
@@ -672,7 +751,7 @@ test('runStreamingTurn hides the reasoning cursor as soon as answer text starts'
   let checkedAfterText = false
 
   const provider: Provider = {
-    id: 'ollama',
+    id: 'llamacpp',
     model: 'qwen-test',
     supportsTools: true,
     async *complete(): AsyncIterable<StreamEvent> {

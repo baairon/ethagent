@@ -29,10 +29,10 @@ test('OpenAIChatProvider finalizes collected tool calls even when finish_reason 
 
   try {
     const provider = new OpenAIChatProvider({
-      id: 'ollama',
+      id: 'llamacpp',
       model: 'qwen-test',
-      baseUrl: 'http://localhost:11434/v1',
-      apiKey: 'ollama',
+      baseUrl: 'http://localhost:8080/v1',
+      apiKey: 'llamacpp',
       tools: [{
         type: 'function',
         function: {
@@ -52,6 +52,46 @@ test('OpenAIChatProvider finalizes collected tool calls even when finish_reason 
       event.name === 'list_directory' &&
       event.input.path === '.',
     ))
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test('OpenAIChatProvider separates llama.cpp think-tag content into reasoning events', async () => {
+  const originalFetch = globalThis.fetch
+  const chunks = [
+    'data: ' + JSON.stringify({ choices: [{ delta: { content: '<thi' } }] }),
+    'data: ' + JSON.stringify({ choices: [{ delta: { content: 'nk>private ' } }] }),
+    'data: ' + JSON.stringify({ choices: [{ delta: { content: 'steps</th' } }] }),
+    'data: ' + JSON.stringify({ choices: [{ delta: { content: 'ink>final answer' } }] }),
+    'data: [DONE]',
+  ].join('\n\n')
+
+  globalThis.fetch = (async () => new Response(chunks, {
+    status: 200,
+    headers: { 'content-type': 'text/event-stream' },
+  })) as typeof fetch
+
+  try {
+    const provider = new OpenAIChatProvider({
+      id: 'llamacpp',
+      model: 'org/model#model.gguf',
+      baseUrl: 'http://localhost:8080/v1',
+      apiKey: 'llamacpp',
+    })
+    const events: StreamEvent[] = []
+    for await (const event of provider.complete([{ role: 'user', content: 'think' }], new AbortController().signal)) {
+      events.push(event)
+    }
+
+    assert.equal(
+      events.filter(event => event.type === 'thinking').map(event => event.delta).join(''),
+      'private steps',
+    )
+    assert.equal(
+      events.filter(event => event.type === 'text').map(event => event.delta).join(''),
+      'final answer',
+    )
   } finally {
     globalThis.fetch = originalFetch
   }

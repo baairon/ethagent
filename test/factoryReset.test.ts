@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
-import { runResetCommand } from '../src/cliReset.js'
+import { runResetCommand } from '../src/cli/reset.js'
 import {
   createFactoryResetPlan,
   runFactoryReset,

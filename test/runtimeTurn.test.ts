@@ -21,7 +21,7 @@ function textProvider(responses: Array<StreamEvent[]>): {
 } {
   const callsRef = { count: 0 }
   const provider: Provider = {
-    id: 'ollama',
+    id: 'llamacpp',
     model: 'qwen-test',
     supportsTools: true,
     async *complete(): AsyncIterable<StreamEvent> {
@@ -371,7 +371,7 @@ test('runRuntimeTurn retries when the provider emits reasoning with no visible a
   const seenMessages: Message[][] = []
   let calls = 0
   const provider: Provider = {
-    id: 'ollama',
+    id: 'llamacpp',
     model: 'qwen-test',
     supportsTools: true,
     async *complete(messages): AsyncIterable<StreamEvent> {
@@ -413,7 +413,7 @@ test('runRuntimeTurn retries when the provider emits reasoning with no visible a
   assert.deepEqual(events.at(-1), { type: 'done', finishedNormally: true })
 })
 
-test('runRuntimeTurn converts bare Ollama JSON tool text into a real tool use', async () => {
+test('runRuntimeTurn converts bare local JSON tool text into a real tool use', async () => {
   const { provider, callsRef } = textProvider([
     [
       {
@@ -458,7 +458,7 @@ test('runRuntimeTurn converts bare Ollama JSON tool text into a real tool use', 
   ))
 })
 
-test('runRuntimeTurn converts multiple standalone Ollama JSON tool lines into tool uses', async () => {
+test('runRuntimeTurn converts multiple standalone local JSON tool lines into tool uses', async () => {
   const { provider, callsRef } = textProvider([
     [
       {
@@ -559,7 +559,7 @@ test('runRuntimeTurn rejects unsupported missing-path claims and retries without
   const seenMessages: Message[][] = []
   let calls = 0
   const provider: Provider = {
-    id: 'ollama',
+    id: 'llamacpp',
     model: 'qwen-test',
     supportsTools: true,
     async *complete(messages): AsyncIterable<StreamEvent> {
@@ -881,7 +881,7 @@ test('runRuntimeTurn does not nudge when text contains completion markers', asyn
 test('runRuntimeTurn yields cancelled + done when signal aborts mid-stream', async () => {
   const controller = new AbortController()
   const provider: Provider = {
-    id: 'ollama',
+    id: 'llamacpp',
     model: 'qwen-test',
     supportsTools: true,
     async *complete(_messages, signal): AsyncIterable<StreamEvent> {
@@ -971,7 +971,7 @@ test('looksLikeContinuationIntent ignores explanatory text without action verbs'
 test('parseLocalModelTextToolUse accepts single local-model tool payloads', () => {
   assert.deepEqual(
     parseLocalModelTextToolUse(
-      { id: 'ollama' },
+      { id: 'llamacpp' },
       '{\n  "name": "list_directory",\n  "arguments": {}\n}',
       2,
     ),
@@ -979,28 +979,28 @@ test('parseLocalModelTextToolUse accepts single local-model tool payloads', () =
   )
   assert.deepEqual(
     parseLocalModelTextToolUse(
-      { id: 'ollama' },
+      { id: 'llamacpp' },
       '```json\n{"name":"list_directory","arguments":{"path":"."}}\n```',
     ),
     { id: 'local-text-tool-0', name: 'list_directory', input: { path: '.' } },
   )
   assert.deepEqual(
     parseLocalModelTextToolUse(
-      { id: 'ollama' },
+      { id: 'llamacpp' },
       '<tool_call>{"name":"list_directory","arguments":{}}</tool_call>',
     ),
     { id: 'local-text-tool-0', name: 'list_directory', input: {} },
   )
   assert.deepEqual(
     parseLocalModelTextToolUse(
-      { id: 'ollama' },
+      { id: 'llamacpp' },
       'Run the following command:\n\n```bash\n01 {"name":"run_bash","arguments":{"command":"ls ./bin"}}\n```\n',
     ),
     { id: 'local-text-tool-0', name: 'run_bash', input: { command: 'ls ./bin' } },
   )
   assert.deepEqual(
     parseLocalModelTextToolUse(
-      { id: 'ollama' },
+      { id: 'llamacpp' },
       [
         'Here is the directory listing:',
         '',
@@ -1019,21 +1019,21 @@ test('parseLocalModelTextToolUse accepts single local-model tool payloads', () =
   )
   assert.deepEqual(
     parseLocalModelTextToolUse(
-      { id: 'ollama' },
+      { id: 'llamacpp' },
       '{"type":"function","function":{"name":"read_file","arguments":"{\\"path\\":\\"package.json\\"}"}}',
     ),
     { id: 'local-text-tool-0', name: 'read_file', input: { path: 'package.json' } },
   )
   assert.deepEqual(
     parseLocalModelTextToolUse(
-      { id: 'ollama' },
+      { id: 'llamacpp' },
       '{"tool_calls":[{"function":{"name":"list_directory","arguments":{"path":"src"}}}]}',
     ),
     { id: 'local-text-tool-0', name: 'list_directory', input: { path: 'src' } },
   )
   assert.deepEqual(
     parseLocalModelTextToolUse(
-      { id: 'ollama' },
+      { id: 'llamacpp' },
       '[{"tool_name":"list_directory","parameters":{"path":"test"}}]',
     ),
     { id: 'local-text-tool-0', name: 'list_directory', input: { path: 'test' } },
@@ -1043,7 +1043,7 @@ test('parseLocalModelTextToolUse accepts single local-model tool payloads', () =
 test('parseLocalModelTextToolUses accepts multiple standalone local-model tool payloads', () => {
   assert.deepEqual(
     parseLocalModelTextToolUses(
-      { id: 'ollama' },
+      { id: 'llamacpp' },
       [
         'My apologies for that oversight. Let me change directories for you properly.',
         '',
@@ -1061,11 +1061,11 @@ test('parseLocalModelTextToolUses accepts multiple standalone local-model tool p
 test('parseLocalModelTextToolUse rejects unsafe or non-local text', () => {
   const cases = [
     [{ id: 'openai' }, '{"name":"list_directory","arguments":{}}'],
-    [{ id: 'ollama' }, 'Sure, use {"name":"list_directory","arguments":{}}'],
-    [{ id: 'ollama' }, '```bash\n{"name":"list_directory","arguments":{}}\n```\n```bash\n{"name":"read_file","arguments":{"path":"package.json"}}\n```'],
-    [{ id: 'ollama' }, '{"name":"missing_tool","arguments":{}}'],
-    [{ id: 'ollama' }, '{"name":"list_directory","arguments":"."}'],
-    [{ id: 'ollama' }, '{"name":"list_directory","arguments":{}'],
+    [{ id: 'llamacpp' }, 'Sure, use {"name":"list_directory","arguments":{}}'],
+    [{ id: 'llamacpp' }, '```bash\n{"name":"list_directory","arguments":{}}\n```\n```bash\n{"name":"read_file","arguments":{"path":"package.json"}}\n```'],
+    [{ id: 'llamacpp' }, '{"name":"missing_tool","arguments":{}}'],
+    [{ id: 'llamacpp' }, '{"name":"list_directory","arguments":"."}'],
+    [{ id: 'llamacpp' }, '{"name":"list_directory","arguments":{}'],
   ] as const
 
   for (const [provider, text] of cases) {

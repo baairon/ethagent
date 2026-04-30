@@ -5,7 +5,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { executeToolWithPermissions } from '../src/runtime/toolExecution.js'
 import type { PermissionRequest } from '../src/tools/contracts.js'
-import { permissionOptionsForRequest } from '../src/ui/PermissionPrompt.js'
+import { permissionOptionsForRequest } from '../src/chat/PermissionPrompt.js'
 import {
   continuityVaultRef,
   readContinuityFiles,

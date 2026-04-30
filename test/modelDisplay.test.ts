@@ -4,7 +4,7 @@ import {
   formatLocalHfModelDisplayName,
   formatModelDisplayName,
   truncateMiddle,
-} from '../src/ui/modelDisplay.js'
+} from '../src/models/modelDisplay.js'
 
 test('local Hugging Face model ids render as repo and filename', () => {
   assert.equal(

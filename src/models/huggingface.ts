@@ -35,6 +35,14 @@ export type HuggingFaceRepoInfo = {
   siblings: HuggingFaceSibling[]
 }
 
+export type HuggingFaceModelSearchItem = {
+  repoId: string
+  downloads?: number
+  likes?: number
+  lastModified?: string
+  tags: string[]
+}
+
 export type HfSafetyReview = {
   risk: HfRisk
   credibility: HfCredibility
@@ -106,6 +114,15 @@ type ModelInfoResponse = {
   tags?: unknown
   cardData?: unknown
   siblings?: unknown
+}
+
+type ModelSearchResponseItem = {
+  id?: unknown
+  modelId?: unknown
+  downloads?: unknown
+  likes?: unknown
+  lastModified?: unknown
+  tags?: unknown
 }
 
 const HF_BASE_URL = 'https://huggingface.co'
@@ -220,6 +237,7 @@ export async function fetchHuggingFaceRepoInfo(
   fetchImpl: FetchImpl = fetch,
 ): Promise<HuggingFaceRepoInfo> {
   const url = new URL(`${HF_BASE_URL}/api/models/${encodeRepoPath(ref.repoId)}`)
+  url.searchParams.set('blobs', 'true')
   if (ref.revision) url.searchParams.set('revision', ref.revision)
   const response = await fetchImpl(url, { headers: { Accept: 'application/json' } })
   if (!response.ok) {
@@ -247,6 +265,24 @@ export async function fetchHuggingFaceRepoInfo(
     tags,
     siblings,
   }
+}
+
+export async function searchHuggingFaceModels(
+  query: string,
+  options: { limit?: number; filter?: string } = {},
+  fetchImpl: FetchImpl = fetch,
+): Promise<HuggingFaceModelSearchItem[]> {
+  const url = new URL(`${HF_BASE_URL}/api/models`)
+  url.searchParams.set('search', query)
+  url.searchParams.set('sort', 'downloads')
+  url.searchParams.set('direction', '-1')
+  url.searchParams.set('limit', String(options.limit ?? 20))
+  if (options.filter) url.searchParams.set('filter', options.filter)
+  const response = await fetchImpl(url, { headers: { Accept: 'application/json' } })
+  if (!response.ok) throw new Error(`Hugging Face catalog HTTP ${response.status}`)
+  const data = await response.json() as unknown
+  if (!Array.isArray(data)) return []
+  return data.flatMap(parseSearchItem)
 }
 
 export function ggufFiles(repo: HuggingFaceRepoInfo): HuggingFaceSibling[] {
@@ -529,15 +565,42 @@ function safePathPart(value: string): string {
 
 function parseSibling(value: unknown): HuggingFaceSibling[] {
   if (!value || typeof value !== 'object') return []
-  const record = value as { rfilename?: unknown; filename?: unknown; size?: unknown }
+  const record = value as { rfilename?: unknown; filename?: unknown; size?: unknown; lfs?: unknown }
   const filename = typeof record.rfilename === 'string'
     ? record.rfilename
     : typeof record.filename === 'string' ? record.filename : ''
   if (!filename) return []
   return [{
     filename,
-    sizeBytes: typeof record.size === 'number' ? record.size : undefined,
+    sizeBytes: siblingSizeBytes(record),
   }]
+}
+
+function parseSearchItem(value: unknown): HuggingFaceModelSearchItem[] {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return []
+  const item = value as ModelSearchResponseItem
+  const repoId = typeof item.id === 'string'
+    ? item.id
+    : typeof item.modelId === 'string' ? item.modelId : ''
+  if (!repoId.includes('/')) return []
+  return [{
+    repoId,
+    downloads: typeof item.downloads === 'number' ? item.downloads : undefined,
+    likes: typeof item.likes === 'number' ? item.likes : undefined,
+    lastModified: typeof item.lastModified === 'string' ? item.lastModified : undefined,
+    tags: Array.isArray(item.tags)
+      ? item.tags.filter((tag): tag is string => typeof tag === 'string')
+      : [],
+  }]
+}
+
+function siblingSizeBytes(record: { size?: unknown; lfs?: unknown }): number | undefined {
+  if (typeof record.size === 'number' && Number.isFinite(record.size) && record.size >= 0) {
+    return record.size
+  }
+  if (!record.lfs || typeof record.lfs !== 'object' || Array.isArray(record.lfs)) return undefined
+  const size = (record.lfs as { size?: unknown }).size
+  return typeof size === 'number' && Number.isFinite(size) && size >= 0 ? size : undefined
 }
 
 function licenseFrom(cardData: unknown, tags: string[]): string | undefined {

@@ -1,5 +1,5 @@
 import type { EthagentConfig } from '../storage/config.js'
-import { defaultBaseUrlFor } from '../storage/config.js'
+import { localProviderBaseUrlFor } from '../storage/config.js'
 import { getKey } from '../storage/secrets.js'
 import type { Provider } from './contracts.js'
 import type { SessionMode } from '../runtime/sessionMode.js'
@@ -10,26 +10,18 @@ import { anthropicTools, openAITools } from '../tools/registry.js'
 import { openAIBaseUrlFor } from '../models/catalog.js'
 
 export function isLocalProvider(provider: string): boolean {
-  return provider === 'ollama' || provider === 'llamacpp'
+  return provider === 'llamacpp'
 }
 
 export function createProvider(config: EthagentConfig, options: { mode?: SessionMode } = {}): Provider {
   const mode = options.mode ?? 'chat'
   const toolContext = { hasIdentity: Boolean(config.identity) }
   switch (config.provider) {
-    case 'ollama':
-      return new OpenAIChatProvider({
-        id: 'ollama',
-        model: config.model,
-        baseUrl: config.baseUrl ?? defaultBaseUrlFor('ollama') ?? 'http://localhost:11434/v1',
-        apiKey: 'ollama',
-        tools: openAITools(mode, toolContext),
-      })
     case 'llamacpp':
       return new OpenAIChatProvider({
         id: 'llamacpp',
         model: config.model,
-        baseUrl: config.baseUrl ?? defaultBaseUrlFor('llamacpp') ?? 'http://localhost:8080/v1',
+        baseUrl: localProviderBaseUrlFor('llamacpp', config.baseUrl),
         apiKey: 'llamacpp',
         tools: openAITools(mode, toolContext),
       })

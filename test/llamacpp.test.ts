@@ -9,7 +9,7 @@ import {
   llamaCppServerCandidates,
   startLlamaCppServer,
   summarizeInstallOutput,
-} from '../src/bootstrap/llamacpp.js'
+} from '../src/models/llamacpp.js'
 
 test('llama.cpp runner discovery checks explicit paths before PATH', () => {
   const candidates = llamaCppServerCandidates({
@@ -104,6 +104,7 @@ test('startLlamaCppServer refuses to switch when another model is already served
 test('startLlamaCppServer waits through slow local runner startup', async () => {
   const originalFetch = globalThis.fetch
   let calls = 0
+  let spawnArgs: string[] = []
   globalThis.fetch = (async () => {
     calls += 1
     if (calls < 3) return new Response('', { status: 503 })
@@ -120,10 +121,14 @@ test('startLlamaCppServer waits through slow local runner startup', async () => 
       deps: {
         access: async () => undefined,
         binaryPath: 'llama-server',
-        spawnImpl: () => fakeChild(),
+        spawnImpl: (_command, args) => {
+          spawnArgs = [...args]
+          return fakeChild()
+        },
       },
     })
     assert.deepEqual(result, { ok: true, alreadyRunning: false })
+    assert.ok(spawnArgs.includes('--jinja'))
   } finally {
     globalThis.fetch = originalFetch
   }

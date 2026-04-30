@@ -10,8 +10,8 @@ import {
   selectRowsForScrollOffset,
   selectRowsForScrollTop,
   selectTailRowsForViewport,
-} from '../src/ui/transcriptViewport.js'
-import type { MessageRow } from '../src/ui/MessageList.js'
+} from '../src/chat/transcriptViewport.js'
+import type { MessageRow } from '../src/chat/MessageList.js'
 
 test('transcript viewport anchor preserves the same row through height changes', () => {
   const ids = ['a', 'b', 'c']
