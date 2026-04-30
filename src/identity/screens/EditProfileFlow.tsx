@@ -22,7 +22,7 @@ export const EditProfileFlow: React.FC<EditProfileFlowProps> = ({ step, onNameSu
       <Surface
         title="Rename Agent Identity"
         subtitle="This updates token metadata and generated MD headers."
-        footer={footerHint('enter continues - esc back')}
+        footer={footerHint('enter continues · esc back')}
       >
         <Text color={theme.dim}>Currently: {currentName || '(unnamed)'}</Text>
         <TextInput
@@ -42,7 +42,7 @@ export const EditProfileFlow: React.FC<EditProfileFlowProps> = ({ step, onNameSu
     <Surface
       title="Describe Agent Identity"
       subtitle="This updates token metadata and generated MD headers."
-      footer={footerHint('enter saves - esc back')}
+      footer={footerHint('enter saves · esc back')}
     >
       <Text color={theme.dim}>Currently: {currentDescription || '(no description)'}</Text>
       <TextInput

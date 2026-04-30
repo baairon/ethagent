@@ -7,12 +7,11 @@ import type { EthagentConfig, EthagentIdentity } from '../../storage/config.js'
 import { IdentitySummary } from './IdentitySummary.js'
 
 export const LOCAL_DATA_MANAGEMENT_COPY = [
-  'SOUL.md and MEMORY.md are private local continuity files.',
-  'SKILLS.md is public discovery metadata, edited locally and published to IPFS.',
+  'SOUL.md and MEMORY.md are private local continuity files; SKILLS.md is public discovery metadata.',
   'Save snapshot and publish encrypts private markdown, pins it to IPFS, and updates tokenURI metadata.',
   'Unlink active agent only removes the selected agent from this device.',
   'ethagent reset wipes local identity metadata, markdown vaults, sessions, history, permissions, and credentials.',
-  'ethagent reset keeps installed local LLM assets and cannot delete onchain tokens or IPFS pins.',
+  'ethagent reset keeps local LLM assets and cannot delete onchain tokens or IPFS pins.',
 ] as const
 
 type DataManagementScreenProps = {
@@ -48,9 +47,12 @@ export const DataManagementScreen: React.FC<DataManagementScreenProps> = ({
     <Box marginTop={1}>
       <Select<'unlink' | 'back'>
         options={[
-          { value: 'unlink', label: 'unlink active agent', disabled: !identity },
-          { value: 'back', label: 'back' },
+          { value: 'unlink', role: 'section', prefix: '--', label: 'Active agent' },
+          { value: 'unlink', label: 'unlink active agent', hint: 'remove active identity selection only', disabled: !identity },
+          { value: 'back', role: 'section', prefix: '--', label: 'Navigation' },
+          { value: 'back', label: 'back to settings', hint: 'return without changing local data', role: 'utility' },
         ]}
+        hintLayout="inline"
         onSubmit={choice => choice === 'unlink' ? onForgetLocalData() : onBack()}
         onCancel={onBack}
       />

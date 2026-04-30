@@ -21,6 +21,7 @@ type SelectProps<T> = {
   options: Array<SelectOption<T>>
   initialIndex?: number
   maxVisible?: number
+  hintLayout?: 'below' | 'inline'
   onSubmit: (value: T) => void
   onCancel?: () => void
   onHighlight?: (value: T) => void
@@ -31,12 +32,13 @@ export function Select<T>({
   options,
   initialIndex = 0,
   maxVisible,
+  hintLayout = 'below',
   onSubmit,
   onCancel,
   onHighlight,
 }: SelectProps<T>) {
-  const firstEnabled = Math.max(0, options.findIndex(option => !option.disabled))
-  const start = options[initialIndex]?.disabled ? firstEnabled : initialIndex
+  const firstEnabled = Math.max(0, options.findIndex(isSelectableOption))
+  const start = isSelectableOption(options[initialIndex]) ? initialIndex : firstEnabled
   const [index, setIndex] = useState(start === -1 ? 0 : start)
   const visibleCount = Math.max(1, maxVisible ?? options.length)
   const windowStart = Math.max(0, Math.min(
@@ -47,6 +49,7 @@ export function Select<T>({
   const visibleOptions = options.slice(windowStart, windowEnd)
   const hasAbove = windowStart > 0
   const hasBelow = windowEnd < options.length
+  const usesInlineSections = hintLayout === 'inline' && options.some(option => option.role === 'section' || option.role === 'group')
 
   const moveBy = (delta: number) => {
     if (options.length === 0) return
@@ -54,7 +57,7 @@ export function Select<T>({
     for (let i = 0; i < options.length; i += 1) {
       next = (next + delta + options.length) % options.length
       const candidate = options[next]
-      if (candidate && !candidate.disabled) {
+      if (isSelectableOption(candidate)) {
         setIndex(next)
         onHighlight?.(candidate.value)
         return
@@ -67,7 +70,7 @@ export function Select<T>({
     else if (key.downArrow || input === 'j') moveBy(1)
     else if (key.return) {
       const selected = options[index]
-      if (selected && !selected.disabled) onSubmit(selected.value)
+      if (isSelectableOption(selected)) onSubmit(selected.value)
     } else if (key.escape) {
       onCancel?.()
     }
@@ -82,33 +85,38 @@ export function Select<T>({
       {visibleOptions.map((option, visibleIndex) => {
         const absoluteIndex = windowStart + visibleIndex
         const isActive = absoluteIndex === index
-        const cursor = option.disabled ? ' ' : isActive ? '>' : ' '
-        const prefix = option.prefix ? `${option.prefix} ` : ''
+        const selectable = isSelectableOption(option)
+        const cursor = !selectable ? ' ' : isActive ? '>' : ' '
         const isUtility = option.role === 'utility'
         const isSection = option.role === 'section' || option.role === 'group'
+        const prefix = option.prefix && !isSection ? `${option.prefix} ` : ''
+        const rowIndent = option.indent ?? (usesInlineSections ? isSection ? 1 : 3 : 0)
         const prefixColor = option.disabled
           ? option.labelColor ?? theme.border
-          : isActive
+          : isActive && selectable
             ? theme.accentPrimary
             : option.labelColor ?? theme.dim
         const labelColor = isSection
           ? option.labelColor ?? theme.dim
-          : isActive && !option.disabled
+          : isActive && selectable
             ? isUtility ? theme.text : theme.accentPrimary
             : option.labelColor ?? (option.disabled ? theme.dim : isUtility ? theme.textSubtle : theme.text)
-        const hintColor = isActive && !option.disabled
+        const hintColor = isActive && selectable
           ? theme.textSubtle
           : option.hintColor ?? theme.dim
-        const bold = option.bold ?? (isActive && !option.disabled && !isUtility)
+        const bold = option.bold ?? (isSection || (isActive && selectable && !isUtility))
+        const inlineHint = Boolean(option.hint && hintLayout === 'inline' && !isSection)
+        const belowHint = Boolean(option.hint && (!inlineHint || isSection))
         return (
           <Box key={absoluteIndex} flexDirection="column">
-            <Box flexDirection="row" marginLeft={option.indent ?? 0}>
+            <Box flexDirection="row" marginLeft={rowIndent}>
               <Text color={prefixColor}>{cursor} </Text>
               {prefix ? <Text color={prefixColor}>{prefix}</Text> : null}
               <Text color={labelColor} bold={bold}>{option.label}</Text>
+              {inlineHint ? <Text color={hintColor}>  {option.hint}</Text> : null}
             </Box>
-            {option.hint ? (
-              <Box marginLeft={2 + (option.indent ?? 0)}>
+            {belowHint ? (
+              <Box marginLeft={2 + rowIndent}>
                 <Text color={hintColor}>{option.hint}</Text>
               </Box>
             ) : null}
@@ -120,4 +128,9 @@ export function Select<T>({
       ) : null}
     </Box>
   )
+}
+
+function isSelectableOption<T>(option: SelectOption<T> | undefined): option is SelectOption<T> & { value: T } {
+  if (!option || option.disabled) return false
+  return option.role !== 'section' && option.role !== 'group' && option.role !== 'notice'
 }

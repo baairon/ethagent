@@ -85,9 +85,12 @@ export const StorageCredentialScreen: React.FC<StorageCredentialScreenProps> = (
         <Box marginTop={1}>
           <Select<StorageCredentialAction>
             options={[
-              { value: 'forget', label: 'forget credential' },
-              { value: 'back', label: 'keep it' },
+              { value: 'forget', role: 'section', prefix: '--', label: 'Credential' },
+              { value: 'forget', label: 'forget credential', hint: 'remove local IPFS pinning token' },
+              { value: 'back', role: 'section', prefix: '--', label: 'Navigation' },
+              { value: 'back', label: 'keep credential', hint: 'return without changing storage access', role: 'utility' },
             ]}
+            hintLayout="inline"
             onSubmit={choice => choice === 'forget' ? onConfirmForget() : onCancel()}
             onCancel={onCancel}
           />
@@ -105,10 +108,13 @@ export const StorageCredentialScreen: React.FC<StorageCredentialScreenProps> = (
       <Box marginTop={1}>
         <Select<StorageCredentialAction>
           options={[
-            { value: 'edit', label: hasCredential ? 'replace credential' : 'save credential' },
-            { value: 'forget', label: 'forget credential', disabled: !hasCredential },
-              { value: 'back', label: 'back' },
+            { value: 'edit', role: 'section', prefix: '--', label: 'Credential' },
+            { value: 'edit', label: hasCredential ? 'replace credential' : 'save credential', hint: 'store Pinata JWT for IPFS pinning' },
+            { value: 'forget', label: 'forget credential', hint: 'remove the local pinning token; existing pins remain', disabled: !hasCredential },
+            { value: 'back', role: 'section', prefix: '--', label: 'Navigation' },
+            { value: 'back', label: 'back to settings', hint: 'return without changing storage access', role: 'utility' },
           ]}
+          hintLayout="inline"
           onSubmit={choice => {
             if (choice === 'edit') return onEdit()
             if (choice === 'forget') return onForget()

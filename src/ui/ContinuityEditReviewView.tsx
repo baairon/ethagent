@@ -20,7 +20,7 @@ export const ContinuityEditReviewView: React.FC<{
   <Surface
     title="private markdown updated"
     subtitle="review the file, then publish an encrypted snapshot."
-    footer="enter select - esc later"
+    footer="enter select · esc later"
   >
     <Box flexDirection="column">
       <Text color={theme.accentMint}>{review.summary}</Text>

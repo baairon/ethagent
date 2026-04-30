@@ -87,6 +87,12 @@ test('browser wallet page differentiates transaction requests', () => {
   assert.match(page, /eth_sendTransaction/)
   assert.match(page, /Base/)
   assert.match(page, /registry/)
+  assert.match(page, /\['action', transactionActionLabel\(\)\]/)
+  assert.match(page, /\['network', chainLabel\(config\.chainIdHex\)\]/)
+  assert.doesNotMatch(page, /\['wallet'/)
+  assert.doesNotMatch(page, /\['registry'/)
+  assert.doesNotMatch(page, /\['data'/)
+  assert.doesNotMatch(page, /\['tx hash'/)
   assert.match(page, /"expectedAccount":"0x000000000000000000000000000000000000dEaD"/)
 })
 

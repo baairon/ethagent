@@ -16,7 +16,7 @@ export const ResetConfirmView: React.FC<{
   }
 
   return (
-    <Surface title="reset ethagent?" subtitle="are you sure? this only affects this machine." footer="enter select - esc cancel">
+    <Surface title="reset ethagent?" subtitle="are you sure? this only affects this machine." footer="enter select · esc cancel">
       <Box flexDirection="column">
         <Section title="will delete" lines={[
           localDataLine(plan.deletePaths.length),
