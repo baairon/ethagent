@@ -2,8 +2,8 @@ import type { ProviderId } from '../storage/config.js'
 import type { Message, MessageContentBlock, Provider, ProviderCompleteOptions, StreamEvent } from './contracts.js'
 import { ProviderError } from './contracts.js'
 import { providerErrorFromResponse } from './errors.js'
+import { fetchWithRetryStreamEvents } from './retry.js'
 import { iterSseFrames } from './sse.js'
-import { fetchWithRetry } from '../utils/withRetry.js'
 import { messageTextContent } from '../utils/messages.js'
 
 export type OpenAIToolDefinition = {
@@ -107,7 +107,7 @@ export class OpenAIChatProvider implements Provider {
 
     let response: Response
     try {
-      response = await fetchWithRetry(`${this.baseUrl}/chat/completions`, {
+      response = yield* fetchWithRetryStreamEvents(`${this.baseUrl}/chat/completions`, {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -119,7 +119,7 @@ export class OpenAIChatProvider implements Provider {
           stream_options: { include_usage: true },
           max_tokens: options.maxTokens,
         }),
-      }, { signal, maxRetries: this.maxRetries })
+      }, { signal, maxRetries: this.maxRetries, rateLimitResetProvider: 'openai-compatible' })
     } catch (err: unknown) {
       if (signal.aborted) return
       const message = providerNetworkErrorMessage(this.id, this.baseUrl, err)

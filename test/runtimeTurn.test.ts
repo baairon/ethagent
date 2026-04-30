@@ -67,6 +67,51 @@ test('runRuntimeTurn emits iteration_start then streams text and completes', asy
   assert.deepEqual(done, { type: 'done', finishedNormally: true })
 })
 
+test('runRuntimeTurn passes provider retry events through without changing the assistant turn', async () => {
+  const { provider, callsRef } = textProvider([
+    [
+      {
+        type: 'retry',
+        attempt: 1,
+        nextAttempt: 2,
+        maxRetries: 4,
+        delayMs: 1500,
+        reason: 'HTTP 429',
+        status: 429,
+      },
+      { type: 'text', delta: 'ready after retry' },
+      { type: 'done', stopReason: 'end_turn' },
+    ],
+  ])
+  const events = await collect(
+    runRuntimeTurn({
+      provider,
+      signal: new AbortController().signal,
+      initialMessages: [{ role: 'user', content: 'hi' }],
+      rebuildMessages: () => [{ role: 'user', content: 'hi' }],
+      runToolBatch: async () => ({ cancelled: false, completedTools: [] }),
+    }),
+  )
+
+  assert.equal(callsRef.count, 1)
+  assert.deepEqual(
+    events.find(e => e.type === 'retry'),
+    {
+      type: 'retry',
+      attempt: 1,
+      nextAttempt: 2,
+      maxRetries: 4,
+      delayMs: 1500,
+      reason: 'HTTP 429',
+      status: 429,
+    },
+  )
+  assert.ok(events.some(e =>
+    e.type === 'assistant_message_committed' && e.text === 'ready after retry',
+  ))
+  assert.deepEqual(events.at(-1), { type: 'done', finishedNormally: true })
+})
+
 test('runRuntimeTurn loops provider after tool batch and feeds rebuilt messages', async () => {
   const rebuiltCalls: number[] = []
   const { provider, callsRef } = textProvider([

@@ -79,6 +79,26 @@ export function classifyRetryableResponse(response: Response, nowMs: number = Da
   return { retryable: true, retryAfterMs, reason: `HTTP ${response.status}`, status: response.status }
 }
 
+export function classifyRetryableProviderResponse(
+  response: Response,
+  nowMs: number = Date.now(),
+  rateLimitResetProvider?: RateLimitResetProvider,
+): RetryClassification {
+  const classification = classifyRetryableResponse(response, nowMs)
+  if (
+    !classification.retryable ||
+    classification.retryAfterMs !== undefined ||
+    response.status !== 429 ||
+    !rateLimitResetProvider
+  ) {
+    return classification
+  }
+  return {
+    ...classification,
+    retryAfterMs: rateLimitResetDelayMs(response.headers, rateLimitResetProvider, nowMs),
+  }
+}
+
 export function computeBackoffMs(
   attempt: number,
   retryAfterMs: number | undefined,
@@ -158,6 +178,7 @@ export type FetchWithRetryOptions = {
   maxDelayMs?: number
   retryAfterCapMs?: number
   jitterRatio?: number
+  rateLimitResetProvider?: RateLimitResetProvider
   signal?: AbortSignal
   fetchImpl?: typeof fetch
   sleep?: (ms: number, signal?: AbortSignal) => Promise<void>
@@ -184,7 +205,7 @@ export async function fetchWithRetry(
       const response = await fetchImpl(input, { ...init, signal: options.signal })
       if (response.ok) return response
 
-      const classification = classifyRetryableResponse(response, now())
+      const classification = classifyRetryableProviderResponse(response, now(), options.rateLimitResetProvider)
       if (!classification.retryable || attempt > policy.maxRetries) return response
 
       try { await response.body?.cancel() } catch { /* ignore */ }

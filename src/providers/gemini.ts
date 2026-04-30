@@ -2,6 +2,7 @@ import { getKey } from '../storage/secrets.js'
 import type { Message, Provider, ProviderCompleteOptions, StreamEvent } from './contracts.js'
 import { ProviderError } from './contracts.js'
 import { providerErrorFromResponse } from './errors.js'
+import { fetchWithRetryStreamEvents } from './retry.js'
 import { iterSseFrames } from './sse.js'
 import { messageTextContent } from '../utils/messages.js'
 
@@ -52,15 +53,14 @@ export class GeminiProvider implements Provider {
 
     let response: Response
     try {
-      response = await fetch(url, {
+      response = yield* fetchWithRetryStreamEvents(url, {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
           accept: 'text/event-stream',
         },
         body: JSON.stringify(payload),
-        signal,
-      })
+      }, { signal })
     } catch (err: unknown) {
       if (signal.aborted) return
       yield { type: 'error', message: (err as Error).message || 'network error' }

@@ -1,4 +1,5 @@
 import type { ProviderId } from '../storage/config.js'
+import type { RetryEvent } from '../utils/withRetry.js'
 
 export type Role = 'system' | 'user' | 'assistant'
 
@@ -28,9 +29,12 @@ export type Message = {
   content: string | MessageContentBlock[]
 }
 
+export type ProviderRetryStreamEvent = { type: 'retry' } & RetryEvent
+
 export type StreamEvent =
   | { type: 'text'; delta: string }
   | { type: 'thinking'; delta: string }
+  | ProviderRetryStreamEvent
   | { type: 'tool_use_start'; id: string; name: string }
   | { type: 'tool_use_delta'; id: string; delta: string }
   | { type: 'tool_use_stop'; id: string; name: string; input: Record<string, unknown> }
