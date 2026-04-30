@@ -26,6 +26,7 @@ import {
   runContinuityUnlock,
   isAgentTokenIdRequiredError,
   type EffectCallbacks,
+  type RestoreProgress,
 } from './identityHubEffects.js'
 import { continuityVaultRef, continuityVaultStatus, continuityWorkingTreeStatus, ensurePublicSkillsFile } from './continuity/storage.js'
 import { openFileInEditor } from './continuity/editor.js'
@@ -106,6 +107,7 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
   const identity = config?.identity
   const [step, dispatch] = useReducer(identityHubReducer, initialStepForAction(initialAction, config))
   const [walletSession, setWalletSession] = useState<BrowserWalletReady | null>(null)
+  const [restoreProgress, setRestoreProgress] = useState<RestoreProgress | null>(null)
   const [jwtSaved, setJwtSaved] = useState<boolean>(false)
   const [copyNotice, setCopyNotice] = useState<string | null>(null)
   const [continuityReady, setContinuityReady] = useState<boolean>(false)
@@ -118,6 +120,9 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
   const back = () => dispatch({ type: 'back', from: step })
 
   useEffect(() => { setWalletSession(null) }, [step.kind])
+  useEffect(() => {
+    if (step.kind !== 'restore-authorizing') setRestoreProgress(null)
+  }, [step.kind])
 
   useEffect(() => {
     let cancelled = false
@@ -153,6 +158,7 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
     onStep: setStep,
     onWalletReady: setWalletSession,
     onIdentityComplete: completeTokenIdentity,
+    onRestoreProgress: setRestoreProgress,
   }
 
   const errorStep = (err: unknown, backStep: Step): void => {
@@ -466,6 +472,7 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
         step={step}
         config={config}
         walletSession={walletSession}
+        restoreProgress={restoreProgress}
         onConnectWallet={() => {
           const purpose = step.kind === 'restore-owner' ? step.purpose : undefined
           setStep({ kind: 'restore-wallet', purpose })

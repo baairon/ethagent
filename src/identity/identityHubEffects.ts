@@ -95,6 +95,12 @@ export type EffectCallbacks = {
   onStep: (step: Step) => void
   onWalletReady: (session: BrowserWalletReady | null) => void
   onIdentityComplete: (identity: EthagentIdentity, message: string) => Promise<void>
+  onRestoreProgress?: (progress: RestoreProgress | null) => void
+}
+
+export type RestoreProgress = {
+  phase: 'decrypting' | 'writing' | 'finishing'
+  label: string
 }
 
 export async function runCreatePreflight(
@@ -373,6 +379,8 @@ export async function runRestoreAuthorize(
     message: step.envelope.challenge,
     onReady: callbacks.onWalletReady,
   })
+  callbacks.onWalletReady(null)
+  callbacks.onRestoreProgress?.({ phase: 'decrypting', label: 'signature received - decrypting encrypted snapshot...' })
   let restored: ReturnType<typeof restoreAgentStateBackupEnvelope> | ReturnType<typeof restoreContinuitySnapshotEnvelope>
   let continuityFiles: ReturnType<typeof restoreContinuitySnapshotEnvelope>['files'] | undefined
   if (isContinuitySnapshotEnvelope(step.envelope)) {
@@ -388,6 +396,7 @@ export async function runRestoreAuthorize(
       walletSignature: wallet.signature,
     })
   }
+  callbacks.onRestoreProgress?.({ phase: 'writing', label: 'restoring local agent files...' })
   const backup: BackupMetadata = {
     cid: step.cid,
     createdAt: step.envelope.createdAt,
@@ -427,6 +436,7 @@ export async function runRestoreAuthorize(
   if (continuityFiles) {
     await writeContinuityFiles(nextIdentity, continuityFiles)
   }
+  callbacks.onRestoreProgress?.({ phase: 'finishing', label: 'finalizing restored identity...' })
   await restorePublishedPublicSkills(nextIdentity, step.apiUrl, step.candidate.publicDiscovery?.skillsCid)
   await ensureIdentityMarkdownScaffold(nextIdentity)
   await callbacks.onIdentityComplete(nextIdentity, `ERC-8004 agent restored - #${step.candidate.agentId.toString()}`)
