@@ -66,6 +66,7 @@ export const DetailsScreen: React.FC<DetailsScreenProps> = ({
         <Box marginTop={1}>
           <Select<string>
             options={copyable.map(field => ({ value: field.label, label: field.label, hint: shortPreview(field.value) }))}
+            hintLayout="inline"
             onSubmit={label => {
               const found = copyable.find(field => field.label === label)
               if (found) onCopy(found.label, found.value)
@@ -79,12 +80,16 @@ export const DetailsScreen: React.FC<DetailsScreenProps> = ({
 
   const credentialLabel = jwtSaved ? 'pinning credential' : 'connect pinning'
   const options: Array<SelectOption<DetailsAction>> = [
-    { value: 'edit', label: 'profile', disabled: !canEditProfile },
-    { value: 'continuity', label: 'memory and persona', disabled: !identity },
-    { value: 'snapshots', label: 'snapshots', disabled: !identity },
-    { value: 'storage-credential', label: credentialLabel },
-    { value: 'copy', label: 'copy values', disabled: copyable.length === 0 },
-    { value: 'data-management', label: 'local data' },
+    { value: 'edit', role: 'section', prefix: '--', label: 'Identity' },
+    { value: 'edit', label: 'profile', hint: 'rename agent and public description', disabled: !canEditProfile },
+    { value: 'copy', label: 'copy values', hint: 'copy CIDs, token id, URI, or owner', disabled: copyable.length === 0 },
+    { value: 'continuity', role: 'section', prefix: '--', label: 'Continuity' },
+    { value: 'continuity', label: 'memory and persona', hint: 'private files and public discovery', disabled: !identity },
+    { value: 'snapshots', label: 'snapshots', hint: 'publish, review, restore checkpoints', disabled: !identity },
+    { value: 'storage-credential', role: 'section', prefix: '--', label: 'Storage' },
+    { value: 'storage-credential', label: credentialLabel, hint: 'save, replace, or forget pinning token' },
+    { value: 'data-management', role: 'section', prefix: '--', label: 'Device' },
+    { value: 'data-management', label: 'local data', hint: 'unlink and reset boundaries on this machine' },
   ]
 
   return (
@@ -93,6 +98,7 @@ export const DetailsScreen: React.FC<DetailsScreenProps> = ({
       <Box marginTop={1}>
         <Select<DetailsAction>
           options={options}
+          hintLayout="inline"
           onSubmit={choice => {
             if (choice === 'edit') return onEditProfile()
             if (choice === 'continuity') return onContinuity()

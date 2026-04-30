@@ -10,8 +10,7 @@ type ForgetAction = 'confirm' | 'cancel'
 
 export const FORGET_LOCAL_AGENT_COPY = [
   'clears only the active agent selection on this machine.',
-  'does not burn, transfer, or delete agent tokens.',
-  'does not delete pinned IPFS backups.',
+  'does not burn, transfer, or delete agent tokens or pinned IPFS backups.',
   'does not delete SOUL.md, MEMORY.md, SKILLS.md, sessions, or chats.',
   'use ethagent reset when you want a full local wipe.',
 ] as const
@@ -45,9 +44,12 @@ export const ForgetIdentityScreen: React.FC<ForgetIdentityScreenProps> = ({
     <Box marginTop={1}>
       <Select<ForgetAction>
         options={[
-          { value: 'confirm', label: 'unlink active agent' },
-          { value: 'cancel', label: 'keep active agent' },
+          { value: 'confirm', role: 'section', prefix: '--', label: 'Active agent' },
+          { value: 'confirm', label: 'unlink active agent', hint: 'clear only the selected identity from this device' },
+          { value: 'cancel', role: 'section', prefix: '--', label: 'Navigation' },
+          { value: 'cancel', label: 'keep active agent', hint: 'return without changing local identity data', role: 'utility' },
         ]}
+        hintLayout="inline"
         onSubmit={choice => choice === 'confirm' ? onConfirm() : onCancel()}
         onCancel={onCancel}
       />

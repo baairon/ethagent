@@ -31,11 +31,16 @@ export const ContinuityDashboardScreen: React.FC<CommonProps & {
     <Box marginTop={1}>
       <Select<DashboardAction>
         options={[
-          { value: 'private', label: 'private memory files', hint: 'restore, inspect, and back up SOUL.md and MEMORY.md' },
-          { value: 'public', label: 'public discovery', hint: 'inspect SKILLS.md and publish agent-readable metadata' },
-          { value: 'snapshots', label: 'snapshots', hint: 'status, history, and restore points' },
-          { value: 'back', label: 'back' },
+          { value: 'private', role: 'section', prefix: '--', label: 'Private' },
+          { value: 'private', label: 'memory files', hint: 'restore, inspect, back up SOUL.md and MEMORY.md' },
+          { value: 'public', role: 'section', prefix: '--', label: 'Public' },
+          { value: 'public', label: 'discovery metadata', hint: 'inspect SKILLS.md and publish metadata' },
+          { value: 'snapshots', role: 'section', prefix: '--', label: 'Recovery' },
+          { value: 'snapshots', label: 'snapshots', hint: 'publish status, history, restore points' },
+          { value: 'back', role: 'section', prefix: '--', label: 'Navigation' },
+          { value: 'back', label: 'back to settings', hint: 'return to agent settings', role: 'utility' },
         ]}
+        hintLayout="inline"
         onSubmit={choice => {
           if (choice === 'private') return onPrivate()
           if (choice === 'public') return onPublic()
@@ -73,12 +78,17 @@ export const PrivateContinuityScreen: React.FC<CommonProps & {
     <Box marginTop={1}>
       <Select<PrivateAction>
         options={[
-          { value: 'restore', label: 'restore from encrypted snapshot', hint: 'requires the wallet that owns the snapshot' },
-          { value: 'soul', label: 'open SOUL.md', disabled: !ready },
-          { value: 'memory', label: 'open MEMORY.md', disabled: !ready },
-          { value: 'backup', label: 'save encrypted snapshot', disabled: !ready || !canBackup },
-          { value: 'back', label: 'back' },
+          { value: 'restore', role: 'section', prefix: '--', label: 'Restore' },
+          { value: 'restore', label: 'restore snapshot', hint: 'decrypt latest IPFS backup with owner wallet' },
+          { value: 'soul', role: 'section', prefix: '--', label: 'Open local files' },
+          { value: 'soul', label: 'open SOUL.md', hint: 'edit persona and operating preferences', disabled: !ready },
+          { value: 'memory', label: 'open MEMORY.md', hint: 'edit private working memory for this agent', disabled: !ready },
+          { value: 'backup', role: 'section', prefix: '--', label: 'Publish' },
+          { value: 'backup', label: 'save snapshot', hint: 'encrypt private files and pin to IPFS', disabled: !ready || !canBackup },
+          { value: 'back', role: 'section', prefix: '--', label: 'Navigation' },
+          { value: 'back', label: 'back to continuity', hint: 'return to memory and persona', role: 'utility' },
         ]}
+        hintLayout="inline"
         onSubmit={choice => {
           if (choice === 'restore') return onRestore()
           if (choice === 'soul') return onOpenSoul()
@@ -103,10 +113,14 @@ export const PublicSkillsScreen: React.FC<CommonProps & {
     <Box marginTop={1}>
       <Select<PublicAction>
         options={[
-          { value: 'skills', label: 'open SKILLS.md' },
-          { value: 'publish', label: 'publish skills and agent card', disabled: !canPublish, hint: 'pins SKILLS.md and updates tokenURI during backup' },
-          { value: 'back', label: 'back' },
+          { value: 'skills', role: 'section', prefix: '--', label: 'Local file' },
+          { value: 'skills', label: 'open SKILLS.md', hint: 'edit public capabilities and notes' },
+          { value: 'publish', role: 'section', prefix: '--', label: 'Publish' },
+          { value: 'publish', label: 'publish skills and card', hint: 'pin SKILLS.md and agent card', disabled: !canPublish },
+          { value: 'back', role: 'section', prefix: '--', label: 'Navigation' },
+          { value: 'back', label: 'back to continuity', hint: 'return to memory and persona', role: 'utility' },
         ]}
+        hintLayout="inline"
         onSubmit={choice => {
           if (choice === 'skills') return onOpenSkills()
           if (choice === 'publish') return onPublish()

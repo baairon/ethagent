@@ -362,7 +362,7 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
     }
   }
 
-  const footer = <Text color={theme.dim}>enter select - esc back</Text>
+  const footer = <Text color={theme.dim}>enter select · esc back</Text>
 
   if (step.kind === 'menu') {
     return (

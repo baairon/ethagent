@@ -98,8 +98,7 @@ test('local agent removal confirmation keeps the device-only boundary explicit',
   const copy = FORGET_LOCAL_AGENT_COPY.join('\n')
   assert.match(copy, /active agent selection/)
   assert.doesNotMatch(copy, /legacy|obsolete|older installs/)
-  assert.match(copy, /does not burn, transfer, or delete agent tokens/)
-  assert.match(copy, /does not delete pinned IPFS backups/)
+  assert.match(copy, /does not burn, transfer, or delete agent tokens or pinned IPFS backups/)
   assert.match(copy, /does not delete SOUL\.md, MEMORY\.md, SKILLS\.md/)
   assert.match(copy, /ethagent reset/)
 })
@@ -110,7 +109,7 @@ test('local data management copy distinguishes local reset from remote identity 
   assert.match(copy, /SKILLS\.md is public discovery metadata/)
   assert.match(copy, /Save snapshot and publish encrypts private markdown/)
   assert.match(copy, /ethagent reset wipes local identity metadata/)
-  assert.match(copy, /keeps installed local LLM assets/)
+  assert.match(copy, /keeps local LLM assets/)
   assert.match(copy, /cannot delete onchain tokens or IPFS pins/)
 })
 
@@ -119,7 +118,7 @@ test('storage credential confirmation distinguishes pinning control from identit
   assert.match(copy, /saved IPFS storage token/)
   assert.match(copy, /existing pinned IPFS backups are not deleted/)
   assert.match(copy, /cannot pin new encrypted state/)
-  assert.match(copy, /agent identity and sessions stay/)
+  assert.match(copy, /identity and sessions stay/)
 })
 
 test('networkLabel and networkSubtitle return human-readable strings for every curated network', () => {

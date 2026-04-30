@@ -19,7 +19,7 @@ export const ModeSwitchView: React.FC<ModeSwitchViewProps> = ({ currentMode, onS
     <Surface
       title="Session Mode"
       subtitle="Choose how the agent should behave for the next turns."
-      footer="enter switches mode - esc closes"
+      footer="enter switches mode · esc closes"
     >
       <Box flexDirection="column" marginBottom={1}>
         <Text color={theme.dim}>Current mode: {labelForMode(currentMode)}</Text>

@@ -594,10 +594,6 @@
     function isTransactionFlow() {
       return config.kind === 'transaction' || config.kind === 'sign-transaction';
     }
-    function dataSizeLabel(data) {
-      if (!data || typeof data !== 'string' || !data.startsWith('0x')) return glyphs.emDash;
-      return Math.max(0, Math.ceil((data.length - 2) / 2)) + ' bytes';
-    }
     function transactionActionLabel() {
       if (config.kind === 'sign-transaction') return 'publish identity snapshot';
       if (config.kind === 'transaction') return 'submit transaction';
@@ -844,15 +840,10 @@
         txSummary.innerHTML = '';
         return;
       }
-      const tx = payload.tx || config.tx || {};
       const rows = [
         ['action', transactionActionLabel()],
         ['network', chainLabel(config.chainIdHex)],
-        ['wallet', shortAddr(payload.account || config.expectedAccount)],
-        ['registry', shortAddr(tx.to)],
-        ['data', dataSizeLabel(tx.data)],
       ];
-      if (payload.txHash) rows.push(['tx hash', payload.txHash]);
       txSummary.innerHTML = rows.map(([key, value]) =>
         '<span class="tx-key">'+escapeHtml(key)+'</span>'+
         '<span class="tx-value'+(value === glyphs.emDash ? ' muted' : '')+'">'+escapeHtml(value)+'</span>'

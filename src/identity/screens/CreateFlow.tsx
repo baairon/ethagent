@@ -67,9 +67,12 @@ export const CreateFlow: React.FC<CreateFlowProps> = ({
         </Box>
         <Select<'replace' | 'back'>
           options={[
-            { value: 'back', label: 'keep the current agent' },
-            { value: 'replace', label: 'mint and use a new agent' },
+            { value: 'back', role: 'section', prefix: '--', label: 'Current identity' },
+            { value: 'back', label: 'keep current agent', hint: 'return to settings without minting anything', role: 'utility' },
+            { value: 'replace', role: 'section', prefix: '--', label: 'New identity' },
+            { value: 'replace', label: 'mint and use new agent', hint: 'create separate token and make it active' },
           ]}
+          hintLayout="inline"
           onSubmit={choice => {
             if (choice === 'back') return onMenu()
             return onSetStep({ kind: 'create-name' })

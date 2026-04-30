@@ -53,16 +53,22 @@ export const SnapshotManagerScreen: React.FC<SnapshotManagerScreenProps> = ({
   onBack,
 }) => {
   const options: Array<SelectOption<SnapshotAction>> = [
-    { value: 'publish', label: 'publish latest', disabled: !ready || !canBackup },
+    { value: 'publish', role: 'section', prefix: '--', label: 'Publish' },
+    { value: 'publish', label: 'publish latest', hint: 'encrypt local continuity and pin to IPFS', disabled: !ready || !canBackup },
+    ...(publishedSnapshots.length > 0 ? [{ value: 'publish' as const, role: 'section' as const, prefix: '--', label: 'Published snapshots' }] : []),
     ...publishedSnapshots.map(snapshot => ({
       value: `published:${snapshot.id}` as const,
       label: `published ${dateLabel(snapshot.createdAt)}  ${shortCid(snapshot.cid)}`,
+      hint: 'restore this pinned encrypted snapshot',
     })),
+    ...(localHistory.length > 0 ? [{ value: 'publish' as const, role: 'section' as const, prefix: '--', label: 'Local checkpoints' }] : []),
     ...localHistory.map(snapshot => ({
       value: `history:${snapshot.id}` as const,
       label: `local ${dateLabel(snapshot.createdAt)}  ${fileLabel(snapshot.file)}`,
+      hint: 'restore this local markdown checkpoint',
     })),
-    { value: 'back', label: 'back' },
+    { value: 'back', role: 'section', prefix: '--', label: 'Navigation' },
+    { value: 'back', label: 'back to continuity', hint: 'return to memory and persona', role: 'utility' },
   ]
 
   return (
@@ -77,6 +83,7 @@ export const SnapshotManagerScreen: React.FC<SnapshotManagerScreenProps> = ({
         <Select<SnapshotAction>
           options={options}
           maxVisible={7}
+          hintLayout="inline"
           onSubmit={choice => {
             if (choice === 'publish') return onPublish()
             if (choice === 'back') return onBack()
@@ -105,9 +112,12 @@ export const SnapshotRestoreConfirmScreen: React.FC<{
     <Box marginTop={1}>
       <Select<'confirm' | 'back'>
         options={[
-          { value: 'confirm', label: 'restore checkpoint', disabled: !snapshot },
-          { value: 'back', label: 'back' },
+          { value: 'confirm', role: 'section', prefix: '--', label: 'Checkpoint' },
+          { value: 'confirm', label: 'restore checkpoint', hint: 'replace local markdown with this saved version', disabled: !snapshot },
+          { value: 'back', role: 'section', prefix: '--', label: 'Navigation' },
+          { value: 'back', label: 'back to snapshots', hint: 'return without changing local files', role: 'utility' },
         ]}
+        hintLayout="inline"
         onSubmit={choice => {
           if (choice === 'confirm') return onConfirm()
           return onBack()
