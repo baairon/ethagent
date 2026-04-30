@@ -29,6 +29,14 @@ export function buildPermissionRule(
         return { kind: 'bash', scope: 'prefix', commandPrefix: request.commandPrefix, cwd: request.cwd }
       }
       return undefined
+    case 'allow-mcp-tool-project':
+      if (request.kind === 'mcp') return { kind: 'mcp', scope: 'tool', toolKey: request.toolKey }
+      return undefined
+    case 'allow-mcp-server-project':
+      if (request.kind === 'mcp' && request.canPersistServer) {
+        return { kind: 'mcp', scope: 'server', normalizedServerName: request.normalizedServerName }
+      }
+      return undefined
     default:
       return undefined
   }
@@ -58,13 +66,20 @@ function matchesPermissionRule(rule: SessionPermissionRule, request: PermissionR
     return false
   }
 
-  if (rule.scope === 'command') return rule.command === request.command && rule.cwd === request.cwd
-  if (rule.scope === 'prefix') {
-    const normalizedCommand = request.command.trim()
-    return (
-      rule.cwd === request.cwd &&
-      (normalizedCommand === rule.commandPrefix || normalizedCommand.startsWith(`${rule.commandPrefix} `))
-    )
+  if (request.kind === 'bash') {
+    if (rule.scope === 'command') return rule.command === request.command && rule.cwd === request.cwd
+    if (rule.scope === 'prefix') {
+      const normalizedCommand = request.command.trim()
+      return (
+        rule.cwd === request.cwd &&
+        (normalizedCommand === rule.commandPrefix || normalizedCommand.startsWith(`${rule.commandPrefix} `))
+      )
+    }
+  }
+
+  if (request.kind === 'mcp') {
+    if (rule.scope === 'tool') return rule.toolKey === request.toolKey
+    if (rule.scope === 'server') return rule.normalizedServerName === request.normalizedServerName
   }
   return false
 }

@@ -21,9 +21,11 @@ test('private continuity edit review helper extracts the TUI popup target', () =
       ok: true,
       summary: 'append to Durable User Preferences in MEMORY.md',
       content: [
-        'updated local private continuity file C:\\Users\\bairo\\.ethagent\\continuity\\agent\\MEMORY.md',
-        'review file: C:\\Users\\bairo\\.ethagent\\continuity\\agent\\MEMORY.md',
-        'save/publish later from Alt+I -> save snapshot and publish',
+        '## Saved private continuity',
+        '',
+        '- File: `identity-vault/MEMORY.md`',
+        '- Review file: `C:\\Users\\bairo\\.ethagent\\continuity\\agent\\MEMORY.md`',
+        '- Publish: Identity Hub > Snapshots',
       ].join('\n'),
     },
   )

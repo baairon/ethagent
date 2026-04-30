@@ -74,6 +74,7 @@ import type { PlanApprovalAction } from './PlanApprovalView.js'
 import type { ContextLimitAction } from './ContextLimitView.js'
 import type { ContinuityEditReviewAction, ContinuityEditReviewState } from './ContinuityEditReviewView.js'
 import { openFileInEditor } from '../identity/continuity/editor.js'
+import { EMPTY_MCP_SNAPSHOT, McpManager, type McpSnapshot } from '../mcp/manager.js'
 
 type ChatScreenProps = {
   config: EthagentConfig
@@ -148,6 +149,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
   const [activeContextUsage, setActiveContextUsage] = useState<ContextUsage>(() =>
     contextUsageFromTokens(0, initialConfig.provider, initialConfig.model),
   )
+  const [mcpSnapshot, setMcpSnapshot] = useState<McpSnapshot>(EMPTY_MCP_SNAPSHOT)
 
   const rowsRef = useRef<MessageRow[]>([])
   const visibleReasoningIdsRef = useRef<string[]>([])
@@ -176,6 +178,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
   const contextLimitStateRef = useRef<ContextLimitState>(null)
   const pendingContinuityEditReviewRef = useRef<ContinuityEditReviewState | null>(null)
   const contextModelSwitchPromptRef = useRef<string | null>(null)
+  const mcpManagerRef = useRef<McpManager | null>(null)
 
   useEffect(() => { rowsRef.current = rows }, [rows])
   useEffect(() => { overlayRef.current = overlay }, [overlay])
@@ -234,6 +237,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
       compactionUiRef.current?.controller.abort()
       if (streamFlushTimerRef.current) clearTimeout(streamFlushTimerRef.current)
       permissionResolveRef.current?.('deny')
+      void mcpManagerRef.current?.close()
     }
   }, [])
 
@@ -247,6 +251,15 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
     },
     [updateRows],
   )
+
+  useEffect(() => {
+    if (!mcpManagerRef.current) {
+      mcpManagerRef.current = new McpManager(cwd, setMcpSnapshot)
+    }
+    void mcpManagerRef.current.refresh(cwd).catch((err: unknown) => {
+      pushNote(`MCP refresh failed: ${(err as Error).message}`, 'error')
+    })
+  }, [cwd, pushNote])
 
   const beginCompactionUi = useCallback((kind: CompactionKind, sourceSessionId: string): CompactionUiState => {
     const progressRowId = nextRowId()
@@ -590,6 +603,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
         setCopyPickerState({ turnText, turnLabel })
         setOverlay('copyPicker')
       },
+      mcp: mcpManagerRef.current ?? undefined,
     }),
     [
       turns,
@@ -641,6 +655,8 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
         config: configRef.current,
         checkpoint: activeCheckpointRef.current,
         abortSignal: streamAbortRef.current?.signal,
+        dynamicTools: mcpManagerRef.current?.getTools() ?? [],
+        mcp: mcpManagerRef.current ?? undefined,
         getPermissionRules: () => permissionRulesRef.current,
         requestPermission,
         onDirectoryChange: next => {
@@ -672,7 +688,10 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
   const runStream = useCallback(
     async (userText: string, modeOverride?: SessionMode) => {
       const activeMode = modeOverride ?? mode
-      const turnProvider = createProvider(configRef.current, { mode: activeMode })
+      const turnProvider = createProvider(configRef.current, {
+        mode: activeMode,
+        dynamicTools: mcpManagerRef.current?.getTools() ?? [],
+      })
       const controller = new AbortController()
       streamAbortRef.current = controller
       let planCandidate: PendingPlan | null = null
@@ -746,7 +765,10 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
 
   const projectedUsageForInput = useCallback((userText: string, modeOverride?: SessionMode): ContextUsage => {
     const activeMode = modeOverride ?? modeRef.current
-    const turnProvider = createProvider(configRef.current, { mode: activeMode })
+    const turnProvider = createProvider(configRef.current, {
+      mode: activeMode,
+      dynamicTools: mcpManagerRef.current?.getTools() ?? [],
+    })
     const projectedMessages: SessionMessage[] = [
       ...sessionMessagesRef.current,
       { role: 'user', content: userText, createdAt: nowIso() },
@@ -817,6 +839,14 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
         const result = await dispatchSlash(value, ctx)
         if (result && result.kind === 'note') {
           pushNote(result.text, result.variant ?? 'info')
+        }
+        if (result && result.kind === 'submit') {
+          const projected = projectedUsageForInput(result.text)
+          if (shouldConfirmContextUsage(projected, CONTEXT_CONFIRM_PERCENT)) {
+            showContextLimitForPrompt(result.text)
+            return
+          }
+          await runStream(result.text)
         }
         return
       }
@@ -1292,7 +1322,10 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
   )
 
   const busy = pullInFlight || Boolean(compactionUi)
-  const slashSuggestions = useMemo(getSlashSuggestions, [])
+  const slashSuggestions = useMemo(
+    () => getSlashSuggestions(mcpManagerRef.current?.getPromptSuggestions() ?? []),
+    [mcpSnapshot],
+  )
 
   useEffect(() => {
     const plan = pendingPlanRef.current
@@ -1529,10 +1562,14 @@ function normalizePrivateContinuityFile(value: unknown): ContinuityEditReviewSta
 
 function extractReviewFilePath(content: string): string | null {
   for (const line of content.split(/\r?\n/)) {
-    const review = line.match(/^review file:\s*(.+)$/i)
-    if (review?.[1]?.trim()) return review[1].trim()
-    const updated = line.match(/^updated local private continuity file\s+(.+)$/i)
-    if (updated?.[1]?.trim()) return updated[1].trim()
+    const review = line.match(/^(?:[-*]\s+)?review file:\s*(.+)$/i)
+    if (review?.[1]?.trim()) return cleanReviewFilePath(review[1])
+    const updated = line.match(/^(?:[-*]\s+)?updated local private continuity file\s+(.+)$/i)
+    if (updated?.[1]?.trim()) return cleanReviewFilePath(updated[1])
   }
   return null
+}
+
+function cleanReviewFilePath(value: string): string {
+  return value.trim().replace(/^`+|`+$/g, '').trim()
 }

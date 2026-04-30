@@ -10,6 +10,7 @@ import type {
   PermissionMode,
   PermissionRequest,
   SessionPermissionRule,
+  Tool,
   ToolExecutionContext,
   ToolResult,
 } from '../tools/contracts.js'
@@ -35,6 +36,8 @@ export type ToolExecutorOptions = {
   config?: EthagentConfig
   abortSignal?: AbortSignal
   checkpoint?: ToolExecutionContext['checkpoint']
+  dynamicTools?: Tool[]
+  mcp?: ToolExecutionContext['mcp']
   getPermissionRules: () => SessionPermissionRule[]
   requestPermission: (request: PermissionRequest) => Promise<PermissionDecision>
   onDirectoryChange: (next: string) => void
@@ -49,7 +52,7 @@ export type ToolExecutionOutcome = {
 export async function executeToolWithPermissions(
   options: ToolExecutorOptions,
 ): Promise<ToolExecutionOutcome> {
-  const tool = getTool(options.name)
+  const tool = getTool(options.name, { dynamicTools: options.dynamicTools })
   if (!tool) {
     return {
       result: {
@@ -77,6 +80,7 @@ export async function executeToolWithPermissions(
     workspaceRoot: options.cwd,
     config: options.config,
     abortSignal: options.abortSignal,
+    mcp: options.mcp,
     checkpoint: options.checkpoint,
     changeDirectory: next => {
       const updated = setRuntimeCwd(next, options.cwd)
@@ -100,7 +104,8 @@ export async function executeToolWithPermissions(
   if (
     options.permissionMode === 'plan' &&
     request.kind !== 'read' &&
-    request.kind !== 'private-continuity-read'
+    request.kind !== 'private-continuity-read' &&
+    !(request.kind === 'mcp' && request.readOnly)
   ) {
     return {
       result: {

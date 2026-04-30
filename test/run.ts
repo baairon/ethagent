@@ -1,4 +1,5 @@
 import './withRetry.test.js'
+import './mcp.test.js'
 import './editTool.test.js'
 import './writeFileTool.test.js'
 import './deleteFileTool.test.js'

@@ -137,6 +137,10 @@ function describeRule(rule: SessionPermissionRule): string {
     if (rule.scope === 'command') return `bash exact: ${rule.command}`
     return `bash prefix: ${rule.commandPrefix}`
   }
+  if (rule.kind === 'mcp') {
+    if (rule.scope === 'tool') return `mcp tool: ${rule.toolKey}`
+    return `mcp server: ${rule.normalizedServerName}`
+  }
   if (rule.scope === 'kind') {
     return rule.kind === 'read'
       ? 'allow all reads'
@@ -150,5 +154,6 @@ function describeRule(rule: SessionPermissionRule): string {
 
 function describeRuleScope(rule: SessionPermissionRule): string {
   if (rule.kind === 'bash') return `cwd ${rule.cwd}`
+  if (rule.kind === 'mcp') return 'MCP project permission'
   return rule.scope === 'kind' ? 'whole project' : rule.path
 }

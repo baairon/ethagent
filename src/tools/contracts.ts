@@ -1,7 +1,9 @@
 import { z } from 'zod'
 import type { EthagentConfig } from '../storage/config.js'
 
-export type ToolKind = 'read' | 'write' | 'edit' | 'delete' | 'bash' | 'cd' | 'private-continuity-read' | 'private-continuity-edit'
+import type { McpRuntime } from '../mcp/manager.js'
+
+export type ToolKind = 'read' | 'write' | 'edit' | 'delete' | 'bash' | 'cd' | 'private-continuity-read' | 'private-continuity-edit' | 'mcp'
 
 export type PermissionRequest =
   | {
@@ -80,6 +82,19 @@ export type PermissionRequest =
       canPersistPrefix: boolean
     }
   | {
+      kind: 'mcp'
+      title: string
+      subtitle: string
+      serverName: string
+      normalizedServerName: string
+      toolName: string
+      toolKey: string
+      readOnly: boolean
+      destructive: boolean
+      openWorld: boolean
+      canPersistServer: boolean
+    }
+  | {
       kind: 'cd'
       path: string
       relativePath: string
@@ -108,6 +123,8 @@ export const SessionPermissionRuleSchema = z.union([
   z.object({ kind: z.literal('cd'), scope: z.literal('directory'), path: z.string().min(1) }),
   z.object({ kind: z.literal('bash'), scope: z.literal('command'), command: z.string().min(1), cwd: z.string().min(1) }),
   z.object({ kind: z.literal('bash'), scope: z.literal('prefix'), commandPrefix: z.string().min(1), cwd: z.string().min(1) }),
+  z.object({ kind: z.literal('mcp'), scope: z.literal('tool'), toolKey: z.string().min(1) }),
+  z.object({ kind: z.literal('mcp'), scope: z.literal('server'), normalizedServerName: z.string().min(1) }),
 ])
 
 export type SessionPermissionRule = z.infer<typeof SessionPermissionRuleSchema>
@@ -119,6 +136,8 @@ export type PermissionDecision =
   | 'allow-directory-project'
   | 'allow-command-project'
   | 'allow-command-prefix-project'
+  | 'allow-mcp-tool-project'
+  | 'allow-mcp-server-project'
   | 'deny'
 
 export type ToolResult =
@@ -129,6 +148,7 @@ export type ToolExecutionContext = {
   workspaceRoot: string
   config?: EthagentConfig
   abortSignal?: AbortSignal
+  mcp?: McpRuntime
   changeDirectory?: (next: string) => void
   checkpoint?: {
     sessionId: string
@@ -152,6 +172,7 @@ export type Tool<Input extends z.ZodTypeAny = z.ZodTypeAny> = {
     anyOf?: Array<Record<string, unknown>>
     additionalProperties?: boolean
   }
+  readOnly?: boolean
   parse(input: Record<string, unknown>): z.infer<Input>
   buildPermissionRequest(input: z.infer<Input>, context: ToolExecutionContext): Promise<PermissionRequest>
   execute(input: z.infer<Input>, context: ToolExecutionContext): Promise<ToolResult>

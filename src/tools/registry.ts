@@ -10,6 +10,7 @@ import { listDirectoryTool } from './listDirectoryTool.js'
 import { privateContinuityEditTool } from './privateContinuityEditTool.js'
 import { privateContinuityReadTool } from './privateContinuityReadTool.js'
 import { readTool } from './readTool.js'
+import { listMcpResourcesTool, readMcpResourceTool } from './mcpResourceTools.js'
 import { writeFileTool } from './writeFileTool.js'
 
 export const BUILTIN_TOOLS: Tool[] = [
@@ -17,6 +18,8 @@ export const BUILTIN_TOOLS: Tool[] = [
   listDirectoryTool,
   readTool,
   privateContinuityReadTool,
+  listMcpResourcesTool,
+  readMcpResourceTool,
   writeFileTool,
   editTool,
   privateContinuityEditTool,
@@ -26,15 +29,18 @@ export const BUILTIN_TOOLS: Tool[] = [
 
 export type ToolAvailabilityContext = {
   hasIdentity?: boolean
+  dynamicTools?: Tool[]
 }
 
-export function getTool(name: string): Tool | undefined {
-  return BUILTIN_TOOLS.find(tool => tool.name === name)
+export function getTool(name: string, context: ToolAvailabilityContext = {}): Tool | undefined {
+  return [...(context.dynamicTools ?? []), ...BUILTIN_TOOLS].find(tool => tool.name === name)
 }
 
 export function toolsForMode(mode: SessionMode = 'chat', context: ToolAvailabilityContext = {}): Tool[] {
   const policy = modePolicy(mode)
-  return BUILTIN_TOOLS.filter(tool => {
+  const allTools = [...BUILTIN_TOOLS, ...(context.dynamicTools ?? [])]
+  return allTools.filter(tool => {
+    if (mode === 'plan' && tool.kind === 'mcp' && tool.readOnly !== true) return false
     if (!policy.exposesToolKind(tool.kind)) return false
     if ((tool.kind === 'private-continuity-read' || tool.kind === 'private-continuity-edit') && !context.hasIdentity) return false
     return true
