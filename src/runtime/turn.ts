@@ -1,4 +1,4 @@
-import type { Message, Provider, StreamEvent } from '../providers/contracts.js'
+import type { Message, Provider, ProviderRetryStreamEvent, StreamEvent } from '../providers/contracts.js'
 import type { ToolResult } from '../tools/contracts.js'
 import { getTool } from '../tools/registry.js'
 import {
@@ -10,6 +10,7 @@ import {
 type ProviderTurnEvent =
   | { type: 'text'; delta: string }
   | { type: 'thinking'; delta: string }
+  | ProviderRetryStreamEvent
   | { type: 'tool_use_start'; id: string; name: string }
   | { type: 'tool_use_delta'; id: string; delta: string }
   | { type: 'tool_use_stop'; id: string; name: string; input: Record<string, unknown> }
@@ -45,6 +46,7 @@ function normalize(event: StreamEvent): ProviderTurnEvent {
   switch (event.type) {
     case 'text': return { type: 'text', delta: event.delta }
     case 'thinking': return { type: 'thinking', delta: event.delta }
+    case 'retry': return event
     case 'tool_use_start': return event
     case 'tool_use_delta': return event
     case 'tool_use_stop': return event
@@ -104,6 +106,7 @@ export type TurnEvent =
   | { type: 'iteration_start'; index: number }
   | { type: 'text'; delta: string }
   | { type: 'thinking'; delta: string }
+  | ProviderRetryStreamEvent
   | { type: 'tool_use_start'; id: string; name: string }
   | { type: 'tool_use_delta'; id: string; delta: string }
   | {
@@ -242,7 +245,9 @@ export async function* runRuntimeTurn(
 
     try {
       for await (const ev of runProviderTurn(provider, workingMessages, signal)) {
-        if (ev.type === 'text') {
+        if (ev.type === 'retry') {
+          yield ev
+        } else if (ev.type === 'text') {
           assistantText += ev.delta
           yield { type: 'text', delta: ev.delta }
         } else if (ev.type === 'thinking') {

@@ -391,6 +391,52 @@ test('runStreamingTurn proceeds to provider after successful preflight', async (
   assert.ok(rows.some(row => row.role === 'assistant' && row.content === 'Ready.'))
 })
 
+test('runStreamingTurn surfaces provider retry status without changing streamed output', async () => {
+  const cwd = await fs.mkdtemp(path.join(os.tmpdir(), 'ethagent-orch-'))
+  const sessionMessages: SessionMessage[] = []
+  const rows: MessageRow[] = []
+  const notes: Array<{ text: string; kind: 'info' | 'error' | 'dim' }> = []
+
+  const provider: Provider = {
+    id: 'llamacpp',
+    model: 'qwen-test',
+    supportsTools: true,
+    async *complete(): AsyncIterable<StreamEvent> {
+      yield {
+        type: 'retry',
+        attempt: 1,
+        nextAttempt: 2,
+        maxRetries: 4,
+        delayMs: 1500,
+        reason: 'HTTP 429',
+        status: 429,
+      }
+      yield { type: 'text', delta: 'Ready after retry.' }
+      yield { type: 'done', stopReason: 'end_turn' }
+    },
+  }
+
+  const result = await runStreamingTurn(makeContext({
+    cwd,
+    provider,
+    userText: 'hello local model',
+    sessionMessages,
+    rows,
+    notes,
+    mode: 'chat',
+  }))
+
+  assert.equal(result.finishedNormally, true)
+  assert.ok(notes.some(note =>
+    note.kind === 'dim' &&
+    note.text === 'provider retry 2/5 in 1.5s (HTTP 429)',
+  ))
+  assert.ok(rows.some(row => row.role === 'assistant' && row.content === 'Ready after retry.'))
+  assert.ok(sessionMessages.some(message =>
+    message.role === 'assistant' && message.content === 'Ready after retry.',
+  ))
+})
+
 test('runStreamingTurn skips provider call when preflight fails', async () => {
   const cwd = await fs.mkdtemp(path.join(os.tmpdir(), 'ethagent-orch-'))
   const sessionMessages: SessionMessage[] = []

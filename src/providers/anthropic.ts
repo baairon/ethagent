@@ -2,8 +2,8 @@ import { getKey } from '../storage/secrets.js'
 import type { Message, MessageContentBlock, Provider, ProviderCompleteOptions, StreamEvent } from './contracts.js'
 import { ProviderError } from './contracts.js'
 import { providerErrorFromResponse } from './errors.js'
+import { fetchWithRetryStreamEvents } from './retry.js'
 import { iterSseEvents } from './sse.js'
-import { fetchWithRetry } from '../utils/withRetry.js'
 
 export type AnthropicToolDefinition = {
   name: string
@@ -79,7 +79,7 @@ export class AnthropicProvider implements Provider {
 
     let response: Response
     try {
-      response = await fetchWithRetry('https://api.anthropic.com/v1/messages', {
+      response = yield* fetchWithRetryStreamEvents('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
@@ -95,7 +95,7 @@ export class AnthropicProvider implements Provider {
           messages: conversation,
           tools: this.tools.length > 0 ? this.tools : undefined,
         }),
-      }, { signal })
+      }, { signal, rateLimitResetProvider: 'anthropic' })
     } catch (err: unknown) {
       if (signal.aborted) return
       yield { type: 'error', message: (err as Error).message || 'network error' }

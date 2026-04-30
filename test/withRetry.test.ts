@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
   classifyRetryableFetchError,
+  classifyRetryableProviderResponse,
   classifyRetryableResponse,
   computeBackoffMs,
   DEFAULT_RETRY_POLICY,
@@ -104,6 +105,24 @@ test('rateLimitResetDelayMs reads Anthropic and OpenAI-compatible reset headers'
   assert.equal(rateLimitResetDelayMs(new Headers(), 'openai-compatible', now), undefined)
 })
 
+test('classifyRetryableProviderResponse uses provider reset headers when retry-after is absent', () => {
+  const classification = classifyRetryableProviderResponse(
+    new Response('rate limited', {
+      status: 429,
+      headers: {
+        'x-ratelimit-reset-requests': '750ms',
+        'x-ratelimit-reset-tokens': '2s',
+      },
+    }),
+    Date.parse('2026-04-30T00:00:00.000Z'),
+    'openai-compatible',
+  )
+
+  assert.equal(classification.retryable, true)
+  assert.equal(classification.retryAfterMs, 2000)
+  assert.equal(classification.status, 429)
+})
+
 test('retryPolicyFromOptions preserves defaults and derives retry-after cap', () => {
   assert.deepEqual(retryPolicyFromOptions(), DEFAULT_RETRY_POLICY)
   assert.deepEqual(retryPolicyFromOptions({ maxRetries: 2, maxDelayMs: 1000 }), {
@@ -165,6 +184,29 @@ test('fetchWithRetry uses injected now for HTTP-date retry-after headers', async
 
   assert.equal(response.status, 200)
   assert.deepEqual(sleeps, [60_000])
+})
+
+test('fetchWithRetry sleeps from provider reset headers when retry-after is absent', async () => {
+  let calls = 0
+  const sleeps: number[] = []
+  const response = await fetchWithRetry('https://example.invalid/endpoint', { method: 'POST' }, {
+    maxRetries: 1,
+    rateLimitResetProvider: 'openai-compatible',
+    sleep: async ms => { sleeps.push(ms) },
+    fetchImpl: (async () => {
+      calls += 1
+      if (calls === 1) {
+        return new Response('rate limited', {
+          status: 429,
+          headers: { 'x-ratelimit-reset-requests': '1s' },
+        })
+      }
+      return new Response('ok', { status: 200 })
+    }) as typeof fetch,
+  })
+
+  assert.equal(response.status, 200)
+  assert.deepEqual(sleeps, [1000])
 })
 
 test('fetchWithRetry surfaces non-retryable status codes without retrying', async () => {

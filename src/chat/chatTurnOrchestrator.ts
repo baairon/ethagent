@@ -432,6 +432,10 @@ async function handleEvent(ev: TurnEvent, ctx: EventHandlerContext): Promise<voi
       ctx.flushStreamRows()
       return
     }
+    case 'retry': {
+      ctx.pushNote(formatRetryStatus(ev), 'dim')
+      return
+    }
     case 'tool_use_stop': {
       ctx.markPendingToolUse()
       ctx.finalizeStreamingRows()
@@ -508,6 +512,21 @@ async function handleEvent(ev: TurnEvent, ctx: EventHandlerContext): Promise<voi
     case 'tool_use_delta':
       return
   }
+}
+
+function formatRetryStatus(ev: Extract<TurnEvent, { type: 'retry' }>): string {
+  const totalAttempts = ev.maxRetries + 1
+  const reason = ev.status !== undefined ? `HTTP ${ev.status}` : ev.code ?? ev.reason
+  return `provider retry ${ev.nextAttempt}/${totalAttempts} in ${formatRetryDelay(ev.delayMs)} (${reason})`
+}
+
+function formatRetryDelay(delayMs: number): string {
+  if (delayMs < 1000) return `${Math.max(0, Math.round(delayMs))}ms`
+  const seconds = delayMs / 1000
+  if (seconds < 10) return `${seconds.toFixed(1).replace(/\.0$/, '')}s`
+  if (seconds < 60) return `${Math.round(seconds)}s`
+  const minutes = seconds / 60
+  return `${minutes.toFixed(minutes < 10 ? 1 : 0).replace(/\.0$/, '')}m`
 }
 
 function updateStreamingRows(
