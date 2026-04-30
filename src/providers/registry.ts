@@ -8,14 +8,15 @@ import { GeminiProvider } from './gemini.js'
 import { OpenAIChatProvider } from './openai-chat.js'
 import { anthropicTools, openAITools } from '../tools/registry.js'
 import { openAIBaseUrlFor } from '../models/catalog.js'
+import type { Tool } from '../tools/contracts.js'
 
 export function isLocalProvider(provider: string): boolean {
   return provider === 'llamacpp'
 }
 
-export function createProvider(config: EthagentConfig, options: { mode?: SessionMode } = {}): Provider {
+export function createProvider(config: EthagentConfig, options: { mode?: SessionMode; dynamicTools?: Tool[] } = {}): Provider {
   const mode = options.mode ?? 'chat'
-  const toolContext = { hasIdentity: Boolean(config.identity) }
+  const toolContext = { hasIdentity: Boolean(config.identity), dynamicTools: options.dynamicTools }
   switch (config.provider) {
     case 'llamacpp':
       return new OpenAIChatProvider({

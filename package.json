@@ -39,9 +39,11 @@
   "author": "bairon.eth",
   "license": "MIT",
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@noble/curves": "^1.9.7",
     "@noble/hashes": "^1.8.0",
     "@noble/post-quantum": "^0.6.1",
+    "ajv": "^8.18.0",
     "ink": "^6.8.0",
     "react": "^19.2.4",
     "tsx": "^4.21.0",

@@ -19,6 +19,7 @@ import { setCwd } from '../runtime/cwd.js'
 import type { SessionMode } from '../runtime/sessionMode.js'
 import type { ContextUsage } from '../runtime/compaction.js'
 import { formatModelDisplayName } from '../models/modelDisplay.js'
+import type { McpManager } from '../mcp/manager.js'
 
 export type IdentityRequestAction =
   | 'manage'
@@ -47,10 +48,12 @@ export type SlashContext = {
   onCompactRequest: () => void
   onIdentityRequest: (action?: IdentityRequestAction) => void
   onCopyPickerRequest: (turnText: string, turnLabel: string) => void
+  mcp?: McpManager
 }
 
 export type SlashResult =
   | { kind: 'note'; text: string; variant?: 'info' | 'error' | 'dim' }
+  | { kind: 'submit'; text: string }
   | { kind: 'handled' }
 
 type CommandSpec = {
@@ -322,6 +325,12 @@ const COMMANDS: CommandSpec[] = [
     },
   },
   {
+    name: 'mcp',
+    enterBehavior: 'fill',
+    summary: 'manage MCP servers · /mcp [status|approve|reject|reconnect|enable|disable|add-json]',
+    run: async (args, ctx) => runMcp(args, ctx),
+  },
+  {
     name: 'identity',
     enterBehavior: 'fill',
     summary: 'Ethereum identity · /identity [status|create|load|remove]',
@@ -382,6 +391,58 @@ async function runHuggingFace(args: string, ctx: SlashContext): Promise<SlashRes
     kind: 'note',
     variant: 'error',
     text: 'usage: /hf [installed|download <huggingface.co link or repo id>]',
+  }
+}
+
+async function runMcp(args: string, ctx: SlashContext): Promise<SlashResult> {
+  if (!ctx.mcp) {
+    return { kind: 'note', variant: 'error', text: 'MCP runtime is not available in this session.' }
+  }
+
+  const tokens = args.trim().split(/\s+/).filter(Boolean)
+  const sub = tokens[0]?.toLowerCase() ?? ''
+  if (!sub || sub === 'status' || sub === 'list') {
+    return { kind: 'note', text: ctx.mcp.renderStatus(), variant: 'info' }
+  }
+
+  try {
+    if (sub === 'approve') {
+      const name = tokens.slice(1).join(' ')
+      if (!name) return { kind: 'note', variant: 'error', text: 'usage: /mcp approve <server>' }
+      return { kind: 'note', text: await ctx.mcp.approveServer(name), variant: 'dim' }
+    }
+    if (sub === 'reject') {
+      const name = tokens.slice(1).join(' ')
+      if (!name) return { kind: 'note', variant: 'error', text: 'usage: /mcp reject <server>' }
+      return { kind: 'note', text: await ctx.mcp.rejectServer(name), variant: 'dim' }
+    }
+    if (sub === 'reconnect') {
+      const name = tokens.slice(1).join(' ') || undefined
+      return { kind: 'note', text: await ctx.mcp.reconnect(name), variant: 'dim' }
+    }
+    if (sub === 'enable' || sub === 'disable') {
+      const name = tokens.slice(1).join(' ')
+      if (!name) return { kind: 'note', variant: 'error', text: `usage: /mcp ${sub} <server>` }
+      return { kind: 'note', text: await ctx.mcp.setEnabled(name, sub === 'enable'), variant: 'dim' }
+    }
+    if (sub === 'add-json') {
+      const project = tokens[1] === '--project'
+      const nameIndex = project ? 2 : 1
+      const name = tokens[nameIndex]
+      if (!name) return { kind: 'note', variant: 'error', text: 'usage: /mcp add-json [--project] <name> <json>' }
+      const jsonStart = nthTokenStart(args, nameIndex + 1)
+      const json = jsonStart >= 0 ? args.slice(jsonStart).trim() : ''
+      if (!json) return { kind: 'note', variant: 'error', text: 'usage: /mcp add-json [--project] <name> <json>' }
+      return { kind: 'note', text: await ctx.mcp.addJson(name, json, project ? 'project' : 'user'), variant: 'dim' }
+    }
+  } catch (err: unknown) {
+    return { kind: 'note', variant: 'error', text: `mcp failed: ${(err as Error).message}` }
+  }
+
+  return {
+    kind: 'note',
+    variant: 'error',
+    text: 'usage: /mcp [status|approve <server>|reject <server>|reconnect [server]|enable <server>|disable <server>|add-json [--project] <name> <json>]',
   }
 }
 
@@ -583,6 +644,12 @@ export async function dispatchSlash(input: string, ctx: SlashContext): Promise<S
   if (!parsed) return null
   const cmd = COMMANDS.find(c => c.name === parsed.name || c.aliases?.includes(parsed.name))
   if (!cmd) {
+    try {
+      const promptText = await ctx.mcp?.runPromptSlash(parsed.name, parsed.args)
+      if (promptText !== null && promptText !== undefined) return { kind: 'submit', text: promptText }
+    } catch (err: unknown) {
+      return { kind: 'note', variant: 'error', text: `mcp prompt failed: ${(err as Error).message}` }
+    }
     return { kind: 'note', variant: 'error', text: `unknown command: /${parsed.name}. try /help` }
   }
   if (ctx.mode === 'plan' && cmd.blockedInPlan) {
@@ -591,11 +658,16 @@ export async function dispatchSlash(input: string, ctx: SlashContext): Promise<S
   return cmd.run(parsed.args, ctx)
 }
 
-export function getSlashSuggestions(): SlashSuggestion[] {
-  return COMMANDS.filter(c => !c.hidden).map(c => ({
+export function getSlashSuggestions(extra: SlashSuggestion[] = []): SlashSuggestion[] {
+  return [...COMMANDS.filter(c => !c.hidden).map(c => ({
     name: c.name,
     summary: c.summary,
     completion: c.requiresArgs || c.enterBehavior === 'fill' ? `/${c.name} ` : `/${c.name}`,
     executeOnEnter: !c.requiresArgs && c.enterBehavior !== 'fill',
-  }))
+  })), ...extra]
+}
+
+function nthTokenStart(value: string, tokenIndex: number): number {
+  const matches = [...value.matchAll(/\S+/g)]
+  return matches[tokenIndex]?.index ?? -1
 }

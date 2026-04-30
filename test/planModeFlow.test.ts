@@ -8,7 +8,7 @@ import { toolsForMode } from '../src/tools/registry.js'
 
 test('plan mode exposes only read tools to the model', () => {
   const planTools = toolsForMode('plan').map(tool => tool.name)
-  assert.deepEqual(planTools.sort(), ['list_directory', 'read_file'].sort())
+  assert.deepEqual(planTools.sort(), ['list_directory', 'list_mcp_resources', 'read_file', 'read_mcp_resource'].sort())
   assert.ok(!planTools.includes('edit_file'))
   assert.ok(!planTools.includes('run_bash'))
   assert.ok(!planTools.includes('change_directory'))
@@ -68,6 +68,7 @@ test('mode policy keeps plan, default, and accept-edits distinct', () => {
   assert.equal(plan.exposesToolKind('edit'), false)
   assert.equal(plan.exposesToolKind('delete'), false)
   assert.equal(plan.exposesToolKind('read'), true)
+  assert.equal(plan.exposesToolKind('mcp'), true)
 
   const chat = modePolicy('chat')
   assert.equal(chat.autoAllowToolKind('edit'), false)

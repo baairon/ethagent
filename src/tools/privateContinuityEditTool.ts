@@ -143,15 +143,21 @@ export const privateContinuityEditTool: Tool<typeof schema> = {
     return {
       ok: true,
       summary: prepared.changeSummary,
-      content: [
-        `updated local private continuity file ${prepared.fullPath}`,
-        `review file: ${prepared.fullPath}`,
-        'open from identity hub, memory and persona',
-        'publish from identity hub snapshots',
-        'previous version saved to private identity history; /rewind does not restore identity markdown',
-      ].join('\n'),
+      content: formatPrivateContinuityEditResult(prepared.file, prepared.fullPath),
     }
   },
+}
+
+function formatPrivateContinuityEditResult(file: 'SOUL.md' | 'MEMORY.md', fullPath: string): string {
+  return [
+    '## Saved private continuity',
+    '',
+    `- File: \`identity-vault/${file}\``,
+    `- Review file: \`${fullPath}\``,
+    '- Open: Identity Hub > Memory and Persona',
+    '- Publish: Identity Hub > Snapshots',
+    '- History: previous version saved to private identity history; `/rewind` does not restore identity markdown',
+  ].join('\n')
 }
 
 function normalizePrivateContinuityInput(input: Record<string, unknown>): Record<string, unknown> {

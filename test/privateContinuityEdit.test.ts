@@ -72,6 +72,8 @@ test('private continuity edit prompts in accept-edits and exposes diff data', as
     assert.equal(seenRequest.file, 'MEMORY.md')
     assert.match(seenRequest.diff, /-private memory/)
     assert.match(seenRequest.diff, /\+approved memory/)
+    assert.doesNotMatch(seenRequest.diff, /^-# Memory/m)
+    assert.doesNotMatch(seenRequest.diff, /^\+# Memory/m)
     assert.deepEqual(permissionOptionsForRequest(seenRequest).map(option => option.value), ['allow-once', 'deny'])
     assert.deepEqual(await readContinuityFiles(identity), {
       'SOUL.md': '# Soul\nprivate soul\n',
@@ -196,11 +198,12 @@ test('approved private continuity edit records identity history but no rewind ch
     })
 
     assert.equal(outcome.result.ok, true)
+    assert.match(outcome.result.content, /Saved private continuity/)
     assert.match(outcome.result.content, /previous version saved to private identity history/)
-    assert.match(outcome.result.content, /\/rewind does not restore identity markdown/)
-    assert.match(outcome.result.content, /review file: .*MEMORY\.md/)
-    assert.match(outcome.result.content, /identity hub, memory and persona/)
-    assert.match(outcome.result.content, /identity hub snapshots/)
+    assert.match(outcome.result.content, /`\/rewind` does not restore identity markdown/)
+    assert.match(outcome.result.content, /Review file: `.*MEMORY\.md`/)
+    assert.match(outcome.result.content, /Identity Hub > Memory and Persona/)
+    assert.match(outcome.result.content, /Identity Hub > Snapshots/)
     assert.match((await readContinuityFiles(identity))['MEMORY.md'], /Identity history can restore private memory/)
 
     const history = await listPrivateContinuityHistory(identity)
@@ -296,6 +299,8 @@ test('private continuity append repairs legacy MEMORY scaffold before appending'
     if (seenRequest?.kind !== 'private-continuity-edit') throw new Error('expected private continuity request')
     assert.match(seenRequest.diff, /\+## Durable User Preferences/)
     assert.match(seenRequest.diff, /\+.*Prefers explicit permission/)
+    assert.doesNotMatch(seenRequest.diff, /^-## Durable Context/m)
+    assert.doesNotMatch(seenRequest.diff, /^\+## Boundaries/m)
 
     const memory = (await readContinuityFiles(identity))['MEMORY.md']
     assert.match(memory, /## Durable Context/)

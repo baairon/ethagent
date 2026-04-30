@@ -90,6 +90,27 @@ export function permissionOptionsForRequest(request: PermissionRequest): Array<{
     ]
   }
 
+  if (request.kind === 'mcp') {
+    const risk = request.destructive
+      ? 'server marks this tool as destructive'
+      : request.openWorld
+        ? 'server marks this tool as open-world'
+        : request.readOnly
+          ? 'server marks this tool as read-only'
+          : 'server did not mark this tool read-only'
+    return [
+      { value: 'allow-once', label: 'allow once', hint: risk },
+      { value: 'allow-mcp-tool-project', label: 'always allow this MCP tool', hint: request.toolKey },
+      {
+        value: 'allow-mcp-server-project',
+        label: `always allow ${request.serverName}`,
+        hint: 'remember all tools from this MCP server for this project',
+        disabled: !request.canPersistServer,
+      },
+      { value: 'deny', label: 'deny', hint: 'return a denial back to the model' },
+    ]
+  }
+
   if (request.kind === 'delete') {
     return [
       { value: 'allow-once', label: 'delete this file', hint: 'approve this deletion only' },
