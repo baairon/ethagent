@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import React from 'react'
 import { Box, Text, renderToString } from 'ink'
-import { inputWrapWidth, renderWithCursor } from '../src/ui/ChatInput.js'
+import { inputWrapWidth, renderWithCursor } from '../src/chat/ChatInput.js'
 
 test('chat input wraps long words without truncation props', () => {
   const rendered = renderWithCursor('averyverylongwordwithoutspaces', 10, true, 8, 5)

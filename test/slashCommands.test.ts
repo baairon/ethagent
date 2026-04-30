@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { dispatchSlash, type SlashContext } from '../src/commands/index.js'
+import { dispatchSlash, type SlashContext } from '../src/chat/commands.js'
 import type { EthagentConfig } from '../src/storage/config.js'
 import { contextUsageFromTokens } from '../src/runtime/compaction.js'
 
@@ -34,9 +34,6 @@ function context(overrides: Partial<SlashContext> = {}): SlashContext {
     onCompactRequest: () => {},
     onIdentityRequest: () => {},
     onCopyPickerRequest: () => {},
-    onPullStart: () => ({ progressId: 'progress-test', signal: new AbortController().signal }),
-    onPullProgress: () => {},
-    onPullDone: () => {},
     ...overrides,
   }
 }
@@ -62,6 +59,15 @@ test('/hf download opens the model picker without exposing a remote catalog', as
   assert.equal(requested, true)
   assert.match(result.text, /add local model file/)
   assert.doesNotMatch(result.text, /catalog/i)
+})
+
+test('/pull is no longer exposed after removing Ollama support', async () => {
+  const result = await dispatchSlash('/pull qwen2.5-coder:7b', context())
+
+  assert.equal(result?.kind, 'note')
+  if (result?.kind !== 'note') return
+  assert.equal(result.variant, 'error')
+  assert.match(result.text, /unknown command: \/pull/)
 })
 
 test('/help lists the identity shortcut in the shortcuts footer', async () => {

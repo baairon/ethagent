@@ -3,7 +3,6 @@ import { Box, Text } from 'ink'
 import { Surface } from '../../ui/Surface.js'
 import { Select } from '../../ui/Select.js'
 import { TextInput } from '../../ui/TextInput.js'
-import { StepIndicator } from '../../ui/StepIndicator.js'
 import { theme } from '../../ui/theme.js'
 import { extractPinataJwt } from '../ipfs.js'
 import { normalizeErc8004RegistryConfig } from '../erc8004.js'
@@ -15,6 +14,21 @@ import { BusyScreen } from './BusyScreen.js'
 import type { BrowserWalletReady } from '../browserWallet.js'
 
 const PINATA_API_KEYS_URL = 'https://app.pinata.cloud/developers/api-keys'
+
+type StepIndicatorProps = {
+  steps: string[]
+  current: number
+}
+
+const StepIndicator: React.FC<StepIndicatorProps> = ({ steps, current }) => {
+  const parts = steps.map((step, index) => {
+    const n = index + 1
+    const active = n === current
+    const done = n < current
+    return `${done ? '✓' : n}. ${step}${active ? ' ←' : ''}`
+  })
+  return <Text color={theme.dim}>{parts.join('  ·  ')}</Text>
+}
 
 type CreateFlowProps = {
   step: Extract<Step, {

@@ -3,12 +3,15 @@
   "version": "1.0.0",
   "description": "A privacy-first AI agent with a portable Ethereum identity",
   "type": "module",
+  "main": "bin/ethagent.js",
   "bin": {
     "ethagent": "bin/ethagent.js"
   },
   "files": [
     "bin",
-    "src"
+    "src",
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
     "start": "node bin/ethagent.js",

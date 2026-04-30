@@ -4,8 +4,9 @@ import os from 'node:os'
 import { z } from 'zod'
 import { atomicWriteText } from './atomicWrite.js'
 
-export const PROVIDERS = ['ollama', 'llamacpp', 'openai', 'anthropic', 'gemini'] as const
+export const PROVIDERS = ['llamacpp', 'openai', 'anthropic', 'gemini'] as const
 export type ProviderId = (typeof PROVIDERS)[number]
+const LEGACY_PROVIDERS = ['ollama', ...PROVIDERS] as const
 
 export const SELECTABLE_NETWORKS = ['mainnet', 'arbitrum', 'base', 'optimism', 'polygon'] as const
 export type SelectableNetwork = (typeof SELECTABLE_NETWORKS)[number]
@@ -61,6 +62,13 @@ const ConfigSchema = z.object({
   selectedNetwork: z.enum(SELECTABLE_NETWORKS).optional(),
 })
 
+const LEGACY_OLLAMA_BASE_URL = 'http://localhost:11434/v1'
+const LegacyConfigSchema = ConfigSchema.extend({
+  provider: z.enum(LEGACY_PROVIDERS),
+})
+
+type LegacyConfig = z.infer<typeof LegacyConfigSchema>
+
 export type EthagentIdentity = z.infer<typeof IdentitySchema>
 
 export type EthagentConfig = z.infer<typeof ConfigSchema>
@@ -88,7 +96,11 @@ export async function loadConfig(): Promise<EthagentConfig | null> {
   }
   try {
     const parsed = JSON.parse(raw)
-    return ConfigSchema.parse(parsed)
+    const active = ConfigSchema.safeParse(parsed)
+    if (active.success) return normalizeConfig(active.data)
+    const legacy = LegacyConfigSchema.safeParse(parsed)
+    if (legacy.success) return migrateLegacyConfig(legacy.data)
+    return null
   } catch {
     return null
   }
@@ -96,7 +108,7 @@ export async function loadConfig(): Promise<EthagentConfig | null> {
 
 export async function saveConfig(config: EthagentConfig): Promise<void> {
   await ensureConfigDir()
-  const validated = ConfigSchema.parse(config)
+  const validated = ConfigSchema.parse(normalizeConfig(config))
   const file = getConfigPath()
   await atomicWriteText(file, JSON.stringify(validated, null, 2) + '\n')
 }
@@ -114,13 +126,60 @@ export function defaultModelFor(provider: ProviderId): string {
     case 'openai':    return 'gpt-5.2'
     case 'anthropic': return 'claude-sonnet-4-5'
     case 'gemini':    return 'gemini-2.0-flash'
-    case 'ollama':    return 'qwen2.5-coder:7b'
     case 'llamacpp':  return 'huggingface-link'
   }
 }
 
 export function defaultBaseUrlFor(provider: ProviderId): string | undefined {
-  if (provider === 'ollama') return 'http://localhost:11434/v1'
   if (provider === 'llamacpp') return 'http://localhost:8080/v1'
   return undefined
+}
+
+export type LocalProviderId = Extract<ProviderId, 'llamacpp'>
+
+export function localProviderBaseUrlFor(provider: LocalProviderId, baseUrl?: string): string {
+  const fallback = defaultBaseUrlFor(provider) ?? ''
+  if (!baseUrl) return fallback
+  return isDefaultBaseUrlFor(baseUrl, LEGACY_OLLAMA_BASE_URL) ? fallback : baseUrl
+}
+
+export function normalizeConfig(config: EthagentConfig): EthagentConfig {
+  if (config.provider !== 'llamacpp') return config
+  const baseUrl = localProviderBaseUrlFor(config.provider, config.baseUrl)
+  return config.baseUrl === baseUrl ? config : { ...config, baseUrl }
+}
+
+function migrateLegacyConfig(config: LegacyConfig): EthagentConfig {
+  if (config.provider !== 'ollama') return normalizeConfig(ConfigSchema.parse(config))
+  return {
+    ...config,
+    provider: 'llamacpp',
+    model: defaultModelFor('llamacpp'),
+    baseUrl: defaultBaseUrlFor('llamacpp'),
+  }
+}
+
+function isDefaultBaseUrlFor(value: string, fallback: string | undefined): boolean {
+  if (!fallback) return false
+  try {
+    const url = new URL(value)
+    const defaultUrl = new URL(fallback)
+    if (url.protocol !== defaultUrl.protocol) return false
+    if (url.hostname.toLowerCase() !== defaultUrl.hostname.toLowerCase()) return false
+    if (effectivePort(url) !== effectivePort(defaultUrl)) return false
+    const path = stripTrailingSlash(url.pathname) || '/'
+    const defaultPath = stripTrailingSlash(defaultUrl.pathname) || '/'
+    return path === '/' || path === defaultPath
+  } catch {
+    return stripTrailingSlash(value) === stripTrailingSlash(fallback)
+  }
+}
+
+function effectivePort(url: URL): string {
+  if (url.port) return url.port
+  return url.protocol === 'https:' ? '443' : '80'
+}
+
+function stripTrailingSlash(value: string): string {
+  return value.replace(/\/+$/, '')
 }

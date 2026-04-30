@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { buildSystemPrompt } from '../src/prompts/systemPrompt.js'
-import { buildBaseMessages } from '../src/ui/chatScreenUtils.js'
+import { buildSystemPrompt } from '../src/runtime/systemPrompt.js'
+import { buildBaseMessages } from '../src/chat/chatScreenUtils.js'
 import type { EthagentConfig } from '../src/storage/config.js'
 
 test('base system prompt does not auto-load continuity markdown files', () => {
@@ -21,12 +21,13 @@ test('identity-linked prompt routes private continuity through scaffold edits', 
   const prompt = buildSystemPrompt({
     cwd: process.cwd(),
     model: 'test-model',
-    provider: 'ollama',
+    provider: 'llamacpp',
     hasTools: true,
     hasIdentity: true,
   })
 
   assert.match(prompt, /SOUL\.md and MEMORY\.md are existing scaffolded private identity files/)
+  assert.match(prompt, /SOUL\.md is the authoritative persona, voice, and standing-behavior layer/)
   assert.match(prompt, /not stored in plans\//)
   assert.match(prompt, /should not be discovered with workspace `list_directory` or `read_file`/)
   assert.match(prompt, /read_private_continuity_file/)

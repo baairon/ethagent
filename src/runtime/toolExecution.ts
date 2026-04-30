@@ -14,15 +14,14 @@ import type {
   ToolResult,
 } from '../tools/contracts.js'
 import { setCwd as setRuntimeCwd } from './cwd.js'
-import { modePolicy } from './modePolicy.js'
 import type { EthagentConfig } from '../storage/config.js'
 import type { SessionMessage } from '../storage/sessions.js'
 import {
   summarizeToolInput,
-  truncateForRow,
-} from '../ui/chatScreenUtils.js'
-import type { MessageRow } from '../ui/MessageList.js'
-import { toPermissionMode, type SessionMode } from './sessionMode.js'
+  toolResultContentForRow,
+} from '../chat/chatScreenUtils.js'
+import type { MessageRow } from '../chat/MessageList.js'
+import { modePolicy, toPermissionMode, type SessionMode } from './sessionMode.js'
 
 // ---------------------------------------------------------------------------
 // Tool execution with permission gating
@@ -283,7 +282,7 @@ async function recordToolResult(
       id: args.nextRowId(),
       name: toolUse.name,
       summary: result.summary,
-      content: truncateForRow(result.content),
+      content: toolResultContentForRow(toolUse.name, result.content, !result.ok),
       isError: !result.ok,
     },
   ])

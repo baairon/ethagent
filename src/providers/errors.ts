@@ -18,7 +18,7 @@ export async function providerErrorFromResponse(
 ): Promise<ProviderError> {
   const detail = await readErrorDetail(response)
 
-  if (provider !== 'ollama' && provider !== 'llamacpp') {
+  if (provider !== 'llamacpp') {
     if (response.status === 401 || response.status === 403) {
       return new ProviderError(`auth failed: check your ${provider} key (/doctor to verify)`)
     }

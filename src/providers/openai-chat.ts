@@ -6,8 +6,6 @@ import { iterSseFrames } from './sse.js'
 import { fetchWithRetry } from '../utils/withRetry.js'
 import { messageTextContent } from '../utils/messages.js'
 
-const DEBUG_STREAM = process.env.ETHAGENT_DEBUG_STREAM === '1'
-
 export type OpenAIToolDefinition = {
   type: 'function'
   function: {
@@ -37,6 +35,7 @@ type ChatChunk = {
       content?: string | null
       reasoning_content?: string | null
       reasoning?: string | null
+      thinking?: string | null
       tool_calls?: Array<{
         index?: number
         id?: string | null
@@ -94,7 +93,7 @@ export class OpenAIChatProvider implements Provider {
     options: ProviderCompleteOptions = {},
   ): AsyncIterable<StreamEvent> {
     const apiKey = await this.resolveApiKey()
-    if (!apiKey && this.id !== 'ollama' && this.id !== 'llamacpp') {
+    if (!apiKey && this.id !== 'llamacpp') {
       const error = new ProviderError(`missing API key for ${this.id} (/doctor to verify)`)
       yield { type: 'error', message: error.message }
       return
@@ -142,6 +141,7 @@ export class OpenAIChatProvider implements Provider {
     let outputTokens: number | undefined
     let stopReason: DoneStopReason = 'unknown'
     const toolCalls = new Map<number, StreamingToolCall>()
+    const contentThinkingParser = new ContentThinkingParser(this.id)
 
     try {
       for await (const frame of iterSseFrames(response.body, signal, READ_TIMEOUT_MS)) {
@@ -161,18 +161,15 @@ export class OpenAIChatProvider implements Provider {
             ? delta.reasoning_content
             : typeof delta?.reasoning === 'string'
               ? delta.reasoning
-              : ''
+              : typeof delta?.thinking === 'string'
+                ? delta.thinking
+                : ''
 
         if (reasoning.length > 0) yield { type: 'thinking', delta: reasoning }
-        if (text.length > 0) yield { type: 'text', delta: text }
-
-        if (DEBUG_STREAM && delta?.tool_calls?.length) {
-          const summary = delta.tool_calls.map(tc => ({
-            index: tc.index,
-            name: tc.function?.name ?? undefined,
-            argsLen: tc.function?.arguments?.length ?? 0,
-          }))
-          process.stderr.write(`[ethagent] stream tool_calls delta: ${JSON.stringify(summary)}\n`)
+        if (text.length > 0) {
+          for (const event of contentThinkingParser.push(text)) {
+            yield event
+          }
         }
 
         for (const event of applyStreamingToolCallDelta(toolCalls, delta?.tool_calls ?? [])) {
@@ -194,6 +191,9 @@ export class OpenAIChatProvider implements Provider {
     }
 
     if (signal.aborted) return
+    for (const event of contentThinkingParser.flush()) {
+      yield event
+    }
 
     let streamEmittedToolUses = 0
     if (stopReason === 'tool_use' || toolCalls.size > 0) {
@@ -207,12 +207,6 @@ export class OpenAIChatProvider implements Provider {
           input: parseToolArguments(toolCall.inputJson),
         }
       }
-    }
-
-    if (DEBUG_STREAM) {
-      process.stderr.write(
-        `[ethagent] stream done ${this.id}: ${streamEmittedToolUses} tool_uses, stopReason=${stopReason}\n`,
-      )
     }
 
     yield { type: 'done', inputTokens, outputTokens, stopReason }
@@ -374,8 +368,75 @@ function providerNetworkErrorMessage(
   fallback = 'network error',
 ): string {
   const message = (err as Error).message || fallback
-  if (provider !== 'ollama' && provider !== 'llamacpp') return message
+  if (provider !== 'llamacpp') return message
   return `${provider} request failed at ${baseUrl}: ${message}`
+}
+
+class ContentThinkingParser {
+  private state: 'text' | 'thinking' = 'text'
+  private buffer = ''
+
+  constructor(private readonly provider: ProviderId) {}
+
+  *push(delta: string): Iterable<StreamEvent> {
+    if (!this.shouldParse()) {
+      yield { type: 'text', delta }
+      return
+    }
+
+    this.buffer += delta
+    yield* this.drain(false)
+  }
+
+  *flush(): Iterable<StreamEvent> {
+    if (!this.shouldParse() || this.buffer.length === 0) return
+    const content = this.buffer
+    this.buffer = ''
+    yield { type: this.state === 'thinking' ? 'thinking' : 'text', delta: content }
+  }
+
+  private *drain(flush: boolean): Iterable<StreamEvent> {
+    while (this.buffer.length > 0) {
+      const tag = this.state === 'text' ? '<think>' : '</think>'
+      const tagIndex = indexOfIgnoreCase(this.buffer, tag)
+
+      if (tagIndex !== -1) {
+        const before = this.buffer.slice(0, tagIndex)
+        if (before.length > 0) {
+          yield { type: this.state === 'thinking' ? 'thinking' : 'text', delta: before }
+        }
+        this.buffer = this.buffer.slice(tagIndex + tag.length)
+        this.state = this.state === 'text' ? 'thinking' : 'text'
+        continue
+      }
+
+      const keep = flush ? 0 : partialTagPrefixLength(this.buffer, tag)
+      const emit = this.buffer.slice(0, this.buffer.length - keep)
+      this.buffer = this.buffer.slice(this.buffer.length - keep)
+      if (emit.length > 0) {
+        yield { type: this.state === 'thinking' ? 'thinking' : 'text', delta: emit }
+      }
+      return
+    }
+  }
+
+  private shouldParse(): boolean {
+    return this.provider === 'llamacpp'
+  }
+}
+
+function indexOfIgnoreCase(value: string, search: string): number {
+  return value.toLowerCase().indexOf(search.toLowerCase())
+}
+
+function partialTagPrefixLength(value: string, tag: string): number {
+  const max = Math.min(value.length, tag.length - 1)
+  const lowerValue = value.toLowerCase()
+  const lowerTag = tag.toLowerCase()
+  for (let size = max; size > 0; size -= 1) {
+    if (lowerValue.endsWith(lowerTag.slice(0, size))) return size
+  }
+  return 0
 }
 
 function repairJsonObject(input: string): string | undefined {

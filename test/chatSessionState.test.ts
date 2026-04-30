@@ -5,39 +5,22 @@ import {
   promptHistoryFromSessionMessages,
   resolveModelSelection,
   restoreConversationState,
-} from '../src/ui/chatSessionState.js'
+} from '../src/chat/chatSessionState.js'
 import type { EthagentConfig } from '../src/storage/config.js'
 import type { SessionMessage } from '../src/storage/sessions.js'
 
 const baseConfig: EthagentConfig = {
   version: 1,
-  provider: 'ollama',
-  model: 'qwen2.5-coder:7b',
-  baseUrl: 'http://localhost:11434/v1',
+  provider: 'llamacpp',
+  model: 'huggingface-link',
+  baseUrl: 'http://localhost:8080/v1',
   firstRunAt: new Date(0).toISOString(),
 }
 
-test('resolveModelSelection returns noop for unchanged ollama model', () => {
-  const result = resolveModelSelection(
-    { kind: 'ollama', model: 'qwen2.5-coder:7b' },
-    baseConfig,
-    {
-      defaultBaseUrlFor: () => 'http://localhost:11434/v1',
-      defaultModelFor: () => 'unused',
-    },
-  )
-
-  assert.deepEqual(result, { kind: 'noop' })
-})
-
-test('resolveModelSelection switches non-ollama providers with the selected model', () => {
+test('resolveModelSelection switches cloud providers with the selected model', () => {
   const result = resolveModelSelection(
     { kind: 'cloud', provider: 'anthropic', model: 'claude-opus-4-1', keyJustSet: true },
     baseConfig,
-    {
-      defaultBaseUrlFor: provider => provider === 'ollama' ? 'http://localhost:11434/v1' : undefined,
-      defaultModelFor: provider => provider === 'anthropic' ? 'claude-sonnet-4-5' : 'fallback-model',
-    },
   )
 
   assert.equal(result.kind, 'switch')
@@ -51,10 +34,6 @@ test('resolveModelSelection switches to a local Hugging Face model with the defa
   const result = resolveModelSelection(
     { kind: 'llamacpp', model: 'org/model#model.Q4_K_M.gguf' },
     baseConfig,
-    {
-      defaultBaseUrlFor: provider => provider === 'llamacpp' ? 'http://localhost:8080/v1' : undefined,
-      defaultModelFor: () => 'unused',
-    },
   )
 
   assert.equal(result.kind, 'switch')
@@ -75,10 +54,6 @@ test('resolveModelSelection preserves an explicit cloud model when provider is u
   const result = resolveModelSelection(
     { kind: 'cloud', provider: 'openai', model: 'custom-model', keyJustSet: false },
     current,
-    {
-      defaultBaseUrlFor: provider => provider === 'ollama' ? 'http://localhost:11434/v1' : undefined,
-      defaultModelFor: () => 'unused-default',
-    },
   )
 
   assert.equal(result.kind, 'switch')
@@ -88,7 +63,7 @@ test('resolveModelSelection preserves an explicit cloud model when provider is u
   assert.equal(result.config.baseUrl, 'https://compat.example/v1')
 })
 
-test('buildResumedSessionState restores cwd, mode, config, and transcript rows', () => {
+test('buildResumedSessionState restores cwd, mode, and transcript rows without switching model config', () => {
   let rowId = 0
   const nextRowId = () => `row-${++rowId}`
   const messages: SessionMessage[] = [
@@ -112,14 +87,11 @@ test('buildResumedSessionState restores cwd, mode, config, and transcript rows',
       turnCount: 1,
     },
     fallbackCwd: 'C:/fallback',
-    currentConfig: baseConfig,
     nextRowId,
   })
 
   assert.equal(resumed.cwd, 'C:/repo/app')
   assert.equal(resumed.mode, 'accept-edits')
-  assert.equal(resumed.config?.provider, 'anthropic')
-  assert.equal(resumed.config?.model, 'claude-sonnet-4-5')
   assert.equal(resumed.rows.at(-1)?.role, 'note')
   assert.deepEqual(resumed.promptHistory, ['make a file'])
 })
@@ -139,7 +111,6 @@ test('buildResumedSessionState hydrates prompt history from the resumed conversa
     messages,
     metadata: null,
     fallbackCwd: 'C:/fallback',
-    currentConfig: baseConfig,
     nextRowId: () => `row-${++rowId}`,
   })
 
@@ -159,7 +130,6 @@ test('buildResumedSessionState keeps every resumed transcript row visible to the
     messages,
     metadata: null,
     fallbackCwd: 'C:/fallback',
-    currentConfig: baseConfig,
     nextRowId: () => `row-${++rowId}`,
   })
 

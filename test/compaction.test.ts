@@ -91,15 +91,15 @@ test('microCompactSessionMessages produces a summary referencing recent user req
 })
 
 test('context usage is calculated against the active model window', () => {
-  const llama = contextUsageFromTokens(32_000, 'ollama', 'llama3.1')
-  const qwen = contextUsageFromTokens(32_000, 'ollama', 'qwen2.5-coder:7b')
+  const llama = contextUsageFromTokens(32_000, 'llamacpp', 'llama3.1')
+  const qwen = contextUsageFromTokens(32_000, 'llamacpp', 'qwen3:8b')
   const openai = contextUsageFromTokens(32_000, 'openai', 'gpt-4o')
   const gpt41 = contextUsageFromTokens(32_000, 'openai', 'gpt-4.1')
 
   assert.equal(llama.windowTokens, 128_000)
   assert.equal(llama.percent, 25)
-  assert.equal(qwen.windowTokens, 32_768)
-  assert.equal(qwen.percent, 98)
+  assert.equal(qwen.windowTokens, 40_000)
+  assert.equal(qwen.percent, 80)
   assert.equal(openai.windowTokens, 128_000)
   assert.equal(openai.percent, 25)
   assert.equal(gpt41.windowTokens, 1_000_000)
@@ -107,8 +107,8 @@ test('context usage is calculated against the active model window', () => {
 })
 
 test('context confirmation uses percent without compacting automatically', () => {
-  assert.equal(shouldConfirmContextUsage(contextUsageFromTokens(28_000, 'ollama', 'qwen2.5-coder:7b'), 90), false)
-  assert.equal(shouldConfirmContextUsage(contextUsageFromTokens(30_000, 'ollama', 'qwen2.5-coder:7b'), 90), true)
+  assert.equal(shouldConfirmContextUsage(contextUsageFromTokens(28_000, 'llamacpp', 'qwen3:8b'), 90), false)
+  assert.equal(shouldConfirmContextUsage(contextUsageFromTokens(37_000, 'llamacpp', 'qwen3:8b'), 90), true)
 })
 
 test('local transcript summary preserves recent user and assistant context when provider compacting fails', () => {
@@ -137,7 +137,7 @@ test('local compaction source bounds oversized transcripts before provider summa
     })),
   ]
 
-  const source = buildCompactionSource(messages, 'ollama')
+  const source = buildCompactionSource(messages, 'llamacpp')
 
   assert.equal(source.compressed, true)
   assert.ok(source.inputTokens <= 6_000)
@@ -149,7 +149,7 @@ test('local compaction source bounds oversized transcripts before provider summa
 test('compactTranscript can be cancelled by the caller signal', async () => {
   const controller = new AbortController()
   const provider: Provider = {
-    id: 'ollama',
+    id: 'llamacpp',
     model: 'test',
     supportsTools: false,
     async *complete(_messages: Message[], signal: AbortSignal): AsyncIterable<StreamEvent> {

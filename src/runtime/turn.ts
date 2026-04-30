@@ -57,7 +57,7 @@ function normalize(event: StreamEvent): ProviderTurnEvent {
  * MAX_CONTINUATION_NUDGES: if the model stops a turn without emitting any
  * tool_use AND the last assistant text signals intent to continue (e.g.
  * "now I'll..."), we re-invoke the provider up to this many times with a
- * small meta nudge appended. Ported from openclaude/src/query.ts:163.
+ * small meta nudge appended.
  */
 export const MAX_CONTINUATION_NUDGES = 3
 
@@ -98,8 +98,7 @@ const REASONING_ONLY_NUDGE_TEXT =
 /**
  * TurnEvent - events emitted by the runtime turn loop. The UI layer subscribes
  * and translates these into Ink rows, notes, permission prompts, and session
- * writes. Modeled after openclaude's event shape but trimmed to what ethagent
- * actually uses.
+ * writes. The shape is intentionally trimmed to what ethagent actually uses.
  */
 export type TurnEvent =
   | { type: 'iteration_start'; index: number }
@@ -184,7 +183,7 @@ export type RuntimeTurnParams = {
 /**
  * runRuntimeTurn - the one and only turn loop.
  *
- * Shape (ported from openclaude/src/query.ts:244):
+ * Shape:
  *   1. Stream the provider.
  *   2. Collect tool_use blocks from native `tool_use_stop` events.
  *   3. If the model emitted tool_uses: execute them, feed results back, loop.
@@ -194,7 +193,7 @@ export type RuntimeTurnParams = {
  *
  * Intentionally absent:
  *   - No provider-family branching (no isLocalProvider specialization).
- *   - No broad regex fallback tool parsing. A narrow Ollama/Qwen
+ *   - No broad regex fallback tool parsing. A narrow local-model
  *     compatibility parser handles standalone JSON tool payloads only.
  *   - No duplicate-tool-call suppression. The model is allowed to repeat.
  *   - No broad forced-repair retries on tool input validation errors - errors
@@ -217,10 +216,14 @@ export async function* runRuntimeTurn(
   let workingMessages = initialMessages
   let continuationNudges = 0
   let iterationIndex = 0
+  let priorIterationHadTools = false
   const toolEvidenceThisTurn: ToolEvidence[] = []
 
   // eslint-disable-next-line no-constant-condition
   while (true) {
+    const hadToolsLastRound = priorIterationHadTools
+    priorIterationHadTools = false
+
     if (signal.aborted) {
       yield { type: 'cancelled' }
       yield doneEvent(false)
@@ -392,6 +395,13 @@ export async function* runRuntimeTurn(
     // No tool work: model decided this turn is over (modulo continuation nudge).
     if (pendingToolUses.length === 0) {
       if (!assistantText && thinkingSeen) {
+        // After a successful tool batch the model gets one shot to summarize.
+        // If it only produced reasoning, that is acceptable — the tool
+        // results are already in the session and speak for themselves.
+        if (hadToolsLastRound) {
+          yield doneEvent(true, stopReason)
+          return
+        }
         if (continuationNudges < maxContinuationNudges) {
           continuationNudges += 1
           yield {
@@ -415,6 +425,14 @@ export async function* runRuntimeTurn(
 
       const nudge = nextNudge(provider, assistantText)
       if (assistantText && continuationNudges < maxContinuationNudges && nudge) {
+        // After a tool batch, the model's summary text often accidentally
+        // matches the continuation-intent heuristic ("I've updated...").
+        // Commit the text and end the turn instead of nudging again.
+        if (hadToolsLastRound && nudge.reason === 'continuation') {
+          yield { type: 'assistant_message_committed', text: assistantText }
+          yield doneEvent(true, stopReason)
+          return
+        }
         continuationNudges += 1
         yield {
           type: 'continuation_nudge',
@@ -498,6 +516,7 @@ export async function* runRuntimeTurn(
       return
     }
 
+    priorIterationHadTools = true
     workingMessages = await rebuildMessages()
   }
 }
@@ -514,7 +533,7 @@ function nextToolResultRepairNudge(
   completedTools: ExecutedToolUse[],
 ): string | null {
   if (!provider.supportsTools) return null
-  if (provider.id !== 'ollama' && provider.id !== 'llamacpp') return null
+  if (provider.id !== 'llamacpp') return null
   const failedPrivateEdit = completedTools.some(completed =>
     completed.name === 'propose_private_continuity_edit'
     && !completed.result.ok
@@ -546,7 +565,7 @@ export function parseLocalModelTextToolUses(
   assistantText: string,
   iterationIndex = 0,
 ): PendingToolUse[] {
-  if (provider.id !== 'ollama') return []
+  if (provider.id !== 'llamacpp') return []
 
   const calls = extractTextToolCalls(assistantText)
   if (calls.length === 0) return []
@@ -792,8 +811,7 @@ export function looksLikeToolDelegationText(text: string): boolean {
 }
 
 /**
- * looksLikeContinuationIntent - heuristic port of openclaude's continuation
- * nudge detection (query.ts:1394-1463).
+ * looksLikeContinuationIntent - heuristic for continuation nudge detection.
  *
  * Two rules:
  *   1. If the text contains an explicit completion marker ("done", "all set",

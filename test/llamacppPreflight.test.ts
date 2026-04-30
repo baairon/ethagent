@@ -5,8 +5,8 @@ import {
   ensureLlamaCppRunnerReady,
   llamaCppModelsEndpointForBaseUrl,
   llamaCppServerHostFromBaseUrl,
-} from '../src/ui/llamacppPreflight.js'
-import type { LlamaCppStartResult } from '../src/bootstrap/llamacpp.js'
+} from '../src/models/llamacppPreflight.js'
+import type { LlamaCppStartResult } from '../src/models/llamacpp.js'
 import type { LocalHfModel } from '../src/models/huggingface.js'
 import type { EthagentConfig } from '../src/storage/config.js'
 
@@ -46,10 +46,14 @@ test('llama.cpp preflight starts the configured local runner when models endpoin
   assert.equal(startArgs[0]?.host, 'http://localhost:8080')
 })
 
-test('llama.cpp preflight reports missing local model metadata without starting provider', async () => {
+test('llama.cpp preflight reports missing local model metadata before probing provider', async () => {
   let started = false
+  let probed = false
   const result = await ensureLlamaCppRunnerReady(config, {
-    fetchImpl: failingFetch,
+    fetchImpl: async () => {
+      probed = true
+      return new Response(JSON.stringify({ data: [{ id: config.model }] }), { status: 200 })
+    },
     findLocalModel: async () => null,
     startServer: async () => {
       started = true
@@ -60,8 +64,28 @@ test('llama.cpp preflight reports missing local model metadata without starting 
   assert.equal(result.ok, false)
   if (result.ok) return
   assert.equal(result.code, 'model-file-missing')
-  assert.match(result.message, /local runner is not reachable/)
+  assert.match(result.message, /local model is not imported/)
+  assert.equal(probed, false)
   assert.equal(started, false)
+})
+
+test('llama.cpp preflight rejects externally served models that were not imported', async () => {
+  const rogueConfig: EthagentConfig = {
+    ...config,
+    model: 'external-server-model',
+  }
+  const result = await ensureLlamaCppRunnerReady(rogueConfig, {
+    fetchImpl: modelsFetch(['external-server-model']),
+    findLocalModel: async () => null,
+    startServer: async () => {
+      throw new Error('should not start')
+    },
+  })
+
+  assert.equal(result.ok, false)
+  if (result.ok) return
+  assert.equal(result.code, 'model-file-missing')
+  assert.match(result.message, /view full catalog/)
 })
 
 test('llama.cpp preflight reports runner-not-installed without calling provider', async () => {

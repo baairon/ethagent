@@ -5,6 +5,7 @@ import os from 'node:os'
 import path from 'node:path'
 import {
   createHfDownloadPlan,
+  fetchHuggingFaceRepoInfo,
   fileFormat,
   getLocalHfCacheDir,
   loadLocalHfModels,
@@ -13,11 +14,14 @@ import {
   quantizationFromFilename,
   reviewHfModel,
   saveLocalHfModels,
+  searchHuggingFaceModels,
   shouldReportDownloadProgress,
   uninstallLocalHfModel,
   type LocalHfModel,
   type HuggingFaceRepoInfo,
 } from '../src/models/huggingface.js'
+import { recommendGgufFile } from '../src/models/modelRecommendation.js'
+import type { SpecSnapshot } from '../src/models/runtimeDetection.js'
 
 const repo: HuggingFaceRepoInfo = {
   repoId: 'org/model-GGUF',
@@ -77,6 +81,19 @@ function localModel(overrides: Partial<LocalHfModel> = {}): LocalHfModel {
   }
 }
 
+function machineSpec(overrides: Partial<SpecSnapshot> = {}): SpecSnapshot {
+  return {
+    platform: 'linux',
+    arch: 'x64',
+    cpuCores: 8,
+    totalRamBytes: 12 * 1024 * 1024 * 1024,
+    effectiveRamBytes: 12 * 1024 * 1024 * 1024,
+    isAppleSilicon: false,
+    gpuVramBytes: null,
+    ...overrides,
+  }
+}
+
 test('Hugging Face refs accept repo ids and model file links', () => {
   assert.deepEqual(parseHuggingFaceRef('org/model-GGUF'), {
     repoId: 'org/model-GGUF',
@@ -101,6 +118,84 @@ test('GGUF metadata parser extracts format and quantization', () => {
   assert.equal(fileFormat('model.Q4_K_M.gguf'), 'gguf')
   assert.equal(fileFormat('pytorch_model.bin'), 'pickle/bin')
   assert.equal(quantizationFromFilename('model.Q4_K_M.gguf'), 'Q4_K_M')
+})
+
+test('repo metadata fetch requests blob details and reads nested LFS sizes', async () => {
+  const requestedUrls: URL[] = []
+  const fetchImpl = (async (input: Parameters<typeof fetch>[0]) => {
+    requestedUrls.push(input instanceof URL ? input : new URL(String(input)))
+    return new Response(JSON.stringify({
+      ...repo,
+      siblings: [
+        { rfilename: 'model.Q4_K_M.gguf', lfs: { size: 4_200_000_000 } },
+        { rfilename: 'README.md', size: 1_024 },
+      ],
+    }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    })
+  }) as typeof fetch
+
+  const info = await fetchHuggingFaceRepoInfo({ repoId: 'org/model-GGUF', revision: 'main' }, fetchImpl)
+  const requestedUrl = requestedUrls[0]
+
+  assert.ok(requestedUrl)
+  assert.equal(requestedUrl.searchParams.get('blobs'), 'true')
+  assert.equal(requestedUrl.searchParams.get('revision'), 'main')
+  assert.deepEqual(info.siblings, [
+    { filename: 'model.Q4_K_M.gguf', sizeBytes: 4_200_000_000 },
+    { filename: 'README.md', sizeBytes: 1_024 },
+  ])
+})
+
+test('Hugging Face model search requests GGUF catalog metadata', async () => {
+  const requestedUrls: URL[] = []
+  const fetchImpl = (async (input: Parameters<typeof fetch>[0]) => {
+    requestedUrls.push(input instanceof URL ? input : new URL(String(input)))
+    return new Response(JSON.stringify([
+      {
+        id: 'org/uncensored-model-GGUF',
+        downloads: 500,
+        likes: 20,
+        lastModified: '2026-01-02T00:00:00.000Z',
+        tags: ['gguf', 'uncensored'],
+      },
+      { id: 'invalid', tags: ['gguf'] },
+    ]), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    })
+  }) as typeof fetch
+
+  const results = await searchHuggingFaceModels('uncensored', { filter: 'gguf', limit: 12 }, fetchImpl)
+  const requestedUrl = requestedUrls[0]
+
+  assert.ok(requestedUrl)
+  assert.equal(requestedUrl.searchParams.get('search'), 'uncensored')
+  assert.equal(requestedUrl.searchParams.get('filter'), 'gguf')
+  assert.equal(requestedUrl.searchParams.get('sort'), 'downloads')
+  assert.equal(requestedUrl.searchParams.get('direction'), '-1')
+  assert.equal(requestedUrl.searchParams.get('limit'), '12')
+  assert.deepEqual(results.map(item => item.repoId), ['org/uncensored-model-GGUF'])
+})
+
+test('machine recommendation ranks files from fetched Hugging Face size metadata', async () => {
+  const fetchImpl = (async () => new Response(JSON.stringify({
+    ...repo,
+    siblings: [
+      { rfilename: 'model.Q4_K_M.gguf', lfs: { size: 4_200_000_000 } },
+      { rfilename: 'model.Q8_0.gguf', lfs: { size: 9_000_000_000 } },
+    ],
+  }), {
+    status: 200,
+    headers: { 'content-type': 'application/json' },
+  })) as typeof fetch
+
+  const info = await fetchHuggingFaceRepoInfo({ repoId: 'org/model-GGUF' }, fetchImpl)
+  const recommendation = recommendGgufFile(info, info.siblings, machineSpec())
+
+  assert.equal(recommendation?.file.filename, 'model.Q4_K_M.gguf')
+  assert.equal(recommendation?.fit, 'fits')
 })
 
 test('safety review categorizes credible pinned GGUF as low risk', () => {

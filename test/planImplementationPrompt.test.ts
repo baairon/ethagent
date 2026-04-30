@@ -3,9 +3,9 @@ import assert from 'node:assert/strict'
 import {
   buildPlanImplementationPrompt,
   buildPlanTransferSeedMessages,
-} from '../src/ui/ChatScreen.js'
-import { PLAN_APPROVAL_OPTIONS } from '../src/ui/PlanApprovalView.js'
-import { CONTEXT_LIMIT_OPTIONS } from '../src/ui/ContextLimitView.js'
+} from '../src/chat/ChatScreen.js'
+import { PLAN_APPROVAL_OPTIONS } from '../src/chat/PlanApprovalView.js'
+import { CONTEXT_LIMIT_OPTIONS } from '../src/chat/ContextLimitView.js'
 
 test('buildPlanImplementationPrompt makes native tools authoritative over bash-biased plan wording', () => {
   const prompt = buildPlanImplementationPrompt([

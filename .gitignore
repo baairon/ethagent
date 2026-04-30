@@ -1,5 +1,12 @@
 node_modules
+dist/
+*.log
+.env
+.env.local
 plans/
+
+# Root continuity markdown can contain private local identity data.
+# Keep this scoped to the repository root so nested docs remain trackable.
 /SOUL.md
 /MEMORY.md
 /SKILLS.md

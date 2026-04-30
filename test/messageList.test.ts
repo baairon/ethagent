@@ -6,9 +6,11 @@ import {
   MessageList,
   reasoningBorderColor,
   reasoningCursorVisible,
+  sanitizeReasoningForDisplay,
   toggleReasoningRow,
   type MessageRow,
-} from '../src/ui/MessageList.js'
+} from '../src/chat/MessageList.js'
+import { sessionMessagesToRows } from '../src/chat/chatScreenUtils.js'
 import { Spinner } from '../src/ui/Spinner.js'
 import { theme } from '../src/ui/theme.js'
 
@@ -115,6 +117,75 @@ test('reasoning rows render raw markdown markers without assistant markdown styl
 
   assert.match(output, /## Reasoning/)
   assert.match(output, /\*\*markers\*\*/)
+})
+
+test('reasoning sanitizer keeps readable reasoning text intact', () => {
+  const input = 'Plan:\n1. Check installed model.\n2. Start llama.cpp with the selected GGUF.'
+
+  assert.equal(sanitizeReasoningForDisplay(input), input)
+})
+
+test('reasoning sanitizer replaces binary-looking text with a readable placeholder', () => {
+  const input = '4-2%+&\'3481*/BD%4/<:81-@$9,0==20D%=C\'G3$/E2>D/=)'.repeat(4)
+
+  assert.equal(sanitizeReasoningForDisplay(input), 'reasoning output was not readable text')
+})
+
+test('reasoning sanitizer strips control characters without mutating readable text', () => {
+  const input = '\u001b[31mInspecting\u001b[0m\tinstalled model\u0007'
+
+  assert.equal(sanitizeReasoningForDisplay(input), 'Inspecting  installed model')
+})
+
+test('successful read tool results do not render file contents in the transcript', () => {
+  const output = renderToString(
+    React.createElement(MessageList, {
+      rows: [{
+        role: 'tool_result',
+        id: 'read-result',
+        name: 'read_file',
+        summary: 'read package.json',
+        content: 'sensitive or very long file contents',
+      }],
+    }),
+  )
+
+  assert.match(output, /result/)
+  assert.match(output, /read_file/)
+  assert.match(output, /read package\.json/)
+  assert.doesNotMatch(output, /sensitive or very long file contents/)
+})
+
+test('failed read tool results still render the error', () => {
+  const output = renderToString(
+    React.createElement(MessageList, {
+      rows: [{
+        role: 'tool_result',
+        id: 'read-error',
+        name: 'read_file',
+        summary: 'read_file failed',
+        content: 'file does not exist',
+        isError: true,
+      }],
+    }),
+  )
+
+  assert.match(output, /file does not exist/)
+})
+
+test('restored successful read results keep file contents out of row state', () => {
+  let id = 0
+  const rows = sessionMessagesToRows([{
+    version: 2,
+    role: 'tool_result',
+    toolUseId: 'tool-1',
+    name: 'read_file',
+    content: 'restored file contents',
+    createdAt: new Date(0).toISOString(),
+  }], () => `row-${++id}`)
+
+  assert.equal(rows[0]?.role, 'tool_result')
+  assert.equal((rows[0] as Extract<MessageRow, { role: 'tool_result' }>).content, '')
 })
 
 test('indeterminate progress rows render as spinner activity', () => {

@@ -222,13 +222,13 @@ test('clearAllSessions removes saved chat logs and session metadata', async () =
     const createdAt = '2026-04-28T00:00:00.000Z'
     await appendSessionMessage('session-a', { role: 'user', content: 'hello', createdAt }, {
       cwd: home,
-      provider: 'ollama',
-      model: 'qwen',
+      provider: 'llamacpp',
+      model: 'org/model#model.gguf',
     })
     await appendSessionMessage('session-b', { role: 'user', content: 'again', createdAt }, {
       cwd: home,
-      provider: 'ollama',
-      model: 'qwen',
+      provider: 'llamacpp',
+      model: 'org/model#model.gguf',
     })
 
     assert.equal((await listSessions()).length, 2)

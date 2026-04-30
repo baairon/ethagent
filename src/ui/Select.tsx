@@ -1,16 +1,18 @@
 import React, { useState } from 'react'
 import { Box, Text } from 'ink'
 import { theme } from './theme.js'
-import { useAppInput } from '../input/AppInputProvider.js'
+import { useAppInput } from '../app/input/AppInputProvider.js'
 
 export type SelectOption<T> = {
   value: T
   label: string
+  subtext?: string
   hint?: string
   disabled?: boolean
   role?: 'section' | 'group' | 'notice' | 'option' | 'utility'
   prefix?: string
   labelColor?: string
+  subtextColor?: string
   hintColor?: string
   bold?: boolean
   indent?: number
@@ -87,7 +89,6 @@ export function Select<T>({
         const isActive = absoluteIndex === index
         const selectable = isSelectableOption(option)
         const cursor = !selectable ? ' ' : isActive ? '>' : ' '
-        const isUtility = option.role === 'utility'
         const isSection = option.role === 'section' || option.role === 'group'
         const prefix = option.prefix && !isSection ? `${option.prefix} ` : ''
         const rowIndent = option.indent ?? (usesInlineSections ? isSection ? 1 : 3 : 0)
@@ -99,12 +100,13 @@ export function Select<T>({
         const labelColor = isSection
           ? option.labelColor ?? theme.dim
           : isActive && selectable
-            ? isUtility ? theme.text : theme.accentPrimary
-            : option.labelColor ?? (option.disabled ? theme.dim : isUtility ? theme.textSubtle : theme.text)
+            ? theme.accentPrimary
+            : option.labelColor ?? (option.disabled ? theme.dim : theme.text)
         const hintColor = isActive && selectable
           ? theme.textSubtle
           : option.hintColor ?? theme.dim
-        const bold = option.bold ?? (isSection || (isActive && selectable && !isUtility))
+        const subtextColor = option.subtextColor ?? theme.dim
+        const bold = option.bold ?? (isSection || (isActive && selectable))
         const inlineHint = Boolean(option.hint && hintLayout === 'inline' && !isSection)
         const belowHint = Boolean(option.hint && (!inlineHint || isSection))
         return (
@@ -115,6 +117,11 @@ export function Select<T>({
               <Text color={labelColor} bold={bold}>{option.label}</Text>
               {inlineHint ? <Text color={hintColor}>  {option.hint}</Text> : null}
             </Box>
+            {option.subtext ? (
+              <Box marginLeft={2 + rowIndent}>
+                <Text color={subtextColor}>{option.subtext}</Text>
+              </Box>
+            ) : null}
             {belowHint ? (
               <Box marginLeft={2 + rowIndent}>
                 <Text color={hintColor}>{option.hint}</Text>
