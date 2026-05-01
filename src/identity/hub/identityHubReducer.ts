@@ -35,7 +35,6 @@ export type Step =
   | { kind: 'public-profile-storage'; identity: EthagentIdentity; registry: Erc8004RegistryConfig; error?: string; pinataJwt?: string; profileUpdates?: ProfileUpdates; returnTo?: Step }
   | { kind: 'continuity-private'; notice?: string }
   | { kind: 'continuity-public'; notice?: string }
-  | { kind: 'continuity-unlocking'; identity: EthagentIdentity; cid?: string; publicSkillsCid?: string; returnTo?: 'private' }
   | { kind: 'rebackup-confirm' }
   | { kind: 'recovery-refetch-confirm' }
   | { kind: 'recovery-refetching'; identity: EthagentIdentity; registry: Erc8004RegistryConfig }
@@ -168,8 +167,6 @@ function backStep(from: Step): Step {
     case 'continuity-private':
     case 'continuity-public':
       return { kind: 'menu' }
-    case 'continuity-unlocking':
-      return { kind: 'continuity-private' }
     case 'rebackup-confirm':
     case 'recovery-refetch-confirm':
     case 'recovery-refetching':

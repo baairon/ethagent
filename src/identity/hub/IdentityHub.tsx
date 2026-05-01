@@ -27,7 +27,6 @@ import {
   runPublicProfilePreflight,
   runPublicProfileSigning,
   runPublicProfileStorageSubmit,
-  runContinuityUnlock,
   runRecoveryRefetch,
   isAgentTokenIdRequiredError,
   type EffectCallbacks,
@@ -362,18 +361,7 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
     return () => { cancelled = true }
   }, [step])
 
-  useEffect(() => {
-    if (step.kind !== 'continuity-unlocking') return
-    let cancelled = false
-    runContinuityUnlock(step, callbacks)
-      .then(() => {
-        if (!cancelled) setContinuityReady(true)
-      })
-      .catch((err: unknown) => {
-        if (!cancelled) handleStepError(err, { kind: 'continuity-private' })
-      })
-    return () => { cancelled = true }
-  }, [step])
+
 
   useEffect(() => {
     if (step.kind !== 'recovery-refetching') return
@@ -632,7 +620,6 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
         notice={step.notice}
         canBackup={canRebackup}
         footer={footer}
-        onRestore={() => { if (identity) setStep({ kind: 'continuity-unlocking', identity, returnTo: 'private' }) }}
         onOpenSoul={() => { void openContinuityFile('soul') }}
         onOpenMemory={() => { void openContinuityFile('memory') }}
         onBackup={() => triggerRebackup({ kind: 'continuity-private' })}
@@ -762,17 +749,7 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
     )
   }
 
-  if (step.kind === 'continuity-unlocking') {
-    return (
-      <WalletApprovalScreen
-        title="Restore Memory & Persona"
-        subtitle="Wallet approval decrypts the encrypted snapshot into local SOUL.md and MEMORY.md working files."
-        walletSession={walletSession}
-        label="waiting for wallet approval..."
-        onCancel={() => setStep({ kind: 'continuity-private' })}
-      />
-    )
-  }
+
 
 
   if (step.kind === 'rebackup-storage' || step.kind === 'public-profile-storage') {

@@ -831,52 +831,6 @@ export async function runPublicProfileStorageSubmit(
   })
 }
 
-export async function runContinuityUnlock(
-  step: Extract<Step, { kind: 'continuity-unlocking' }>,
-  callbacks: Pick<EffectCallbacks, 'onStep' | 'onWalletReady'>,
-): Promise<void> {
-  const identity = step.identity
-  const ownerAddress = getAddress(identity.ownerAddress ?? identity.address)
-  const chainId = identity.chainId ?? identity.backup?.chainId ?? 1
-  const snapshotCid = step.cid ?? identity.backup?.cid
-  if (snapshotCid) {
-    const raw = await catFromIpfs(identity.backup?.ipfsApiUrl ?? DEFAULT_IPFS_API_URL, snapshotCid)
-    const envelope = parseRestorableEnvelope(raw)
-    if (isContinuitySnapshotEnvelope(envelope)) {
-      assertContinuitySnapshotOwner(envelope, ownerAddress)
-      const wallet = await requestBrowserWalletSignature({
-        chainId,
-        expectedAccount: ownerAddress,
-        message: envelope.challenge,
-        onReady: callbacks.onWalletReady,
-      })
-      const payload = restoreContinuitySnapshotEnvelope({ envelope, walletSignature: wallet.signature })
-      await writeContinuityFiles({ ...identity, state: payload.state }, payload.files)
-      await restorePublishedPublicSkills(identity, identity.backup?.ipfsApiUrl ?? DEFAULT_IPFS_API_URL, step.publicSkillsCid)
-      callbacks.onStep({ kind: 'continuity-private', notice: 'published snapshot restored locally. review, then publish when ready.' })
-      return
-    }
-    assertAgentStateBackupOwner(envelope, ownerAddress)
-    const wallet = await requestBrowserWalletSignature({
-      chainId,
-      expectedAccount: ownerAddress,
-      message: envelope.challenge,
-      onReady: callbacks.onWalletReady,
-    })
-    restoreAgentStateBackupEnvelope({ envelope, walletSignature: wallet.signature })
-  } else {
-    const wallet = await requestBrowserWalletSignature({
-      chainId,
-      expectedAccount: ownerAddress,
-      message: createContinuitySnapshotChallenge(ownerAddress),
-      onReady: callbacks.onWalletReady,
-    })
-    void wallet.signature
-  }
-  await ensureContinuityFiles(identity)
-  callbacks.onStep({ kind: 'continuity-private', notice: 'local private working files are ready on this machine.' })
-}
-
 
 export async function runRecoveryRefetch(
   identity: EthagentIdentity,

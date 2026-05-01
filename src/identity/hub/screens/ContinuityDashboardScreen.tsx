@@ -7,7 +7,7 @@ import type { EthagentConfig, EthagentIdentity } from '../../../storage/config.j
 import { IdentitySummary } from './IdentitySummary.js'
 import { shortCid } from '../identityHubModel.js'
 
-type PrivateAction = 'restore' | 'soul' | 'memory' | 'backup' | 'back'
+type PrivateAction = 'soul' | 'memory' | 'backup' | 'back'
 type PublicAction = 'edit' | 'skills' | 'publish' | 'back'
 
 type CommonProps = {
@@ -21,7 +21,6 @@ type CommonProps = {
 
 export const PrivateContinuityScreen: React.FC<CommonProps & {
   canBackup: boolean
-  onRestore: () => void
   onOpenSoul: () => void
   onOpenMemory: () => void
   onBackup: () => void
@@ -32,7 +31,6 @@ export const PrivateContinuityScreen: React.FC<CommonProps & {
   notice,
   footer,
   canBackup,
-  onRestore,
   onOpenSoul,
   onOpenMemory,
   onBackup,
@@ -44,8 +42,6 @@ export const PrivateContinuityScreen: React.FC<CommonProps & {
     <Box marginTop={1}>
       <Select<PrivateAction>
         options={[
-          { value: 'restore', role: 'section', prefix: '--', label: 'Restore' },
-          { value: 'restore', label: 'restore snapshot', hint: 'decrypt latest IPFS backup with owner wallet' },
           { value: 'soul', role: 'section', prefix: '--', label: 'Open local files' },
           { value: 'soul', label: 'open SOUL.md', hint: 'edit persona and operating preferences', disabled: !ready },
           { value: 'memory', label: 'open MEMORY.md', hint: 'edit private working memory for this agent', disabled: !ready },
@@ -56,7 +52,6 @@ export const PrivateContinuityScreen: React.FC<CommonProps & {
         ]}
         hintLayout="inline"
         onSubmit={choice => {
-          if (choice === 'restore') return onRestore()
           if (choice === 'soul') return onOpenSoul()
           if (choice === 'memory') return onOpenMemory()
           if (choice === 'backup') return onBackup()
@@ -106,7 +101,7 @@ const PrivateRows: React.FC<{ identity?: EthagentIdentity; ready: boolean }> = (
   <Box flexDirection="column" marginTop={1}>
     <Text>
       <Text color={theme.dim}>{'local files'.padEnd(13)}</Text>
-      <Text color={ready ? theme.text : theme.dim}>{ready ? 'SOUL.md and MEMORY.md ready' : 'restore local working files'}</Text>
+      <Text color={ready ? theme.text : theme.dim}>{ready ? 'SOUL.md and MEMORY.md ready' : 'missing local working files'}</Text>
     </Text>
     <Text>
       <Text color={theme.dim}>{'snapshot'.padEnd(13)}</Text>
@@ -135,7 +130,7 @@ const PublicProfileRows: React.FC<{ identity?: EthagentIdentity }> = ({ identity
 function privateSubtitle(ready: boolean): string {
   return ready
     ? 'SOUL.md and MEMORY.md are private local files on this machine.'
-    : 'Restore requires the wallet that owns the encrypted snapshot.'
+    : 'Use "refetch latest snapshot" from the hub menu to recover files.'
 }
 
 function readStateString(state: Record<string, unknown> | undefined, key: string): string {
