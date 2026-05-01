@@ -33,9 +33,9 @@ export const DetailsScreen: React.FC<DetailsScreenProps> = ({
       label: field.label,
       hint: shortPreview(field.value),
     })),
-    ...(copyable.length === 0 ? [{ value: 'back' as const, role: 'notice' as const, label: 'no values available yet' }] : []),
+    ...(copyable.length === 0 ? [{ value: 'back' as const, role: 'notice' as const, label: 'No Values Available Yet' }] : []),
     { value: 'back', role: 'section', prefix: '--', label: 'Navigation' },
-    { value: 'back', label: 'back to identity hub', hint: 'return without copying', role: 'utility' },
+    { value: 'back', label: 'Back To Identity Hub', hint: 'Return without copying', role: 'utility' },
   ]
 
   return (

@@ -67,12 +67,12 @@ export const EditProfileFlow: React.FC<EditProfileFlowProps> = ({
             <Select<'choose' | 'manual' | 'skip' | 'delete' | 'back'>
               options={[
                 { value: 'choose', role: 'section', prefix: '--', label: 'Image' },
-                { value: 'choose', label: 'choose image file', hint: 'open the operating system file picker' },
-                { value: 'manual', label: 'enter path manually', hint: 'fallback if a file picker is unavailable' },
-                ...(currentImage ? [{ value: 'delete' as const, label: 'delete current image', hint: 'remove the attached image from public profile' }] : []),
-                { value: 'skip', label: currentImage ? 'keep current image' : 'no image', hint: 'save without changing the image' },
+                { value: 'choose', label: 'Choose Image File', hint: 'Open the operating system file picker' },
+                { value: 'manual', label: 'Enter Path Manually', hint: 'Fallback if a file picker is unavailable' },
+                ...(currentImage ? [{ value: 'delete' as const, label: 'Delete Current Image', hint: 'Remove the attached image from public profile' }] : []),
+                { value: 'skip', label: currentImage ? 'Keep Current Image' : 'No Image', hint: 'Save without changing the image' },
                 { value: 'back', role: 'section', prefix: '--', label: 'Navigation' },
-                { value: 'back', label: 'back', hint: 'return to description', role: 'utility' },
+                { value: 'back', label: 'Back', hint: 'Return to description', role: 'utility' },
               ]}
               hintLayout="inline"
               onSubmit={choice => {

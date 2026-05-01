@@ -79,15 +79,21 @@ export class ContinuitySnapshotOwnerMismatchError extends Error {
   }
 }
 
+export const CONTINUITY_SNAPSHOT_CHALLENGE_MESSAGES = [
+  'ethagent: save or restore identity files',
+  'Action: encrypt or decrypt local identity files',
+  'Private: SOUL.md, MEMORY.md',
+  'Public: skills.json, public profile',
+  'Safety: no transaction, spending, or approvals',
+  'Version: 1',
+] as const
+
 export function createContinuitySnapshotChallenge(ownerAddress: string): string {
   const checksum = toChecksumAddress(ownerAddress)
   return [
-    'ethagent private continuity',
+    CONTINUITY_SNAPSHOT_CHALLENGE_MESSAGES[0],
     `Owner: ${checksum}`,
-    'Purpose: unlock the encrypted SOUL.md and MEMORY.md snapshot for this device',
-    'Scope: read and restore private agent continuity only',
-    'Safety: this signature does not send a transaction, spend funds, or grant token approval',
-    'Version: 1',
+    ...CONTINUITY_SNAPSHOT_CHALLENGE_MESSAGES.slice(1),
   ].join('\n')
 }
 

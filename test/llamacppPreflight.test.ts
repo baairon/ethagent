@@ -85,7 +85,7 @@ test('llama.cpp preflight rejects externally served models that were not importe
   assert.equal(result.ok, false)
   if (result.ok) return
   assert.equal(result.code, 'model-file-missing')
-  assert.match(result.message, /view full catalog/)
+  assert.match(result.message, /View Full Catalog/)
 })
 
 test('llama.cpp preflight reports runner-not-installed without calling provider', async () => {

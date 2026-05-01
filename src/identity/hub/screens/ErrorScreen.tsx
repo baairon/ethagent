@@ -20,9 +20,9 @@ export const ErrorScreen: React.FC<ErrorScreenProps> = ({ error, back, footer, o
     <Select<'back' | 'close'>
       options={[
         { value: 'back', role: 'section', prefix: '--', label: 'Recovery' },
-        { value: 'back', label: 'go back', hint: 'return to the previous identity step' },
+        { value: 'back', label: 'Go Back', hint: 'Return to the previous identity step' },
         { value: 'close', role: 'section', prefix: '--', label: 'Exit' },
-        { value: 'close', label: 'close hub', hint: 'return to the chat without retrying', role: 'utility' },
+        { value: 'close', label: 'Close Hub', hint: 'Return to chat without retrying', role: 'utility' },
       ]}
       hintLayout="inline"
       onSubmit={choice => {

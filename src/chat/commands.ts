@@ -154,7 +154,7 @@ const COMMANDS: CommandSpec[] = [
         if (installed.length === 0) {
           return {
             kind: 'note',
-            text: 'no local model files downloaded. open alt+p and choose "add local model file".',
+            text: 'No local model files downloaded. Open Alt+P and choose "Add Local Model File".',
           }
         }
         const lines = installed.map(m => {
@@ -190,7 +190,7 @@ const COMMANDS: CommandSpec[] = [
           return {
             kind: 'note',
             variant: 'error',
-            text: `'${name}' is not downloaded. open alt+p and choose "view full catalog" or "add local model file".`,
+            text: `'${name}' is not downloaded. Open Alt+P and choose "View Full Catalog" or "Add Local Model File".`,
           }
         }
       } else {
@@ -364,7 +364,7 @@ async function runHuggingFace(args: string, ctx: SlashContext): Promise<SlashRes
       return {
         kind: 'note',
         variant: 'dim',
-        text: 'no local model files downloaded. press alt+p and choose "add local model file".',
+        text: 'No local model files downloaded. Press Alt+P and choose "Add Local Model File".',
       }
     }
     const lines = installed.map(model => {
@@ -382,8 +382,8 @@ async function runHuggingFace(args: string, ctx: SlashContext): Promise<SlashRes
       kind: 'note',
       variant: 'dim',
       text: link
-        ? `alt+p opened. choose "add local model file" and paste: ${link}`
-        : 'alt+p opened. choose "add local model file" and paste the model URL or repo id.',
+        ? `Alt+P opened. Choose "Add Local Model File" and paste: ${link}`
+        : 'Alt+P opened. Choose "Add Local Model File" and paste the model URL or repo ID.',
     }
   }
 

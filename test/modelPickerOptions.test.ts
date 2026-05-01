@@ -241,13 +241,13 @@ test('picker options expose grouped catalog and key management for keyed and unk
     currentModel: 'gpt-5.2',
   })
 
-  assert.equal(optionByValue(options, 'key:manage:openai').label, 'api key · manage')
-  assert.equal(optionByValue(options, 'catalog:openai').label, 'full catalog')
+  assert.equal(optionByValue(options, 'key:manage:openai').label, 'API Key · Manage')
+  assert.equal(optionByValue(options, 'catalog:openai').label, 'Full Catalog')
   assert.equal(optionByValue(options, 'catalog:openai').role, 'utility')
   assert.equal(optionByValue(options, 'catalog:openai').indent, 4)
   assert.equal(optionByValue(options, 'key:manage:openai').role, 'utility')
   assert.equal(optionByValue(options, 'key:manage:openai').indent, 4)
-  assert.equal(optionByValue(options, 'key:set:anthropic').label, 'api key · add')
+  assert.equal(optionByValue(options, 'key:set:anthropic').label, 'API Key · Add')
   assert.equal(optionByValue(options, 'key:set:anthropic').role, 'utility')
   assert.equal(optionByValue(options, 'key:set:anthropic').indent, 4)
   assert.equal(options.some(option => option.value === 'key:set:openai'), false)
@@ -268,11 +268,11 @@ test('picker hierarchy uses provider group labels without repeated provider pref
   })
 
   assert.equal(optionByValue(options, 'hdr:local').role, 'section')
-  assert.equal(optionByValue(options, 'hdr:local').label, 'local models')
+  assert.equal(optionByValue(options, 'hdr:local').label, 'Local Models')
   assert.equal(optionByValue(options, 'hdr:local:hf').role, 'group')
-  assert.equal(optionByValue(options, 'hf:download').label, 'add local model file')
-  assert.equal(optionByValue(options, 'hf:download').hint, 'paste a GGUF link')
-  assert.equal(optionByValue(options, 'local:catalog').label, 'view full catalog')
+  assert.equal(optionByValue(options, 'hf:download').label, 'Add Local Model File')
+  assert.equal(optionByValue(options, 'hf:download').hint, 'Paste a GGUF link')
+  assert.equal(optionByValue(options, 'local:catalog').label, 'View Full Catalog')
   assert.equal(options.some(option => option.value.startsWith('ol:')), false)
   assert.equal(options.some(option => option.value === 'hdr:local:ollama'), false)
   assert.equal(options.some(option => option.value === 'local:uninstall'), false)
@@ -307,14 +307,14 @@ test('Hugging Face picker shows installed models and link-only download action',
     currentModel: 'org/model#model.Q4_K_M.gguf',
   })
 
-  assert.equal(optionByValue(options, 'hdr:local:hf').label, 'added from links')
+  assert.equal(optionByValue(options, 'hdr:local:hf').label, 'Added From Links')
   assert.match(optionByValue(options, 'hf:org/model#model.Q4_K_M.gguf').label, /\* org\/model \/ model\.Q4_K_M\.gguf/)
   assert.doesNotMatch(optionByValue(options, 'hf:org/model#model.Q4_K_M.gguf').label, /4\.2 GB/)
   assert.equal(optionByValue(options, 'hf:org/model#model.Q4_K_M.gguf').prefix, undefined)
-  assert.equal(optionByValue(options, 'hf:org/model#model.Q4_K_M.gguf').subtext, '4.2 GB · installed')
+  assert.equal(optionByValue(options, 'hf:org/model#model.Q4_K_M.gguf').subtext, '4.2 GB · Installed')
   assert.equal(optionByValue(options, 'hf:org/model#model.Q4_K_M.gguf').hint, undefined)
-  assert.equal(optionByValue(options, 'hf:download').label, 'add local model file')
-  assert.equal(optionByValue(options, 'local:uninstall').label, 'uninstall downloaded GGUF')
+  assert.equal(optionByValue(options, 'hf:download').label, 'Add Local Model File')
+  assert.equal(optionByValue(options, 'local:uninstall').label, 'Uninstall Downloaded GGUF')
   assert.equal(options.some(option => option.value.startsWith('catalog:huggingface')), false)
 })
 
@@ -324,7 +324,7 @@ test('Hugging Face file picker renders size and status as muted subtext', () => 
 
   const recommended = optionByValue(options, 'model.Q4_K_M.gguf')
   assert.equal(recommended.label, 'model.Q4_K_M.gguf')
-  assert.equal(recommended.subtext, '4.2 GB · recommended · installed')
+  assert.equal(recommended.subtext, '4.2 GB · Recommended · Installed')
   assert.equal(recommended.hint, undefined)
 
   const other = optionByValue(options, 'model.Q8_0.gguf')
@@ -347,7 +347,7 @@ test('installed Hugging Face resolver prefers the installed recommended file', (
   assert.equal(exact?.filename, 'model.Q8_0.gguf')
 })
 
-test('view full catalog shows one recommendation and installed status', () => {
+test('View Full Catalog shows recommendation and install status', () => {
   const repo = hfRepo()
   const installedEntry = uncensoredCatalogEntry({
     repo,
@@ -359,9 +359,9 @@ test('view full catalog shows one recommendation and installed status', () => {
   }, [installedEntry])
 
   const option = optionByValue(options, catalogOptionValue(repo.repoId, 'model.Q4_K_M.gguf'))
-  assert.equal(optionByValue(options, 'hdr:uncensored:catalog').label, 'hugging face gguf files')
+  assert.equal(optionByValue(options, 'hdr:uncensored:catalog').label, 'Curated Local GGUF Files')
   assert.equal(option.label, 'org/model / model.Q4_K_M.gguf')
-  assert.equal(option.subtext, 'Q4_K_M · 4.2 GB · recommended for this machine · installed')
+  assert.equal(option.subtext, 'Q4_K_M · 4.2 GB · Recommended for this machine · Installed')
   assert.equal(options.some(candidate => candidate.value.startsWith('ol:')), false)
   assert.equal(options.some(candidate => candidate.value === 'ollama:uninstall'), false)
 })
@@ -401,7 +401,7 @@ test('empty keyed cloud catalogs show no selectable model rows', () => {
   })
 
   assert.deepEqual(valuesFor(options, 'openai'), [])
-  assert.equal(optionByValue(options, 'hdr:cloud-empty:openai').label, 'no selectable models')
+  assert.equal(optionByValue(options, 'hdr:cloud-empty:openai').label, 'No selectable models')
   assert.equal(optionByValue(options, 'hdr:cloud-empty:openai').indent, 4)
 })
 
@@ -427,7 +427,7 @@ test('fallback catalogs show provider-level notice and still expose the configur
 
   assert.equal(
     optionByValue(options, 'hdr:cloud-fallback:gemini').label,
-    'catalog unavailable · HTTP 400 · showing configured model',
+    'Catalog unavailable · HTTP 400 · showing configured model',
   )
   assert.deepEqual(valuesFor(options, 'gemini'), ['gemini-2.0-flash'])
   assert.equal(optionByValue(options, 'c:gemini:gemini-2.0-flash').hint, undefined)

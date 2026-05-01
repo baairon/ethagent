@@ -46,7 +46,7 @@
       background: #fbfaf6;
       display: grid;
       place-items: center;
-      padding: 24px;
+      padding: clamp(18px, 3vw, 28px);
     }
 
     body::before {
@@ -79,15 +79,15 @@
     main {
       position: relative;
       z-index: 1;
-      width: min(720px, 100%);
-      max-height: calc(100vh - 48px);
+      width: min(700px, 100%);
+      max-height: calc(100dvh - 36px);
       display: flex;
       flex-direction: column;
       background: rgba(255, 255, 255, 0.95);
       backdrop-filter: blur(40px) saturate(1.4);
       -webkit-backdrop-filter: blur(40px) saturate(1.4);
       border: 1px solid rgba(255, 255, 255, 0.7);
-      border-radius: 28px;
+      border-radius: 26px;
       box-shadow:
         0 1px 0 rgba(255, 255, 255, 0.9) inset,
         0 -1px 0 rgba(255, 255, 255, 0.4) inset,
@@ -112,15 +112,15 @@
       display: flex;
       align-items: center;
       gap: 8px;
-      padding: 14px 18px;
+      padding: 14px 20px;
       border-bottom: 1px solid rgba(255, 255, 255, 0.5);
       background: linear-gradient(180deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.2));
       flex: none;
     }
 
     .light {
-      width: 12px;
-      height: 12px;
+      width: 10px;
+      height: 10px;
       border-radius: 999px;
       box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.08), 0 1px 0 rgba(255, 255, 255, 0.6) inset;
     }
@@ -140,7 +140,7 @@
     .chrome-title {
       flex: 1;
       text-align: center;
-      font-size: 12px;
+      font-size: 11.5px;
       color: rgba(31, 35, 48, 0.55);
       font-weight: 500;
       letter-spacing: 0.01em;
@@ -150,10 +150,10 @@
     .body {
       flex: 1;
       min-height: 0;
-      padding: 18px 28px 22px;
+      padding: clamp(20px, 3vw, 28px) clamp(22px, 4vw, 32px) clamp(22px, 3vw, 30px);
       display: flex;
       flex-direction: column;
-      gap: 14px;
+      gap: 15px;
       overflow: hidden;
     }
 
@@ -167,7 +167,7 @@
 
     .splash {
       font-family: var(--font-mono);
-      font-size: 11px;
+      font-size: clamp(9.5px, 1.35vw, 11px);
       font-weight: 800;
       line-height: 1.05;
       letter-spacing: 0;
@@ -207,7 +207,6 @@
     .status-line,
     .status-hint,
     .flow-detail,
-    .tx-summary,
     #error-block-slot,
     .net-pill {
       transition: height 480ms var(--ease-standard), background-color 320ms var(--ease-standard), border-color 320ms var(--ease-standard), color 320ms var(--ease-standard), box-shadow 320ms var(--ease-standard);
@@ -234,14 +233,14 @@
     .head .label {
       font-family: var(--font-ui);
       color: var(--c-gray-800);
-      font-size: 12.5px;
+      font-size: 11.5px;
       font-weight: 500;
       letter-spacing: 0;
       text-transform: capitalize;
       display: inline-flex;
       align-items: center;
-      gap: 8px;
-      padding: 5px 12px 5px 10px;
+      gap: 6px;
+      padding: 5px 13px 5px 10px;
       background: rgba(255, 255, 255, 0.6);
       border-radius: 999px;
       border: 1px solid rgba(255, 255, 255, 0.85);
@@ -259,9 +258,9 @@
 
     .flow-title {
       font-family: var(--font-display);
-      font-size: 18px;
+      font-size: clamp(18px, 2.6vw, 20px);
       font-weight: 600;
-      line-height: 1.18;
+      line-height: 1.22;
       letter-spacing: 0;
       margin: 0;
       color: var(--c-gray-900);
@@ -271,14 +270,14 @@
     .details {
       display: flex;
       flex-direction: column;
-      gap: 8px;
-      padding: 12px 14px;
+      gap: 9px;
+      padding: 14px 16px;
       background: rgba(255, 255, 255, 0.45);
       backdrop-filter: blur(16px);
       border: 1px solid rgba(255, 255, 255, 0.85);
       border-radius: 14px;
       box-shadow: 0 4px 16px -4px rgba(31, 35, 48, 0.08), 0 1px 0 rgba(255, 255, 255, 0.7) inset;
-      max-height: 200px;
+      max-height: 210px;
       opacity: 1;
       margin-top: 0;
       overflow: hidden;
@@ -299,13 +298,13 @@
 
     .flow-detail {
       display: grid;
-      grid-template-columns: 88px 1fr;
+      grid-template-columns: 96px 1fr;
       align-items: center;
       gap: 12px;
-      font-size: 13px;
+      font-size: 13.5px;
       color: var(--c-gray-700);
       margin: 0;
-      line-height: 1.4;
+      line-height: 1.35;
     }
 
     .flow-detail[hidden] {
@@ -314,7 +313,7 @@
 
     .flow-detail .key {
       font-family: var(--font-mono);
-      font-size: 10.5px;
+      font-size: 10px;
       font-weight: 500;
       color: var(--c-gray-500);
       text-transform: lowercase;
@@ -336,8 +335,8 @@
     .status {
       display: flex;
       flex-direction: column;
-      gap: 6px;
-      padding: 14px 16px;
+      gap: 7px;
+      padding: 15px 17px;
       background: rgba(255, 255, 255, 0.45);
       backdrop-filter: blur(16px);
       border: 1px solid rgba(255, 255, 255, 0.85);
@@ -349,7 +348,7 @@
       display: flex;
       align-items: center;
       gap: 12px;
-      font-size: 13px;
+      font-size: 13.5px;
       font-weight: 500;
       color: var(--c-gray-900);
       margin: 0;
@@ -358,8 +357,8 @@
     .status-line .marker {
       font-family: var(--font-mono);
       font-size: 13px;
-      width: 28px;
-      height: 28px;
+      width: 29px;
+      height: 29px;
       display: inline-flex;
       align-items: center;
       justify-content: center;
@@ -373,60 +372,10 @@
     }
 
     .status-hint {
-      font-size: 12px;
+      font-size: 12.5px;
       color: var(--c-gray-500);
-      margin: 0 0 0 40px;
-      line-height: 1.45;
-    }
-
-    .tx-summary {
-      display: grid;
-      grid-template-columns: max-content minmax(0, 1fr);
-      align-items: center;
-      column-gap: 14px;
-      row-gap: 6px;
-      padding: 12px 16px;
-      background: rgba(255, 255, 255, 0.45);
-      backdrop-filter: blur(16px);
-      border: 1px solid rgba(255, 255, 255, 0.85);
-      border-radius: 14px;
-      box-shadow: 0 4px 16px -4px rgba(31, 35, 48, 0.08), 0 1px 0 rgba(255, 255, 255, 0.7) inset;
-      max-height: 240px;
-      opacity: 1;
-      margin-top: 0;
-      overflow: hidden;
-      transition: max-height 480ms var(--ease-standard), padding 480ms var(--ease-standard), margin 480ms var(--ease-standard), opacity 480ms var(--ease-standard), background-color 320ms var(--ease-standard), border-color 320ms var(--ease-standard);
-    }
-
-    .tx-summary[hidden] {
-      display: grid;
-      max-height: 0;
-      opacity: 0;
-      padding-top: 0;
-      padding-bottom: 0;
-      margin-top: -14px;
-      border-color: transparent;
-      background-color: transparent;
-      pointer-events: none;
-    }
-
-    .tx-key {
-      font-family: var(--font-mono);
-      font-size: 11px;
-      color: var(--c-gray-500);
-      text-transform: lowercase;
-    }
-
-    .tx-value {
-      font-size: 12px;
-      color: var(--c-gray-800);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .tx-value.muted {
-      color: var(--c-gray-400);
+      margin: 0 0 0 41px;
+      line-height: 1.4;
     }
 
     #error-block-slot:empty {
@@ -442,11 +391,11 @@
     }
 
     #error-block-slot {
-      padding: 16px 20px;
+      padding: 12px 14px;
       background: rgba(255, 255, 255, 0.45);
       backdrop-filter: blur(16px);
       border: 1px solid rgba(255, 255, 255, 0.85);
-      border-radius: 16px;
+      border-radius: 14px;
       box-shadow: 0 8px 24px -6px rgba(31, 35, 48, 0.08), 0 1px 0 rgba(255, 255, 255, 0.7) inset;
       max-height: 400px;
       opacity: 1;
@@ -457,7 +406,7 @@
 
     .error-title {
       color: var(--c-gray-900);
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 600;
       letter-spacing: 0;
       text-transform: capitalize;
@@ -466,7 +415,7 @@
 
     .error-msg {
       color: var(--c-gray-900);
-      font-size: 13.5px;
+      font-size: 13px;
       font-weight: 600;
       margin: 0 0 6px;
       line-height: 1.45;
@@ -474,7 +423,7 @@
 
     .error-hint {
       color: var(--c-gray-500);
-      font-size: 12.5px;
+      font-size: 11.5px;
       margin: 0;
       line-height: 1.5;
     }
@@ -504,7 +453,7 @@
 
     .footer {
       flex: none;
-      padding: 14px 22px 16px;
+      padding: 15px 22px 17px;
       border-top: 1px solid rgba(255, 255, 255, 0.5);
       background: linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.5));
       display: flex;
@@ -548,16 +497,16 @@
     .shortcut {
       font: inherit;
       font-family: var(--font-ui);
-      font-size: 13px;
+
       font-weight: 500;
       background: rgba(255, 255, 255, 0.7);
       border: 1px solid rgba(255, 255, 255, 0.85);
-      padding: 7px 14px;
+      padding: 8px 14px;
       cursor: pointer;
       color: var(--c-gray-700);
       display: inline-flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
       border-radius: 999px;
       transition: all 0.15s var(--ease-standard);
       box-shadow: 0 1px 2px rgba(31, 35, 48, 0.03), 0 1px 0 rgba(255, 255, 255, 0.5) inset;
@@ -614,7 +563,7 @@
       align-items: center;
       justify-content: center;
       gap: 4px;
-      padding: 2px 7px;
+      padding: 2px 6px;
       font-family: var(--font-mono);
       font-size: 10.5px;
       font-weight: 500;
@@ -633,6 +582,190 @@
 
     .head .net {
       display: none;
+    }
+
+    @media (max-width: 560px), (max-height: 680px) {
+      body {
+        padding: 10px;
+      }
+
+      main {
+        max-height: calc(100dvh - 20px);
+        border-radius: 18px;
+      }
+
+      .chrome {
+        padding: 9px 12px;
+      }
+
+      .body {
+        padding: 12px 13px 14px;
+        gap: 9px;
+      }
+
+      .splash-wrap {
+        margin: 2px 0 0;
+        padding: 2px 0;
+      }
+
+      .splash {
+        font-size: 8px;
+      }
+
+      .flow-title {
+        font-size: 16px;
+      }
+
+      .details,
+      .status {
+        padding: 10px 11px;
+        border-radius: 12px;
+      }
+
+      .flow-detail {
+        grid-template-columns: 74px 1fr;
+        gap: 8px;
+        font-size: 12px;
+      }
+
+      .status-line {
+        gap: 8px;
+        font-size: 12px;
+      }
+
+      .status-line .marker {
+        width: 24px;
+        height: 24px;
+      }
+
+      .status-hint {
+        margin-left: 32px;
+        font-size: 11.5px;
+      }
+
+      .footer {
+        padding: 10px 12px 12px;
+        gap: 8px;
+      }
+
+      .actions {
+        gap: 7px;
+      }
+
+      .shortcut {
+        font-size: 12px;
+        padding: 6px 10px;
+      }
+
+      .net-pill {
+        font-size: 10px;
+        padding: 4px 8px;
+      }
+    }
+
+    /* dark mode: terminal-style window. */
+    main {
+      background: #0b0f14;
+      color: #f1f1f1;
+      border-color: rgba(255, 255, 255, 0.08);
+      box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.05) inset,
+        0 -1px 0 rgba(0, 0, 0, 0.4) inset,
+        0 30px 60px -20px rgba(0, 0, 0, 0.55),
+        0 12px 24px -8px rgba(0, 0, 0, 0.35);
+      --c-gray-900: #f1f1f1;
+      --c-gray-800: #d8d8d8;
+      --c-gray-700: #b0b0b0;
+      --c-gray-500: #8a8a8a;
+      --c-gray-400: #6f6f6f;
+    }
+
+    .splash {
+      color: #b0b0b0;
+    }
+
+    main::before {
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.18), transparent);
+    }
+
+    .chrome {
+      border-bottom-color: rgba(255, 255, 255, 0.06);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01));
+    }
+
+    .chrome-title {
+      color: rgba(241, 241, 241, 0.55);
+    }
+
+    .head .label {
+      background: rgba(255, 255, 255, 0.06);
+      border-color: rgba(255, 255, 255, 0.1);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 0 rgba(255, 255, 255, 0.05) inset;
+    }
+
+    .details,
+    .status,
+    #error-block-slot {
+      background: rgba(255, 255, 255, 0.04);
+      border-color: rgba(255, 255, 255, 0.08);
+      box-shadow: 0 4px 16px -4px rgba(0, 0, 0, 0.35), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+    }
+
+    .flow-detail .key {
+      background: rgba(255, 255, 255, 0.05);
+      border-color: rgba(255, 255, 255, 0.08);
+    }
+
+    .error-hint code {
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .footer {
+      border-top-color: rgba(255, 255, 255, 0.06);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.01), rgba(255, 255, 255, 0.04));
+    }
+
+    .net-pill {
+      background: rgba(255, 255, 255, 0.04);
+      border-color: rgba(255, 255, 255, 0.08);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    }
+
+    /* esc key: secondary black */
+    #cancel.shortcut {
+      background: #1f2330;
+      border-color: rgba(255, 255, 255, 0.08);
+      color: #b0b0b0;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+    }
+
+    #cancel.shortcut:hover:not(:disabled) {
+      background: #2a2e3c;
+      color: #f1f1f1;
+    }
+
+    /* primary action: pin literal so the var override does not bleed through */
+    .shortcut.primary {
+      background: #1f2330;
+      border-color: #1f2330;
+      color: #fff;
+      box-shadow: 0 2px 8px -2px rgba(0, 0, 0, 0.5), 0 1px 0 rgba(255, 255, 255, 0.1) inset;
+    }
+
+    .shortcut.primary:hover:not(:disabled) {
+      background: #2a2e3c;
+      color: #fff;
+    }
+
+    .shortcut.primary .key {
+      background: rgba(255, 255, 255, 0.12);
+      border-color: rgba(255, 255, 255, 0.2);
+      color: rgba(255, 255, 255, 0.9);
+    }
+
+    .key {
+      background: rgba(255, 255, 255, 0.06);
+      border-color: rgba(255, 255, 255, 0.1);
     }
   </style>
 </head>
@@ -660,7 +793,6 @@
             wallet…</span></p>
         <p class="status-hint" id="status-hint">open your wallet extension if it doesn't pop up automatically.</p>
       </div>
-      <div class="tx-summary" id="tx-summary" hidden></div>
       <div id="error-block-slot"></div>
     </div>
     <div class="footer">
@@ -704,8 +836,8 @@
     document.getElementById("splash").innerHTML = renderEyes();
 
     const config = window.__WALLET_CONFIG__ || { sessionToken: "preview", kind: "sign", chainIdHex: "0xaa36a7", message: "identity proof for 0x9F2a…BC4e" };
-    const CLOSE_DELAY_MS = 1800;
-    const TX_CLOSE_DELAY_MS = 8500;
+    const CLOSE_DELAY_MS = 10000;
+    const TX_CLOSE_DELAY_MS = 10000;
     const CANCEL_CLOSE_DELAY_MS = 3200;
     const WALLET_PROVIDER_WAIT_MS = 3000;
     const WALLET_PROVIDER_POLL_MS = 100;
@@ -713,14 +845,13 @@
     const FLOW_COPY = {
       account: { accent: "sign", tabTitle: "connect wallet", label: "wallet request", title: "Connect wallet to find your agent", detail: null },
       sign: { accent: "sign", tabTitle: "sign message", label: "signature request", title: "Sign a message to prove ownership", detail: "message" },
-      "sign-transaction": { accent: "transaction", tabTitle: "approve identity update", label: "identity approval", title: "Sign and submit in one wallet flow", detail: "message" },
+      "sign-transaction": { accent: "transaction", tabTitle: "approve identity update", label: "identity approval", title: "Sign, then save identity files", detail: "message" },
       transaction: { accent: "transaction", tabTitle: "submit transaction", label: "transaction request", title: "Submit transaction to mint your ERC-8004 agent", detail: "registry" }
     };
     const STATE_TITLES = { connecting: "connecting wallet", approveSign: "approve signature", preparingTransaction: "preparing transaction", approveTransaction: "approve transaction", error: "wallet error", default: "wallet request" };
     function chainLabel(hex) { const k = String(hex || "").toLowerCase(); return (CHAINS[k] && CHAINS[k].name) || ("chain " + k); }
     function shortAddr(addr) { if (!addr || typeof addr !== "string") return glyphs.emDash; if (addr.length <= 14) return addr; return addr.slice(0, 6) + glyphs.ellipsis + addr.slice(-4); }
     function isTransactionFlow() { return config.kind === "transaction" || config.kind === "sign-transaction"; }
-    function transactionActionLabel() { if (config.kind === "sign-transaction") return "save identity snapshot"; if (config.kind === "transaction") return "submit transaction"; return "wallet request"; }
 
     const card = document.getElementById("card");
     const promptText = document.getElementById("prompt-text");
@@ -736,11 +867,11 @@
     const statusText = document.getElementById("status-text");
     const statusHint = document.getElementById("status-hint");
     const errorSlot = document.getElementById("error-block-slot");
-    const txSummary = document.getElementById("tx-summary");
     const approve = document.getElementById("approve");
     const cancel = document.getElementById("cancel");
     let announcedEthereum = null;
     let activeEthereum = null;
+    let closeCountdown = null;
 
     function rememberAnnouncedProvider(event) { const provider = event && event.detail && event.detail.provider; if (provider && !announcedEthereum) announcedEthereum = provider; }
     window.addEventListener("eip6963:announceProvider", rememberAnnouncedProvider);
@@ -890,7 +1021,6 @@
       errorSlot.innerHTML = "";
       statusBlock.style.display = "flex";
       setTabTitle(tabTitleForState(state));
-      renderTransactionSummary(payload);
       switch (state) {
         case "connecting":
           setStatus("·", "connecting to your wallet…", "open your wallet extension if it doesn't pop up automatically.", true);
@@ -901,10 +1031,10 @@
           else setStatus("·", "review and submit the transaction in your wallet", "check the network and contract address before approving.", true);
           break;
         case "approve-sign":
-          setStatus("·", "approve the signature in your wallet", "used to encrypt or unlock the agent backup.", true);
+          setStatus("·", "approve the signature in your wallet", "this encrypts or decrypts SOUL.md and MEMORY.md.", true);
           break;
         case "preparing-transaction":
-          setStatus("·", "saving encrypted IPFS backup and preparing transaction...", "keep this page open. the transaction prompt will appear here.", true);
+          setStatus("·", "encrypting SOUL.md and MEMORY.md, then preparing the update...", "keep this page open. the transaction prompt will appear here.", true);
           break;
         case "approve-transaction":
           setStatus("·", "review and submit the transaction in your wallet", "check the network and contract address before approving.", true);
@@ -925,20 +1055,6 @@
           renderError(payload);
           break;
       }
-    }
-
-    function renderTransactionSummary() {
-      if (!isTransactionFlow()) {
-        txSummary.hidden = true;
-        txSummary.innerHTML = "";
-        return;
-      }
-      const rows = [["action", transactionActionLabel()], ["network", chainLabel(config.chainIdHex)]];
-      txSummary.innerHTML = rows.map(([key, value]) =>
-        '<span class="tx-key">' + escapeHtml(key) + "</span>" +
-        '<span class="tx-value' + (value === glyphs.emDash ? " muted" : "") + '">' + escapeHtml(value) + "</span>"
-      ).join("");
-      txSummary.hidden = false;
     }
 
     function renderError(payload) {
@@ -970,13 +1086,26 @@
       if (!r.ok || !d.ok) throw new Error(d.error || "wallet request failed");
       return d;
     }
+    function showCloseCountdown(delayMs) {
+      if (closeCountdown) clearInterval(closeCountdown);
+      const deadline = Date.now() + delayMs;
+      const update = () => {
+        const seconds = Math.max(1, Math.ceil((deadline - Date.now()) / 1000));
+        statusHint.textContent = "return to your terminal. closing in " + seconds + "s.";
+      };
+      update();
+      closeCountdown = setInterval(update, 250);
+    }
     function closeSoon(delayMs) {
+      const ms = delayMs == null ? CLOSE_DELAY_MS : delayMs;
+      showCloseCountdown(ms);
       setTimeout(() => {
+        if (closeCountdown) clearInterval(closeCountdown);
         try { if (window.opener && !window.opener.closed) window.opener.focus(); } catch (_) { }
         window.close();
         window.open("", "_self");
         window.close();
-      }, delayMs == null ? CLOSE_DELAY_MS : delayMs);
+      }, ms);
     }
 
     async function ensureWallet() {

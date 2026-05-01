@@ -16,27 +16,26 @@ export const ResetConfirmView: React.FC<{
   }
 
   return (
-    <Surface title="reset ethagent?" subtitle="are you sure? this only affects this machine." footer="enter select · esc cancel">
+    <Surface title="Reset Local Data?" subtitle="Deletes this machine's ethagent data. Models and onchain records stay." footer="enter select · esc cancel">
       <Box flexDirection="column">
-        <Section title="will delete" lines={[
+        <Section title="Deletes" lines={[
+          'Identity files, sessions, history, credentials',
           localDataLine(plan.deletePaths.length),
-          'identity metadata, markdown vaults, sessions, prompt history',
-          'rewind history, permissions, credentials',
         ]} />
-        <Section title="will keep" lines={[
-          'installed local LLM assets',
-          ...(plan.preservedPaths.length > 0 ? [`${plan.preservedPaths.length} local model path${plan.preservedPaths.length === 1 ? '' : 's'}`] : ['no local model assets found']),
+        <Section title="Keeps" lines={[
+          'Local GGUF models and llama.cpp runners',
+          ...(plan.preservedPaths.length > 0 ? [`${plan.preservedPaths.length} local model path${plan.preservedPaths.length === 1 ? '' : 's'}`] : ['No local model assets found']),
         ]} />
-        <Section title="not touched" lines={[
-          'onchain agent tokens',
-          'IPFS-pinned snapshots and public metadata',
+        <Section title="Not Touched" lines={[
+          'ERC-8004 tokens and onchain records',
+          'IPFS snapshots and public metadata',
         ]} />
       </Box>
       <Box marginTop={1}>
         <Select<'confirm' | 'cancel'>
           options={[
-            { value: 'confirm', label: 'reset local data', hint: 'delete local ethagent data now' },
-            { value: 'cancel', label: 'cancel', hint: 'leave local data unchanged' },
+            { value: 'confirm', label: 'Reset Local Data', hint: 'Delete local ethagent data now' },
+            { value: 'cancel', label: 'Cancel', hint: 'Leave local data unchanged' },
           ]}
           onSubmit={choice => finish(choice === 'confirm')}
           onCancel={() => finish(false)}
@@ -56,6 +55,6 @@ const Section: React.FC<{ title: string; lines: string[] }> = ({ title, lines })
 )
 
 function localDataLine(count: number): string {
-  if (count === 0) return 'no local ethagent data found'
+  if (count === 0) return 'No local ethagent data found'
   return `${count} local path${count === 1 ? '' : 's'} under ~/.ethagent`
 }

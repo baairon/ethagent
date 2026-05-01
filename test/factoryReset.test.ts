@@ -53,8 +53,8 @@ test('ethagent reset requires confirm by default and supports --yes for automati
     })
 
     assert.equal(denied, 1)
-    assert.match(deniedOutput.join(''), /type confirm/)
-    assert.match(deniedOutput.join(''), /factory reset cancelled/)
+    assert.match(deniedOutput.join(''), /Reset Cancelled/)
+    assert.doesNotMatch(deniedOutput.join(''), /Type CONFIRM/)
     await assertExists(path.join(root, 'config.json'))
 
     const allowedOutput: string[] = []
@@ -65,8 +65,14 @@ test('ethagent reset requires confirm by default and supports --yes for automati
     })
 
     assert.equal(allowed, 0)
-    assert.match(allowedOutput.join(''), /factory reset complete/)
-    assert.match(allowedOutput.join(''), /local LLM assets/)
+    assert.match(allowedOutput.join(''), /Ethagent Reset/)
+    assert.match(allowedOutput.join(''), /Deletes:/)
+    assert.match(allowedOutput.join(''), /Keeps:/)
+    assert.match(allowedOutput.join(''), /Not Touched:/)
+    assert.match(allowedOutput.join(''), /Reset Complete/)
+    assert.match(allowedOutput.join(''), /Kept \d+ local model paths?/)
+    assert.doesNotMatch(allowedOutput.join(''), /\.salt/)
+    assert.doesNotMatch(allowedOutput.join(''), /Type CONFIRM/)
     await assertMissing(path.join(root, 'config.json'))
     await assertExists(path.join(root, 'models', 'huggingface', 'model.gguf'))
   })

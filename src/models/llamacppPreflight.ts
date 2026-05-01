@@ -43,7 +43,7 @@ export async function ensureLlamaCppRunnerReady(
       message: formatPreflightFailure(
         'local model is not imported',
         config.model,
-        'choose an imported Hugging Face GGUF model from view full catalog or add a local model file',
+        'choose an imported GGUF model from View Full Catalog or Add Local Model File',
       ),
     }
   }

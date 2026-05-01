@@ -59,7 +59,7 @@ export const RestoreFlow: React.FC<RestoreFlowProps> = ({
         <Select<'connect'>
           options={[
             { value: 'connect', role: 'section', prefix: '--', label: 'Wallet' },
-            { value: 'connect', label: 'connect wallet', hint: 'search tokens owned by browser wallet' },
+            { value: 'connect', label: 'Connect Wallet', hint: 'Search tokens owned by browser wallet' },
           ]}
           hintLayout="inline"
           onSubmit={onConnectWallet}
@@ -137,7 +137,7 @@ export const RestoreFlow: React.FC<RestoreFlowProps> = ({
       >
         <Select<string>
           options={[
-            { value: 'section:owned-agents', role: 'section', prefix: '--', label: 'Owned agents' },
+            { value: 'section:owned-agents', role: 'section', prefix: '--', label: 'Owned Agents' },
             ...step.candidates.map(candidate => {
               const current = isSwitch && isCurrentAgentCandidate(config?.identity, candidate)
               return {

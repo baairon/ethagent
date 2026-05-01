@@ -37,7 +37,7 @@ export async function runResetCommand(args: string[] = [], io: ResetCommandIO = 
       ? await readTextConfirmation(plan, io)
       : await readInkConfirmation(plan, io)
     if (!confirmed) {
-      write('factory reset cancelled.\n')
+      write('Reset Cancelled.\n')
       return 1
     }
   } else {
@@ -46,12 +46,12 @@ export async function runResetCommand(args: string[] = [], io: ResetCommandIO = 
 
   const result = await runFactoryReset({ clearSecrets: io.clearSecrets })
   write([
-    'factory reset complete.',
-    `deleted ${result.deletedPaths.length} local path${result.deletedPaths.length === 1 ? '' : 's'}.`,
-    `cleared ${result.clearedSecretAccounts.length} known secret account${result.clearedSecretAccounts.length === 1 ? '' : 's'}.`,
+    'Reset Complete.',
+    `Deleted ${result.deletedPaths.length} local path${result.deletedPaths.length === 1 ? '' : 's'}.`,
+    `Cleared ${result.clearedSecretAccounts.length} secret account${result.clearedSecretAccounts.length === 1 ? '' : 's'}.`,
     result.preservedPaths.length > 0
-      ? `preserved local LLM assets: ${result.preservedPaths.length} path${result.preservedPaths.length === 1 ? '' : 's'}.`
-      : 'no local model assets were present.',
+      ? `Kept ${result.preservedPaths.length} local model path${result.preservedPaths.length === 1 ? '' : 's'}.`
+      : 'Kept no local model assets.',
     '',
   ].join('\n'))
   return 0
@@ -90,7 +90,6 @@ async function readInkConfirmation(plan: FactoryResetPlan, io: ResetCommandIO): 
 
 async function readConfirmation(io: ResetCommandIO): Promise<string> {
   if (io.readConfirmation) {
-    ;(io.write ?? (text => { processStdout.write(text) }))('type confirm to wipe local ethagent data: ')
     return io.readConfirmation()
   }
 
@@ -99,7 +98,7 @@ async function readConfirmation(io: ResetCommandIO): Promise<string> {
     output: io.output ?? processStdout,
   })
   try {
-    return await rl.question('type confirm to wipe local ethagent data: ')
+    return await rl.question('Confirm reset: ')
   } finally {
     rl.close()
   }

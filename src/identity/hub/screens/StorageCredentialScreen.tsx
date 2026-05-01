@@ -86,9 +86,9 @@ export const StorageCredentialScreen: React.FC<StorageCredentialScreenProps> = (
           <Select<StorageCredentialAction>
             options={[
               { value: 'forget', role: 'section', prefix: '--', label: 'Credential' },
-              { value: 'forget', label: 'forget credential', hint: 'remove local IPFS pinning token' },
+              { value: 'forget', label: 'Forget Credential', hint: 'Remove local IPFS pinning token' },
               { value: 'back', role: 'section', prefix: '--', label: 'Navigation' },
-              { value: 'back', label: 'keep credential', hint: 'return without changing storage access', role: 'utility' },
+              { value: 'back', label: 'Keep Credential', hint: 'Return without changing storage access', role: 'utility' },
             ]}
             hintLayout="inline"
             onSubmit={choice => choice === 'forget' ? onConfirmForget() : onCancel()}
@@ -109,10 +109,10 @@ export const StorageCredentialScreen: React.FC<StorageCredentialScreenProps> = (
         <Select<StorageCredentialAction>
           options={[
             { value: 'edit', role: 'section', prefix: '--', label: 'Credential' },
-            { value: 'edit', label: hasCredential ? 'replace credential' : 'save credential', hint: 'store Pinata JWT for IPFS pinning' },
-            { value: 'forget', label: 'forget credential', hint: 'remove the local pinning token; existing pins remain', disabled: !hasCredential },
+            { value: 'edit', label: hasCredential ? 'Replace Credential' : 'Save Credential', hint: 'Store Pinata JWT for IPFS pinning' },
+            { value: 'forget', label: 'Forget Credential', hint: 'Remove the local pinning token; existing pins remain', disabled: !hasCredential },
             { value: 'back', role: 'section', prefix: '--', label: 'Navigation' },
-            { value: 'back', label: 'back to identity hub', hint: 'return without changing storage access', role: 'utility' },
+            { value: 'back', label: 'Back To Identity Hub', hint: 'Return without changing storage access', role: 'utility' },
           ]}
           hintLayout="inline"
           onSubmit={choice => {

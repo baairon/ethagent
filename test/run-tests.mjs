@@ -16,6 +16,7 @@ const compile = spawnSync(
 )
 
 if (compile.status !== 0) {
+  await fs.rm(outDir, { recursive: true, force: true })
   process.exit(compile.status ?? 1)
 }
 

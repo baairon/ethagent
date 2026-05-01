@@ -12,23 +12,10 @@ import { AppInputProvider, useAppInput } from '../app/input/AppInputProvider.js'
 import { loadConfig, type EthagentConfig } from '../storage/config.js'
 import { runResetCommand } from './reset.js'
 import { runPreviewCommand } from './preview.js'
+import { checkForUpdates } from './updateNotice.js'
+import { Spinner } from '../ui/Spinner.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const pkgPath = path.resolve(__dirname, '..', '..', 'package.json')
-const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'))
-
-async function checkForUpdates(): Promise<string | null> {
-  try {
-    const res = await fetch('https://registry.npmjs.org/ethagent/latest', { signal: AbortSignal.timeout(1200) })
-    const { version: latest } = await res.json() as { version: string }
-    if (latest && latest !== pkg.version) {
-      return `✨ update available · run npm i -g ethagent`
-    }
-  } catch {
-    // Silent fail for offline/timeout
-  }
-  return null
-}
 
 function readVersion(): string {
   try {
@@ -64,17 +51,24 @@ type AppPhase =
   | { kind: 'cancelled' }
   | { kind: 'error'; message: string }
 
-const AppRoot: React.FC<{ setExitCode: (code: number) => void; updateNotice: string | null }> = ({ setExitCode, updateNotice }) => {
+const MIN_STARTUP_SPINNER_MS = 480
+
+function delay(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+const AppRoot: React.FC<{ setExitCode: (code: number) => void; currentVersion: string }> = ({ setExitCode, currentVersion }) => {
   const [phase, setPhase] = useState<AppPhase>({ kind: 'loading' })
+  const [updateNotice, setUpdateNotice] = useState<string | null>(null)
   const { exit } = useApp()
 
   useEffect(() => {
     if (phase.kind !== 'loading') return
     let cancelled = false
-    loadConfig()
+    Promise.all([loadConfig(), delay(MIN_STARTUP_SPINNER_MS)])
       .then(config => {
         if (cancelled) return
-        setPhase(config ? { kind: 'ready', config } : { kind: 'setup' })
+        setPhase(config[0] ? { kind: 'ready', config: config[0] } : { kind: 'setup' })
       })
       .catch((err: unknown) => {
         if (cancelled) return
@@ -82,6 +76,16 @@ const AppRoot: React.FC<{ setExitCode: (code: number) => void; updateNotice: str
       })
     return () => { cancelled = true }
   }, [phase])
+
+  useEffect(() => {
+    let cancelled = false
+    void checkForUpdates(currentVersion)
+      .then(notice => {
+        if (!cancelled) setUpdateNotice(notice)
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [currentVersion])
 
   useEffect(() => {
     if (phase.kind === 'cancelled') {
@@ -103,7 +107,11 @@ const AppRoot: React.FC<{ setExitCode: (code: number) => void; updateNotice: str
   })
 
   if (phase.kind === 'loading') {
-    return null
+    return (
+      <Box padding={1}>
+        <Spinner label="Starting ethagent..." showElapsed={false} />
+      </Box>
+    )
   }
   if (phase.kind === 'setup') {
     return (
@@ -136,12 +144,12 @@ const AppRoot: React.FC<{ setExitCode: (code: number) => void; updateNotice: str
   )
 }
 
-async function runDefault(updateNotice: string | null): Promise<number> {
+async function runDefault(currentVersion: string): Promise<number> {
   let exitCode = 0
   const instance = render(
     <AppInputProvider>
       <KeybindingProvider>
-        <AppRoot setExitCode={code => { exitCode = code }} updateNotice={updateNotice} />
+        <AppRoot setExitCode={code => { exitCode = code }} currentVersion={currentVersion} />
       </KeybindingProvider>
     </AppInputProvider>,
     {
@@ -160,9 +168,7 @@ async function main(): Promise<number> {
   const argv = process.argv.slice(2)
   const [cmd, ...rest] = argv
 
-  const updateNotice = await checkForUpdates()
-
-  if (!cmd) return runDefault(updateNotice)
+  if (!cmd) return runDefault(readVersion())
   if (cmd === '--version' || cmd === '-v') {
     process.stdout.write(`ethagent ${readVersion()}\n`)
     return 0

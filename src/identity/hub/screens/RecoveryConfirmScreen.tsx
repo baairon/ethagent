@@ -20,7 +20,7 @@ export const RecoveryConfirmScreen: React.FC<RecoveryConfirmScreenProps> = ({ mo
   const isPublish = mode === 'publish'
   const title = isPublish ? 'Save Snapshot?' : 'Refetch Latest From Chain?'
   const subtitle = isPublish
-    ? 'Saves any local edits to SOUL.md, MEMORY.md, skills.json, and public profile metadata.'
+    ? 'Saves any local edits to SOUL.md, MEMORY.md, skills.json, and public profile.'
     : 'This overwrites local files with the on-chain version.'
 
   const headlineColor = isPublish ? theme.accentPeach : theme.accentMint
@@ -28,7 +28,7 @@ export const RecoveryConfirmScreen: React.FC<RecoveryConfirmScreenProps> = ({ mo
     ? 'Saving updates the on-chain pointer for this agent.'
     : 'Refetching replaces local SOUL.md, MEMORY.md, and skills.json with what is on chain.'
   const detail = isPublish
-    ? 'Local edits to SOUL.md, MEMORY.md, skills.json, and public profile metadata become the saved state. The previous snapshot pointer is overwritten.'
+    ? 'Any local edits to SOUL.md, MEMORY.md, skills.json, and public profile become the saved state. The previous snapshot pointer is overwritten.'
     : 'Unsaved local edits will be lost. Use this when local files are missing or out of sync with the latest saved snapshot.'
 
   const needsBackup = workingStatus?.publishState === 'local-changes' || workingStatus?.publishState === 'not-published' || workingStatus?.publishState === 'verify-needed'

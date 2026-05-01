@@ -80,7 +80,7 @@ test('identity hub summary always shows the short state CID for the menu card', 
   assert.deepEqual(rows.map(row => row.label), ['owner', 'token', 'network', 'state', 'skills', 'card', 'image'])
   assert.equal(rows[3]?.value, 'bafybeigdy...3w6y7q')
   assert.equal(rows[0]?.value, '0x0000...dEaD')
-  assert.equal(rows[5]?.value, 'not published')
+  assert.equal(rows[5]?.value, 'not saved')
   assert.equal(rows[6]?.value, 'not attached')
 })
 
@@ -91,8 +91,8 @@ test('identity hub summary collapses gracefully when no identity is loaded', () 
   assert.equal(rows[1]?.value, 'not created')
   assert.equal(rows[2]?.value, 'ethereum mainnet')
   assert.equal(rows[3]?.value, 'not saved yet')
-  assert.equal(rows[4]?.value, 'not published')
-  assert.equal(rows[5]?.value, 'not published')
+  assert.equal(rows[4]?.value, 'not saved')
+  assert.equal(rows[5]?.value, 'not saved')
   assert.equal(rows[6]?.value, 'not attached')
 })
 
@@ -223,7 +223,7 @@ test('copyableIdentityFields returns the user-actionable values for the copy pic
       status: 'pinned',
     },
   })
-  assert.deepEqual(fields.map(f => f.label), ['state CID', 'registration CID', 'agent URI', 'owner address', 'token id'])
+  assert.deepEqual(fields.map(f => f.label), ['State CID', 'Registration CID', 'Agent URI', 'Owner Address', 'Token ID'])
   assert.equal(copyableIdentityFields(undefined).length, 0)
 })
 
@@ -260,7 +260,7 @@ test('token candidate hint falls back to network only when no backup is pinned y
     registration: null,
   } as const
 
-  assert.equal(tokenCandidateLabel(candidate), 'agent token #1')
+  assert.equal(tokenCandidateLabel(candidate), 'Agent Token #1')
   assert.equal(tokenCandidateHint(candidate), 'ethereum mainnet')
 })
 
@@ -289,8 +289,8 @@ test('current agent candidate marker requires the selected token identity', () =
   assert.equal(isCurrentAgentCandidate(identity, { ...candidate, agentId: 1n }), false)
   assert.equal(isCurrentAgentCandidate(identity, { ...candidate, chainId: 1 }), false)
   assert.equal(isCurrentAgentCandidate(undefined, candidate), false)
-  assert.equal(tokenCandidateSelectLabel(candidate, true), 'agent token #45744  *')
-  assert.equal(tokenCandidateSelectLabel(candidate, false), 'agent token #45744')
+  assert.equal(tokenCandidateSelectLabel(candidate, true), 'Agent Token #45744  *')
+  assert.equal(tokenCandidateSelectLabel(candidate, false), 'Agent Token #45744')
 })
 
 function assertNoNetworkJargon(value: string): void {

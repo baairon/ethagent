@@ -93,7 +93,7 @@ export function tokenLabel(candidate: Erc8004AgentCandidate): string {
 }
 
 export function tokenCandidateLabel(candidate: Erc8004AgentCandidate): string {
-  return candidate.name?.trim() || `agent token #${candidate.agentId.toString()}`
+  return candidate.name?.trim() || `Agent Token #${candidate.agentId.toString()}`
 }
 
 export function tokenCandidateSelectLabel(
@@ -273,14 +273,14 @@ export type CopyableField = {
 export function copyableIdentityFields(identity?: EthagentIdentity): CopyableField[] {
   if (!identity) return []
   const fields: CopyableField[] = []
-  if (identity.backup?.cid) fields.push({ label: 'state CID', value: identity.backup.cid })
-  if (identity.publicSkills?.cid) fields.push({ label: 'skills CID', value: identity.publicSkills.cid })
-  if (identity.publicSkills?.agentCardCid) fields.push({ label: 'agent card CID', value: identity.publicSkills.agentCardCid })
-  if (identity.metadataCid) fields.push({ label: 'registration CID', value: identity.metadataCid })
-  if (identity.agentUri) fields.push({ label: 'agent URI', value: identity.agentUri })
+  if (identity.backup?.cid) fields.push({ label: 'State CID', value: identity.backup.cid })
+  if (identity.publicSkills?.cid) fields.push({ label: 'Skills CID', value: identity.publicSkills.cid })
+  if (identity.publicSkills?.agentCardCid) fields.push({ label: 'Agent Card CID', value: identity.publicSkills.agentCardCid })
+  if (identity.metadataCid) fields.push({ label: 'Registration CID', value: identity.metadataCid })
+  if (identity.agentUri) fields.push({ label: 'Agent URI', value: identity.agentUri })
   const owner = identity.ownerAddress ?? identity.address
-  if (owner) fields.push({ label: 'owner address', value: owner })
-  if (identity.agentId) fields.push({ label: 'token id', value: identity.agentId })
+  if (owner) fields.push({ label: 'Owner Address', value: owner })
+  if (identity.agentId) fields.push({ label: 'Token ID', value: identity.agentId })
   return fields
 }
 

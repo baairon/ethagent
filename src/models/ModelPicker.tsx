@@ -167,8 +167,8 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
 
   if (state.kind === 'loading') {
     return (
-      <Surface title={contextFit ? 'Switch to Larger-Context Model' : 'Switch Provider / Model'} subtitle="Loading providers and models.">
-        <Spinner label="loading providers..." />
+      <Surface title={contextFit ? 'Switch to Larger-Context Model' : 'Switch Provider · Model'} subtitle="Loading providers and models.">
+        <Spinner label="Loading providers..." />
       </Surface>
     )
   }
@@ -178,10 +178,10 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
       <Surface
         title="Add Local Model"
         subtitle={LOCAL_MODEL_LINK_EXAMPLE}
-        footer="enter checks link · esc returns to picker"
+        footer="enter check link · esc back"
       >
         <TextInput
-          label="model link"
+          label="Model Link"
           placeholder={LOCAL_MODEL_LINK_HINT}
           onSubmit={value => void inspectHfInput(state, value, setState)}
           onCancel={() => setState({ kind: 'list', data: state.data })}
@@ -194,19 +194,19 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
   if (state.kind === 'hfLoading') {
     return (
       <Surface title="Checking Model Link" subtitle={state.input}>
-        <Spinner label="reading model page..." />
+        <Spinner label="Reading model page..." />
       </Surface>
     )
   }
 
   if (state.kind === 'hfFilePick') {
     const options = buildHfFileOptions(state.repo, state.files, state.data.machineSpec, state.data.hfModels.map(model => model.id))
-    const recommendedIndex = Math.max(0, options.findIndex(option => option.subtext?.includes('recommended')))
+    const recommendedIndex = Math.max(0, options.findIndex(option => option.subtext?.includes('Recommended')))
     return (
       <Surface
         title="Choose a Compatible File"
         subtitle={`${state.repo.repoId} has ${state.files.length} compatible local model file${state.files.length === 1 ? '' : 's'}.`}
-        footer="enter selects · esc returns to link input"
+        footer="enter select · esc back"
       >
         <Select
           options={options}
@@ -228,7 +228,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
       <Surface
         title="Review Model Link"
         subtitle="Only download models from creators you trust. Check the license and source before continuing."
-        footer="enter selects · esc returns to picker"
+        footer="enter select · esc back"
         tone={plan.review.risk === 'high' ? 'error' : plan.review.risk === 'medium' ? 'muted' : 'primary'}
       >
         <Box flexDirection="column" marginBottom={1}>
@@ -243,9 +243,9 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
         </Box>
         <Select<'download' | 'pick' | 'cancel'>
           options={[
-            { value: 'download', label: 'download this model', disabled: !canDownload },
-            { value: 'pick', label: 'pick another file' },
-            { value: 'cancel', label: 'cancel' },
+            { value: 'download', label: 'Download This Model', disabled: !canDownload },
+            { value: 'pick', label: 'Pick Another File' },
+            { value: 'cancel', label: 'Cancel' },
           ]}
           onSubmit={choice => {
             if (choice === 'download') void startHfDownload(state, setState, hfAbortRef, onPick)
@@ -276,12 +276,12 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
       <Surface
         title={state.alreadyInstalled ? 'Model Already Downloaded' : 'Model Ready'}
         subtitle={state.model.displayName}
-        footer="enter selects · esc returns to picker"
+        footer="enter select · esc back"
       >
         <Select<'use' | 'back'>
           options={[
-            { value: 'use', label: 'use this model now' },
-            { value: 'back', label: 'back to picker' },
+            { value: 'use', label: 'Use This Model Now' },
+            { value: 'back', label: 'Back To Picker' },
           ]}
           onSubmit={choice => {
             if (choice === 'use') void startAndPickHfModel(state.model, state, setState, onPick)
@@ -295,11 +295,11 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
 
   if (state.kind === 'hfError') {
     return (
-      <Surface title="Model Link Failed" subtitle={state.message} tone="error" footer="enter selects · esc returns to picker">
+      <Surface title="Model Link Failed" subtitle={state.message} tone="error" footer="enter select · esc back">
         <Select<'retry' | 'back'>
           options={[
-            { value: 'retry', label: state.input ? 'retry link' : 'download another model' },
-            { value: 'back', label: 'back to picker' },
+            { value: 'retry', label: state.input ? 'Retry Link' : 'Download Another Model' },
+            { value: 'back', label: 'Back To Picker' },
           ]}
           onSubmit={choice => {
             if (choice === 'retry') setState({ kind: 'hfInput', data: state.data, error: state.input ? undefined : state.message })
@@ -324,7 +324,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
       role: 'option' as const,
     }))
     return (
-      <Surface title="Uninstall Downloaded GGUF" subtitle="Choose a downloaded model file to remove." footer="enter selects · esc returns to picker">
+      <Surface title="Uninstall Downloaded GGUF" subtitle="Choose a downloaded model file to remove." footer="enter select · esc back">
         {options.length === 0 ? (
           <Text color={theme.dim}>No local models found.</Text>
         ) : (
@@ -345,15 +345,15 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
   if (state.kind === 'localUninstallConfirm') {
     const modelName = state.target.displayName
     return (
-      <Surface title="Confirm Uninstall" subtitle={modelName} footer="enter selects · esc returns to model list">
+      <Surface title="Confirm Uninstall" subtitle={modelName} footer="enter select · esc back">
         <Box flexDirection="column" marginBottom={1}>
           <Text color={theme.dim}>{localUninstallBoundaryCopy(state.target)}</Text>
           <Text color={theme.dim}>Runner binaries are left unchanged.</Text>
         </Box>
         <Select<'confirm' | 'back'>
           options={[
-            { value: 'confirm', label: 'uninstall local model' },
-            { value: 'back', label: 'back' },
+            { value: 'confirm', label: 'Uninstall Local Model' },
+            { value: 'back', label: 'Back' },
           ]}
           onSubmit={choice => {
             if (choice === 'confirm') void uninstallLocalModel(state, setState)
@@ -378,9 +378,9 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
 
   if (state.kind === 'localUninstallDone') {
     return (
-      <Surface title="Local Model Uninstalled" subtitle={state.modelName} footer="enter returns to picker · esc closes">
+      <Surface title="Local Model Uninstalled" subtitle={state.modelName} footer="enter back to picker · esc close">
         <Select<'back'>
-          options={[{ value: 'back', label: 'back to picker' }]}
+          options={[{ value: 'back', label: 'Back To Picker' }]}
           onSubmit={() => setState({ kind: 'list', data: state.data })}
           onCancel={() => setState({ kind: 'list', data: state.data })}
         />
@@ -390,11 +390,11 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
 
   if (state.kind === 'localUninstallError') {
     return (
-      <Surface title="Could Not Uninstall Local Model" subtitle={state.message} tone="error" footer="enter selects · esc returns to picker">
+      <Surface title="Could Not Uninstall Local Model" subtitle={state.message} tone="error" footer="enter select · esc back">
         <Select<'retry' | 'back'>
           options={[
-            { value: 'retry', label: 'try again' },
-            { value: 'back', label: 'back to picker' },
+            { value: 'retry', label: 'Try Again' },
+            { value: 'back', label: 'Back To Picker' },
           ]}
           onSubmit={choice => {
             if (choice === 'retry') void uninstallLocalModel({ kind: 'localUninstallConfirm', data: state.data, target: state.target }, setState)
@@ -411,7 +411,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
       <Surface
         title="Install Local Runner"
         subtitle="This model is downloaded. Install the local runner once to start it here."
-        footer="enter selects · esc returns to picker"
+        footer="enter select · esc back"
       >
         <Box flexDirection="column" marginBottom={1}>
           <Text color={theme.dim}>Ethagent tried to start {friendlyFileName(state.model.filename)} automatically.</Text>
@@ -420,10 +420,10 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
         </Box>
         <Select<'install' | 'path' | 'back' | 'download'>
           options={[
-            { value: 'install', label: 'install local runner' },
-            { value: 'path', label: 'use existing runner path' },
-            { value: 'back', label: 'back to picker' },
-            { value: 'download', label: 'add another local model' },
+            { value: 'install', label: 'Install Local Runner' },
+            { value: 'path', label: 'Use Existing Runner Path' },
+            { value: 'back', label: 'Back To Picker' },
+            { value: 'download', label: 'Add Another Local Model' },
           ]}
           onSubmit={choice => {
             if (choice === 'download') setState({ kind: 'hfInput', data: state.data })
@@ -449,7 +449,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
   if (state.kind === 'localRunnerInstallFail') {
     const options = buildRunnerRecoveryOptions(state.result)
     return (
-      <Surface title="Runner Setup Needs Attention" subtitle={state.result.message} tone="error" footer="enter selects · esc returns to picker">
+      <Surface title="Runner Setup Needs Attention" subtitle={state.result.message} tone="error" footer="enter select · esc back">
         <Select<'retry' | 'build' | 'path' | 'back'>
           options={options}
           onSubmit={choice => {
@@ -469,7 +469,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
       <Surface
         title="Runner Path"
         subtitle="Paste the full path to llama-server."
-        footer="enter saves · esc returns to install"
+        footer="enter save · esc back"
       >
         {state.submitting ? (
           <Spinner label="checking runner path..." />
@@ -489,20 +489,20 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
   if (state.kind === 'localRunnerStarting') {
     return (
       <Surface title="Starting Local Model" subtitle={state.model.displayName}>
-        <ElapsedSpinner startedAt={state.startedAt} label="starting local runner" />
+        <ElapsedSpinner startedAt={state.startedAt} label="Starting local runner" />
       </Surface>
     )
   }
 
   if (state.kind === 'localRunnerStartFail') {
     return (
-      <Surface title="Local Model Failed to Start" subtitle={localRunnerStartFailureSubtitle(state.result)} tone="error" footer="enter selects · esc returns to picker">
+      <Surface title="Local Model Failed to Start" subtitle={localRunnerStartFailureSubtitle(state.result)} tone="error" footer="enter select · esc back">
         <Select<'retry' | 'path' | 'install' | 'back'>
           options={[
-            { value: 'retry', label: 'try again' },
-            { value: 'path', label: 'use existing runner path' },
-            { value: 'install', label: 'install local runner' },
-            { value: 'back', label: 'back to picker' },
+            { value: 'retry', label: 'Try Again' },
+            { value: 'path', label: 'Use Existing Runner Path' },
+            { value: 'install', label: 'Install Local Runner' },
+            { value: 'back', label: 'Back To Picker' },
           ]}
           onSubmit={choice => {
             if (choice === 'retry') void startAndPickHfModel(state.model, { kind: 'hfDone', data: state.data, model: state.model }, setState, onPick)
@@ -522,7 +522,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
       <Surface
         title={`${capitalize(action)} ${provider} API Key`}
         subtitle="Stored in your OS keyring when available; never written to config in plaintext."
-        footer="enter saves · esc returns to picker"
+        footer="enter save · esc back"
       >
         {submitting ? (
           <Spinner label={`saving ${provider} key...`} />
@@ -546,16 +546,16 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
       <Surface
         title={`${capitalize(provider)} API Key`}
         subtitle="Manage the stored key for this provider."
-        footer="enter selects · esc returns to picker"
+        footer="enter select · esc back"
       >
         {submitting ? (
           <Spinner label={`removing ${provider} key...`} />
         ) : (
           <Select
             options={[
-              { value: 'edit', label: 'replace stored api key' },
-              { value: 'delete', label: 'remove stored api key' },
-              { value: 'cancel', label: 'back' },
+              { value: 'edit', label: 'Replace Stored API Key' },
+              { value: 'delete', label: 'Remove Stored API Key' },
+              { value: 'cancel', label: 'Back' },
             ]}
             onSubmit={(value) => {
               if (value === 'edit') {
@@ -590,7 +590,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
       <Surface
         title={`${capitalize(state.provider)} Full Catalog`}
         subtitle={contextFit ? contextFitSubtitle(contextFit) : 'All discovered models for this provider'}
-        footer="enter selects · esc returns to picker"
+        footer="enter select · esc back"
       >
         <Select
           options={options}
@@ -608,20 +608,20 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
 
   if (state.kind === 'localCatalogLoading') {
     return (
-      <Surface title="view full catalog" subtitle="loading files from configured hugging face repo.">
-        <Spinner label="reading hugging face files..." />
+      <Surface title="View Full Catalog" subtitle="Loading curated local GGUF files.">
+        <Spinner label="Reading Hugging Face files..." />
       </Surface>
     )
   }
 
   if (state.kind === 'localCatalogError') {
     return (
-      <Surface title="view full catalog failed" subtitle={state.message} tone="error" footer="enter selects · esc returns to picker">
+      <Surface title="Catalog Failed" subtitle={state.message} tone="error" footer="enter select · esc back">
         <Select<'retry' | 'paste' | 'back'>
           options={[
-            { value: 'retry', label: 'retry catalog' },
-            { value: 'paste', label: 'paste a GGUF link' },
-            { value: 'back', label: 'back to picker' },
+            { value: 'retry', label: 'Retry Catalog' },
+            { value: 'paste', label: 'Paste GGUF Link' },
+            { value: 'back', label: 'Back To Picker' },
           ]}
           onSubmit={choice => {
             if (choice === 'retry') void openLocalCatalog(state.data, setState)
@@ -639,9 +639,9 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
     const initialIndex = localModelOptionIndex(options, currentProvider, currentModel)
     return (
       <Surface
-        title="view full catalog"
-        subtitle="one recommendation for this machine + install status"
-        footer="enter selects · esc returns to picker"
+        title="View Full Catalog"
+        subtitle="Curated local GGUF files with recommendation and install status."
+        footer="enter select · esc back"
       >
         <Select
           options={options}
@@ -660,9 +660,9 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
 
   return (
     <Surface
-      title={contextFit ? 'Switch to Larger-Context Model' : 'Switch Provider / Model'}
-      subtitle={contextFit ? contextFitSubtitle(contextFit) : 'Downloaded GGUF files + cloud providers'}
-      footer="enter selects · esc closes · /models lists installed models"
+      title={contextFit ? 'Switch to Larger-Context Model' : 'Switch Provider · Model'}
+      subtitle={contextFit ? contextFitSubtitle(contextFit) : 'Downloaded GGUF files · cloud providers'}
+      footer="enter select · esc close · /models lists installed models"
     >
       <Select
         options={options}
@@ -798,7 +798,7 @@ function buildCatalogOptions(
   if (!catalog || catalog.entries.length === 0) {
     return [{
       value: `hdr:catalog-empty:${provider}`,
-      label: 'no models found',
+      label: 'No Models Found',
       disabled: true,
       role: 'notice',
       prefix: 'note',
@@ -953,8 +953,8 @@ export function buildHfFileOptions(
   return ordered.map(item => {
     const size = item.file.sizeBytes ? formatBytes(item.file.sizeBytes) : ''
     const indicators = [
-      item.file.filename === recommended ? 'recommended' : '',
-      installed.has(localModelId(repo.repoId, item.file.filename)) ? 'installed' : '',
+      item.file.filename === recommended ? 'Recommended' : '',
+      installed.has(localModelId(repo.repoId, item.file.filename)) ? 'Installed' : '',
     ]
     return {
       value: item.file.filename,
@@ -972,17 +972,17 @@ function buildRunnerRecoveryOptions(
   if (result.recovery.includes('source-build')) {
     options.push({
       value: 'build',
-      label: 'build local runner',
-      hint: 'uses git and cmake if installed',
+      label: 'Build Local Runner',
+      hint: 'Uses git and CMake if installed',
     })
   }
   if (result.recovery.includes('runner-path')) {
-    options.push({ value: 'path', label: 'use existing runner path' })
+    options.push({ value: 'path', label: 'Use Existing Runner Path' })
   }
   if (result.recovery.includes('retry-install')) {
-    options.push({ value: 'retry', label: 'retry automatic install' })
+    options.push({ value: 'retry', label: 'Retry Automatic Install' })
   }
-  options.push({ value: 'back', label: 'back to picker' })
+  options.push({ value: 'back', label: 'Back To Picker' })
   return options
 }
 
@@ -1256,7 +1256,7 @@ async function runRunnerSetup(
   const startedAt = Date.now()
   const initialProgress: LlamaCppInstallProgress = {
     phase: 'checking',
-    label: 'preparing local runner',
+    label: 'Preparing local runner',
     progress: 0.04,
   }
   const updateProgress = (progress: LlamaCppInstallProgress): void => {
@@ -1373,16 +1373,16 @@ function fitColor(fit: GgufMachineFit): string {
 }
 
 function fitLabel(fit: GgufMachineFit, recommended: boolean): string {
-  if (recommended && fit !== 'too-large') return 'recommended for this machine'
-  if (recommended) return 'best match found; may be too large'
+  if (recommended && fit !== 'too-large') return 'Recommended for this machine'
+  if (recommended) return 'Best match found; may be too large'
   return fileFitHint(fit)
 }
 
 function fileFitHint(fit: GgufMachineFit): string {
   switch (fit) {
-    case 'fits': return 'fits this machine'
-    case 'tight': return 'may be slow or tight on memory'
-    case 'too-large': return 'likely too large for this machine'
+    case 'fits': return 'Fits this machine'
+    case 'tight': return 'May be slow or tight on memory'
+    case 'too-large': return 'Likely too large for this machine'
     case 'unknown': return 'machine fit unknown'
   }
 }

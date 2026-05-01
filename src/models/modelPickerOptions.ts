@@ -11,7 +11,7 @@ import type { UncensoredCatalogEntry } from './uncensoredCatalog.js'
 export type CloudProviderId = Exclude<ProviderId, 'llamacpp'>
 
 export const MODEL_PICKER_CLOUD_PROVIDERS: CloudProviderId[] = ['openai', 'anthropic', 'gemini']
-export const LOCAL_MODEL_LINK_HINT = 'paste a GGUF link'
+export const LOCAL_MODEL_LINK_HINT = 'Paste a GGUF link'
 export const LOCAL_MODEL_LINK_EXAMPLE = 'e.g. https://huggingface.co/Qwen/Qwen3-8B-GGUF'
 
 export type LocalHfPickerModel = {
@@ -57,20 +57,20 @@ export function buildModelPickerOptions(
 ): SelectOption<string>[] {
   const options: SelectOption<string>[] = []
 
-  options.push(sectionOption('hdr:local', 'local models'))
-  appendHfModelOptions(options, data, context, 'added from links', 46)
-  options.push(utilityOption('hf:download', 'add local model file', LOCAL_MODEL_LINK_HINT))
-  options.push(utilityOption('local:catalog', 'view full catalog', 'from configured hugging face repo'))
+  options.push(sectionOption('hdr:local', 'Local Models'))
+  appendHfModelOptions(options, data, context, 'Added From Links', 46)
+  options.push(utilityOption('hf:download', 'Add Local Model File', LOCAL_MODEL_LINK_HINT))
+  options.push(utilityOption('local:catalog', 'View Full Catalog', 'Curated local GGUF files'))
   if (data.hfModels.length > 0) {
-    options.push(utilityOption('local:uninstall', 'uninstall downloaded GGUF'))
+    options.push(utilityOption('local:uninstall', 'Uninstall Downloaded GGUF'))
   }
 
-  options.push(sectionOption('hdr:cloud', 'cloud'))
+  options.push(sectionOption('hdr:cloud', 'Cloud'))
   for (const provider of MODEL_PICKER_CLOUD_PROVIDERS) {
     options.push(groupOption(`hdr:cloud:${provider}`, provider))
     const keySet = data.cloudKeys[provider] === true
     if (!keySet) {
-      options.push(utilityOption(`key:set:${provider}`, 'api key · add'))
+      options.push(utilityOption(`key:set:${provider}`, 'API Key · Add'))
       continue
     }
 
@@ -79,14 +79,14 @@ export function buildModelPickerOptions(
       const reason = catalog.error ? ` · ${catalog.error}` : ''
       options.push(noticeOption(
         `hdr:cloud-fallback:${provider}`,
-        `catalog unavailable${reason} · showing configured model`,
+        `Catalog unavailable${reason} · showing configured model`,
         CHILD_INDENT,
       ))
     }
 
     const models = orderModelsForContextFit(provider, cloudPickerModels(provider, catalog, context), context.contextFit)
     if (models.length === 0) {
-      options.push(noticeOption(`hdr:cloud-empty:${provider}`, 'no selectable models', CHILD_INDENT))
+      options.push(noticeOption(`hdr:cloud-empty:${provider}`, 'No selectable models', CHILD_INDENT))
     }
     for (const model of models) {
       const active = context.currentProvider === provider && context.currentModel === model
@@ -96,8 +96,8 @@ export function buildModelPickerOptions(
         contextFitLabel(provider, model, `${displayName}${active ? '  *' : ''}`, context.contextFit),
       ))
     }
-    options.push(utilityOption(`catalog:${provider}`, 'full catalog'))
-    options.push(utilityOption(`key:manage:${provider}`, 'api key · manage'))
+    options.push(utilityOption(`catalog:${provider}`, 'Full Catalog'))
+    options.push(utilityOption(`key:manage:${provider}`, 'API Key · Manage'))
   }
 
   return options
@@ -109,10 +109,10 @@ export function buildLocalModelCatalogOptions(
   catalog: UncensoredCatalogEntry[] = [],
 ): SelectOption<string>[] {
   const options: SelectOption<string>[] = []
-  options.push(sectionOption('hdr:local-catalog', 'view full catalog'))
-  options.push(groupOption('hdr:uncensored:catalog', 'hugging face gguf files'))
+  options.push(sectionOption('hdr:local-catalog', 'View Full Catalog'))
+  options.push(groupOption('hdr:uncensored:catalog', 'Curated Local GGUF Files'))
   if (catalog.length === 0) {
-    options.push(noticeOption('hdr:uncensored-empty', 'setup files unavailable; paste a GGUF link instead', CHILD_INDENT))
+    options.push(noticeOption('hdr:uncensored-empty', 'Setup files unavailable; paste a GGUF link instead', CHILD_INDENT))
   } else {
     for (const entry of catalog) {
       const id = localModelId(entry.repo.repoId, entry.file.filename)
@@ -126,18 +126,18 @@ export function buildLocalModelCatalogOptions(
         displayName,
         undefined,
         modelMetadataSubtext(`${quant} · ${formatSize(entry.file.sizeBytes ?? 0)}`, [
-          entry.recommended ? 'recommended for this machine' : '',
-          entry.installed ? 'installed' : '',
+          entry.recommended ? 'Recommended for this machine' : '',
+          entry.installed ? 'Installed' : '',
         ]),
       ))
     }
   }
 
-  appendHfModelOptions(options, data, context, 'downloaded GGUF', 50)
-  options.push(utilityOption('hf:download', 'add local model file', LOCAL_MODEL_LINK_HINT))
+  appendHfModelOptions(options, data, context, 'Downloaded GGUF', 50)
+  options.push(utilityOption('hf:download', 'Add Local Model File', LOCAL_MODEL_LINK_HINT))
 
   if (data.hfModels.length > 0) {
-    options.push(utilityOption('local:uninstall', 'uninstall downloaded GGUF'))
+    options.push(utilityOption('local:uninstall', 'Uninstall Downloaded GGUF'))
   }
   return options
 }
@@ -151,7 +151,7 @@ function appendHfModelOptions(
 ): void {
   options.push(groupOption('hdr:local:hf', groupLabel))
   if (data.hfModels.length === 0) {
-    options.push(noticeOption('hdr:hf-empty', 'no downloaded files', CHILD_INDENT))
+    options.push(noticeOption('hdr:hf-empty', 'No downloaded files', CHILD_INDENT))
     return
   }
 
@@ -174,7 +174,7 @@ function appendHfModelOptions(
       `hf:${id}`,
       contextFitLabel('llamacpp', id, `${active ? '* ' : '  '}${displayName}`, context.contextFit),
       undefined,
-      modelMetadataSubtext(size, ['installed']),
+      modelMetadataSubtext(size, ['Installed']),
     ))
   }
 }

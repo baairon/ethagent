@@ -48,15 +48,13 @@ export async function createFactoryResetPlan(): Promise<FactoryResetPlan> {
     deletePaths,
     preservedPaths,
     preservedDescriptions: [
-      'Hugging Face GGUF model files under models/',
-      'local model registry local-models.json',
-      'llama.cpp runner assets under runners/',
-      'local runner path config local-runner.json',
-      'external package-installed runtimes outside ~/.ethagent',
+      'Local GGUF models and metadata',
+      'llama.cpp runner assets',
+      'External package-installed runtimes',
     ],
     remoteDescriptions: [
       'ERC-8004 tokens and onchain records',
-      'IPFS-pinned encrypted snapshots and public skills metadata',
+      'IPFS snapshots and public metadata',
     ],
   }
 }
@@ -91,18 +89,16 @@ export async function runFactoryReset(options: { clearSecrets?: boolean } = {}):
 
 export function formatFactoryResetPlan(plan: FactoryResetPlan): string {
   return [
-    'ethagent reset',
+    'Ethagent Reset',
     '',
-    'will delete:',
-    ...formatPaths(plan.deletePaths, plan.configDir),
+    'Deletes:',
+    ...formatDeleteSummary(plan.deletePaths.length),
     '',
-    'will keep:',
-    ...plan.preservedDescriptions.map(item => `  · ${item}`),
+    'Keeps:',
+    ...plan.preservedDescriptions.map(item => `  - ${item}`),
     '',
-    'not touched:',
-    ...plan.remoteDescriptions.map(item => `  · ${item}`),
-    '',
-    'type confirm to reset this machine.',
+    'Not Touched:',
+    ...plan.remoteDescriptions.map(item => `  - ${item}`),
   ].join('\n')
 }
 
@@ -115,11 +111,12 @@ async function readConfigEntries(configDir: string): Promise<string[]> {
   }
 }
 
-function formatPaths(paths: string[], configDir: string): string[] {
-  if (paths.length === 0) return ['  · no local ethagent data found']
-  return paths
-    .map(target => `  · ${path.relative(configDir, target) || path.basename(target)}`)
-    .sort()
+function formatDeleteSummary(count: number): string[] {
+  if (count === 0) return ['  - No local ethagent data found']
+  return [
+    '  - Identity files, sessions, history, credentials',
+    `  - ${count} local path${count === 1 ? '' : 's'} under ~/.ethagent`,
+  ]
 }
 
 function assertInsideConfigDir(configDir: string, target: string): void {

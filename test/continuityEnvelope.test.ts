@@ -48,11 +48,12 @@ test('continuity snapshot challenge explains purpose, scope, and wallet safety',
   const ownerAddress = addressFromPrivateKey(privateKey)
   const challenge = createContinuitySnapshotChallenge(ownerAddress)
 
-  assert.match(challenge, /^ethagent private continuity\n/)
+  assert.match(challenge, /^ethagent: save or restore identity files\n/)
   assert.match(challenge, new RegExp(`Owner: ${ownerAddress}`))
-  assert.match(challenge, /Purpose: unlock the encrypted SOUL\.md and MEMORY\.md snapshot for this device/)
-  assert.match(challenge, /Scope: read and restore private agent continuity only/)
-  assert.match(challenge, /does not send a transaction, spend funds, or grant token approval/)
+  assert.match(challenge, /Action: encrypt or decrypt local identity files/)
+  assert.match(challenge, /Private: SOUL\.md, MEMORY\.md/)
+  assert.match(challenge, /Public: skills\.json, public profile/)
+  assert.match(challenge, /Safety: no transaction, spending, or approvals/)
   assert.match(challenge, /Version: 1$/)
 })
 
