@@ -12,8 +12,13 @@ import { AppInputProvider, useAppInput } from '../app/input/AppInputProvider.js'
 import { loadConfig, type EthagentConfig } from '../storage/config.js'
 import { runResetCommand } from './reset.js'
 import { runPreviewCommand } from './preview.js'
+import updateNotifier from 'update-notifier'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const pkgPath = path.resolve(__dirname, '..', '..', 'package.json')
+const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'))
+
+updateNotifier({ pkg }).notify()
 
 function readVersion(): string {
   try {
