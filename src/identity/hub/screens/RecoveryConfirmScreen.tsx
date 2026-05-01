@@ -18,17 +18,17 @@ type RecoveryConfirmScreenProps = {
 
 export const RecoveryConfirmScreen: React.FC<RecoveryConfirmScreenProps> = ({ mode, workingStatus, footer, onConfirm, onBack }) => {
   const isPublish = mode === 'publish'
-  const title = isPublish ? 'Publish Snapshot?' : 'Refetch Latest From Chain?'
+  const title = isPublish ? 'Save Snapshot?' : 'Refetch Latest From Chain?'
   const subtitle = isPublish
     ? 'This replaces the current on-chain snapshot pointer.'
     : 'This overwrites local files with the on-chain version.'
 
   const headlineColor = isPublish ? theme.accentPeach : theme.accentMint
   const headline = isPublish
-    ? 'Publishing replaces the on-chain pointer for this agent.'
+    ? 'Saving replaces the on-chain pointer for this agent.'
     : 'Refetching replaces local SOUL.md, MEMORY.md, and skills.json with what is on chain.'
   const detail = isPublish
-    ? 'The old snapshot pointer is overwritten. Local edits become the published state.'
+    ? 'The old snapshot pointer is overwritten. Local edits become the saved state.'
     : 'Unsaved local edits will be lost. Use this when local files are missing or out of sync with the latest published snapshot.'
 
   const needsBackup = workingStatus?.publishState === 'local-changes' || workingStatus?.publishState === 'not-published' || workingStatus?.publishState === 'verify-needed'
@@ -50,7 +50,7 @@ export const RecoveryConfirmScreen: React.FC<RecoveryConfirmScreenProps> = ({ mo
         <Text color={theme.textSubtle}>{detail}</Text>
         {isPublish && changedFiles.length > 0 && (
           <Box marginTop={1}>
-            <Text color={theme.textSubtle}>to publish: </Text>
+            <Text color={theme.textSubtle}>unsaved changes: </Text>
             <Text color="red" bold>{changedFiles.join(', ')}</Text>
           </Box>
         )}
@@ -58,10 +58,10 @@ export const RecoveryConfirmScreen: React.FC<RecoveryConfirmScreenProps> = ({ mo
       <Box marginTop={1}>
         <Select<'confirm' | 'back'>
           options={[
-            { value: 'confirm', role: 'section', prefix: '--', label: isPublish ? 'Publish' : 'Refetch' },
+            { value: 'confirm', role: 'section', prefix: '--', label: isPublish ? 'Save' : 'Refetch' },
             {
               value: 'confirm',
-              label: isPublish ? 'Yes, Publish Snapshot Now' : 'Yes, Refetch From Chain',
+              label: isPublish ? 'Yes, Save Snapshot Now' : 'Yes, Refetch From Chain',
               hint: isPublish ? 'Sign and overwrite the on-chain pointer' : 'Wallet decrypts and overwrites local files',
             },
             { value: 'back', role: 'section', prefix: '--', label: 'Cancel' },

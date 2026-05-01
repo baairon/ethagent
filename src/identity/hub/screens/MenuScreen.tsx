@@ -69,7 +69,7 @@ export const MenuScreen: React.FC<MenuScreenProps> = ({
         { value: 'private-memory', role: 'section', prefix: '--', label: 'Private local files' },
         { value: 'private-memory', label: 'memory and persona', hint: 'SOUL.md and MEMORY.md only on this device' },
         { value: 'backup', role: 'section', prefix: '--', label: 'Recovery' },
-        { value: 'backup', label: 'publish snapshot now', hint: 'publishes SOUL.md, MEMORY.md, skills.json, and metadata', disabled: !canRebackup },
+        { value: 'backup', label: 'save snapshot now', hint: 'publishes SOUL.md, MEMORY.md, skills.json, and metadata', disabled: !canRebackup },
         { value: 'refetch', label: 'refetch latest snapshot', hint: 'restore local files from the latest published snapshot', disabled: !canRefetch },
         { value: 'storage-credential', role: 'section', prefix: '--', label: 'Storage' },
         { value: 'storage-credential', label: 'IPFS credential', hint: 'save, replace, or forget Pinata JWT' },

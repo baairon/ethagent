@@ -31,13 +31,11 @@ export type Step =
   | { kind: 'restore-authorizing'; cid: string; apiUrl: string; envelope: RestorableBackupEnvelope; candidate: Erc8004AgentCandidate; purpose?: RestorePurpose }
   | { kind: 'rebackup-signing'; identity: EthagentIdentity; registry: Erc8004RegistryConfig; pinataJwt?: string; profileUpdates?: ProfileUpdates; returnTo?: Step }
   | { kind: 'rebackup-storage'; identity: EthagentIdentity; registry: Erc8004RegistryConfig; error?: string; pinataJwt?: string; profileUpdates?: ProfileUpdates; returnTo?: Step }
-  | { kind: 'public-profile-signing'; identity: EthagentIdentity; registry: Erc8004RegistryConfig; pinataJwt?: string; profileUpdates?: ProfileUpdates; returnTo?: Step }
-  | { kind: 'public-profile-storage'; identity: EthagentIdentity; registry: Erc8004RegistryConfig; error?: string; pinataJwt?: string; profileUpdates?: ProfileUpdates; returnTo?: Step }
   | { kind: 'continuity-private'; notice?: string }
   | { kind: 'continuity-public'; notice?: string }
-  | { kind: 'rebackup-confirm' }
-  | { kind: 'recovery-refetch-confirm' }
-  | { kind: 'recovery-refetching'; identity: EthagentIdentity; registry: Erc8004RegistryConfig }
+  | { kind: 'rebackup-confirm'; back: Step }
+  | { kind: 'recovery-refetch-confirm'; back: Step }
+  | { kind: 'recovery-refetching'; identity: EthagentIdentity; registry: Erc8004RegistryConfig; back: Step }
   | { kind: 'rebackup-start'; back: Step }
   | { kind: 'edit-profile-name'; identity: EthagentIdentity; registry: Erc8004RegistryConfig; returnTo?: Step }
   | { kind: 'edit-profile-description'; identity: EthagentIdentity; registry: Erc8004RegistryConfig; name: string; returnTo?: Step }

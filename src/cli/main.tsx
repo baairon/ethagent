@@ -12,13 +12,29 @@ import { AppInputProvider, useAppInput } from '../app/input/AppInputProvider.js'
 import { loadConfig, type EthagentConfig } from '../storage/config.js'
 import { runResetCommand } from './reset.js'
 import { runPreviewCommand } from './preview.js'
-import updateNotifier from 'update-notifier'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const pkgPath = path.resolve(__dirname, '..', '..', 'package.json')
 const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'))
 
-updateNotifier({ pkg, updateCheckInterval: 0 }).notify()
+async function checkForUpdates() {
+  try {
+    const res = await fetch('https://registry.npmjs.org/ethagent/latest', { signal: AbortSignal.timeout(1200) })
+    const { version: latest } = await res.json() as { version: string }
+    if (latest && latest !== pkg.version) {
+      const line1 = ` Update available: ${theme.accentPrimary}${pkg.version}${theme.text} -> ${theme.accentMint}${latest}${theme.text} `
+      const line2 = ` Run ${theme.accentPeach}npm install -g ethagent${theme.text} to update `
+      const border = theme.dim + '─'.repeat(Math.max(line1.length - 20, line2.length - 20) + 10) + theme.text
+      
+      process.stdout.write(`\n${theme.dim}┌${border}┐${theme.text}\n`)
+      process.stdout.write(`${theme.dim}│${theme.text}  ${line1}  ${theme.dim}│${theme.text}\n`)
+      process.stdout.write(`${theme.dim}│${theme.text}  ${line2}  ${theme.dim}│${theme.text}\n`)
+      process.stdout.write(`${theme.dim}└${border}┘${theme.text}\n\n`)
+    }
+  } catch {
+    // Silent fail for offline/timeout
+  }
+}
 
 function readVersion(): string {
   try {
@@ -152,6 +168,8 @@ async function runDefault(): Promise<number> {
 async function main(): Promise<number> {
   const argv = process.argv.slice(2)
   const [cmd, ...rest] = argv
+
+  await checkForUpdates()
 
   if (!cmd) return runDefault()
   if (cmd === '--version' || cmd === '-v') {

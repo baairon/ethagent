@@ -39,7 +39,7 @@ export const IdentitySummary: React.FC<{
   }
 
   const lastSavedRow = needsBackup
-    ? { label: 'to publish', value: changedFiles.length > 0 ? changedFiles.join(', ') : 'markdown files', tone: 'warn' as const, highlight: true }
+    ? { label: 'unsaved changes', value: changedFiles.length > 0 ? changedFiles.join(', ') : 'markdown files', tone: 'warn' as const, highlight: true }
     : { label: 'last saved', value: lastBackup, tone: lastBackup === 'never' ? 'dim' as const : 'ok' as const }
 
   const summaryRows = [

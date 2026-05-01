@@ -406,8 +406,8 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
           setCopyNotice(null)
           setStep({ kind: 'restore-wallet', purpose: identity ? 'switch' : 'restore' })
         }}
-        onBackupNow={() => setStep({ kind: 'rebackup-confirm' })}
-        onRefetchLatest={() => setStep({ kind: 'recovery-refetch-confirm' })}
+        onBackupNow={() => setStep({ kind: 'rebackup-confirm', back: { kind: 'menu' } })}
+        onRefetchLatest={() => setStep({ kind: 'recovery-refetch-confirm', back: { kind: 'menu' } })}
         onPublicProfile={() => setStep({ kind: 'continuity-public' })}
         onPrivateMemory={() => setStep({ kind: 'continuity-private' })}
         onCopyValues={() => setStep({ kind: 'details' })}
@@ -561,7 +561,7 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
         mode="publish"
         workingStatus={workingStatus}
         footer={footer}
-        onConfirm={() => triggerRebackup({ kind: 'menu' })}
+        onConfirm={() => triggerRebackup(step.back)}
         onBack={back}
       />
     )
@@ -577,10 +577,10 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
           if (!identity) return
           const registry = resolveRegistryForIdentity(identity)
           if (!registry) {
-            errorStep(new Error('no agent registry configured for this identity'), { kind: 'menu' })
+            errorStep(new Error('no agent registry configured for this identity'), step.back)
             return
           }
-          setStep({ kind: 'recovery-refetching', identity, registry })
+          setStep({ kind: 'recovery-refetching', identity, registry, back: step.back })
         }}
         onBack={back}
       />
@@ -594,7 +594,7 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
         subtitle="Wallet approval decrypts the latest published snapshot and overwrites local SOUL.md, MEMORY.md, and skills.json."
         walletSession={walletSession}
         label={restoreProgress?.label ?? 'fetching latest snapshot from chain...'}
-        onCancel={() => setStep({ kind: 'menu' })}
+        onCancel={() => setStep(step.back)}
       />
     )
   }
@@ -610,7 +610,7 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
         footer={footer}
         onOpenSoul={() => { void openContinuityFile('soul') }}
         onOpenMemory={() => { void openContinuityFile('memory') }}
-        onBackup={() => triggerRebackup({ kind: 'continuity-private' })}
+        onBackup={() => setStep({ kind: 'rebackup-confirm', back: { kind: 'continuity-private' } })}
         onBack={back}
       />
     )
@@ -627,7 +627,7 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
         footer={footer}
         onEditProfile={() => openPublicProfileEdit({ kind: 'continuity-public' })}
         onOpenSkills={() => { void openContinuityFile('skills') }}
-        onPublish={() => triggerRebackup({ kind: 'continuity-public' })}
+        onPublish={() => setStep({ kind: 'rebackup-confirm', back: { kind: 'continuity-public' } })}
         onBack={back}
       />
     )
