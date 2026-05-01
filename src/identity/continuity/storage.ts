@@ -138,26 +138,6 @@ function syncSkillsJson(existing: string, fresh: string): string {
     }
     return `${JSON.stringify(merged, null, 2)}\n`
   } catch {
-    // If it was the old markdown format or invalid JSON, try to extract the JSON block
-    const extracted = extractMarkedBlock(existing, 'public-profile')
-    if (extracted) {
-      try {
-        // Remove ```json and ```
-        const cleanJson = extracted.replace(/^```json\s+/, '').replace(/\s+```$/, '')
-        const parsed = JSON.parse(cleanJson)
-        const freshParsed = JSON.parse(fresh)
-        const merged = {
-          ...parsed,
-          ...freshParsed,
-          skills: parsed.skills || freshParsed.skills,
-          inputModes: parsed.inputModes || freshParsed.inputModes,
-          outputModes: parsed.outputModes || freshParsed.outputModes,
-        }
-        return `${JSON.stringify(merged, null, 2)}\n`
-      } catch {
-        return fresh
-      }
-    }
     return fresh
   }
 }
@@ -169,14 +149,6 @@ export async function ensurePublicSkillsFile(
   const ref = await ensureContinuityVault(identity)
   if (await exists(ref.publicSkillsPath)) return readPublicSkillsFile(identity)
 
-  const legacyPath = path.join(ref.dir, 'SKILLS.md')
-  if (await exists(legacyPath)) {
-    const legacyContent = await fs.readFile(legacyPath, 'utf8')
-    const jsonContent = syncSkillsJson(legacyContent, defaultPublicSkillsJson(identity))
-    await atomicWriteText(ref.publicSkillsPath, jsonContent, { mode: 0o644 })
-    await fs.rm(legacyPath, { force: true })
-    return readPublicSkillsFile(identity)
-  }
 
   const fallback = await resolvePublicSkillsFallback(identity, options.fallback)
   await atomicWriteText(ref.publicSkillsPath, normalizeMarkdown(fallback), { mode: 0o644 })

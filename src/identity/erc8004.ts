@@ -449,7 +449,7 @@ export function withEthagentPointers(
     ...(publicDiscovery?.skillsCid ? {
       publicSkills: {
         cid: publicDiscovery.skillsCid,
-        format: 'text/markdown',
+        format: 'application/json',
         ...(updatedAt ? { updatedAt } : {}),
       },
     } : {}),
