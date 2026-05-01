@@ -24,9 +24,6 @@ import {
   runRebackupPreflight,
   runRebackupSigning,
   runRebackupStorageSubmit,
-  runPublicProfilePreflight,
-  runPublicProfileSigning,
-  runPublicProfileStorageSubmit,
   runRecoveryRefetch,
   isAgentTokenIdRequiredError,
   type EffectCallbacks,
@@ -190,16 +187,7 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
       .catch((err: unknown) => errorStep(err, backStep))
   }
 
-  const triggerPublicProfilePublish = (backStep: Step, profileUpdates?: ProfileUpdates): void => {
-    if (!identity) return
-    const registry = resolveRegistryForIdentity(identity)
-    if (!registry) {
-      errorStep(new Error('no agent registry configured for this identity'), backStep)
-      return
-    }
-    runPublicProfilePreflight(identity, registry, callbacks, profileUpdates, backStep)
-      .catch((err: unknown) => errorStep(err, backStep))
-  }
+
 
   useEffect(() => {
     if (step.kind !== 'rebackup-start') return
@@ -639,7 +627,7 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
         footer={footer}
         onEditProfile={() => openPublicProfileEdit({ kind: 'continuity-public' })}
         onOpenSkills={() => { void openContinuityFile('skills') }}
-        onPublish={() => triggerPublicProfilePublish({ kind: 'continuity-public' })}
+        onPublish={() => triggerRebackup({ kind: 'continuity-public' })}
         onBack={back}
       />
     )
@@ -689,8 +677,7 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
         onImageSubmit={imagePath => {
           if (step.kind !== 'edit-profile-image') return
           const updates: ProfileUpdates = { name: step.name, description: step.description, ...(imagePath ? { imagePath } : {}) }
-          runPublicProfilePreflight(step.identity, step.registry, callbacks, updates, step.returnTo ?? { kind: 'continuity-public' })
-            .catch((err: unknown) => errorStep(err, step.returnTo ?? { kind: 'continuity-public' }))
+          triggerRebackup(step.returnTo ?? { kind: 'continuity-public' }, updates)
         }}
         onImagePick={() => {
           if (step.kind !== 'edit-profile-image') return
@@ -702,8 +689,7 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
                 return
               }
               const updates: ProfileUpdates = { name: imageStep.name, description: imageStep.description, imagePath: result.file }
-              runPublicProfilePreflight(imageStep.identity, imageStep.registry, callbacks, updates, imageStep.returnTo ?? { kind: 'continuity-public' })
-                .catch((err: unknown) => errorStep(err, imageStep.returnTo ?? { kind: 'continuity-public' }))
+              triggerRebackup(imageStep.returnTo ?? { kind: 'continuity-public' }, updates)
             })
             .catch((err: unknown) => {
               setStep({ ...imageStep, error: `${(err as Error).message}. enter a path manually if needed.` })
@@ -727,17 +713,7 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
     )
   }
 
-  if (step.kind === 'public-profile-signing') {
-    return (
-      <WalletApprovalScreen
-        title="Approve Public Profile"
-        subtitle="Pins skills.json and the Agent Card, then updates tokenURI. Private files are not read."
-        walletSession={walletSession}
-        label="waiting for wallet approval..."
-        onCancel={() => setStep(step.returnTo ?? { kind: 'continuity-public' })}
-      />
-    )
-  }
+
 
   if (step.kind === 'rebackup-start') {
     return (
@@ -752,18 +728,14 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
 
 
 
-  if (step.kind === 'rebackup-storage' || step.kind === 'public-profile-storage') {
+  if (step.kind === 'rebackup-storage') {
     return (
       <RebackupStorageScreen
         step={step}
         footer={footer}
         onSubmit={async input => {
           try {
-            if (step.kind === 'rebackup-storage') {
-              await runRebackupStorageSubmit(input, step, callbacks)
-            } else {
-              await runPublicProfileStorageSubmit(input, step, callbacks)
-            }
+            await runRebackupStorageSubmit(input, step, callbacks)
           } catch (err: unknown) {
             setStep({ ...step, error: (err as Error).message })
           }

@@ -45,8 +45,8 @@ export const PrivateContinuityScreen: React.FC<CommonProps & {
           { value: 'soul', role: 'section', prefix: '--', label: 'Open local files' },
           { value: 'soul', label: 'open SOUL.md', hint: 'edit persona and operating preferences', disabled: !ready },
           { value: 'memory', label: 'open MEMORY.md', hint: 'edit private working memory for this agent', disabled: !ready },
-          { value: 'backup', role: 'section', prefix: '--', label: 'Publish' },
-          { value: 'backup', label: 'save snapshot', hint: 'save editor changes first; then encrypt and pin', disabled: !ready || !canBackup },
+          { value: 'backup', role: 'section', prefix: '--', label: 'Recovery' },
+          { value: 'backup', label: 'publish snapshot now', hint: 'publishes SOUL.md, MEMORY.md, skills.json, and metadata', disabled: !ready || !canBackup },
           { value: 'back', role: 'section', prefix: '--', label: 'Navigation' },
           { value: 'back', label: 'back to identity hub', hint: 'return without changing private files', role: 'utility' },
         ]}
@@ -69,7 +69,7 @@ export const PublicSkillsScreen: React.FC<CommonProps & {
   onOpenSkills: () => void
   onPublish: () => void
 }> = ({ identity, config, notice, footer, canPublish, onEditProfile, onOpenSkills, onPublish, onBack }) => (
-  <Surface title="Public Profile" subtitle={notice ?? 'Public token metadata only. Private SOUL.md and MEMORY.md are not touched here.'} footer={footer}>
+  <Surface title="Public Profile" subtitle={notice ?? 'Manage public metadata, skills.json, and the agent card.'} footer={footer}>
     <IdentitySummary identity={identity} config={config} compact />
     <PublicProfileRows identity={identity} />
     <Box marginTop={1}>
@@ -79,8 +79,8 @@ export const PublicSkillsScreen: React.FC<CommonProps & {
           { value: 'edit', label: 'edit name, description, image', hint: 'upload a local image to IPFS automatically' },
           { value: 'skills', role: 'section', prefix: '--', label: 'Capabilities' },
           { value: 'skills', label: 'open skills.json', hint: 'edit public capabilities and notes' },
-          { value: 'publish', role: 'section', prefix: '--', label: 'Publish' },
-          { value: 'publish', label: 'publish public profile', hint: 'save skills.json first; pins metadata and updates tokenURI', disabled: !canPublish },
+          { value: 'publish', role: 'section', prefix: '--', label: 'Recovery' },
+          { value: 'publish', label: 'publish snapshot now', hint: 'publishes SOUL.md, MEMORY.md, skills.json, and metadata', disabled: !canPublish },
           { value: 'back', role: 'section', prefix: '--', label: 'Navigation' },
           { value: 'back', label: 'back to identity hub', hint: 'return without changing public metadata', role: 'utility' },
         ]}
