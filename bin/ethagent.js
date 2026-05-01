@@ -7,7 +7,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const cli = join(__dirname, '..', 'src', 'cli', 'main.tsx')
 
 try {
-  execFileSync('node', ['--import', 'tsx/esm', cli, ...process.argv.slice(2)], { stdio: 'inherit' })
+  const tsxPath = import.meta.resolve('tsx/esm')
+  execFileSync('node', ['--import', tsxPath, cli, ...process.argv.slice(2)], { stdio: 'inherit' })
 } catch (err) {
   if (err?.code === 'ENOENT') {
     process.stderr.write('ethagent: node 20+ is required on PATH. install Node.js, then retry.\n')
