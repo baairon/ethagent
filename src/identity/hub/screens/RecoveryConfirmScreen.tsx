@@ -50,7 +50,7 @@ export const RecoveryConfirmScreen: React.FC<RecoveryConfirmScreenProps> = ({ mo
         <Text color={theme.textSubtle}>{detail}</Text>
         {isPublish && changedFiles.length > 0 && (
           <Box marginTop={1}>
-            <Text color={theme.textSubtle}>unsaved changes: </Text>
+            <Text color={theme.textSubtle}>to publish: </Text>
             <Text color="red" bold>{changedFiles.join(', ')}</Text>
           </Box>
         )}

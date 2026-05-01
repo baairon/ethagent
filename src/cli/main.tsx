@@ -18,7 +18,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const pkgPath = path.resolve(__dirname, '..', '..', 'package.json')
 const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'))
 
-updateNotifier({ pkg }).notify()
+updateNotifier({ pkg, updateCheckInterval: 0 }).notify()
 
 function readVersion(): string {
   try {
