@@ -5,6 +5,7 @@ import { type EthagentConfig, type EthagentIdentity, type SelectableNetwork } fr
 import { clearIdentity, setTokenIdentity } from '../storage/identity.js'
 import { copyToClipboard } from '../utils/clipboard.js'
 import { catFromIpfs, DEFAULT_IPFS_API_URL } from './ipfs.js'
+import { openImageFilePicker } from './imagePicker.js'
 import { hasPinataJwt, clearPinataJwt, savePinataJwt } from './pinataJwt.js'
 import { registryConfigFromConfig } from './registryConfig.js'
 import { identityHubErrorView, isRegistrationPreflightError, pinataErrorText } from './identityHubModel.js'
@@ -23,12 +24,20 @@ import {
   runRebackupPreflight,
   runRebackupSigning,
   runRebackupStorageSubmit,
+  runPublicProfilePreflight,
+  runPublicProfileSigning,
+  runPublicProfileStorageSubmit,
   runContinuityUnlock,
   isAgentTokenIdRequiredError,
   type EffectCallbacks,
   type RestoreProgress,
 } from './identityHubEffects.js'
-import { continuityVaultRef, continuityVaultStatus, continuityWorkingTreeStatus, ensurePublicSkillsFile } from './continuity/storage.js'
+import {
+  continuityVaultRef,
+  continuityVaultStatus,
+  continuityWorkingTreeStatus,
+  ensurePublicSkillsFile,
+} from './continuity/storage.js'
 import { openFileInEditor } from './continuity/editor.js'
 import {
   listPrivateContinuityHistory,
@@ -50,11 +59,8 @@ import { WalletApprovalScreen } from './screens/WalletApprovalScreen.js'
 import { RebackupStorageScreen } from './screens/RebackupStorageScreen.js'
 import { BusyScreen } from './screens/BusyScreen.js'
 import { EditProfileFlow } from './screens/EditProfileFlow.js'
-import { ForgetIdentityScreen } from './screens/ForgetIdentityScreen.js'
-import { DataManagementScreen } from './screens/DataManagementScreen.js'
 import { StorageCredentialScreen } from './screens/StorageCredentialScreen.js'
 import {
-  ContinuityDashboardScreen,
   PrivateContinuityScreen,
   PublicSkillsScreen,
 } from './screens/ContinuityDashboardScreen.js'
@@ -193,7 +199,18 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
       errorStep(new Error('no agent registry configured for this identity'), backStep)
       return
     }
-    runRebackupPreflight(identity, registry, callbacks, profileUpdates)
+    runRebackupPreflight(identity, registry, callbacks, profileUpdates, backStep)
+      .catch((err: unknown) => errorStep(err, backStep))
+  }
+
+  const triggerPublicProfilePublish = (backStep: Step, profileUpdates?: ProfileUpdates): void => {
+    if (!identity) return
+    const registry = resolveRegistryForIdentity(identity)
+    if (!registry) {
+      errorStep(new Error('no agent registry configured for this identity'), backStep)
+      return
+    }
+    runPublicProfilePreflight(identity, registry, callbacks, profileUpdates, backStep)
       .catch((err: unknown) => errorStep(err, backStep))
   }
 
@@ -204,25 +221,37 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
 
   useEffect(() => {
     let cancelled = false
-    if (!identity || (step.kind !== 'continuity-snapshots' && step.kind !== 'continuity-history-restore-confirm')) return
-    Promise.all([
-      listPrivateContinuityHistory(identity, 40),
-      listPublishedContinuitySnapshots(identity, 40),
-      continuityWorkingTreeStatus(identity),
-    ])
-      .then(([history, published, status]) => {
+    let timeoutId: NodeJS.Timeout | undefined
+    if (!identity || (step.kind !== 'menu' && step.kind !== 'continuity-onchain-backups' && step.kind !== 'continuity-full-history' && step.kind !== 'continuity-history-restore-confirm')) return
+
+    const checkStatus = async () => {
+      try {
+        const [history, published] = await Promise.all([
+          listPrivateContinuityHistory(identity, 40),
+          listPublishedContinuitySnapshots(identity, 40),
+        ])
+        const status = await continuityWorkingTreeStatus(identity, published[0])
         if (cancelled) return
         setSnapshotHistory(history)
         setPublishedSnapshots(published)
         setWorkingStatus(status)
-      })
-      .catch(() => {
+      } catch {
         if (cancelled) return
         setSnapshotHistory([])
         setPublishedSnapshots([])
         setWorkingStatus(null)
-      })
-    return () => { cancelled = true }
+      }
+      if (!cancelled) {
+        timeoutId = setTimeout(() => { void checkStatus() }, 1500)
+      }
+    }
+
+    void checkStatus()
+
+    return () => {
+      cancelled = true
+      if (timeoutId) clearTimeout(timeoutId)
+    }
   }, [identity, step.kind])
 
   useEffect(() => {
@@ -325,10 +354,34 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
             error: pinataErrorText(err),
             pinataJwt: step.pinataJwt,
             profileUpdates: step.profileUpdates,
+            returnTo: step.returnTo,
           })
           return
         }
-        handleStepError(err, { kind: 'details' })
+        handleStepError(err, step.returnTo ?? { kind: 'menu' })
+      })
+    return () => { cancelled = true }
+  }, [step])
+
+  useEffect(() => {
+    if (step.kind !== 'public-profile-signing') return
+    let cancelled = false
+    runPublicProfileSigning(step, callbacks)
+      .catch((err: unknown) => {
+        if (cancelled) return
+        if (isStorageError(err)) {
+          setStep({
+            kind: 'public-profile-storage',
+            identity: step.identity,
+            registry: step.registry,
+            error: pinataErrorText(err),
+            pinataJwt: step.pinataJwt,
+            profileUpdates: step.profileUpdates,
+            returnTo: step.returnTo,
+          })
+          return
+        }
+        handleStepError(err, step.returnTo ?? { kind: 'continuity-public' })
       })
     return () => { cancelled = true }
   }, [step])
@@ -341,10 +394,11 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
         if (!cancelled) setContinuityReady(true)
       })
       .catch((err: unknown) => {
-        if (!cancelled) handleStepError(err, step.returnTo === 'snapshots' ? { kind: 'continuity-snapshots' } : { kind: 'continuity-private' })
+        if (!cancelled) handleStepError(err, step.returnTo === 'snapshots' ? { kind: 'continuity-onchain-backups' } : { kind: 'continuity-private' })
       })
     return () => { cancelled = true }
   }, [step])
+
 
   const openContinuityFile = async (kind: 'soul' | 'memory' | 'skills'): Promise<void> => {
     if (!identity) return
@@ -358,7 +412,7 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
       const file = kind === 'soul' ? ref.soulPath : kind === 'memory' ? ref.memoryPath : ref.publicSkillsPath
       const result = await openFileInEditor(file)
       const message = result.ok
-        ? `opened ${kind === 'soul' ? 'SOUL.md' : kind === 'memory' ? 'MEMORY.md' : 'SKILLS.md'} with ${result.method}.`
+        ? `opened ${kind === 'soul' ? 'SOUL.md' : kind === 'memory' ? 'MEMORY.md' : 'skills.json'} with ${result.method}.`
         : `open failed: ${result.error}`
       setStep(kind === 'skills'
         ? { kind: 'continuity-public', notice: message }
@@ -368,7 +422,7 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
     }
   }
 
-  const footer = <Text color={theme.dim}>enter select · esc back</Text>
+  const footer = <Text color={theme.dim}>enter select - esc back</Text>
 
   if (step.kind === 'menu') {
     return (
@@ -376,6 +430,7 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
         mode={mode}
         config={config}
         identity={identity}
+        workingStatus={workingStatus}
         canRebackup={canRebackup}
         footer={footer}
         onCreate={() => {
@@ -387,7 +442,11 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
           setStep({ kind: 'restore-wallet', purpose: identity ? 'switch' : 'restore' })
         }}
         onBackupNow={() => triggerRebackup({ kind: 'menu' })}
-        onDetails={() => setStep({ kind: 'details' })}
+        onPublicProfile={() => setStep({ kind: 'continuity-public' })}
+        onPrivateMemory={() => setStep({ kind: 'continuity-private' })}
+        onOnchainBackups={() => setStep({ kind: 'continuity-onchain-backups' })}
+        onCopyValues={() => setStep({ kind: 'details' })}
+        onStorageCredential={() => setStep({ kind: 'storage-credential' })}
         onSkip={() => onComplete({ kind: 'skip' })}
         onCancel={() => onComplete({ kind: 'cancel' })}
       />
@@ -509,68 +568,32 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
       <DetailsScreen
         identity={identity}
         config={config}
-        copyPicker={step.copyPicker}
-        jwtSaved={jwtSaved}
         copyNotice={copyNotice}
-        canRebackup={canRebackup}
-        canEditProfile={canRebackup}
         footer={footer}
         onCopy={async (label, value) => {
           const result = await copyToClipboard(value)
           setCopyNotice(result.ok ? `copied ${label} via ${result.method}.` : `copy failed: ${result.error}`)
           setStep({ kind: 'details' })
         }}
-        onOpenCopyPicker={() => setStep({ kind: 'details', copyPicker: true })}
-        onCloseCopyPicker={() => setStep({ kind: 'details' })}
-        onEditProfile={() => {
-          if (!identity) return
-          const registry = resolveRegistryForIdentity(identity)
-          if (!registry) {
-            errorStep(new Error('no agent registry configured for this identity'), { kind: 'details' })
-            return
-          }
-          setStep({ kind: 'edit-profile-name', identity, registry })
-        }}
-        onContinuity={() => setStep({ kind: 'continuity-dashboard' })}
-        onSnapshots={() => setStep({ kind: 'continuity-snapshots' })}
-        onStorageCredential={() => setStep({ kind: 'storage-credential' })}
-        onDataManagement={() => setStep({ kind: 'data-management' })}
         onBack={back}
       />
     )
   }
 
-  if (step.kind === 'data-management') {
-    return (
-      <DataManagementScreen
-        identity={identity}
-        config={config}
-        footer={footer}
-        onForgetLocalData={() => setStep({ kind: 'forget-confirm' })}
-        onBack={back}
-      />
-    )
+  const openPublicProfileEdit = (backStep: Step): void => {
+    if (!identity) return
+    const registry = resolveRegistryForIdentity(identity)
+    if (!registry) {
+      errorStep(new Error('no agent registry configured for this identity'), backStep)
+      return
+    }
+    setStep({ kind: 'edit-profile-name', identity, registry, returnTo: backStep })
   }
 
-  if (step.kind === 'continuity-dashboard') {
-    return (
-      <ContinuityDashboardScreen
-        identity={identity}
-        config={config}
-        ready={continuityReady}
-        notice={step.notice}
-        footer={footer}
-        onPrivate={() => setStep({ kind: 'continuity-private' })}
-        onPublic={() => setStep({ kind: 'continuity-public' })}
-        onSnapshots={() => setStep({ kind: 'continuity-snapshots' })}
-        onBack={back}
-      />
-    )
-  }
-
-  if (step.kind === 'continuity-snapshots') {
+  if (step.kind === 'continuity-onchain-backups' || step.kind === 'continuity-full-history') {
     return (
       <SnapshotManagerScreen
+        mode={step.kind === 'continuity-full-history' ? 'full-history' : 'onchain-backups'}
         identity={identity}
         config={config}
         ready={continuityReady}
@@ -580,26 +603,38 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
         localHistory={snapshotHistory}
         canBackup={canRebackup}
         footer={footer}
-        onPublish={() => triggerRebackup({ kind: 'continuity-snapshots' })}
+        onPublish={() => triggerRebackup({ kind: 'continuity-onchain-backups' })}
+        onFullHistory={() => setStep({ kind: 'continuity-full-history' })}
         onRestorePublished={snapshotId => {
           if (!identity) return
-          const snapshot = publishedSnapshots.find(item => item.id === snapshotId)
-          if (snapshot) setStep({
+          let cid: string | undefined
+          if (snapshotId === identity.backup?.cid) {
+            cid = identity.backup.cid
+          } else {
+            const past = identity.backup?.pastBackups?.find(b => b.cid === snapshotId)
+            if (past) cid = past.cid
+            else {
+              const local = publishedSnapshots.find(item => item.id === snapshotId || item.cid === snapshotId)
+              if (local) cid = local.cid
+            }
+          }
+          if (cid) setStep({
             kind: 'continuity-unlocking',
             identity,
-            cid: snapshot.cid,
-            publicSkillsCid: snapshot.publicSkillsCid,
-            returnTo: 'snapshots',
+            cid,
+            returnTo: 'snapshots'
           })
         }}
-        onRestoreHistory={snapshotId => setStep({ kind: 'continuity-history-restore-confirm', snapshotId })}
+        onRestoreHistory={snapshotId => {
+          setStep({ kind: 'continuity-history-restore-confirm', snapshotId })
+        }}
         onBack={back}
       />
     )
   }
 
   if (step.kind === 'continuity-history-restore-confirm') {
-    const snapshot = snapshotHistory.find(item => item.id === step.snapshotId)
+    const snapshot = snapshotHistory.find(s => s.id === step.snapshotId)
     return (
       <SnapshotRestoreConfirmScreen
         snapshot={snapshot}
@@ -609,9 +644,9 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
           void restorePrivateContinuityHistorySnapshot(identity, snapshot.id)
             .then(() => {
               setContinuityReady(true)
-              setStep({ kind: 'continuity-snapshots', notice: 'local checkpoint restored. review, then publish when ready.' })
+              setStep({ kind: 'continuity-onchain-backups', notice: 'local checkpoint restored. review, then publish when ready.' })
             })
-            .catch((err: unknown) => errorStep(err, { kind: 'continuity-snapshots' }))
+            .catch((err: unknown) => errorStep(err, { kind: 'continuity-onchain-backups' }))
         }}
         onBack={back}
       />
@@ -643,10 +678,11 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
         config={config}
         ready={continuityReady}
         notice={step.notice}
-        canPublish={canRebackup && continuityReady}
+        canPublish={canRebackup}
         footer={footer}
+        onEditProfile={() => openPublicProfileEdit({ kind: 'continuity-public' })}
         onOpenSkills={() => { void openContinuityFile('skills') }}
-        onPublish={() => triggerRebackup({ kind: 'continuity-public' })}
+        onPublish={() => triggerPublicProfilePublish({ kind: 'continuity-public' })}
         onBack={back}
       />
     )
@@ -664,14 +700,14 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
           await clearPinataJwt().catch(() => {})
           setJwtSaved(false)
           setCopyNotice('IPFS storage credential removed.')
-          setStep({ kind: 'details' })
+          setStep({ kind: 'menu' })
         }}
         onSubmit={async input => {
           try {
             await savePinataJwt(input)
             setJwtSaved(true)
             setCopyNotice('IPFS storage credential saved.')
-            setStep({ kind: 'details' })
+            setStep({ kind: 'menu' })
           } catch (err: unknown) {
             setStep({ kind: 'storage-credential-input', error: (err as Error).message })
           }
@@ -681,51 +717,43 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
     )
   }
 
-  if (step.kind === 'edit-profile-name' || step.kind === 'edit-profile-description') {
+  if (step.kind === 'edit-profile-name' || step.kind === 'edit-profile-description' || step.kind === 'edit-profile-image') {
     return (
       <EditProfileFlow
         step={step}
         onNameSubmit={name => {
           if (step.kind !== 'edit-profile-name') return
-          setStep({ kind: 'edit-profile-description', identity: step.identity, registry: step.registry, name })
+          setStep({ kind: 'edit-profile-description', identity: step.identity, registry: step.registry, name, returnTo: step.returnTo })
         }}
         onDescriptionSubmit={description => {
           if (step.kind !== 'edit-profile-description') return
-          const updates: ProfileUpdates = { name: step.name, description }
-          runRebackupPreflight(step.identity, step.registry, callbacks, updates)
-            .catch((err: unknown) => errorStep(err, { kind: 'details' }))
+          setStep({ kind: 'edit-profile-image', identity: step.identity, registry: step.registry, name: step.name, description, returnTo: step.returnTo })
         }}
-        onBack={back}
-        onMenu={() => setStep({ kind: 'details' })}
-      />
-    )
-  }
-
-  if (step.kind === 'forget-confirm') {
-    return (
-      <ForgetIdentityScreen
-        identity={identity}
-        config={config}
-        footer={footer}
-        onConfirm={() => {
-          void (async () => {
-            try {
-              if (!config) {
-                onComplete({ kind: 'cancel' })
+        onImageSubmit={imagePath => {
+          if (step.kind !== 'edit-profile-image') return
+          const updates: ProfileUpdates = { name: step.name, description: step.description, ...(imagePath ? { imagePath } : {}) }
+          runPublicProfilePreflight(step.identity, step.registry, callbacks, updates, step.returnTo ?? { kind: 'continuity-public' })
+            .catch((err: unknown) => errorStep(err, step.returnTo ?? { kind: 'continuity-public' }))
+        }}
+        onImagePick={() => {
+          if (step.kind !== 'edit-profile-image') return
+          const imageStep = step
+          void openImageFilePicker()
+            .then(result => {
+              if (!result.ok) {
+                setStep({ ...imageStep, error: result.cancelled ? 'image selection cancelled.' : `${result.error}. enter a path manually if needed.` })
                 return
               }
-              const nextConfig = await clearIdentity(config)
-              onComplete({
-                kind: 'updated',
-                config: nextConfig,
-                message: 'unlinked active agent. markdown, chats, token, and pinned backups were kept.',
-              })
-            } catch (err: unknown) {
-              errorStep(err, { kind: 'forget-confirm' })
-            }
-          })()
+              const updates: ProfileUpdates = { name: imageStep.name, description: imageStep.description, imagePath: result.file }
+              runPublicProfilePreflight(imageStep.identity, imageStep.registry, callbacks, updates, imageStep.returnTo ?? { kind: 'continuity-public' })
+                .catch((err: unknown) => errorStep(err, imageStep.returnTo ?? { kind: 'continuity-public' }))
+            })
+            .catch((err: unknown) => {
+              setStep({ ...imageStep, error: `${(err as Error).message}. enter a path manually if needed.` })
+            })
         }}
-        onCancel={back}
+        onBack={back}
+        onMenu={() => setStep(step.returnTo ?? { kind: 'continuity-public' })}
       />
     )
   }
@@ -734,10 +762,22 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
     return (
       <WalletApprovalScreen
         title="Approve Encrypted Snapshot"
-        subtitle="One browser flow signs, saves the encrypted SOUL/MEMORY snapshot, and updates tokenURI."
+        subtitle="Signs, encrypts private SOUL.md and MEMORY.md, pins them, and refreshes recovery metadata."
         walletSession={walletSession}
         label="waiting for wallet approval..."
-        onCancel={() => setStep({ kind: 'details' })}
+        onCancel={() => setStep(step.returnTo ?? { kind: 'menu' })}
+      />
+    )
+  }
+
+  if (step.kind === 'public-profile-signing') {
+    return (
+      <WalletApprovalScreen
+        title="Approve Public Profile"
+        subtitle="Pins skills.json and the Agent Card, then updates tokenURI. Private files are not read."
+        walletSession={walletSession}
+        label="waiting for wallet approval..."
+        onCancel={() => setStep(step.returnTo ?? { kind: 'continuity-public' })}
       />
     )
   }
@@ -759,19 +799,24 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
         subtitle="Wallet approval decrypts the encrypted snapshot into local SOUL.md and MEMORY.md working files."
         walletSession={walletSession}
         label="waiting for wallet approval..."
-        onCancel={() => setStep(step.returnTo === 'snapshots' ? { kind: 'continuity-snapshots' } : { kind: 'continuity-private' })}
+        onCancel={() => setStep(step.returnTo === 'snapshots' ? { kind: 'continuity-onchain-backups' } : { kind: 'continuity-private' })}
       />
     )
   }
 
-  if (step.kind === 'rebackup-storage') {
+
+  if (step.kind === 'rebackup-storage' || step.kind === 'public-profile-storage') {
     return (
       <RebackupStorageScreen
         step={step}
         footer={footer}
         onSubmit={async input => {
           try {
-            await runRebackupStorageSubmit(input, step, callbacks)
+            if (step.kind === 'rebackup-storage') {
+              await runRebackupStorageSubmit(input, step, callbacks)
+            } else {
+              await runPublicProfileStorageSubmit(input, step, callbacks)
+            }
           } catch (err: unknown) {
             setStep({ ...step, error: (err as Error).message })
           }
@@ -847,7 +892,7 @@ function initialStepForAction(
 ): Step {
   if (action === 'create') return config?.identity ? { kind: 'replace-confirm', next: 'create' } : { kind: 'create-name' }
   if (action === 'load') return { kind: 'restore-wallet', purpose: config?.identity ? 'switch' : 'restore' }
-  if (action === 'save-snapshot') return config?.identity ? { kind: 'rebackup-start', back: { kind: 'details' } } : { kind: 'menu' }
-  if (action === 'settings') return config?.identity ? { kind: 'details' } : { kind: 'menu' }
+  if (action === 'save-snapshot') return config?.identity ? { kind: 'rebackup-start', back: { kind: 'menu' } } : { kind: 'menu' }
+  if (action === 'settings') return { kind: 'menu' }
   return { kind: 'menu' }
 }

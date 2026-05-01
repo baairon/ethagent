@@ -570,7 +570,7 @@
         accent: 'transaction',
         tabTitle: 'ethagent · submit transaction',
         label: 'transaction request',
-        title: 'Submit transaction to mint your ERC-8004 agent',
+        title: 'Submit transaction to update your ERC-8004 profile',
         detail: 'registry',
       },
     };
@@ -820,7 +820,7 @@
               : 'submitted · returning to ethagent';
           if (payload.txHash) {
             statusHint.textContent = isTransactionFlow()
-              ? 'transaction submitted. this tab will close after you can read the hash.'
+              ? 'transaction submitted. returning to ethagent.'
               : 'this tab will close shortly.';
           } else {
             statusHint.textContent = 'this tab will close shortly.';

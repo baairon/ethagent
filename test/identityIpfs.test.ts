@@ -1,6 +1,14 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { addToIpfs, catFromIpfs, extractPinataJwt, PINATA_UPLOAD_API_URL } from '../src/identity/ipfs.js'
+import {
+  addToIpfs,
+  addFileToIpfs,
+  catFromIpfs,
+  extractPinataJwt,
+  PINATA_AUTH_TEST_URL,
+  PINATA_UPLOAD_API_URL,
+  validatePinataJwt,
+} from '../src/identity/ipfs.js'
 
 const TEST_JWT = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJwaW5hdGEifQ.signature'
 
@@ -57,6 +65,34 @@ test('Pinata upload uses bearer auth and returns data.cid', async () => {
   }
 })
 
+test('Pinata image upload sends filename and content type with bearer auth', async () => {
+  const calls: Array<{ input: string; auth?: string; file?: File | null }> = []
+  const fetchImpl = async (input: string | URL, init?: RequestInit): Promise<Response> => {
+    const body = init?.body as FormData
+    calls.push({
+      input: String(input),
+      auth: init?.headers instanceof Headers
+        ? init.headers.get('authorization') ?? undefined
+        : (init?.headers as Record<string, string> | undefined)?.Authorization,
+      file: body.get('file') as File | null,
+    })
+    return new Response(JSON.stringify({ data: { cid: 'bafy-image-cid' } }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    })
+  }
+
+  const result = await addFileToIpfs(PINATA_UPLOAD_API_URL, new Uint8Array([1, 2, 3]), 'agent.png', 'image/png', fetchImpl, {
+    pinataJwt: TEST_JWT,
+  })
+
+  assert.deepEqual(result, { cid: 'bafy-image-cid', pinVerified: true, provider: 'pinata' })
+  assert.equal(calls[0]?.input, PINATA_UPLOAD_API_URL)
+  assert.equal(calls[0]?.auth, `Bearer ${TEST_JWT}`)
+  assert.equal(calls[0]?.file?.name, 'agent.png')
+  assert.equal(calls[0]?.file?.type, 'image/png')
+})
+
 test('Pinata JWT extractor accepts raw JWT and copy-all output', () => {
   assert.equal(extractPinataJwt(TEST_JWT), TEST_JWT)
   assert.equal(extractPinataJwt([
@@ -72,7 +108,33 @@ test('Pinata JWT extractor accepts raw JWT and copy-all output', () => {
 test('Pinata JWT extractor rejects API key and secret fields', () => {
   assert.throws(() => extractPinataJwt('API Key: f6ce52d7aecdace366d'), /Use the JWT, not the API key or secret/)
   assert.throws(() => extractPinataJwt('API Secret: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'), /Use the JWT, not the API key or secret/)
+  assert.throws(() => extractPinataJwt('aaa.bbb.ccc'), /Paste the JWT from Pinata/)
   assert.throws(() => extractPinataJwt('not a token'), /Paste the JWT from Pinata/)
+})
+
+test('Pinata JWT validation calls the authentication endpoint', async () => {
+  const calls: Array<{ input: string; auth?: string }> = []
+  const fetchImpl = async (input: string | URL, init?: RequestInit): Promise<Response> => {
+    calls.push({
+      input: String(input),
+      auth: init?.headers instanceof Headers
+        ? init.headers.get('authorization') ?? undefined
+        : (init?.headers as Record<string, string> | undefined)?.Authorization,
+    })
+    return new Response(JSON.stringify({ message: 'ok' }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    })
+  }
+
+  await assert.doesNotReject(validatePinataJwt(TEST_JWT, fetchImpl))
+  assert.equal(calls[0]?.input, PINATA_AUTH_TEST_URL)
+  assert.equal(calls[0]?.auth, `Bearer ${TEST_JWT}`)
+})
+
+test('Pinata JWT validation rejects unauthenticated credentials', async () => {
+  const fetchImpl = async (): Promise<Response> => new Response('{}', { status: 401, statusText: 'Unauthorized' })
+  await assert.rejects(validatePinataJwt(TEST_JWT, fetchImpl), /Pinata rejected this JWT/)
 })
 
 test('Pinata fetch reads from configured gateway', async () => {

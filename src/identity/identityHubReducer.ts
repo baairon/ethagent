@@ -7,7 +7,7 @@ import type { IdentityHubErrorView } from './identityHubModel.js'
 
 export type RestorePurpose = 'restore' | 'switch'
 export type DetailsView = Extract<Step, { kind: 'details' }>
-export type ProfileUpdates = { name?: string; description?: string }
+export type ProfileUpdates = { name?: string; description?: string; imagePath?: string }
 export type RestorableBackupEnvelope = AgentStateBackupEnvelope | ContinuitySnapshotEnvelope
 
 export type Step =
@@ -29,23 +29,24 @@ export type Step =
   | { kind: 'restore-select-token'; ownerHandle: string; registry: Erc8004RegistryConfig; candidates: Erc8004AgentCandidate[]; purpose?: RestorePurpose }
   | { kind: 'restore-fetching'; cid: string; apiUrl: string; candidate: Erc8004AgentCandidate; purpose?: RestorePurpose }
   | { kind: 'restore-authorizing'; cid: string; apiUrl: string; envelope: RestorableBackupEnvelope; candidate: Erc8004AgentCandidate; purpose?: RestorePurpose }
-  | { kind: 'rebackup-signing'; identity: EthagentIdentity; registry: Erc8004RegistryConfig; pinataJwt?: string; profileUpdates?: ProfileUpdates }
-  | { kind: 'rebackup-storage'; identity: EthagentIdentity; registry: Erc8004RegistryConfig; error?: string; pinataJwt?: string; profileUpdates?: ProfileUpdates }
-  | { kind: 'continuity-dashboard'; notice?: string }
+  | { kind: 'rebackup-signing'; identity: EthagentIdentity; registry: Erc8004RegistryConfig; pinataJwt?: string; profileUpdates?: ProfileUpdates; returnTo?: Step }
+  | { kind: 'rebackup-storage'; identity: EthagentIdentity; registry: Erc8004RegistryConfig; error?: string; pinataJwt?: string; profileUpdates?: ProfileUpdates; returnTo?: Step }
+  | { kind: 'public-profile-signing'; identity: EthagentIdentity; registry: Erc8004RegistryConfig; pinataJwt?: string; profileUpdates?: ProfileUpdates; returnTo?: Step }
+  | { kind: 'public-profile-storage'; identity: EthagentIdentity; registry: Erc8004RegistryConfig; error?: string; pinataJwt?: string; profileUpdates?: ProfileUpdates; returnTo?: Step }
   | { kind: 'continuity-private'; notice?: string }
   | { kind: 'continuity-public'; notice?: string }
-  | { kind: 'continuity-snapshots'; notice?: string }
+  | { kind: 'continuity-onchain-backups', notice?: string }
+  | { kind: 'continuity-full-history', notice?: string }
   | { kind: 'continuity-history-restore-confirm'; snapshotId: string }
   | { kind: 'continuity-unlocking'; identity: EthagentIdentity; cid?: string; publicSkillsCid?: string; returnTo?: 'private' | 'snapshots' }
   | { kind: 'rebackup-start'; back: Step }
-  | { kind: 'edit-profile-name'; identity: EthagentIdentity; registry: Erc8004RegistryConfig }
-  | { kind: 'edit-profile-description'; identity: EthagentIdentity; registry: Erc8004RegistryConfig; name: string }
-  | { kind: 'forget-confirm' }
-  | { kind: 'data-management' }
+  | { kind: 'edit-profile-name'; identity: EthagentIdentity; registry: Erc8004RegistryConfig; returnTo?: Step }
+  | { kind: 'edit-profile-description'; identity: EthagentIdentity; registry: Erc8004RegistryConfig; name: string; returnTo?: Step }
+  | { kind: 'edit-profile-image'; identity: EthagentIdentity; registry: Erc8004RegistryConfig; name: string; description: string; error?: string; returnTo?: Step }
   | { kind: 'storage-credential' }
   | { kind: 'storage-credential-input'; error?: string }
   | { kind: 'storage-credential-forget-confirm' }
-  | { kind: 'details'; copyPicker?: boolean }
+  | { kind: 'details' }
   | { kind: 'busy'; label: string }
   | { kind: 'error'; error: IdentityHubErrorView; back: Step }
 
@@ -70,8 +71,6 @@ export type Action =
   | { type: 'fetched'; step: Step }
   | { type: 'authorized' }
   | { type: 'openDetails' }
-  | { type: 'startForgetIdentity' }
-  | { type: 'cancelForgetIdentity' }
   | { type: 'openCopyPicker' }
   | { type: 'closeCopyPicker' }
   | { type: 'error'; error: IdentityHubErrorView; back: Step }
@@ -108,12 +107,8 @@ export function identityHubReducer(state: Step, action: Action): Step {
       return { kind: 'restore-wallet' }
     case 'openDetails':
       return { kind: 'details' }
-    case 'startForgetIdentity':
-      return { kind: 'forget-confirm' }
-    case 'cancelForgetIdentity':
-      return { kind: 'details' }
     case 'openCopyPicker':
-      if (state.kind === 'details') return { kind: 'details', copyPicker: true }
+      if (state.kind === 'details') return { kind: 'details' }
       return state
     case 'closeCopyPicker':
       if (state.kind === 'details') return { kind: 'details' }
@@ -162,32 +157,33 @@ function backStep(from: Step): Step {
     case 'restore-authorizing':
       return { kind: 'restore-network', ownerHandle: from.candidate.ownerAddress, purpose: from.purpose }
     case 'details':
-      if (from.copyPicker) return { kind: 'details' }
       return { kind: 'menu' }
     case 'rebackup-signing':
     case 'rebackup-storage':
     case 'rebackup-start':
-      return from.kind === 'rebackup-start' ? from.back : { kind: 'details' }
-    case 'continuity-snapshots':
-      return { kind: 'continuity-dashboard' }
-    case 'continuity-history-restore-confirm':
-      return { kind: 'continuity-snapshots' }
-    case 'continuity-dashboard':
-      return { kind: 'details' }
+      return from.kind === 'rebackup-start' ? from.back : from.returnTo ?? { kind: 'menu' }
+    case 'public-profile-signing':
+    case 'public-profile-storage':
+      return from.returnTo ?? { kind: 'continuity-public' }
+    case 'continuity-onchain-backups':
+      return { kind: 'menu' }
+    case 'continuity-full-history':
+      return { kind: 'continuity-onchain-backups' }
     case 'continuity-private':
     case 'continuity-public':
+      return { kind: 'menu' }
     case 'continuity-unlocking':
-      return { kind: 'continuity-dashboard' }
+      return from.returnTo === 'snapshots' ? { kind: 'continuity-onchain-backups' } : { kind: 'continuity-private' }
     case 'edit-profile-name':
-      return { kind: 'details' }
+      return from.returnTo ?? { kind: 'continuity-public' }
     case 'edit-profile-description':
-      return { kind: 'edit-profile-name', identity: from.identity, registry: from.registry }
-    case 'forget-confirm':
-    case 'data-management':
+      return { kind: 'edit-profile-name', identity: from.identity, registry: from.registry, returnTo: from.returnTo }
+    case 'edit-profile-image':
+      return { kind: 'edit-profile-description', identity: from.identity, registry: from.registry, name: from.name, returnTo: from.returnTo }
     case 'storage-credential':
     case 'storage-credential-input':
     case 'storage-credential-forget-confirm':
-      return { kind: 'details' }
+      return { kind: 'menu' }
     case 'error':
       return from.back
     default:

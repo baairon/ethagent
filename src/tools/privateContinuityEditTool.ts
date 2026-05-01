@@ -83,7 +83,7 @@ export const privateContinuityEditTool: Tool<typeof schema> = {
     'Prefer appendToSection+appendText to build on an existing scaffold section; use oldText+newText only for targeted replacement after exact text is known.',
     'Whole-file replacement is disabled for private continuity.',
     'Approved private continuity edits are not managed by /rewind; the previous version is saved to private identity history before writing.',
-    'Do not use this for public SKILLS.md; suggest SKILLS.md changes in chat for the user to apply manually.',
+    'Do not use this for public skills.json; suggest skills.json changes in chat for the user to apply manually.',
   ].join(' '),
   inputSchema: schema,
   inputSchemaJson: {

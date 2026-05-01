@@ -66,31 +66,29 @@ test('identityHubReducer: restore back returns to previous restore step instead 
   assert.equal(identityHubReducer(select, { type: 'back', from: select }).kind, 'restore-network')
 })
 
-test('identityHubReducer: details subviews back to settings, then hub', () => {
-  const copy: Step = { kind: 'details', copyPicker: true }
-  const plain = identityHubReducer(copy, { type: 'back', from: copy })
-  assert.deepEqual(plain, { kind: 'details' })
-
+test('identityHubReducer: top-level identity subviews back to hub', () => {
   assert.equal(identityHubReducer({ kind: 'details' }, { type: 'back', from: { kind: 'details' } }).kind, 'menu')
-  assert.equal(identityHubReducer({ kind: 'forget-confirm' }, { type: 'back', from: { kind: 'forget-confirm' } }).kind, 'details')
-  assert.equal(identityHubReducer({ kind: 'data-management' }, { type: 'back', from: { kind: 'data-management' } }).kind, 'details')
-  assert.equal(identityHubReducer({ kind: 'storage-credential-input' }, { type: 'back', from: { kind: 'storage-credential-input' } }).kind, 'details')
+  assert.equal(identityHubReducer({ kind: 'continuity-public' }, { type: 'back', from: { kind: 'continuity-public' } }).kind, 'menu')
+  assert.equal(identityHubReducer({ kind: 'continuity-private' }, { type: 'back', from: { kind: 'continuity-private' } }).kind, 'menu')
+  assert.equal(identityHubReducer({ kind: 'continuity-onchain-backups' }, { type: 'back', from: { kind: 'continuity-onchain-backups' } }).kind, 'menu')
+  assert.equal(identityHubReducer({ kind: 'storage-credential-input' }, { type: 'back', from: { kind: 'storage-credential-input' } }).kind, 'menu')
 })
 
 test('identityHubReducer: edit profile back preserves identity and registry', () => {
-  const state: Step = { kind: 'edit-profile-description', identity, registry, name: 'pip' }
+  const state: Step = { kind: 'edit-profile-description', identity, registry, name: 'pip', returnTo: { kind: 'continuity-public' } }
   const next = identityHubReducer(state, { type: 'back', from: state })
   assert.equal(next.kind, 'edit-profile-name')
   if (next.kind === 'edit-profile-name') {
     assert.equal(next.identity.address, identity.address)
     assert.equal(next.registry.chainId, registry.chainId)
+    assert.deepEqual(next.returnTo, { kind: 'continuity-public' })
   }
 })
 
-test('identityHubReducer: backup approval returns to settings', () => {
+test('identityHubReducer: backup approval returns to hub', () => {
   const state: Step = { kind: 'rebackup-signing', identity, registry }
   const next = identityHubReducer(state, { type: 'back', from: state })
-  assert.equal(next.kind, 'details')
+  assert.equal(next.kind, 'menu')
 })
 
 test('identityHubReducer: error back returns the stored step', () => {

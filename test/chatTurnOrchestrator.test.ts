@@ -75,7 +75,7 @@ test('identity continuity context auto-loads SOUL, MEMORY, and SKILLS markdown',
     assert.match(content, /private persona/)
     assert.match(content, /<MEMORY\.md visibility="private">/)
     assert.match(content, /private preference/)
-    assert.match(content, /<SKILLS\.md visibility="public">/)
+    assert.match(content, /<skills\.json visibility="public">/)
     assert.match(content, /public discovery/)
     assert.match(content, /published copy is referenced from onchain tokenURI metadata/)
   })

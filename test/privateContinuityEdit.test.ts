@@ -110,7 +110,7 @@ test('private continuity read prompts and ensures missing vault scaffolds are re
     assert.equal(outcome.result.ok, true)
     assert.equal(outcome.sessionRule, undefined)
     assert.equal(outcome.persistRule, false)
-    assert.match(outcome.result.content, /1: # .* Memory/)
+    assert.match(outcome.result.content, /1: # MEMORY\.md/)
     assert.match(outcome.result.content, /Durable User Preferences/)
     assert.equal(seenRequest, undefined)
 
@@ -221,7 +221,7 @@ test('approved private continuity append builds on an existing scaffold section'
   await withHome(async () => {
     await writeContinuityFiles(identity, {
       'SOUL.md': '# Soul\n\n## Persona\n\n- Existing persona\n',
-      'MEMORY.md': '# Memory\n\n## Durable User Preferences\n\n- Existing preference\n\n## Boundaries\n\n- Keep public capabilities in SKILLS.md.\n',
+      'MEMORY.md': '# Memory\n\n## Durable User Preferences\n\n- Existing preference\n\n## Boundaries\n\n- Keep public capabilities in skills.json.\n',
     })
 
     const outcome = await executeToolWithPermissions({
@@ -252,7 +252,7 @@ test('approved private continuity append builds on an existing scaffold section'
         '',
         '## Boundaries',
         '',
-        '- Keep public capabilities in SKILLS.md.',
+        '- Keep public capabilities in skills.json.',
       ].join('\n') + '\n',
     })
   })

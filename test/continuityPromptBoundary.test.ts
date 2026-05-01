@@ -14,7 +14,7 @@ test('base system prompt does not auto-load continuity markdown files', () => {
 
   assert.equal(prompt.includes('SOUL.md'), false)
   assert.equal(prompt.includes('MEMORY.md'), false)
-  assert.equal(prompt.includes('SKILLS.md'), false)
+  assert.equal(prompt.includes('skills.json'), false)
 })
 
 test('identity-linked prompt routes private continuity through scaffold edits', () => {

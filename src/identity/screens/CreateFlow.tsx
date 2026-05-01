@@ -25,9 +25,9 @@ const StepIndicator: React.FC<StepIndicatorProps> = ({ steps, current }) => {
     const n = index + 1
     const active = n === current
     const done = n < current
-    return `${done ? '✓' : n}. ${step}${active ? ' ←' : ''}`
+    return `${done ? 'done' : n}. ${step}${active ? ' <' : ''}`
   })
-  return <Text color={theme.dim}>{parts.join('  ·  ')}</Text>
+  return <Text color={theme.dim}>{parts.join('  -  ')}</Text>
 }
 
 type CreateFlowProps = {
@@ -70,7 +70,7 @@ export const CreateFlow: React.FC<CreateFlowProps> = ({
 
   if (step.kind === 'replace-confirm') {
     return (
-      <Surface title="Create a New Agent?" footer="enter selects · esc back">
+      <Surface title="Create a New Agent?" footer="enter selects - esc back">
         <Box flexDirection="column" marginBottom={1}>
           <Text color={theme.dim}>
             Your current agent stays in your wallet and remains loadable.
@@ -82,7 +82,7 @@ export const CreateFlow: React.FC<CreateFlowProps> = ({
         <Select<'replace' | 'back'>
           options={[
             { value: 'back', role: 'section', prefix: '--', label: 'Current identity' },
-            { value: 'back', label: 'keep current agent', hint: 'return to settings without minting anything', role: 'utility' },
+            { value: 'back', label: 'keep current agent', hint: 'return without minting anything', role: 'utility' },
             { value: 'replace', role: 'section', prefix: '--', label: 'New identity' },
             { value: 'replace', label: 'mint and use new agent', hint: 'create separate token and make it active' },
           ]}
@@ -99,7 +99,7 @@ export const CreateFlow: React.FC<CreateFlowProps> = ({
 
   if (step.kind === 'create-name') {
     return (
-      <Surface title="Name Your Agent" subtitle={indicator} footer="enter continues · esc back">
+      <Surface title="Name Your Agent" subtitle={indicator} footer="enter continues - esc back">
         {step.error ? <Text color="#e87070">{step.error}</Text> : null}
         <TextInput
           key="agent-name"
@@ -114,7 +114,7 @@ export const CreateFlow: React.FC<CreateFlowProps> = ({
 
   if (step.kind === 'create-description') {
     return (
-      <Surface title="Describe Your Agent" subtitle={indicator} footer="enter continues · esc back">
+      <Surface title="Describe Your Agent" subtitle={indicator} footer="enter continues - esc back">
         <Text color={theme.dim}>Optional. One short sentence is enough.</Text>
         <TextInput
           key="agent-description"
@@ -142,7 +142,7 @@ export const CreateFlow: React.FC<CreateFlowProps> = ({
       <Surface
         title={`${step.resolution.network ? networkLabel(step.resolution.network).charAt(0).toUpperCase() + networkLabel(step.resolution.network).slice(1) : ''} Agent Registry`}
         subtitle={step.error ?? 'Paste the agent registry address for this network.'}
-        footer="enter continues · esc back"
+        footer="enter continues - esc back"
       >
         <Text color={theme.dim}>RPC defaults to {step.resolution.defaultRpcUrl}</Text>
         <TextInput
@@ -179,13 +179,13 @@ export const CreateFlow: React.FC<CreateFlowProps> = ({
     <Surface
       title="Connect IPFS Storage"
       subtitle={step.error ?? 'Save a Pinata JWT so ethagent can pin encrypted state to IPFS.'}
-      footer="enter continues · esc back"
+      footer="enter continues - esc back"
     >
       <Text>
         <Text color={theme.dim}>Paste your Pinata JWT. Get one at </Text>
         <Text color={theme.accentPrimary} underline>{PINATA_API_KEYS_URL}</Text>
       </Text>
-      <Text color={theme.dim}>Saved encrypted on this device · used only for IPFS pinning</Text>
+      <Text color={theme.dim}>Saved encrypted on this device - used only for IPFS pinning</Text>
       <TextInput
         key="create-storage"
         isSecret

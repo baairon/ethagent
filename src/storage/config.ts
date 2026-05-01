@@ -37,6 +37,10 @@ const IdentitySchema = z.object({
     agentUri: z.string().min(1).optional(),
     metadataCid: z.string().min(1).optional(),
     txHash: z.string().regex(/^0x[a-fA-F0-9]+$/).optional(),
+    pastBackups: z.array(z.object({
+      cid: z.string().min(1),
+      createdAt: z.string(),
+    })).optional(),
   }).optional(),
   publicSkills: z.object({
     cid: z.string().min(1).optional(),

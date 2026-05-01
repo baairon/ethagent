@@ -201,12 +201,16 @@ export function identitySummaryRows(
   const chain = chainSummaryRow(config, identity)
   const stateValue = backup?.cid ? shortCid(backup.cid) : 'not saved yet'
   const skillsValue = identity?.publicSkills?.cid ? shortCid(identity.publicSkills.cid) : 'not published'
+  const cardValue = identity?.publicSkills?.agentCardCid ? shortCid(identity.publicSkills.agentCardCid) : 'not published'
+  const imageValue = typeof identity?.state?.imageUrl === 'string' && identity.state.imageUrl.trim() ? 'attached' : 'not attached'
   return [
     { label: 'owner', value: ownerValue, tone: identity ? 'ok' : 'dim' },
     { label: 'token', value: tokenValue, tone: identity?.agentId ? 'ok' : 'dim' },
     { label: 'network', value: chain.value, tone: chain.tone },
     { label: 'state', value: stateValue, tone: backup ? 'ok' : 'dim' },
     { label: 'skills', value: skillsValue, tone: identity?.publicSkills?.cid ? 'ok' : 'dim' },
+    { label: 'card', value: cardValue, tone: identity?.publicSkills?.agentCardCid ? 'ok' : 'dim' },
+    { label: 'image', value: imageValue, tone: imageValue === 'attached' ? 'ok' : 'dim' },
   ]
 }
 

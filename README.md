@@ -31,9 +31,9 @@ ethagent keeps three identity markdown files in the local identity vault:
 
 - `SOUL.md` private persona, boundaries, and standing instructions
 - `MEMORY.md` private durable preferences, project context, and decisions
-- `SKILLS.md` public agent discovery metadata and capabilities
+- `skills.json` public agent discovery metadata. Using strict JSON makes the agent's capabilities easily parsable by other applications and smart contracts, creating an optimal foundation for agent-to-agent delegation and autonomous discovery.
 
-When you choose **save snapshot and publish**, ethagent encrypts `SOUL.md` and `MEMORY.md`, pins the encrypted snapshot to IPFS, pins public `SKILLS.md` metadata, and updates the ERC-8004 tokenURI to point at the latest CIDs. The markdown is never written in plaintext onchain.
+When you choose **save snapshot and publish**, ethagent encrypts `SOUL.md` and `MEMORY.md`, pins the encrypted snapshot to IPFS, pins public `skills.json` metadata, and updates the ERC-8004 tokenURI to point at the latest CIDs. The markdown is never written in plaintext onchain.
 
 Your private continuity is encrypted for the wallet that authorized each snapshot. If the ERC-8004 token is transferred, the new holder can see public token metadata and backup CIDs, but cannot decrypt prior private memory without an explicit re-encryption handoff. For more background on portable agent identity and continuity, see [soul.md](https://soul.md/).
 
@@ -50,7 +50,7 @@ Before resetting, open `alt+i` and use **snapshots** or **save snapshot and publ
 | Inference | Hotswappable model, local or cloud |
 | Identity | ERC-8004 token owned by your wallet controls the agent identity |
 | Backup | Encrypted SOUL.md and MEMORY.md snapshots pinned to IPFS |
-| Discovery | Public SKILLS.md metadata pinned to IPFS and referenced from tokenURI |
+| Discovery | Public skills.json metadata pinned to IPFS and referenced from tokenURI |
 | Registration | ERC-8004 onchain agent record, restorable from address or ENS |
 
 Identity is the foundation. Once your ERC-8004 token exists, every other layer attaches to it.

@@ -9,23 +9,27 @@ import type { Step } from '../identityHubReducer.js'
 const PINATA_API_KEYS_URL = 'https://app.pinata.cloud/developers/api-keys'
 
 type RebackupStorageScreenProps = {
-  step: Extract<Step, { kind: 'rebackup-storage' }>
+  step: Extract<Step, { kind: 'rebackup-storage' | 'public-profile-storage' }>
   footer: React.ReactNode
   onSubmit: (input: string) => void
   onCancel: () => void
 }
 
-export const RebackupStorageScreen: React.FC<RebackupStorageScreenProps> = ({ step, footer, onSubmit, onCancel }) => (
-  <Surface
-    title="Connect IPFS Storage"
-    subtitle={step.error ?? 'Save a Pinata JWT so ethagent can pin encrypted state to IPFS.'}
-    footer={footer}
-  >
+export const RebackupStorageScreen: React.FC<RebackupStorageScreenProps> = ({ step, footer, onSubmit, onCancel }) => {
+  const publicOnly = step.kind === 'public-profile-storage'
+  return (
+    <Surface
+      title="Connect IPFS Storage"
+      subtitle={step.error ?? (publicOnly
+        ? 'Save a Pinata JWT so ethagent can pin public profile metadata to IPFS.'
+        : 'Save a Pinata JWT so ethagent can pin encrypted state to IPFS.')}
+      footer={footer}
+    >
     <Text>
       <Text color={theme.dim}>Paste your Pinata JWT. Get one at </Text>
       <Text color={theme.accentPrimary} underline>{PINATA_API_KEYS_URL}</Text>
     </Text>
-    <Text color={theme.dim}>Saved encrypted on this device · used only for IPFS pinning</Text>
+    <Text color={theme.dim}>Saved encrypted on this device - used only for IPFS pinning</Text>
     <TextInput
       key="rebackup-storage"
       isSecret
@@ -41,5 +45,6 @@ export const RebackupStorageScreen: React.FC<RebackupStorageScreenProps> = ({ st
       onSubmit={onSubmit}
       onCancel={onCancel}
     />
-  </Surface>
-)
+    </Surface>
+  )
+}

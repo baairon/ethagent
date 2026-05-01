@@ -1,3 +1,6 @@
+import fs from 'node:fs/promises'
+import os from 'node:os'
+import path from 'node:path'
 import type { Address, Hex } from 'viem'
 import type { EthagentConfig, EthagentIdentity, SelectableNetwork } from '../storage/config.js'
 import { saveConfig } from '../storage/config.js'
@@ -20,9 +23,14 @@ import {
   continuityAgentSnapshot,
   continuityVaultStatus,
   defaultContinuityFiles,
+  ensurePublicSkillsFile,
   ensureIdentityMarkdownScaffold,
   ensureContinuityFiles,
+  continuitySnapshotContentHashes,
+  equalContinuitySnapshotHashes,
+  localContinuitySnapshotContentHashes,
   prepareSyncedIdentityMarkdownScaffold,
+  prepareSyncedPublicSkillsJson,
   readContinuityFiles,
   readPublicSkillsFile,
   writeContinuityFiles,
@@ -33,11 +41,14 @@ import {
 import {
   createAgentCard,
   defaultPublicSkillsProfile,
-  renderPublicSkillsMarkdown,
+  renderPublicSkillsJson,
   serializeAgentCard,
 } from './continuity/publicSkills.js'
-import { recordPublishedContinuitySnapshot } from './continuity/snapshots.js'
-import { addToIpfs, catFromIpfs, DEFAULT_IPFS_API_URL, isPinataUploadUrl, type IpfsAddResult } from './ipfs.js'
+import {
+  recordPublishedContinuitySnapshot,
+  updatePublishedContinuitySnapshotContentHashes,
+} from './continuity/snapshots.js'
+import { addFileToIpfs, addToIpfs, catFromIpfs, DEFAULT_IPFS_API_URL, isPinataUploadUrl, type IpfsAddResult } from './ipfs.js'
 import {
   AgentTokenIdRequiredError,
   chainIdForNetwork,
@@ -52,16 +63,18 @@ import {
   preflightSetAgentUri,
   registeredAgentFromReceipt,
   withEthagentBackupPointer,
+  withEthagentPointers,
   type Erc8004AgentCandidate,
   type Erc8004RegistryConfig,
 } from './erc8004.js'
 import { getAddress } from 'viem'
 import { registryConfigFromConfig, type RegistryResolution } from './registryConfig.js'
-import { resolvePinataJwt, savePinataJwt } from './pinataJwt.js'
+import { resolveValidatedPinataJwt, savePinataJwt } from './pinataJwt.js'
 import {
   requestBrowserWalletAccount,
   requestBrowserWalletSignature,
   requestBrowserWalletSignatureAndTransaction,
+  sendBrowserWalletTransaction,
   type BrowserWalletReady,
 } from './browserWallet.js'
 import { initialAgentState, PREFLIGHT_AGENT_URI } from './identityHubModel.js'
@@ -78,7 +91,7 @@ type CreatePreparedTransaction = {
   publicSkills: PublicSkillsMetadata
   state: Record<string, unknown>
   continuityFiles: ReturnType<typeof defaultContinuityFiles>
-  publicSkillsMarkdown: string
+  publicSkillsJson: string
 }
 
 type RebackupPreparedTransaction = {
@@ -89,6 +102,15 @@ type RebackupPreparedTransaction = {
   publicSkills: PublicSkillsMetadata
   identity: EthagentIdentity
   markdownScaffold?: IdentityMarkdownScaffold
+}
+
+type PublicProfilePreparedTransaction = {
+  ownerAddress: Address
+  agentUri: string
+  metadataCid: string
+  publicSkills: PublicSkillsMetadata
+  identity: EthagentIdentity
+  publicSkillsJson: string
 }
 
 export type EffectCallbacks = {
@@ -116,7 +138,19 @@ export async function runCreatePreflight(
     return
   }
   const apiUrl = DEFAULT_IPFS_API_URL
-  const jwt = isPinataUploadUrl(apiUrl) ? await resolvePinataJwt() : undefined
+  let jwt: string | undefined
+  try {
+    jwt = isPinataUploadUrl(apiUrl) ? await resolveValidatedPinataJwt() : undefined
+  } catch (err: unknown) {
+    callbacks.onStep({
+      kind: 'create-storage',
+      name: step.name,
+      description: step.description,
+      registry: resolution.config,
+      error: (err as Error).message,
+    })
+    return
+  }
   if (isPinataUploadUrl(apiUrl) && !jwt) {
     callbacks.onStep({ kind: 'create-storage', name: step.name, description: step.description, registry: resolution.config })
     return
@@ -168,8 +202,8 @@ export async function runCreateSigning(
       })
       const continuityFiles = defaultContinuityFiles(draftIdentity)
       const publicProfile = defaultPublicSkillsProfile(draftIdentity)
-      const publicSkillsMarkdown = renderPublicSkillsMarkdown(publicProfile)
-      const publicSkillsPin = await addToIpfs(DEFAULT_IPFS_API_URL, publicSkillsMarkdown, fetch, { pinataJwt: step.pinataJwt })
+      const publicSkillsJson = renderPublicSkillsJson(publicProfile)
+      const publicSkillsPin = await addToIpfs(DEFAULT_IPFS_API_URL, publicSkillsJson, fetch, { pinataJwt: step.pinataJwt })
       assertVerifiedPin(publicSkillsPin)
       const agentCardPin = await addToIpfs(DEFAULT_IPFS_API_URL, serializeAgentCard(createAgentCard(publicProfile)), fetch, { pinataJwt: step.pinataJwt })
       assertVerifiedPin(agentCardPin)
@@ -207,6 +241,7 @@ export async function runCreateSigning(
         type: 'https://eips.ethereum.org/EIPS/eip-8004#registration-v1',
         name: step.name,
         ...(step.description ? { description: step.description } : {}),
+        ...(typeof state.imageUrl === 'string' ? { image: state.imageUrl } : {}),
       }, {
         cid,
         envelopeVersion: envelope.envelopeVersion,
@@ -231,7 +266,7 @@ export async function runCreateSigning(
           publicSkills,
           state,
           continuityFiles,
-          publicSkillsMarkdown,
+          publicSkillsJson,
         },
       }
     },
@@ -266,7 +301,7 @@ export async function runCreateSigning(
   }
   await writeIdentityMarkdownScaffold(nextIdentity, {
     ...defaultContinuityFiles(nextIdentity),
-    'SKILLS.md': result.prepared.publicSkillsMarkdown,
+    'skills.json': result.prepared.publicSkillsJson,
   })
   await recordPublishedContinuitySnapshot({ identity: nextIdentity, label: 'initial published snapshot' }).catch(() => null)
   await callbacks.onIdentityComplete(nextIdentity, `ERC-8004 agent registered - #${registered.agentId.toString()}`)
@@ -422,7 +457,12 @@ export async function runRestoreAuthorize(
     agentId: step.candidate.agentId.toString(),
     agentUri: step.candidate.agentUri,
     metadataCid: step.candidate.metadataCid,
-    state: restored.state,
+    state: {
+      ...restored.state,
+      ...(step.candidate.name ? { name: step.candidate.name } : {}),
+      ...(step.candidate.description ? { description: step.candidate.description } : {}),
+      ...(step.candidate.imageUrl ? { imageUrl: step.candidate.imageUrl } : {}),
+    },
     backup,
     ...(step.candidate.publicDiscovery ? {
       publicSkills: {
@@ -439,6 +479,7 @@ export async function runRestoreAuthorize(
   callbacks.onRestoreProgress?.({ phase: 'finishing', label: 'finalizing restored identity...' })
   await restorePublishedPublicSkills(nextIdentity, step.apiUrl, step.candidate.publicDiscovery?.skillsCid)
   await ensureIdentityMarkdownScaffold(nextIdentity)
+  await recordPublishedContinuitySnapshot({ identity: nextIdentity, label: 'restored from agent backup' }).catch(() => null)
   await callbacks.onIdentityComplete(nextIdentity, `ERC-8004 agent restored - #${step.candidate.agentId.toString()}`)
 }
 
@@ -467,7 +508,13 @@ export async function runRegistrySubmit(
     onConfigChange(next)
   }
   const apiUrl = DEFAULT_IPFS_API_URL
-  const jwt = isPinataUploadUrl(apiUrl) ? await resolvePinataJwt() : undefined
+  let jwt: string | undefined
+  try {
+    jwt = isPinataUploadUrl(apiUrl) ? await resolveValidatedPinataJwt() : undefined
+  } catch (err: unknown) {
+    callbacks.onStep({ kind: 'create-storage', name: step.name, description: step.description, registry, error: (err as Error).message })
+    return
+  }
   if (isPinataUploadUrl(apiUrl) && !jwt) {
     callbacks.onStep({ kind: 'create-storage', name: step.name, description: step.description, registry })
     return
@@ -517,18 +564,25 @@ export async function runRebackupPreflight(
   registry: Erc8004RegistryConfig,
   callbacks: EffectCallbacks,
   profileUpdates?: ProfileUpdates,
+  returnTo: Step = { kind: 'menu' },
 ): Promise<void> {
   const status = await continuityVaultStatus(identity)
   if (!status.ready) {
     throw new Error('restore local SOUL.md and MEMORY.md working files before saving an encrypted snapshot')
   }
   const apiUrl = DEFAULT_IPFS_API_URL
-  const jwt = isPinataUploadUrl(apiUrl) ? await resolvePinataJwt() : undefined
-  if (isPinataUploadUrl(apiUrl) && !jwt) {
-    callbacks.onStep({ kind: 'rebackup-storage', identity, registry, profileUpdates })
+  let jwt: string | undefined
+  try {
+    jwt = isPinataUploadUrl(apiUrl) ? await resolveValidatedPinataJwt() : undefined
+  } catch (err: unknown) {
+    callbacks.onStep({ kind: 'rebackup-storage', identity, registry, error: (err as Error).message, profileUpdates, returnTo })
     return
   }
-  callbacks.onStep({ kind: 'rebackup-signing', identity, registry, pinataJwt: jwt, profileUpdates })
+  if (isPinataUploadUrl(apiUrl) && !jwt) {
+    callbacks.onStep({ kind: 'rebackup-storage', identity, registry, profileUpdates, returnTo })
+    return
+  }
+  callbacks.onStep({ kind: 'rebackup-signing', identity, registry, pinataJwt: jwt, profileUpdates, returnTo })
 }
 
 export async function runRebackupSigning(
@@ -550,11 +604,23 @@ export async function runRebackupSigning(
       const profile = step.profileUpdates ?? {}
       const nextName = typeof profile.name === 'string' && profile.name.trim() ? profile.name.trim() : (typeof baseState.name === 'string' ? baseState.name : undefined)
       const nextDescription = profile.description !== undefined ? profile.description.trim() : (typeof baseState.description === 'string' ? baseState.description : '')
+      const uploadedImageUri = profile.imagePath === 'delete'
+        ? ''
+        : profile.imagePath
+          ? await uploadAgentImage(profile.imagePath, step.pinataJwt)
+          : typeof baseState.imageUrl === 'string' && baseState.imageUrl.trim()
+            ? baseState.imageUrl.trim()
+            : undefined
       const state: Record<string, unknown> = {
         ...baseState,
         ...(nextName !== undefined ? { name: nextName } : {}),
         description: nextDescription,
         lastBackedUpAt: new Date().toISOString(),
+      }
+      if (uploadedImageUri === '') {
+        delete state.imageUrl
+      } else if (uploadedImageUri) {
+        state.imageUrl = uploadedImageUri
       }
       const nextIdentityForFiles: EthagentIdentity = { ...step.identity, state }
       const markdownScaffold = step.profileUpdates
@@ -563,10 +629,10 @@ export async function runRebackupSigning(
       const continuityFiles = markdownScaffold
         ? { 'SOUL.md': markdownScaffold['SOUL.md'], 'MEMORY.md': markdownScaffold['MEMORY.md'] }
         : await readContinuityFiles(nextIdentityForFiles)
-      const publicSkillsMarkdown = markdownScaffold
-        ? markdownScaffold['SKILLS.md']
+      const publicSkillsJson = markdownScaffold
+        ? markdownScaffold['skills.json']
         : await readPublicSkillsFile(nextIdentityForFiles)
-      const publicSkillsPin = await addToIpfs(DEFAULT_IPFS_API_URL, publicSkillsMarkdown, fetch, { pinataJwt: step.pinataJwt })
+      const publicSkillsPin = await addToIpfs(DEFAULT_IPFS_API_URL, publicSkillsJson, fetch, { pinataJwt: step.pinataJwt })
       assertVerifiedPin(publicSkillsPin)
       const agentCardPin = await addToIpfs(
         DEFAULT_IPFS_API_URL,
@@ -588,6 +654,12 @@ export async function runRebackupSigning(
       const statePin = await addToIpfs(DEFAULT_IPFS_API_URL, serializeContinuitySnapshotEnvelope(envelope), fetch, { pinataJwt: step.pinataJwt })
       assertVerifiedPin(statePin)
       const cid = statePin.cid
+      const previousBackup = step.identity.backup
+      const pastBackups = previousBackup?.cid ? [
+        { cid: previousBackup.cid, createdAt: previousBackup.createdAt },
+        ...(previousBackup.pastBackups ?? []),
+      ].slice(0, 30) : undefined
+
       const backup: BackupMetadata = {
         cid,
         createdAt: envelope.createdAt,
@@ -599,6 +671,7 @@ export async function runRebackupSigning(
         rpcUrl: step.registry.rpcUrl,
         identityRegistryAddress: step.registry.identityRegistryAddress,
         agentId: step.identity.agentId,
+        ...(pastBackups ? { pastBackups } : {}),
       }
       const publicSkills: PublicSkillsMetadata = {
         cid: publicSkillsPin.cid,
@@ -610,10 +683,12 @@ export async function runRebackupSigning(
         type: 'https://eips.ethereum.org/EIPS/eip-8004#registration-v1',
         name: nextName ?? deriveAgentName(step.identity),
         ...(nextDescription ? { description: nextDescription } : {}),
+        ...(uploadedImageUri ? { image: uploadedImageUri } : {}),
       }, {
         cid,
         envelopeVersion: envelope.envelopeVersion,
         createdAt: envelope.createdAt,
+        ...(pastBackups ? { pastBackups } : {}),
       }, {
         skillsCid: publicSkills.cid,
         agentCardCid: publicSkills.agentCardCid,
@@ -674,7 +749,87 @@ export async function runRebackupStorageSubmit(
   callbacks: EffectCallbacks,
 ): Promise<void> {
   const { jwt: pinataJwt } = await savePinataJwt(input)
-  callbacks.onStep({ kind: 'rebackup-signing', identity: step.identity, registry: step.registry, pinataJwt, profileUpdates: step.profileUpdates })
+  callbacks.onStep({ kind: 'rebackup-signing', identity: step.identity, registry: step.registry, pinataJwt, profileUpdates: step.profileUpdates, returnTo: step.returnTo })
+}
+
+export async function runPublicProfilePreflight(
+  identity: EthagentIdentity,
+  registry: Erc8004RegistryConfig,
+  callbacks: EffectCallbacks,
+  profileUpdates?: ProfileUpdates,
+  returnTo: Step = { kind: 'continuity-public' },
+): Promise<void> {
+  const apiUrl = DEFAULT_IPFS_API_URL
+  let jwt: string | undefined
+  try {
+    jwt = isPinataUploadUrl(apiUrl) ? await resolveValidatedPinataJwt() : undefined
+  } catch (err: unknown) {
+    callbacks.onStep({ kind: 'public-profile-storage', identity, registry, error: (err as Error).message, profileUpdates, returnTo })
+    return
+  }
+  if (isPinataUploadUrl(apiUrl) && !jwt) {
+    callbacks.onStep({ kind: 'public-profile-storage', identity, registry, profileUpdates, returnTo })
+    return
+  }
+  callbacks.onStep({ kind: 'public-profile-signing', identity, registry, pinataJwt: jwt, profileUpdates, returnTo })
+}
+
+export async function runPublicProfileSigning(
+  step: Extract<Step, { kind: 'public-profile-signing' }>,
+  callbacks: EffectCallbacks,
+): Promise<void> {
+  const expectedOwner = getAddress(step.identity.ownerAddress ?? step.identity.address)
+  if (!step.identity.agentId) throw new Error('cannot publish public profile: identity is missing an agent token id')
+
+  const prepared = await preparePublicProfileTransaction(step, expectedOwner)
+  const agentId = BigInt(step.identity.agentId)
+  await preflightSetAgentUri({
+    ...step.registry,
+    account: expectedOwner,
+    agentId,
+    newUri: prepared.agentUri,
+  })
+
+  const tx = await sendBrowserWalletTransaction({
+    chainId: step.registry.chainId,
+    expectedAccount: expectedOwner,
+    to: step.registry.identityRegistryAddress,
+    data: encodeSetAgentUri({ agentId, newUri: prepared.agentUri }),
+    onReady: callbacks.onWalletReady,
+  })
+  const client = createErc8004PublicClient(step.registry)
+  await client.waitForTransactionReceipt({ hash: tx.txHash })
+
+  const nextIdentity: EthagentIdentity = {
+    ...prepared.identity,
+    source: 'erc8004',
+    address: getAddress(prepared.ownerAddress),
+    ownerAddress: getAddress(prepared.ownerAddress),
+    chainId: step.registry.chainId,
+    rpcUrl: step.registry.rpcUrl,
+    identityRegistryAddress: step.registry.identityRegistryAddress,
+    agentUri: prepared.agentUri,
+    metadataCid: prepared.metadataCid,
+    publicSkills: prepared.publicSkills,
+  }
+  await writePublicSkillsFile(nextIdentity, prepared.publicSkillsJson)
+  await callbacks.onIdentityComplete(nextIdentity, step.profileUpdates ? 'public profile updated' : 'public profile published')
+}
+
+export async function runPublicProfileStorageSubmit(
+  input: string,
+  step: Extract<Step, { kind: 'public-profile-storage' }>,
+  callbacks: EffectCallbacks,
+): Promise<void> {
+  const { jwt: pinataJwt } = await savePinataJwt(input)
+  callbacks.onStep({
+    kind: 'public-profile-signing',
+    identity: step.identity,
+    registry: step.registry,
+    pinataJwt,
+    profileUpdates: step.profileUpdates,
+    returnTo: step.returnTo,
+  })
 }
 
 export async function runContinuityUnlock(
@@ -700,8 +855,8 @@ export async function runContinuityUnlock(
       await writeContinuityFiles({ ...identity, state: payload.state }, payload.files)
       await restorePublishedPublicSkills(identity, identity.backup?.ipfsApiUrl ?? DEFAULT_IPFS_API_URL, step.publicSkillsCid)
       callbacks.onStep(step.returnTo === 'snapshots'
-        ? { kind: 'continuity-snapshots', notice: 'published snapshot restored locally. review, then publish when ready.' }
-        : { kind: 'continuity-private', notice: 'private files restored from encrypted IPFS snapshot.' })
+        ? { kind: 'continuity-onchain-backups', notice: 'published snapshot restored locally. review, then publish when ready.' }
+        : { kind: 'continuity-private', notice: 'published snapshot restored locally. review, then publish when ready.' })
       return
     }
     assertAgentStateBackupOwner(envelope, ownerAddress)
@@ -723,8 +878,91 @@ export async function runContinuityUnlock(
   }
   await ensureContinuityFiles(identity)
   callbacks.onStep(step.returnTo === 'snapshots'
-    ? { kind: 'continuity-snapshots', notice: 'local private working files are ready on this machine.' }
+    ? { kind: 'continuity-onchain-backups', notice: 'local private working files are ready on this machine.' }
     : { kind: 'continuity-private', notice: 'local private working files are ready on this machine.' })
+}
+
+
+async function preparePublicProfileTransaction(
+  step: Extract<Step, { kind: 'public-profile-signing' }>,
+  ownerAddress: Address,
+): Promise<PublicProfilePreparedTransaction> {
+  const baseState = (step.identity.state ?? {}) as Record<string, unknown>
+  const profile = step.profileUpdates ?? {}
+  const nextName = typeof profile.name === 'string' && profile.name.trim()
+    ? profile.name.trim()
+    : (typeof baseState.name === 'string' && baseState.name.trim() ? baseState.name.trim() : deriveAgentName(step.identity))
+  const nextDescription = profile.description !== undefined
+    ? profile.description.trim()
+    : (typeof baseState.description === 'string' ? baseState.description : '')
+  const uploadedImageUri = profile.imagePath === 'delete'
+    ? ''
+    : profile.imagePath
+      ? await uploadAgentImage(profile.imagePath, step.pinataJwt)
+      : typeof baseState.imageUrl === 'string' && baseState.imageUrl.trim()
+        ? baseState.imageUrl.trim()
+        : undefined
+  const updatedAt = new Date().toISOString()
+  const state: Record<string, unknown> = {
+    ...baseState,
+    name: nextName,
+    description: nextDescription,
+    publicProfileUpdatedAt: updatedAt,
+  }
+  if (uploadedImageUri === '') {
+    delete state.imageUrl
+  } else if (uploadedImageUri) {
+    state.imageUrl = uploadedImageUri
+  }
+  const nextIdentityForFiles: EthagentIdentity = { ...step.identity, state }
+  const publicSkillsJson = step.profileUpdates
+    ? await prepareSyncedPublicSkillsJson(nextIdentityForFiles)
+    : await ensurePublicSkillsFile(nextIdentityForFiles)
+  const publicSkillsPin = await addToIpfs(DEFAULT_IPFS_API_URL, publicSkillsJson, fetch, { pinataJwt: step.pinataJwt })
+  assertVerifiedPin(publicSkillsPin)
+  const agentCardPin = await addToIpfs(
+    DEFAULT_IPFS_API_URL,
+    serializeAgentCard(createAgentCard(defaultPublicSkillsProfile(nextIdentityForFiles))),
+    fetch,
+    { pinataJwt: step.pinataJwt },
+  )
+  assertVerifiedPin(agentCardPin)
+  const publicSkills: PublicSkillsMetadata = {
+    cid: publicSkillsPin.cid,
+    agentCardCid: agentCardPin.cid,
+    updatedAt,
+    status: 'pinned',
+  }
+  const backup = step.identity.backup
+  const registration = withEthagentPointers({
+    type: 'https://eips.ethereum.org/EIPS/eip-8004#registration-v1',
+    name: nextName,
+    ...(nextDescription ? { description: nextDescription } : {}),
+    ...(uploadedImageUri ? { image: uploadedImageUri } : {}),
+  }, {
+    ...(backup ? {
+      backup: {
+        cid: backup.cid,
+        envelopeVersion: backup.envelopeVersion,
+        createdAt: backup.createdAt,
+      },
+    } : {}),
+    publicDiscovery: {
+      skillsCid: publicSkills.cid,
+      agentCardCid: publicSkills.agentCardCid,
+      updatedAt,
+    },
+  })
+  const metadataPin = await addToIpfs(DEFAULT_IPFS_API_URL, JSON.stringify(registration, null, 2), fetch, { pinataJwt: step.pinataJwt })
+  assertVerifiedPin(metadataPin)
+  return {
+    ownerAddress,
+    agentUri: `ipfs://${metadataPin.cid}`,
+    metadataCid: metadataPin.cid,
+    publicSkills,
+    identity: { ...step.identity, state },
+    publicSkillsJson,
+  }
 }
 
 function deriveAgentName(identity: EthagentIdentity): string {
@@ -732,6 +970,46 @@ function deriveAgentName(identity: EthagentIdentity): string {
   const name = typeof state.name === 'string' ? state.name.trim() : ''
   if (name) return name
   return identity.agentId ? `agent #${identity.agentId}` : 'unnamed agent'
+}
+
+async function uploadAgentImage(imagePath: string, pinataJwt: string | undefined): Promise<string> {
+  const file = resolveImagePath(imagePath)
+  const data = await fs.readFile(file)
+  const contentType = imageContentType(file)
+  const pin = await addFileToIpfs(DEFAULT_IPFS_API_URL, data, path.basename(file), contentType, fetch, { pinataJwt })
+  assertVerifiedPin(pin)
+  return `ipfs://${pin.cid}`
+}
+
+function resolveImagePath(input: string): string {
+  const trimmed = input.trim()
+  if (!trimmed) throw new Error('image file path is empty')
+  if (/^https?:\/\//i.test(trimmed) || /^ipfs:\/\//i.test(trimmed)) {
+    throw new Error('enter a local image file path; ethagent uploads it to IPFS')
+  }
+  if (!/\.(png|jpe?g|gif|webp|svg)$/i.test(trimmed)) {
+    throw new Error('agent image must be png, jpg, gif, webp, or svg')
+  }
+  return path.resolve(trimmed.replace(/^~(?=$|[\\/])/, os.homedir()))
+}
+
+function imageContentType(file: string): string {
+  const ext = path.extname(file).toLowerCase()
+  switch (ext) {
+    case '.png':
+      return 'image/png'
+    case '.jpg':
+    case '.jpeg':
+      return 'image/jpeg'
+    case '.gif':
+      return 'image/gif'
+    case '.webp':
+      return 'image/webp'
+    case '.svg':
+      return 'image/svg+xml'
+    default:
+      throw new Error('agent image must be png, jpg, gif, webp, or svg')
+  }
 }
 
 function assertVerifiedPin(pin: IpfsAddResult, expectedCid?: string): void {

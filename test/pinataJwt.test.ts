@@ -9,10 +9,15 @@ import {
   hasPinataJwt,
   invalidatePinataJwtCache,
   resolvePinataJwt,
+  resolveValidatedPinataJwt,
   savePinataJwt,
 } from '../src/identity/pinataJwt.js'
 
 const TEST_JWT = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJwaW5hdGEifQ.signature'
+const validPinataFetch = async (): Promise<Response> => new Response(JSON.stringify({ message: 'ok' }), {
+  status: 200,
+  headers: { 'content-type': 'application/json' },
+})
 
 async function withTempHome(fn: () => Promise<void>): Promise<void> {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'ethagent-pinata-'))
@@ -46,7 +51,7 @@ test('savePinataJwt rejects non-JWT strings via extractPinataJwt', async () => {
 test('savePinataJwt persists the JWT and round-trips through get/has/resolve', async () => {
   await withTempHome(async () => {
     assert.equal(await hasPinataJwt(), false)
-    const { jwt } = await savePinataJwt(TEST_JWT)
+    const { jwt } = await savePinataJwt(TEST_JWT, { fetchImpl: validPinataFetch })
     assert.equal(jwt, TEST_JWT)
     assert.equal(await hasPinataJwt(), true)
     assert.equal(await getPinataJwt(), TEST_JWT)
@@ -57,7 +62,7 @@ test('savePinataJwt persists the JWT and round-trips through get/has/resolve', a
 test('savePinataJwt extracts a JWT from copy-all paste', async () => {
   await withTempHome(async () => {
     const blob = ['API Key', 'f6ce52d7aecdace366d', 'JWT', TEST_JWT].join('\n')
-    const { jwt } = await savePinataJwt(blob)
+    const { jwt } = await savePinataJwt(blob, { fetchImpl: validPinataFetch })
     assert.equal(jwt, TEST_JWT)
     assert.equal(await resolvePinataJwt(), TEST_JWT)
   })
@@ -65,7 +70,7 @@ test('savePinataJwt extracts a JWT from copy-all paste', async () => {
 
 test('clearPinataJwt removes the secret and updates the cache', async () => {
   await withTempHome(async () => {
-    await savePinataJwt(TEST_JWT)
+    await savePinataJwt(TEST_JWT, { fetchImpl: validPinataFetch })
     assert.equal(await resolvePinataJwt(), TEST_JWT)
     await clearPinataJwt()
     assert.equal(await hasPinataJwt(), false)
@@ -90,8 +95,32 @@ test('stored JWT takes precedence over PINATA_JWT env', async () => {
     process.env.PINATA_JWT = 'env-fallback-jwt'
     invalidatePinataJwtCache()
     try {
-      await savePinataJwt(TEST_JWT)
+      await savePinataJwt(TEST_JWT, { fetchImpl: validPinataFetch })
       assert.equal(await resolvePinataJwt(), TEST_JWT)
+    } finally {
+      delete process.env.PINATA_JWT
+    }
+  })
+})
+
+test('savePinataJwt does not persist a JWT Pinata rejects', async () => {
+  await withTempHome(async () => {
+    const rejectedFetch = async (): Promise<Response> => new Response('{}', { status: 403, statusText: 'Forbidden' })
+    await assert.rejects(savePinataJwt(TEST_JWT, { fetchImpl: rejectedFetch }), /Pinata rejected this JWT/)
+    assert.equal(await hasPinataJwt(), false)
+  })
+})
+
+test('resolveValidatedPinataJwt validates stored and environment credentials', async () => {
+  await withTempHome(async () => {
+    await savePinataJwt(TEST_JWT, { fetchImpl: validPinataFetch })
+    assert.equal(await resolveValidatedPinataJwt(validPinataFetch), TEST_JWT)
+
+    await clearPinataJwt()
+    process.env.PINATA_JWT = TEST_JWT
+    invalidatePinataJwtCache()
+    try {
+      assert.equal(await resolveValidatedPinataJwt(validPinataFetch), TEST_JWT)
     } finally {
       delete process.env.PINATA_JWT
     }

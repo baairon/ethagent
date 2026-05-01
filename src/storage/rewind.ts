@@ -237,7 +237,7 @@ function isIdentityMarkdownSnapshot(snapshot: RewindSnapshot): boolean {
   )
 }
 
-const IDENTITY_MARKDOWN_FILES = new Set(['soul.md', 'memory.md', 'skills.md'])
+const IDENTITY_MARKDOWN_FILES = new Set(['soul.md', 'memory.md', 'skills.json'])
 
 function normalizeSnippet(input?: string): string {
   const normalized = (input ?? '').replace(/\s+/g, ' ').trim()

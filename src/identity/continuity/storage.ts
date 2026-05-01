@@ -1,9 +1,10 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
+import { createHash } from 'node:crypto'
 import { getConfigDir, type EthagentIdentity } from '../../storage/config.js'
 import { atomicWriteText } from '../../storage/atomicWrite.js'
 import type { ContinuityAgentSnapshot, ContinuityFiles } from './envelope.js'
-import { defaultPublicSkillsProfile, renderPublicSkillsMarkdown } from './publicSkills.js'
+import { defaultPublicSkillsProfile, renderPublicSkillsJson } from './publicSkills.js'
 
 export const PRIVATE_CONTINUITY_FILES = ['SOUL.md', 'MEMORY.md'] as const
 export type PrivateContinuityFile = (typeof PRIVATE_CONTINUITY_FILES)[number]
@@ -16,7 +17,19 @@ export type ContinuityVaultRef = {
 }
 
 export type IdentityMarkdownScaffold = ContinuityFiles & {
-  'SKILLS.md': string
+  'skills.json': string
+}
+
+export type ContinuitySnapshotFile = PrivateContinuityFile | 'skills.json'
+export type ContinuitySnapshotContentHashes = Record<ContinuitySnapshotFile, string>
+export type ContinuityPublishState = 'not-restored' | 'not-published' | 'verify-needed' | 'local-changes' | 'published'
+export type ContinuityWorkingTreeStatus = {
+  ready: boolean
+  newestLocalChangeAt?: string
+  localChangedAfterBackup: boolean
+  publishState: ContinuityPublishState
+  localContentHashes?: ContinuitySnapshotContentHashes
+  publishedContentHashes?: ContinuitySnapshotContentHashes
 }
 
 export function continuityVaultRef(identity: Pick<EthagentIdentity, 'chainId' | 'identityRegistryAddress' | 'agentId' | 'address'>): ContinuityVaultRef {
@@ -25,7 +38,7 @@ export function continuityVaultRef(identity: Pick<EthagentIdentity, 'chainId' | 
     dir,
     soulPath: path.join(dir, 'SOUL.md'),
     memoryPath: path.join(dir, 'MEMORY.md'),
-    publicSkillsPath: path.join(dir, 'SKILLS.md'),
+    publicSkillsPath: path.join(dir, 'skills.json'),
   }
 }
 
@@ -67,7 +80,7 @@ export async function ensureIdentityMarkdownScaffold(
   const publicSkills = await ensurePublicSkillsFile(identity, { fallback: options.publicSkillsFallback })
   return {
     ...privateFiles,
-    'SKILLS.md': publicSkills,
+    'skills.json': publicSkills,
   }
 }
 
@@ -79,7 +92,7 @@ export async function writeIdentityMarkdownScaffold(
     'SOUL.md': files['SOUL.md'],
     'MEMORY.md': files['MEMORY.md'],
   })
-  await writePublicSkillsFile(identity, files['SKILLS.md'])
+  await writePublicSkillsFile(identity, files['skills.json'])
   return ref
 }
 
@@ -94,7 +107,7 @@ export async function prepareSyncedIdentityMarkdownScaffold(identity: EthagentId
   const privateFiles = await readContinuityFiles(identity)
   const publicSkills = await readPublicSkillsFile(identity)
   const privateDefaults = defaultContinuityFiles(identity)
-  const publicDefault = defaultPublicSkillsMarkdown(identity)
+  const publicDefault = defaultPublicSkillsJson(identity)
   return {
     'SOUL.md': syncGeneratedMarkdown(privateFiles['SOUL.md'], privateDefaults['SOUL.md'], [
       { marker: 'identity', legacyHeading: 'Identity' },
@@ -102,9 +115,50 @@ export async function prepareSyncedIdentityMarkdownScaffold(identity: EthagentId
     'MEMORY.md': syncGeneratedMarkdown(privateFiles['MEMORY.md'], privateDefaults['MEMORY.md'], [
       { marker: 'identity' },
     ]),
-    'SKILLS.md': syncGeneratedMarkdown(publicSkills, publicDefault, [
-      { marker: 'public-profile' },
-    ]),
+    'skills.json': syncSkillsJson(publicSkills, publicDefault),
+  }
+}
+
+export async function prepareSyncedPublicSkillsJson(identity: EthagentIdentity): Promise<string> {
+  await ensurePublicSkillsFile(identity)
+  const publicSkills = await readPublicSkillsFile(identity)
+  return syncSkillsJson(publicSkills, defaultPublicSkillsJson(identity))
+}
+
+function syncSkillsJson(existing: string, fresh: string): string {
+  try {
+    const existingParsed = JSON.parse(existing)
+    const freshParsed = JSON.parse(fresh)
+    const merged = {
+      ...existingParsed,
+      ...freshParsed,
+      skills: existingParsed.skills || freshParsed.skills,
+      inputModes: existingParsed.inputModes || freshParsed.inputModes,
+      outputModes: existingParsed.outputModes || freshParsed.outputModes,
+    }
+    return `${JSON.stringify(merged, null, 2)}\n`
+  } catch {
+    // If it was the old markdown format or invalid JSON, try to extract the JSON block
+    const extracted = extractMarkedBlock(existing, 'public-profile')
+    if (extracted) {
+      try {
+        // Remove ```json and ```
+        const cleanJson = extracted.replace(/^```json\s+/, '').replace(/\s+```$/, '')
+        const parsed = JSON.parse(cleanJson)
+        const freshParsed = JSON.parse(fresh)
+        const merged = {
+          ...parsed,
+          ...freshParsed,
+          skills: parsed.skills || freshParsed.skills,
+          inputModes: parsed.inputModes || freshParsed.inputModes,
+          outputModes: parsed.outputModes || freshParsed.outputModes,
+        }
+        return `${JSON.stringify(merged, null, 2)}\n`
+      } catch {
+        return fresh
+      }
+    }
+    return fresh
   }
 }
 
@@ -114,6 +168,16 @@ export async function ensurePublicSkillsFile(
 ): Promise<string> {
   const ref = await ensureContinuityVault(identity)
   if (await exists(ref.publicSkillsPath)) return readPublicSkillsFile(identity)
+
+  const legacyPath = path.join(ref.dir, 'SKILLS.md')
+  if (await exists(legacyPath)) {
+    const legacyContent = await fs.readFile(legacyPath, 'utf8')
+    const jsonContent = syncSkillsJson(legacyContent, defaultPublicSkillsJson(identity))
+    await atomicWriteText(ref.publicSkillsPath, jsonContent, { mode: 0o644 })
+    await fs.rm(legacyPath, { force: true })
+    return readPublicSkillsFile(identity)
+  }
+
   const fallback = await resolvePublicSkillsFallback(identity, options.fallback)
   await atomicWriteText(ref.publicSkillsPath, normalizeMarkdown(fallback), { mode: 0o644 })
   return readPublicSkillsFile(identity)
@@ -121,7 +185,7 @@ export async function ensurePublicSkillsFile(
 
 export async function readPublicSkillsFile(identity: EthagentIdentity): Promise<string> {
   const ref = await ensureContinuityVault(identity)
-  return readOrDefault(ref.publicSkillsPath, defaultPublicSkillsMarkdown(identity))
+  return readOrDefault(ref.publicSkillsPath, defaultPublicSkillsJson(identity))
 }
 
 export async function writePublicSkillsFile(identity: EthagentIdentity, content: string): Promise<ContinuityVaultRef> {
@@ -136,11 +200,10 @@ export async function continuityVaultStatus(identity: EthagentIdentity): Promise
   return { ready: soul && memory, files: ref }
 }
 
-export async function continuityWorkingTreeStatus(identity: EthagentIdentity): Promise<{
-  ready: boolean
-  newestLocalChangeAt?: string
-  localChangedAfterBackup: boolean
-}> {
+export async function continuityWorkingTreeStatus(
+  identity: EthagentIdentity,
+  publishedSnapshot?: { contentHashes?: ContinuitySnapshotContentHashes },
+): Promise<ContinuityWorkingTreeStatus> {
   const ref = continuityVaultRef(identity)
   const stats = await Promise.all([
     statIfExists(ref.soulPath),
@@ -148,12 +211,66 @@ export async function continuityWorkingTreeStatus(identity: EthagentIdentity): P
     statIfExists(ref.publicSkillsPath),
   ])
   const newestMs = Math.max(0, ...stats.flatMap(stat => stat ? [stat.mtimeMs] : []))
-  const backupMs = identity.backup?.createdAt ? Date.parse(identity.backup.createdAt) : Number.NaN
+  const ready = Boolean(stats[0] && stats[1])
+  const localContentHashes = ready
+    ? await localContinuitySnapshotContentHashes(identity).catch(() => undefined)
+    : undefined
+  const publishedContentHashes = publishedSnapshot?.contentHashes
+  const publishState: ContinuityPublishState = !ready
+    ? 'not-restored'
+    : !identity.backup?.cid
+      ? 'not-published'
+      : !localContentHashes || !publishedContentHashes
+        ? 'verify-needed'
+        : equalContinuitySnapshotHashes(localContentHashes, publishedContentHashes)
+          ? 'published'
+          : 'local-changes'
+
   return {
-    ready: Boolean(stats[0] && stats[1]),
+    ready,
     ...(newestMs > 0 ? { newestLocalChangeAt: new Date(newestMs).toISOString() } : {}),
-    localChangedAfterBackup: Number.isFinite(backupMs) ? newestMs > backupMs + 1000 : newestMs > 0,
+    localChangedAfterBackup: publishState === 'local-changes',
+    publishState,
+    ...(localContentHashes ? { localContentHashes } : {}),
+    ...(publishedContentHashes ? { publishedContentHashes } : {}),
   }
+}
+
+export async function localContinuitySnapshotContentHashes(
+  identity: EthagentIdentity,
+): Promise<ContinuitySnapshotContentHashes> {
+  const privateFiles = await readContinuityFiles(identity)
+  const publicSkills = await readPublicSkillsFile(identity)
+  return continuitySnapshotContentHashes(privateFiles, publicSkills)
+}
+
+export function continuitySnapshotContentHashes(
+  privateFiles: ContinuityFiles,
+  publicSkills: string,
+): ContinuitySnapshotContentHashes {
+  return {
+    'SOUL.md': hashContinuitySnapshotContent(privateFiles['SOUL.md']),
+    'MEMORY.md': hashContinuitySnapshotContent(privateFiles['MEMORY.md']),
+    'skills.json': hashContinuitySnapshotContent(publicSkills),
+  }
+}
+
+export function equalContinuitySnapshotHashes(
+  a: ContinuitySnapshotContentHashes,
+  b: ContinuitySnapshotContentHashes,
+): boolean {
+  return a['SOUL.md'] === b['SOUL.md']
+    && a['MEMORY.md'] === b['MEMORY.md']
+    && a['skills.json'] === b['skills.json']
+}
+
+function hashContinuitySnapshotContent(value: string): string {
+  return createHash('sha256').update(normalizeSnapshotContent(value), 'utf8').digest('hex')
+}
+
+function normalizeSnapshotContent(value: string): string {
+  const normalized = value.replace(/\r\n?/g, '\n')
+  return normalized.endsWith('\n') ? normalized : `${normalized}\n`
 }
 
 export function continuityAgentSnapshot(identity: EthagentIdentity): ContinuityAgentSnapshot {
@@ -187,7 +304,7 @@ export function defaultContinuityFiles(identity: EthagentIdentity, now = new Dat
   })
   return {
     'SOUL.md': [
-      `# ${name} Soul`,
+      '# SOUL.md',
       '',
       identityBlock,
       '',
@@ -201,11 +318,12 @@ export function defaultContinuityFiles(identity: EthagentIdentity, now = new Dat
       '',
       '- Keep private continuity, persona, and owner-specific standing instructions in this file.',
       '- Do not publish this file directly; use encrypted snapshot backup from Identity Hub.',
-      '- Public capabilities belong in SKILLS.md.',
+      '- Public capabilities belong in skills.json.',
       '',
       '## Maintenance Rules',
       '',
       '- Keep the generated Agent Identity block intact; edit owner-authored sections below it.',
+      '- Do not duplicate the mutable public agent name here; it lives in token metadata and the Agent Card.',
       '- Prefer durable guidance over session-specific notes.',
       '- Move factual project memory to MEMORY.md when it is not persona or instruction material.',
       '',
@@ -216,7 +334,7 @@ export function defaultContinuityFiles(identity: EthagentIdentity, now = new Dat
       `Created: ${created}`,
     ].join('\n') + '\n',
     'MEMORY.md': [
-      `# ${name} Memory`,
+      '# MEMORY.md',
       '',
       identityBlock,
       '',
@@ -239,6 +357,7 @@ export function defaultContinuityFiles(identity: EthagentIdentity, now = new Dat
       '## Maintenance Rules',
       '',
       '- Prefer stable facts, preferences, and decisions over chat transcripts.',
+      '- Do not duplicate the mutable public agent name here; it lives in token metadata and the Agent Card.',
       '- Add dates or source context when a note may become stale.',
       '- Remove or rewrite stale memory instead of accumulating contradictions.',
       '',
@@ -246,15 +365,15 @@ export function defaultContinuityFiles(identity: EthagentIdentity, now = new Dat
       '',
       '- Do not store secrets unless the user explicitly asks for it.',
       '- Do not store raw wallet signatures or private keys.',
-      '- Keep public capabilities in SKILLS.md.',
+      '- Keep public capabilities in skills.json.',
       '',
       `Created: ${created}`,
     ].join('\n') + '\n',
   }
 }
 
-export function defaultPublicSkillsMarkdown(identity: EthagentIdentity): string {
-  return renderPublicSkillsMarkdown(defaultPublicSkillsProfile(identity))
+export function defaultPublicSkillsJson(identity: EthagentIdentity): string {
+  return renderPublicSkillsJson(defaultPublicSkillsProfile(identity))
 }
 
 function continuityVaultId(identity: Pick<EthagentIdentity, 'chainId' | 'identityRegistryAddress' | 'agentId' | 'address'>): string {
@@ -282,10 +401,10 @@ async function resolvePublicSkillsFallback(
     try {
       return await fallback()
     } catch {
-      return defaultPublicSkillsMarkdown(identity)
+      return defaultPublicSkillsJson(identity)
     }
   }
-  return defaultPublicSkillsMarkdown(identity)
+  return defaultPublicSkillsJson(identity)
 }
 
 async function readOrDefault(file: string, fallback: string): Promise<string> {
@@ -334,12 +453,10 @@ function renderPrivateIdentityBlock(args: {
   return [
     '<!-- ethagent:identity:start -->',
     '## Agent Identity',
-    `- Agent name: ${args.name}`,
     `- Owner wallet: ${args.owner}`,
     `- ERC-8004 token: ${args.token}`,
     `- Chain ID: ${args.chainId}`,
     `- Registry: ${args.registry}`,
-    `- Public description: ${args.description}`,
     '- Visibility: private local working file; encrypted before IPFS backup.',
     '<!-- ethagent:identity:end -->',
   ].join('\n')

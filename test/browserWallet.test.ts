@@ -109,6 +109,7 @@ test('browser wallet page supports the single signature and transaction flow', (
   assert.match(page, /approve-sign/)
   assert.match(page, /approve-transaction/)
   assert.match(page, /saving encrypted IPFS backup/)
+  assert.doesNotMatch(page, /this tab will close after you can read the hash/)
 })
 
 test('browser wallet page updates generated signature message details', () => {

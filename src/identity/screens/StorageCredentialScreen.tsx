@@ -112,7 +112,7 @@ export const StorageCredentialScreen: React.FC<StorageCredentialScreenProps> = (
             { value: 'edit', label: hasCredential ? 'replace credential' : 'save credential', hint: 'store Pinata JWT for IPFS pinning' },
             { value: 'forget', label: 'forget credential', hint: 'remove the local pinning token; existing pins remain', disabled: !hasCredential },
             { value: 'back', role: 'section', prefix: '--', label: 'Navigation' },
-            { value: 'back', label: 'back to settings', hint: 'return without changing storage access', role: 'utility' },
+            { value: 'back', label: 'back to identity hub', hint: 'return without changing storage access', role: 'utility' },
           ]}
           hintLayout="inline"
           onSubmit={choice => {

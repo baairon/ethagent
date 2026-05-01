@@ -261,6 +261,7 @@ test('discoverOwnedAgentBackups verifies ownership before loading agent metadata
       getLogs: async () => [{ args: { tokenId: 7n } }],
       readContract: async (call: { functionName: string }) => {
         if (call.functionName === 'balanceOf') return 1n
+        if (call.functionName === 'tokenOfOwnerByIndex') throw new Error('enumerable unsupported')
         if (call.functionName === 'ownerOf') return other
         tokenUriReads++
         return agentDataUri('ignored')
@@ -283,6 +284,7 @@ test('discoverOwnedAgentBackups returns transfer-owned agents with recoverable s
       getLogs: async () => [{ args: { tokenId: 9n } }],
       readContract: async (call: { functionName: string }) => {
         if (call.functionName === 'balanceOf') return 1n
+        if (call.functionName === 'tokenOfOwnerByIndex') throw new Error('enumerable unsupported')
         if (call.functionName === 'ownerOf') return owner
         if (call.functionName === 'tokenURI') return agentDataUri('bafy-state-base', 'base agent')
         throw new Error(`unexpected read: ${call.functionName}`)
@@ -294,6 +296,36 @@ test('discoverOwnedAgentBackups returns transfer-owned agents with recoverable s
   assert.equal(candidates[0]?.agentId, 9n)
   assert.equal(candidates[0]?.name, 'base agent')
   assert.equal(candidates[0]?.backup?.cid, 'bafy-state-base')
+})
+
+test('discoverOwnedAgentBackups uses enumerable owner indexes before log scans', async () => {
+  const owner = '0x000000000000000000000000000000000000dEaD'
+  const candidates = await discoverOwnedAgentBackups({
+    chainId: 8453,
+    rpcUrl: 'https://base.publicnode.com',
+    identityRegistryAddress: DEFAULT_ERC8004_IDENTITY_REGISTRY_ADDRESS,
+    ownerHandle: owner,
+    publicClient: {
+      getLogs: async () => {
+        throw new Error('logs should not be scanned when enumerable lookup works')
+      },
+      readContract: async (call: { functionName: string; args: unknown[] }) => {
+        if (call.functionName === 'balanceOf') return 1n
+        if (call.functionName === 'tokenOfOwnerByIndex') {
+          assert.equal(call.args[0], owner)
+          assert.equal(call.args[1], 0n)
+          return 11n
+        }
+        if (call.functionName === 'ownerOf') return owner
+        if (call.functionName === 'tokenURI') return agentDataUri('bafy-enumerable', 'enumerable agent')
+        throw new Error(`unexpected read: ${call.functionName}`)
+      },
+    } as any,
+  })
+
+  assert.equal(candidates.length, 1)
+  assert.equal(candidates[0]?.agentId, 11n)
+  assert.equal(candidates[0]?.backup?.cid, 'bafy-enumerable')
 })
 
 test('discoverOwnedAgentBackups asks for token id when positive balance logs time out', async () => {
@@ -310,10 +342,16 @@ test('discoverOwnedAgentBackups asks for token id when positive balance logs tim
       },
       readContract: async (call: { functionName: string }) => {
         if (call.functionName === 'balanceOf') return 1n
+        if (call.functionName === 'tokenOfOwnerByIndex') throw new Error('enumerable unsupported')
         throw new Error(`unexpected read: ${call.functionName}`)
       },
     } as any,
-  }), AgentTokenIdRequiredError)
+  }), (err: unknown) => {
+    assert.ok(err instanceof AgentTokenIdRequiredError)
+    assert.match(err.message, /Automatic base lookup timed out\. Enter the agent token ID to continue\./)
+    assert.doesNotMatch(err.message, /URL:/)
+    return true
+  })
 })
 
 test('discoverOwnedAgentBackupByTokenId validates ownership without logs', async () => {

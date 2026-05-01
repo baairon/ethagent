@@ -4,24 +4,23 @@ import { Surface } from '../../ui/Surface.js'
 import { Select, type SelectOption } from '../../ui/Select.js'
 import { theme } from '../../ui/theme.js'
 import type { EthagentConfig, EthagentIdentity } from '../../storage/config.js'
+import type { ContinuityWorkingTreeStatus } from '../continuity/storage.js'
 import type { PrivateContinuityHistorySnapshot } from '../continuity/history.js'
 import type { PublishedContinuitySnapshot } from '../continuity/snapshots.js'
 import { shortCid } from '../identityHubModel.js'
 import { IdentitySummary } from './IdentitySummary.js'
 
-export type SnapshotWorkingStatus = {
-  ready: boolean
-  newestLocalChangeAt?: string
-  localChangedAfterBackup: boolean
-}
+export type SnapshotWorkingStatus = ContinuityWorkingTreeStatus
 
 type SnapshotAction =
   | 'publish'
+  | 'view-full-history'
   | 'back'
   | `published:${string}`
   | `history:${string}`
 
 type SnapshotManagerScreenProps = {
+  mode: 'onchain-backups' | 'full-history'
   identity?: EthagentIdentity
   config?: EthagentConfig
   ready: boolean
@@ -32,12 +31,14 @@ type SnapshotManagerScreenProps = {
   localHistory: PrivateContinuityHistorySnapshot[]
   footer: React.ReactNode
   onPublish: () => void
+  onFullHistory?: () => void
   onRestorePublished: (snapshotId: string) => void
   onRestoreHistory: (snapshotId: string) => void
   onBack: () => void
 }
 
 export const SnapshotManagerScreen: React.FC<SnapshotManagerScreenProps> = ({
+  mode,
   identity,
   config,
   ready,
@@ -48,37 +49,94 @@ export const SnapshotManagerScreen: React.FC<SnapshotManagerScreenProps> = ({
   localHistory,
   footer,
   onPublish,
+  onFullHistory,
   onRestorePublished,
   onRestoreHistory,
   onBack,
 }) => {
-  const options: Array<SelectOption<SnapshotAction>> = [
-    { value: 'publish', role: 'section', prefix: '--', label: 'Publish' },
-    { value: 'publish', label: 'publish latest', hint: 'encrypt local continuity and pin to IPFS', disabled: !ready || !canBackup },
-    ...(publishedSnapshots.length > 0 ? [{ value: 'publish' as const, role: 'section' as const, prefix: '--', label: 'Published snapshots' }] : []),
-    ...publishedSnapshots.map(snapshot => ({
-      value: `published:${snapshot.id}` as const,
-      label: `published ${dateLabel(snapshot.createdAt)}  ${shortCid(snapshot.cid)}`,
-      hint: 'restore this pinned encrypted snapshot',
-    })),
-    ...(localHistory.length > 0 ? [{ value: 'publish' as const, role: 'section' as const, prefix: '--', label: 'Local checkpoints' }] : []),
-    ...localHistory.map(snapshot => ({
-      value: `history:${snapshot.id}` as const,
-      label: `local ${dateLabel(snapshot.createdAt)}  ${fileLabel(snapshot.file)}`,
-      hint: 'restore this local markdown checkpoint',
-    })),
+  const allPublished = React.useMemo(() => {
+    const combined: Array<{ id: string; cid: string; createdAt?: string; label: string }> = []
+    if (identity?.backup?.cid) {
+      combined.push({
+        id: identity.backup.cid,
+        cid: identity.backup.cid,
+        createdAt: identity.backup.createdAt,
+        label: 'latest'
+      })
+      for (const past of identity.backup.pastBackups ?? []) {
+        if (!combined.some(c => c.cid === past.cid)) {
+          combined.push({
+            id: past.cid,
+            cid: past.cid,
+            createdAt: past.createdAt,
+            label: 'past'
+          })
+        }
+      }
+    }
+    for (const local of publishedSnapshots) {
+      if (!combined.some(c => c.cid === local.cid)) {
+        combined.push({
+          id: local.id,
+          cid: local.cid,
+          createdAt: local.createdAt,
+          label: 'local'
+        })
+      }
+    }
+    return combined.sort((a, b) => {
+      const aDate = a.createdAt ? new Date(a.createdAt).getTime() : 0
+      const bDate = b.createdAt ? new Date(b.createdAt).getTime() : 0
+      return bDate - aDate
+    })
+  }, [identity?.backup, publishedSnapshots])
+
+  const options: Array<SelectOption<SnapshotAction>> = mode === 'onchain-backups' ? [
+    ...(allPublished.length > 0 ? [{ value: 'back' as const, role: 'section' as const, prefix: '--', label: 'Backups' }] : []),
+    ...allPublished.slice(0, 5).map((snapshot, index) => {
+      const version = allPublished.length - index
+      return {
+        value: `published:${snapshot.id}` as const,
+        label: `backup ${shortCid(snapshot.cid)}`,
+        subtext: [
+          dateLabel(snapshot.createdAt),
+          `v${version}`,
+          snapshot.label === 'latest' ? 'latest backup' : 'past backup',
+          'pinned encrypted snapshot'
+        ].filter(Boolean).join(' · '),
+        role: 'option' as const,
+      }
+    }),
+    ...(allPublished.length > 5 ? [
+      { value: 'back' as const, role: 'section' as const, prefix: '--', label: 'More' },
+      { value: 'view-full-history' as const, label: 'view full history', hint: `see all ${allPublished.length} backups`, role: 'utility' as const }
+    ] : []),
     { value: 'back', role: 'section', prefix: '--', label: 'Navigation' },
-    { value: 'back', label: 'back to continuity', hint: 'return to memory and persona', role: 'utility' },
+    { value: 'back', label: 'back to identity hub', hint: 'return to top-level identity actions', role: 'utility' },
+  ] : [
+    ...(allPublished.length > 0 ? [{ value: 'back' as const, role: 'section' as const, prefix: '--', label: 'Full Backup History' }] : []),
+    ...allPublished.map((snapshot, index) => {
+      const version = allPublished.length - index
+      return {
+        value: `published:${snapshot.id}` as const,
+        label: `v${version} · ${shortCid(snapshot.cid)}`,
+        subtext: dateLabel(snapshot.createdAt) || 'unknown date',
+        role: 'option' as const,
+      }
+    }),
+    { value: 'back', role: 'section', prefix: '--', label: 'Navigation' },
+    { value: 'back', label: 'back to onchain backups', hint: 'return to recent backups', role: 'utility' },
   ]
 
   return (
-    <Surface title="snapshots" subtitle={notice ?? snapshotSubtitle(identity, workingStatus)} footer={footer}>
-      <IdentitySummary identity={identity} config={config} compact />
-      <Box flexDirection="column" marginTop={1}>
-        <StatusRow label="status" value={localStatusLabel(workingStatus)} tone={workingStatus?.localChangedAfterBackup ? 'warn' : ready ? 'ok' : 'dim'} />
-        <StatusRow label="latest" value={latestSnapshotLabel(identity)} tone={identity?.backup?.cid ? 'ok' : 'dim'} />
-        <StatusRow label="saved" value={`${publishedSnapshots.length} published, ${localHistory.length} local`} tone={publishedSnapshots.length + localHistory.length > 0 ? 'ok' : 'dim'} />
-      </Box>
+    <Surface title={mode === 'onchain-backups' ? 'onchain backups' : 'full backup history'} subtitle={notice ?? snapshotSubtitle(identity, workingStatus)} footer={footer}>
+      {mode === 'onchain-backups' && <IdentitySummary identity={identity} config={config} compact />}
+      {mode === 'onchain-backups' && (
+        <Box flexDirection="column" marginTop={1}>
+          <StatusRow label="latest" value={latestSnapshotLabel(identity)} tone={identity?.backup?.cid ? 'ok' : 'dim'} />
+          <StatusRow label="saved" value={`${allPublished.length} published`} tone={allPublished.length > 0 ? 'ok' : 'dim'} />
+        </Box>
+      )}
       <Box marginTop={1}>
         <Select<SnapshotAction>
           options={options}
@@ -87,6 +145,7 @@ export const SnapshotManagerScreen: React.FC<SnapshotManagerScreenProps> = ({
           onSubmit={choice => {
             if (choice === 'publish') return onPublish()
             if (choice === 'back') return onBack()
+            if (choice === 'view-full-history') return onFullHistory?.()
             if (choice.startsWith('published:')) return onRestorePublished(choice.slice('published:'.length))
             if (choice.startsWith('history:')) return onRestoreHistory(choice.slice('history:'.length))
           }}
@@ -141,14 +200,33 @@ const StatusRow: React.FC<{ label: string; value: string; tone: 'ok' | 'warn' | 
 function snapshotSubtitle(identity: EthagentIdentity | undefined, status?: SnapshotWorkingStatus | null): string {
   if (!identity) return 'create or load an agent first.'
   if (!status?.ready) return 'restore private files first.'
-  if (status.localChangedAfterBackup) return 'local changes need publishing.'
+  if (status.publishState === 'local-changes') return 'local changes need publishing.'
+  if (status.publishState === 'verify-needed') return 'unknown local status; consider publishing.'
+  if (status.publishState === 'not-published') return 'publish a snapshot to back up local markdown.'
   return 'up to date.'
 }
 
 function localStatusLabel(status?: SnapshotWorkingStatus | null): string {
   if (!status?.ready) return 'not restored'
-  if (status.localChangedAfterBackup) return `needs publish ${dateLabel(status.newestLocalChangeAt)}`
-  return 'up to date'
+  switch (status.publishState) {
+    case 'not-published':
+      return 'not published'
+    case 'verify-needed':
+      return 'status unknown'
+    case 'local-changes':
+      return `local changes ${dateLabel(status.newestLocalChangeAt)}`
+    case 'published':
+      return 'matches published'
+    default:
+      return 'not restored'
+  }
+}
+
+function statusTone(status: SnapshotWorkingStatus | null | undefined, ready: boolean): 'ok' | 'warn' | 'dim' {
+  if (!ready || !status) return 'dim'
+  if (status.publishState === 'published') return 'ok'
+  if (status.publishState === 'local-changes' || status.publishState === 'verify-needed') return 'warn'
+  return 'dim'
 }
 
 function latestSnapshotLabel(identity?: EthagentIdentity): string {

@@ -38,7 +38,7 @@ export type SupportedErc8004Chain = {
 export const SUPPORTED_ERC8004_CHAINS: SupportedErc8004Chain[] = [
   chainEntry(mainnet.id,  'Ethereum Mainnet', DEFAULT_ETHEREUM_RPC_URL,              [],                                DEFAULT_ERC8004_IDENTITY_REGISTRY_ADDRESS, 24_339_871n,  10_000n, 'mainnet', 'mainnet'),
   chainEntry(arbitrum.id, 'Arbitrum One',     'https://arbitrum-one.publicnode.com', [],                                DEFAULT_ERC8004_IDENTITY_REGISTRY_ADDRESS, 428_895_443n, 20_000n, 'l2',      'arbitrum'),
-  chainEntry(base.id,     'Base',             'https://mainnet.base.org',            ['https://base.publicnode.com'],    DEFAULT_ERC8004_IDENTITY_REGISTRY_ADDRESS, 41_663_783n,  5_000n,  'l2',      'base'),
+  chainEntry(base.id,     'Base',             'https://base.llamarpc.com',           ['https://mainnet.base.org', 'https://base.publicnode.com'],    DEFAULT_ERC8004_IDENTITY_REGISTRY_ADDRESS, 41_663_783n,  10_000n,  'l2',      'base'),
   chainEntry(optimism.id, 'Optimism',         'https://optimism.publicnode.com',     ['https://mainnet.optimism.io'],    DEFAULT_ERC8004_IDENTITY_REGISTRY_ADDRESS, 147_514_947n, 20_000n, 'l2',      'optimism'),
   chainEntry(polygon.id,  'Polygon',          'https://polygon-bor.publicnode.com',  ['https://polygon-rpc.com'],        DEFAULT_ERC8004_IDENTITY_REGISTRY_ADDRESS, 82_458_484n,  10_000n, 'l2',      'polygon'),
 ]
@@ -77,6 +77,7 @@ export class MissingRegistryAddressError extends Error {
 const ERC8004_ABI = parseAbi([
   'function register(string agentURI) returns (uint256)',
   'function balanceOf(address owner) view returns (uint256)',
+  'function tokenOfOwnerByIndex(address owner, uint256 index) view returns (uint256)',
   'function ownerOf(uint256 tokenId) view returns (address)',
   'function tokenURI(uint256 tokenId) view returns (string)',
   'function setAgentURI(uint256 agentId, string newURI)',
@@ -107,6 +108,7 @@ export type EthagentBackupPointer = {
   envelopeVersion?: string
   createdAt?: string
   agentAddress?: Address
+  pastBackups?: Array<{ cid: string; createdAt?: string }>
 }
 
 export type EthagentPublicDiscoveryPointer = {
@@ -125,6 +127,7 @@ export type Erc8004AgentCandidate = {
   metadataCid?: string
   name?: string
   description?: string
+  imageUrl?: string
   backup?: EthagentBackupPointer
   publicDiscovery?: EthagentPublicDiscoveryPointer
   registration: Record<string, unknown> | null
@@ -186,6 +189,7 @@ export class AgentTokenIdRequiredError extends Error {
   ownerAddress: Address
   registry: Erc8004RegistryConfig
   balance: bigint
+  detail?: string
 
   constructor(args: {
     ownerAddress: Address
@@ -195,12 +199,12 @@ export class AgentTokenIdRequiredError extends Error {
   }) {
     const chain = supportedErc8004ChainForId(args.registry.chainId)
     const label = chain?.network ?? chain?.name ?? `chain ${args.registry.chainId}`
-    super(`${label} lookup timed out; enter the agent token id`)
+    super(`Automatic ${label} lookup timed out. Enter the agent token ID to continue.`)
     this.name = 'AgentTokenIdRequiredError'
     this.ownerAddress = args.ownerAddress
     this.registry = args.registry
     this.balance = args.balance
-    if (args.detail) this.message = `${this.message}: ${cleanRpcError(args.detail)}`
+    if (args.detail) this.detail = cleanRpcError(args.detail)
   }
 }
 
@@ -373,11 +377,24 @@ export function parseEthagentBackupPointer(registration: Record<string, unknown>
   const cid = backup ? stringField(backup, 'cid') : undefined
   if (!cid) return null
   const agentAddress = stringField(ext, 'agentAddress')
+  const pastBackupsArray = arrayField(backup ?? {}, 'pastBackups')
+  const pastBackups = pastBackupsArray?.flatMap(item => {
+    if (!item || typeof item !== 'object') return []
+    const obj = item as Record<string, unknown>
+    const itemCid = stringField(obj, 'cid')
+    if (!itemCid) return []
+    return [{
+      cid: itemCid,
+      ...(stringField(obj, 'createdAt') ? { createdAt: stringField(obj, 'createdAt') } : {}),
+    }]
+  })
+
   return {
     cid,
     envelopeVersion: backup ? stringField(backup, 'envelopeVersion') : undefined,
     createdAt: backup ? stringField(backup, 'createdAt') : undefined,
     ...(agentAddress && isAddress(agentAddress) ? { agentAddress: getAddress(agentAddress) } : {}),
+    ...(pastBackups && pastBackups.length > 0 ? { pastBackups } : {}),
   }
 }
 
@@ -403,18 +420,32 @@ export function withEthagentBackupPointer(
   backup: EthagentBackupPointer,
   publicDiscovery?: EthagentPublicDiscoveryPointer,
 ): Record<string, unknown> {
+  return withEthagentPointers(registration, { backup, publicDiscovery })
+}
+
+export function withEthagentPointers(
+  registration: Record<string, unknown> | null,
+  pointers: {
+    backup?: EthagentBackupPointer
+    publicDiscovery?: EthagentPublicDiscoveryPointer
+  },
+): Record<string, unknown> {
   const next: Record<string, unknown> = registration ? { ...registration } : {}
   const prior = objectField(next, 'x-ethagent') ?? {}
-  const updatedAt = publicDiscovery?.updatedAt ?? backup.createdAt
+  const { backup, publicDiscovery } = pointers
+  const updatedAt = publicDiscovery?.updatedAt ?? backup?.createdAt
   next['x-ethagent'] = {
     ...prior,
     version: 1,
-    ...(backup.agentAddress ? { agentAddress: backup.agentAddress } : {}),
-    backup: {
-      cid: backup.cid,
-      ...(backup.envelopeVersion ? { envelopeVersion: backup.envelopeVersion } : {}),
-      ...(backup.createdAt ? { createdAt: backup.createdAt } : {}),
-    },
+    ...(backup?.agentAddress ? { agentAddress: backup.agentAddress } : {}),
+    ...(backup ? {
+      backup: {
+        cid: backup.cid,
+        ...(backup.envelopeVersion ? { envelopeVersion: backup.envelopeVersion } : {}),
+        ...(backup.createdAt ? { createdAt: backup.createdAt } : {}),
+        ...(backup.pastBackups && backup.pastBackups.length > 0 ? { pastBackups: backup.pastBackups } : {}),
+      },
+    } : {}),
     ...(publicDiscovery?.skillsCid ? {
       publicSkills: {
         cid: publicDiscovery.skillsCid,
@@ -573,13 +604,38 @@ async function findCandidateTokenIds(args: {
   fromBlock: bigint
 }): Promise<bigint[]> {
   const tokenIds = new Set<bigint>()
-  const balance = await args.publicClient.readContract({
-    address: args.registry.identityRegistryAddress,
-    abi: ERC8004_ABI,
-    functionName: 'balanceOf',
-    args: [args.ownerAddress],
-  }) as bigint
+  let balance: bigint | undefined
+  let attempt = 0
+  while (true) {
+    try {
+      balance = await args.publicClient.readContract({
+        address: args.registry.identityRegistryAddress,
+        abi: ERC8004_ABI,
+        functionName: 'balanceOf',
+        args: [args.ownerAddress],
+      }) as bigint
+      break
+    } catch (err: unknown) {
+      if (++attempt > 3) {
+        throw new AgentTokenIdRequiredError({
+          ownerAddress: args.ownerAddress,
+          registry: args.registry,
+          balance: 0n,
+          detail: cleanRpcError(err),
+        })
+      }
+      await new Promise(r => setTimeout(r, attempt * 1000))
+    }
+  }
   if (balance === 0n) return []
+
+  const enumerableTokenIds = await findEnumerableTokenIds({
+    publicClient: args.publicClient,
+    registry: args.registry,
+    ownerAddress: args.ownerAddress,
+    balance,
+  })
+  if (enumerableTokenIds) return enumerableTokenIds
 
   try {
     for await (const logs of getTransferLogChunksBackwards({
@@ -624,15 +680,97 @@ async function* getTransferLogChunksBackwards(args: {
 }): AsyncGenerator<TransferLog[]> {
   const latest = await args.publicClient.getBlockNumber()
   if (args.fromBlock > latest) return
-  for (const range of blockRangesBackwards(args.fromBlock, latest, logBlockRangeForChain(args.registry.chainId))) {
-    const logs = await args.publicClient.getLogs({
-      address: args.registry.identityRegistryAddress,
-      event: TRANSFER_EVENT,
-      args: { to: args.ownerAddress },
-      fromBlock: range.fromBlock,
-      toBlock: range.toBlock,
-    })
-    yield logs as TransferLog[]
+  
+  const ranges = blockRangesBackwards(args.fromBlock, latest, logBlockRangeForChain(args.registry.chainId))
+  const CONCURRENCY = 5
+  
+  for (let i = 0; i < ranges.length; i += CONCURRENCY) {
+    const batch = ranges.slice(i, i + CONCURRENCY)
+    const logsArrays = await Promise.all(batch.map(async range => {
+      try {
+        return await getTransferLogsAdaptive({
+          ...args,
+          fromBlock: range.fromBlock,
+          toBlock: range.toBlock,
+          minBlockRange: minLogBlockRangeForChain(args.registry.chainId),
+        })
+      } catch {
+        return [] as TransferLog[]
+      }
+    }))
+    for (const logs of logsArrays) {
+      if (logs.length > 0) yield logs
+    }
+  }
+}
+
+async function findEnumerableTokenIds(args: {
+  publicClient: PublicClient
+  registry: Erc8004RegistryConfig
+  ownerAddress: Address
+  balance: bigint
+}): Promise<bigint[] | null> {
+  const tokenIds: bigint[] = []
+  try {
+    for (let index = 0n; index < args.balance; index += 1n) {
+      const tokenId = await args.publicClient.readContract({
+        address: args.registry.identityRegistryAddress,
+        abi: ERC8004_ABI,
+        functionName: 'tokenOfOwnerByIndex',
+        args: [args.ownerAddress, index],
+      }) as bigint
+      tokenIds.push(tokenId)
+    }
+    return tokenIds
+  } catch {
+    return null
+  }
+}
+
+async function getTransferLogsAdaptive(args: {
+  publicClient: PublicClient
+  registry: Erc8004RegistryConfig
+  ownerAddress: Address
+  fromBlock: bigint
+  toBlock: bigint
+  minBlockRange: bigint
+}): Promise<TransferLog[]> {
+  const size = args.toBlock - args.fromBlock + 1n
+  let attempt = 0
+  while (true) {
+    try {
+      const logs = await args.publicClient.getLogs({
+        address: args.registry.identityRegistryAddress,
+        event: TRANSFER_EVENT,
+        args: { to: args.ownerAddress },
+        fromBlock: args.fromBlock,
+        toBlock: args.toBlock,
+      })
+      return logs as TransferLog[]
+    } catch (err: unknown) {
+      attempt++
+      const msg = err instanceof Error ? err.message.toLowerCase() : String(err).toLowerCase()
+      const isSizeLimit = msg.includes('limit') || msg.includes('range') || msg.includes('too many') || msg.includes('exceeds') || msg.includes('block count')
+      
+      if (!isSizeLimit && attempt <= 3) {
+        await new Promise(r => setTimeout(r, attempt * 1000))
+        continue
+      }
+      if (size <= args.minBlockRange) {
+        if (attempt <= 3) {
+          await new Promise(r => setTimeout(r, attempt * 1000))
+          continue
+        }
+        throw err
+      }
+      
+      const mid = args.fromBlock + size / 2n - 1n
+      const [newer, older] = await Promise.all([
+        getTransferLogsAdaptive({ ...args, fromBlock: mid + 1n, toBlock: args.toBlock }),
+        getTransferLogsAdaptive({ ...args, fromBlock: args.fromBlock, toBlock: mid })
+      ])
+      return [...newer, ...older]
+    }
   }
 }
 
@@ -664,25 +802,41 @@ async function loadOwnedAgentCandidate(args: DiscoverOwnedAgentsArgs & {
   ownerAddress: Address
   tokenId: bigint
 }): Promise<Erc8004AgentCandidate> {
-  const currentOwner = await args.publicClient.readContract({
-    address: args.identityRegistryAddress,
-    abi: ERC8004_ABI,
-    functionName: 'ownerOf',
-    args: [args.tokenId],
-  }) as Address
+  let attempt = 0
+  let currentOwner: Address | undefined
+  let agentUri: string | undefined
+  while (true) {
+    try {
+      if (!currentOwner) {
+        currentOwner = await args.publicClient.readContract({
+          address: args.identityRegistryAddress,
+          abi: ERC8004_ABI,
+          functionName: 'ownerOf',
+          args: [args.tokenId],
+        }) as Address
+      }
+      if (!agentUri) {
+        agentUri = await args.publicClient.readContract({
+          address: args.identityRegistryAddress,
+          abi: ERC8004_ABI,
+          functionName: 'tokenURI',
+          args: [args.tokenId],
+        }) as string
+      }
+      break
+    } catch (err: unknown) {
+      if (++attempt > 3) throw err
+      await new Promise(r => setTimeout(r, attempt * 1000))
+    }
+  }
+
   if (currentOwner.toLowerCase() !== args.ownerAddress.toLowerCase()) {
     throw new TokenOwnerMismatchError()
   }
-  const agentUri = await args.publicClient.readContract({
-    address: args.identityRegistryAddress,
-    abi: ERC8004_ABI,
-    functionName: 'tokenURI',
-    args: [args.tokenId],
-  }) as string
   const loaded = await loadAgentRegistration(agentUri, {
     ipfsApiUrl: args.ipfsApiUrl ?? DEFAULT_IPFS_API_URL,
     fetchImpl: args.fetchImpl,
-  }).catch(() => ({ metadataCid: cidFromUri(agentUri), registration: null }))
+  }).catch(() => ({ metadataCid: cidFromUri(agentUri!), registration: null }))
   const parsed = parseEthagentBackupPointer(loaded.registration)
   const publicDiscovery = parseEthagentPublicDiscoveryPointer(loaded.registration)
   return {
@@ -695,6 +849,7 @@ async function loadOwnedAgentCandidate(args: DiscoverOwnedAgentsArgs & {
     metadataCid: loaded.metadataCid,
     name: stringField(loaded.registration, 'name'),
     description: stringField(loaded.registration, 'description'),
+    imageUrl: stringField(loaded.registration, 'image'),
     backup: parsed ?? undefined,
     publicDiscovery: publicDiscovery ?? undefined,
     registration: loaded.registration,
@@ -707,13 +862,21 @@ async function isCurrentTokenOwner(
   tokenId: bigint,
   ownerAddress: Address,
 ): Promise<boolean> {
-  const currentOwner = await publicClient.readContract({
-    address: registry,
-    abi: ERC8004_ABI,
-    functionName: 'ownerOf',
-    args: [tokenId],
-  }) as Address
-  return currentOwner.toLowerCase() === ownerAddress.toLowerCase()
+  let attempt = 0
+  while (true) {
+    try {
+      const currentOwner = await publicClient.readContract({
+        address: registry,
+        abi: ERC8004_ABI,
+        functionName: 'ownerOf',
+        args: [tokenId],
+      }) as Address
+      return currentOwner.toLowerCase() === ownerAddress.toLowerCase()
+    } catch (err: unknown) {
+      if (++attempt > 3) throw err
+      await new Promise(r => setTimeout(r, attempt * 1000))
+    }
+  }
 }
 
 async function resolveOwnerAddressForSupportedLookup(
@@ -767,7 +930,15 @@ function blockRangesBackwards(
 }
 
 function logBlockRangeForChain(chainId: number): bigint {
-  return supportedErc8004ChainForId(chainId)?.logBlockRange ?? 10_000n
+  const chain = supportedErc8004ChainForId(chainId)
+  if (!chain) return 10_000n
+  return chain.logBlockRange
+}
+
+function minLogBlockRangeForChain(chainId: number): bigint {
+  const chain = supportedErc8004ChainForId(chainId)
+  if (!chain) return 2_000n
+  return chain.kind === 'l2' ? chain.logBlockRange : chain.logBlockRange / 2n || 1n
 }
 
 function chainSortIndex(chainId: number): number {
@@ -815,6 +986,11 @@ function objectField(input: Record<string, unknown>, key: string): Record<string
   const value = input[key]
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
   return value as Record<string, unknown>
+}
+
+function arrayField(input: Record<string, unknown>, key: string): Array<unknown> | null {
+  const value = input[key]
+  return Array.isArray(value) ? value : null
 }
 
 function stringField(input: Record<string, unknown> | null, key: string): string | undefined {

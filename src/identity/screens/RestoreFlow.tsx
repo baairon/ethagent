@@ -54,7 +54,7 @@ export const RestoreFlow: React.FC<RestoreFlowProps> = ({
       <Surface
         title={isSwitch ? 'Switch Agent Identity' : 'Restore an Agent'}
         subtitle="Connect the wallet that owns the agent you want to load."
-        footer={footerHint('enter select · esc back')}
+        footer={footerHint('enter select - esc back')}
       >
         <Select<'connect'>
           options={[
@@ -75,7 +75,7 @@ export const RestoreFlow: React.FC<RestoreFlowProps> = ({
       <Surface
         title={`${resolution.network ? networkLabel(resolution.network).charAt(0).toUpperCase() + networkLabel(resolution.network).slice(1) : ''} Agent Registry`}
         subtitle={step.error ? `lookup failed: ${step.error}` : 'Paste the agent registry address for this network.'}
-        footer={footerHint('enter discover · esc back')}
+        footer={footerHint('enter discover - esc back')}
       >
         <Text color={theme.dim}>RPC defaults to {resolution.defaultRpcUrl}</Text>
         <TextInput
@@ -116,7 +116,7 @@ export const RestoreFlow: React.FC<RestoreFlowProps> = ({
       <Surface
         title="Enter Agent Token ID"
         subtitle={step.error ?? `${networkLabelForRegistry(step.registry)} lookup needs the token id.`}
-        footer={footerHint('enter continue · esc back')}
+        footer={footerHint('enter continue - esc back')}
       >
         <TextInput
           placeholder="#45744"
@@ -133,7 +133,7 @@ export const RestoreFlow: React.FC<RestoreFlowProps> = ({
       <Surface
         title={isSwitch ? 'Switch to an Agent' : 'Choose Your Agent'}
         subtitle={step.ownerHandle}
-        footer={footerHint('enter select · esc back')}
+        footer={footerHint('enter select - esc back')}
       >
         <Select<string>
           options={[

@@ -3,50 +3,80 @@ import { Box } from 'ink'
 import { Surface } from '../../ui/Surface.js'
 import { Select, type SelectOption } from '../../ui/Select.js'
 import type { EthagentConfig, EthagentIdentity } from '../../storage/config.js'
+import type { ContinuityWorkingTreeStatus } from '../continuity/storage.js'
 import { IdentitySummary } from './IdentitySummary.js'
 
 type MenuScreenProps = {
   mode: 'first-run' | 'manage'
   config?: EthagentConfig
   identity?: EthagentIdentity
+  workingStatus?: ContinuityWorkingTreeStatus | null
   canRebackup: boolean
   footer: React.ReactNode
   onCreate: () => void
   onLoad: () => void
   onBackupNow: () => void
-  onDetails: () => void
+  onPublicProfile: () => void
+  onPrivateMemory: () => void
+  onOnchainBackups: () => void
+  onCopyValues: () => void
+  onStorageCredential: () => void
   onSkip: () => void
   onCancel: () => void
 }
 
-type Action = 'create' | 'load' | 'backup' | 'details' | 'skip' | 'cancel'
+type Action =
+  | 'public-profile'
+  | 'private-memory'
+  | 'continuity-onchain-backups'
+  | 'backup'
+  | 'copy'
+  | 'storage-credential'
+  | 'create'
+  | 'load'
+  | 'skip'
+  | 'cancel'
 
 export const MenuScreen: React.FC<MenuScreenProps> = ({
   mode,
   config,
   identity,
+  workingStatus,
   canRebackup,
   footer,
   onCreate,
   onLoad,
   onBackupNow,
-  onDetails,
+  onPublicProfile,
+  onPrivateMemory,
+  onOnchainBackups,
+  onCopyValues,
+  onStorageCredential,
   onSkip,
   onCancel,
 }) => {
   const title = mode === 'first-run' ? 'Set Up Agent Identity' : 'Agent Identity'
   const subtitle = mode === 'first-run'
     ? 'Create a portable agent or load one you already own.'
-    : 'Back up, switch, or start a new one.'
+    : 'Public, private, recovery, storage, and device controls are separate.'
+
+  const needsBackup = workingStatus?.publishState === 'local-changes' || workingStatus?.publishState === 'not-published'
 
   const options: Array<SelectOption<Action>> = identity
     ? [
-        { value: 'backup', role: 'section', prefix: '--', label: 'Backup' },
-        { value: 'backup', label: 'save snapshot', hint: 'encrypt state, pin to IPFS, refresh metadata', disabled: !canRebackup },
-        { value: 'load', role: 'section', prefix: '--', label: 'Identity' },
-        { value: 'load', label: 'switch agent', hint: 'load a different agent token owned by your wallet' },
+        { value: 'public-profile', role: 'section', prefix: '--', label: 'Public metadata' },
+        { value: 'public-profile', label: 'public profile', hint: 'name, image, skills.json, agent card' },
+        { value: 'private-memory', role: 'section', prefix: '--', label: 'Private local files' },
+        { value: 'private-memory', label: 'memory and persona', hint: 'SOUL.md and MEMORY.md only on this device' },
+        { value: 'continuity-onchain-backups', role: 'section', prefix: '--', label: 'Recovery' },
+        { value: 'backup', label: 'publish snapshot now', hint: 'pins local SOUL, MEMORY, and SKILLS edits', disabled: !canRebackup },
+        { value: 'continuity-onchain-backups', label: 'onchain backups', hint: 'view and restore onchain encrypted backups' },
+        { value: 'storage-credential', role: 'section', prefix: '--', label: 'Storage' },
+        { value: 'storage-credential', label: 'IPFS credential', hint: 'save, replace, or forget Pinata JWT' },
+        { value: 'copy', role: 'section', prefix: '--', label: 'Agent token' },
+        { value: 'copy', label: 'copy values', hint: 'copy CIDs, token id, URI, or owner' },
+        { value: 'load', label: 'switch agent', hint: 'load a different token owned by your wallet' },
         { value: 'create', label: 'new agent', hint: 'mint another token and make it active here' },
-        { value: 'details', label: 'settings', hint: 'profile, continuity, storage, local data' },
         { value: 'cancel', role: 'section', prefix: '--', label: 'Exit' },
         { value: 'cancel', label: 'close hub', hint: 'return to the chat without changing identity', role: 'utility' },
       ]
@@ -62,7 +92,7 @@ export const MenuScreen: React.FC<MenuScreenProps> = ({
 
   return (
     <Surface title={title} subtitle={subtitle} footer={footer}>
-      <IdentitySummary identity={identity} config={config} compact={Boolean(identity)} />
+      <IdentitySummary identity={identity} config={config} workingStatus={workingStatus} compact={Boolean(identity)} />
       <Box marginTop={1}>
         <Select<Action>
           options={options}
@@ -70,8 +100,12 @@ export const MenuScreen: React.FC<MenuScreenProps> = ({
           onSubmit={choice => {
             if (choice === 'skip') return onSkip()
             if (choice === 'cancel') return onCancel()
-            if (choice === 'details') return onDetails()
+            if (choice === 'public-profile') return onPublicProfile()
+            if (choice === 'private-memory') return onPrivateMemory()
+            if (choice === 'continuity-onchain-backups') return onOnchainBackups()
             if (choice === 'backup') return onBackupNow()
+            if (choice === 'copy') return onCopyValues()
+            if (choice === 'storage-credential') return onStorageCredential()
             if (choice === 'load') return onLoad()
             if (choice === 'create') return onCreate()
           }}
