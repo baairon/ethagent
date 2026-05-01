@@ -22,7 +22,7 @@ export const ErrorScreen: React.FC<ErrorScreenProps> = ({ error, back, footer, o
         { value: 'back', role: 'section', prefix: '--', label: 'Recovery' },
         { value: 'back', label: 'Go Back', hint: 'Return to the previous identity step' },
         { value: 'close', role: 'section', prefix: '--', label: 'Exit' },
-        { value: 'close', label: 'Close Hub', hint: 'Return to chat without retrying', role: 'utility' },
+        { value: 'close', label: 'Close Identity Hub', hint: 'Return to chat without retrying', role: 'utility' },
       ]}
       hintLayout="inline"
       onSubmit={choice => {

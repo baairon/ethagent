@@ -665,7 +665,7 @@ export async function buildIdentityContinuityContextMessages(
       content: [
         '<identity_continuity_files>',
         `Automatic identity continuity load failed: ${(err as Error).message}`,
-        'If the user asks about continuity, surface this failure and route them to the identity hub.',
+        'If the user asks about continuity, surface this failure and route them to the Identity Hub.',
         '</identity_continuity_files>',
       ].join('\n'),
     }]

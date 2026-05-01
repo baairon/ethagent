@@ -78,7 +78,7 @@ export const MenuScreen: React.FC<MenuScreenProps> = ({
         { value: 'load', label: 'Switch Agent', hint: 'Load a different token owned by your wallet' },
         { value: 'create', label: 'New Agent', hint: 'Mint another token and make it active here' },
         { value: 'cancel', role: 'section', prefix: '--', label: 'Exit' },
-        { value: 'cancel', label: 'Close Hub', hint: 'Return to chat without changing identity', role: 'utility' },
+        { value: 'cancel', label: 'Close Identity Hub', hint: 'Return to chat without changing identity', role: 'utility' },
       ]
     : [
         { value: 'create', role: 'section', prefix: '--', label: 'Setup' },
@@ -87,7 +87,7 @@ export const MenuScreen: React.FC<MenuScreenProps> = ({
         { value: 'skip', role: 'section', prefix: '--', label: 'Exit' },
         ...(mode === 'first-run'
           ? [{ value: 'skip' as Action, label: 'Skip For Now', hint: 'Continue now; use /identity later', role: 'utility' as const }]
-          : [{ value: 'cancel' as Action, label: 'Close Hub', hint: 'Return to chat without changing identity', role: 'utility' as const }]),
+          : [{ value: 'cancel' as Action, label: 'Close Identity Hub', hint: 'Return to chat without changing identity', role: 'utility' as const }]),
       ]
 
   return (

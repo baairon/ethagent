@@ -135,7 +135,7 @@ const PublicProfileRows: React.FC<{ identity?: EthagentIdentity }> = ({ identity
 function privateSubtitle(ready: boolean): string {
   return ready
     ? 'SOUL.md and MEMORY.md are private local files on this machine.'
-    : 'Use "Refetch Latest Snapshot" from the hub menu to recover files.'
+    : 'Use "Refetch Latest Snapshot" from the Identity Hub menu to recover files.'
 }
 
 function readStateString(state: Record<string, unknown> | undefined, key: string): string {
