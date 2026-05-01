@@ -27,6 +27,17 @@
       --c-blue-700: #2954c6;
       --c-danger: #e5484d;
       --c-success: #1aa86b;
+      --pastel-red: #f6b7ba;
+      --pastel-peach: #f8cdbb;
+      --pastel-yellow: #f5e6b3;
+      --pastel-mint: #bfe8cd;
+      --pastel-sky: #bfdcf4;
+      --pastel-blue: #a9c7f7;
+      --mint-accent: #7070f0;
+      --mint-accent-strong: #5858d8;
+      --mint-accent-soft: rgba(112, 112, 240, 0.16);
+      --mint-glow: rgba(112, 112, 240, 0.28);
+      --c-text-accent: #9eaae0;
       --ease-standard: cubic-bezier(0.2, 0.0, 0, 1);
       --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
       --fg-1: #1f2330;
@@ -97,44 +108,14 @@
       height: fit-content;
     }
 
-    main::before {
-      content: "";
-      position: absolute;
-      top: 0;
-      left: 12%;
-      right: 12%;
-      height: 1px;
-      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.95), transparent);
-      pointer-events: none;
-    }
-
     .chrome {
       display: flex;
       align-items: center;
-      gap: 8px;
+      justify-content: center;
       padding: 14px 20px;
       border-bottom: 1px solid rgba(255, 255, 255, 0.5);
-      background: linear-gradient(180deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.2));
+      background: transparent;
       flex: none;
-    }
-
-    .light {
-      width: 10px;
-      height: 10px;
-      border-radius: 999px;
-      box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.08), 0 1px 0 rgba(255, 255, 255, 0.6) inset;
-    }
-
-    .light.r {
-      background: #ff5f57;
-    }
-
-    .light.y {
-      background: #febc2e;
-    }
-
-    .light.g {
-      background: #28c840;
     }
 
     .chrome-title {
@@ -144,7 +125,7 @@
       color: rgba(31, 35, 48, 0.55);
       font-weight: 500;
       letter-spacing: 0.01em;
-      margin-right: 56px;
+      margin: 0;
     }
 
     .body {
@@ -168,15 +149,15 @@
     .splash {
       font-family: var(--font-mono);
       font-size: clamp(9.5px, 1.35vw, 11px);
-      font-weight: 800;
+      font-weight: 700;
       line-height: 1.05;
       letter-spacing: 0;
       white-space: pre;
       margin: 0;
-      color: var(--c-gray-700);
-      text-align: center;
-      transform: scaleX(0.75);
+      text-align: left;
+      transform: scaleX(0.8);
       transform-origin: 50% 50%;
+      color: rgba(255, 255, 255, 0.18);
     }
 
     .spinner {
@@ -196,9 +177,9 @@
     }
 
     [data-flow] {
-      --accent: #6366f1;
-      --accent-soft: rgba(99, 102, 241, 0.12);
-      --glow: rgba(99, 102, 241, 0.35);
+      --accent: var(--mint-accent);
+      --accent-soft: var(--mint-accent-soft);
+      --glow: var(--mint-glow);
     }
 
     main,
@@ -341,7 +322,7 @@
       backdrop-filter: blur(16px);
       border: 1px solid rgba(255, 255, 255, 0.85);
       border-radius: 14px;
-      box-shadow: 0 8px 24px -6px rgba(31, 35, 48, 0.08), 0 1px 0 rgba(255, 255, 255, 0.7) inset;
+      box-shadow: 0 4px 16px -4px rgba(31, 35, 48, 0.08), 0 1px 0 rgba(255, 255, 255, 0.7) inset;
     }
 
     .status-line {
@@ -363,12 +344,15 @@
       align-items: center;
       justify-content: center;
       border-radius: 999px;
-      background: var(--accent-soft);
-      color: var(--accent);
+      background: rgba(255, 255, 255, 0.55);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.75);
+      box-shadow: 0 2px 8px -2px rgba(31, 35, 48, 0.1), 0 1px 0 rgba(255, 255, 255, 0.8) inset;
+      color: var(--c-text-accent);
       flex: none;
       font-variant-numeric: tabular-nums;
       font-weight: 600;
-      box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 15%, transparent) inset;
     }
 
     .status-hint {
@@ -429,16 +413,16 @@
     }
 
     .error-hint a {
-      color: var(--accent);
+      color: var(--c-text-accent);
       text-decoration: none;
       font-weight: 600;
-      border-bottom: 1px dashed color-mix(in srgb, var(--accent) 50%, transparent);
+      border-bottom: 1px dashed color-mix(in srgb, var(--c-text-accent) 50%, transparent);
       padding-bottom: 1px;
       transition: all 0.2s ease;
     }
 
     .error-hint a:hover {
-      color: var(--accent);
+      color: var(--c-text-accent);
       border-bottom-style: solid;
     }
 
@@ -455,7 +439,7 @@
       flex: none;
       padding: 15px 22px 17px;
       border-top: 1px solid rgba(255, 255, 255, 0.5);
-      background: linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.5));
+      background: transparent;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -466,22 +450,23 @@
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      font-family: var(--font-mono);
-      font-size: 11px;
-      color: var(--c-gray-500);
-      padding: 5px 10px;
+      font-family: var(--font-ui);
+      font-size: 11.5px;
+      font-weight: 500;
+      color: var(--c-gray-800);
+      padding: 5px 13px 5px 10px;
       background: rgba(255, 255, 255, 0.6);
-      border: 1px solid rgba(255, 255, 255, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.85);
       border-radius: 999px;
-      box-shadow: 0 1px 2px rgba(31, 35, 48, 0.04);
+      box-shadow: 0 1px 2px rgba(31, 35, 48, 0.05), 0 1px 0 rgba(255, 255, 255, 0.7) inset;
     }
 
     .net-pill .dot {
       width: 6px;
       height: 6px;
       border-radius: 999px;
-      background: var(--c-success);
-      box-shadow: 0 0 0 2px rgba(26, 168, 107, 0.18);
+      background: var(--accent);
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent);
     }
 
     .net-pill[hidden] {
@@ -498,16 +483,17 @@
       font: inherit;
       font-family: var(--font-ui);
 
+      font-size: 12.5px;
       font-weight: 500;
       background: rgba(255, 255, 255, 0.7);
       border: 1px solid rgba(255, 255, 255, 0.85);
-      padding: 8px 14px;
+      padding: 5px 10px;
       cursor: pointer;
       color: var(--c-gray-700);
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      border-radius: 999px;
+      border-radius: 7px;
       transition: all 0.15s var(--ease-standard);
       box-shadow: 0 1px 2px rgba(31, 35, 48, 0.03), 0 1px 0 rgba(255, 255, 255, 0.5) inset;
     }
@@ -653,8 +639,8 @@
       }
 
       .shortcut {
-        font-size: 12px;
-        padding: 6px 10px;
+        font-size: 11.5px;
+        padding: 4px 8px;
       }
 
       .net-pill {
@@ -681,16 +667,12 @@
     }
 
     .splash {
-      color: #b0b0b0;
-    }
-
-    main::before {
-      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.18), transparent);
+      color: rgba(255, 255, 255, 0.7);
     }
 
     .chrome {
       border-bottom-color: rgba(255, 255, 255, 0.06);
-      background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01));
+      background: transparent;
     }
 
     .chrome-title {
@@ -704,11 +686,22 @@
     }
 
     .details,
-    .status,
     #error-block-slot {
       background: rgba(255, 255, 255, 0.04);
       border-color: rgba(255, 255, 255, 0.08);
       box-shadow: 0 4px 16px -4px rgba(0, 0, 0, 0.35), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+    }
+
+    .status {
+      background: rgba(255, 255, 255, 0.04);
+      border-color: rgba(255, 255, 255, 0.08);
+      box-shadow: 0 4px 16px -4px rgba(0, 0, 0, 0.35), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+    }
+
+    .status-line .marker {
+      background: rgba(255, 255, 255, 0.07);
+      border-color: rgba(255, 255, 255, 0.12);
+      box-shadow: 0 2px 8px -2px rgba(0, 0, 0, 0.5), 0 1px 0 rgba(255, 255, 255, 0.07) inset;
     }
 
     .flow-detail .key {
@@ -722,13 +715,13 @@
 
     .footer {
       border-top-color: rgba(255, 255, 255, 0.06);
-      background: linear-gradient(180deg, rgba(255, 255, 255, 0.01), rgba(255, 255, 255, 0.04));
+      background: transparent;
     }
 
     .net-pill {
-      background: rgba(255, 255, 255, 0.04);
-      border-color: rgba(255, 255, 255, 0.08);
-      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+      background: rgba(255, 255, 255, 0.06);
+      border-color: rgba(255, 255, 255, 0.1);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 0 rgba(255, 255, 255, 0.05) inset;
     }
 
     /* esc key: secondary black */
@@ -773,9 +766,6 @@
 <body>
   <main data-flow="sign" id="card">
     <div class="chrome">
-      <span class="light r"></span>
-      <span class="light y"></span>
-      <span class="light g"></span>
       <span class="chrome-title" id="chrome-title">ethagent</span>
     </div>
     <div class="body">
@@ -789,7 +779,7 @@
             id="detail-val">—</span></p>
       </div>
       <div class="status" id="status-block">
-        <p class="status-line"><span class="marker" id="status-marker">·</span><span id="status-text">connecting to your
+        <p class="status-line"><span class="marker" id="status-marker"></span><span id="status-text">connecting to your
             wallet…</span></p>
         <p class="status-hint" id="status-hint">open your wallet extension if it doesn't pop up automatically.</p>
       </div>
@@ -810,22 +800,22 @@
   </main>
   <script>
     const glyphs = {
-      eyes: [
-        "                                          .-+:                       ",
-        "                  :=-                       -%@@@%.                  ",
-        "             *@@@@@#-                              *@@-              ",
-        "          +@@.                                        +@             ",
-        "        @@=                                  -#=-+++=+:              ",
-        "      #%        .:===-:                      -@* +@@@@%              ",
-        "           *@-+@@@@@:                       %@@+  @@@=#@             ",
-        "          *@=   @@@@@@@-                   .@.@@@@@@@ :              ",
-        "        @@+=@@@@@@@@@@@@:                  .% *@@@@@*-=              ",
-        "       #:-@ -@@@@@@@@@-+%                   @  -@@@- #               ",
-        "       :  #+  @@@@@@@- -%                    =#     =                ",
-        "           -@:        *@                          .+%%                ",
-        "              :%#: --                                                 ",
-        "              .-:                                                     "
-      ].join("\n"),
+      eyes: `
+                                         -+:
+                   :=-                    -%@@@%.
+             *@@@@@#-                           *@@-
+          +@@.                                     +@
+        @@=                               -#=-+++=+:
+      #%        .:===-:                   -@* +@@@@%
+           *@-+@@@@@:                    %@@+  @@@=#@
+          *@=   @@@@@@@-                .@.@@@@@@@ :
+        @@+=@@@@@@@@@@@@:               .% *@@@@@*-=
+       #:-@ -@@@@@@@@@-+%                @  -@@@- #
+       :  #+  @@@@@@@- -%                 =#     =
+           -@:        *@                      .+%%
+              :%#: --
+              .-:
+                                                           `,
       ellipsis: "…",
       emDash: "—"
     };
@@ -838,7 +828,7 @@
     const config = window.__WALLET_CONFIG__ || { sessionToken: "preview", kind: "sign", chainIdHex: "0xaa36a7", message: "identity proof for 0x9F2a…BC4e" };
     const CLOSE_DELAY_MS = 10000;
     const TX_CLOSE_DELAY_MS = 10000;
-    const CANCEL_CLOSE_DELAY_MS = 3200;
+    const CANCEL_CLOSE_DELAY_MS = 10000;
     const WALLET_PROVIDER_WAIT_MS = 3000;
     const WALLET_PROVIDER_POLL_MS = 100;
     const CHAINS = { "0x1": { name: "Ethereum Mainnet" }, "0xaa36a7": { name: "Sepolia" }, "0x2105": { name: "Base" }, "0x14a34": { name: "Base Sepolia" }, "0xa": { name: "OP Mainnet" }, "0xa4b1": { name: "Arbitrum One" } };
@@ -848,7 +838,7 @@
       "sign-transaction": { accent: "transaction", tabTitle: "approve identity update", label: "identity approval", title: "Sign, then save identity files", detail: "message" },
       transaction: { accent: "transaction", tabTitle: "submit transaction", label: "transaction request", title: "Submit transaction to mint your ERC-8004 agent", detail: "registry" }
     };
-    const STATE_TITLES = { connecting: "connecting wallet", approveSign: "approve signature", preparingTransaction: "preparing transaction", approveTransaction: "approve transaction", error: "wallet error", default: "wallet request" };
+    const STATE_TITLES = { connecting: "Connecting wallet", approveSign: "Approve signature", preparingTransaction: "Preparing transaction", approveTransaction: "Approve transaction", error: "Wallet error", default: "Wallet request" };
     function chainLabel(hex) { const k = String(hex || "").toLowerCase(); return (CHAINS[k] && CHAINS[k].name) || ("chain " + k); }
     function shortAddr(addr) { if (!addr || typeof addr !== "string") return glyphs.emDash; if (addr.length <= 14) return addr; return addr.slice(0, 6) + glyphs.ellipsis + addr.slice(-4); }
     function isTransactionFlow() { return config.kind === "transaction" || config.kind === "sign-transaction"; }
@@ -934,19 +924,19 @@
       if (state === "approve-transaction") return STATE_TITLES.approveTransaction;
       if (state === "error") return STATE_TITLES.error;
       if (state === "approve") {
-        if (config.kind === "account") return "approve connection";
+        if (config.kind === "account") return "Approve connection";
         if (config.kind === "sign") return STATE_TITLES.approveSign;
         return STATE_TITLES.approveTransaction;
       }
       if (state === "submitting") {
         if (config.kind === "account") return STATE_TITLES.connecting;
-        if (config.kind === "sign") return "verifying signature";
-        return "confirming transaction";
+        if (config.kind === "sign") return "Verifying signature";
+        return "Confirming transaction";
       }
       if (state === "done") {
-        if (config.kind === "account") return "wallet connected";
-        if (config.kind === "sign") return "message signed";
-        return "transaction submitted";
+        if (config.kind === "account") return "Wallet connected";
+        if (config.kind === "sign") return "Message signed";
+        return "Transaction submitted";
       }
       return flowCopy().tabTitle || STATE_TITLES.default;
     }
@@ -1023,31 +1013,32 @@
       setTabTitle(tabTitleForState(state));
       switch (state) {
         case "connecting":
-          setStatus("·", "connecting to your wallet…", "open your wallet extension if it doesn't pop up automatically.", true);
+          setStatus("·", "Connecting to your wallet…", "Open your wallet extension if it doesn't pop up automatically.", true);
           break;
         case "approve":
-          if (config.kind === "account") setStatus("·", "approve wallet connection", "the selected address will be used to search for owned agents.", true);
-          else if (config.kind === "sign") setStatus("·", "approve the signature in your wallet", "a prompt should be open. waiting for your signature.", true);
-          else setStatus("·", "review and submit the transaction in your wallet", "check the network and contract address before approving.", true);
+          if (config.kind === "account") setStatus("·", "Approve wallet connection", "The selected address will be used to search for owned agents.", true);
+          else if (config.kind === "sign") setStatus("·", "Approve the signature in your wallet", "A prompt should be open. Waiting for your signature.", true);
+          else setStatus("·", "Review and submit the transaction in your wallet", "Check the network and contract address before approving.", true);
           break;
         case "approve-sign":
-          setStatus("·", "approve the signature in your wallet", "this encrypts or decrypts SOUL.md and MEMORY.md.", true);
+          setStatus("·", "Approve the signature in your wallet", "This encrypts or decrypts SOUL.md and MEMORY.md.", true);
           break;
         case "preparing-transaction":
-          setStatus("·", "encrypting SOUL.md and MEMORY.md, then preparing the update...", "keep this page open. the transaction prompt will appear here.", true);
+          setStatus("·", "Encrypting SOUL.md and MEMORY.md, then preparing the update...", "Keep this page open. The transaction prompt will appear here.", true);
           break;
         case "approve-transaction":
-          setStatus("·", "review and submit the transaction in your wallet", "check the network and contract address before approving.", true);
+          setStatus("·", "Review and submit the transaction in your wallet", "Check the network and contract address before approving.", true);
           break;
         case "submitting":
-          if (config.kind === "account") setStatus("·", "connecting wallet…", "sending the selected address back.", true);
-          else if (config.kind === "sign") setStatus("·", "verifying signature…", "recovering the signing address.", true);
-          else setStatus("·", "submitted · waiting for confirmation…", "your wallet has accepted the transaction.", true);
+          if (config.kind === "account") setStatus("·", "Connecting wallet…", "Sending the selected address back.", true);
+          else if (config.kind === "sign") setStatus("·", "Verifying signature…", "Recovering the signing address.", true);
+          else setStatus("·", "Submitted · waiting for confirmation…", "Your wallet has accepted the transaction.", true);
           break;
         case "done":
-          setMarker("✓");
-          statusText.textContent = config.kind === "account" ? "connected · returning" : config.kind === "sign" ? "signed · returning" : "submitted · returning";
-          statusHint.textContent = payload.txHash ? (isTransactionFlow() ? "transaction submitted. returning." : "this tab will close shortly.") : "this tab will close shortly.";
+          stopSpinner();
+          statusMarker.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+          statusText.textContent = config.kind === "account" ? "Connected · returning" : config.kind === "sign" ? "Signed · returning" : "Submitted · returning";
+          statusHint.textContent = payload.txHash ? (isTransactionFlow() ? "Transaction submitted. Returning." : "This tab will close shortly.") : "This tab will close shortly.";
           break;
         case "error":
           stopSpinner();
@@ -1062,20 +1053,20 @@
       const isNoWallet = /no wallet|window\.ethereum|metamask|rabby|brave|extension/i.test(msg);
       const isUserReject = /user rejected|user denied|cancelled|canceled/i.test(msg);
       const isWrongChain = /chain|network/i.test(msg) && !isNoWallet;
-      let title = "wallet error";
+      let title = "Wallet error";
       let body = msg;
-      let hint = "press enter to retry, or esc to abort.";
+      let hint = "Press enter to retry, or esc to abort.";
       if (isNoWallet) {
-        title = "no wallet";
-        body = "install a browser wallet.";
+        title = "No wallet";
+        body = "Install a browser wallet.";
         hint = 'Get <a href="https://phantom.com/download" target="_blank" rel="noopener">Phantom</a>, then press <code>enter</code>.';
       } else if (isUserReject) {
-        title = "rejected";
-        body = "request declined in wallet.";
-        hint = "press <code>enter</code> to retry, or <code>esc</code> to abort.";
+        title = "Rejected";
+        body = "Request declined in wallet.";
+        hint = "Press <code>enter</code> to retry, or <code>esc</code> to abort.";
       } else if (isWrongChain) {
-        title = "wrong network";
-        hint = "expected <code>" + escapeHtml(chainLabel(config.chainIdHex)) + "</code>. switch networks, then retry.";
+        title = "Wrong network";
+        hint = "Expected <code>" + escapeHtml(chainLabel(config.chainIdHex)) + "</code>. Switch networks, then retry.";
       }
       errorSlot.innerHTML = '<p class="error-title">' + escapeHtml(title) + "</p>" + '<p class="error-msg">' + escapeHtml(body) + "</p>" + '<p class="error-hint">' + hint + "</p>";
     }
@@ -1091,7 +1082,7 @@
       const deadline = Date.now() + delayMs;
       const update = () => {
         const seconds = Math.max(1, Math.ceil((deadline - Date.now()) / 1000));
-        statusHint.textContent = "return to your terminal. closing in " + seconds + "s.";
+        statusHint.textContent = "Return to your terminal. Closing in " + seconds + "s.";
       };
       update();
       closeCountdown = setInterval(update, 250);
@@ -1188,7 +1179,7 @@
       cancel.disabled = true;
       await post("/cancel", {}).catch(() => { });
       setState("done");
-      statusText.textContent = "cancelled · returning";
+      statusText.textContent = "Cancelled · returning";
       closeSoon(CANCEL_CLOSE_DELAY_MS);
     }
     approve.onclick = runWalletFlow;
