@@ -17,23 +17,17 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const pkgPath = path.resolve(__dirname, '..', '..', 'package.json')
 const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'))
 
-async function checkForUpdates() {
+async function checkForUpdates(): Promise<string | null> {
   try {
     const res = await fetch('https://registry.npmjs.org/ethagent/latest', { signal: AbortSignal.timeout(1200) })
     const { version: latest } = await res.json() as { version: string }
     if (latest && latest !== pkg.version) {
-      const line1 = ` Update available: ${theme.accentPrimary}${pkg.version}${theme.text} -> ${theme.accentMint}${latest}${theme.text} `
-      const line2 = ` Run ${theme.accentPeach}npm install -g ethagent${theme.text} to update `
-      const border = theme.dim + '─'.repeat(Math.max(line1.length - 20, line2.length - 20) + 10) + theme.text
-      
-      process.stdout.write(`\n${theme.dim}┌${border}┐${theme.text}\n`)
-      process.stdout.write(`${theme.dim}│${theme.text}  ${line1}  ${theme.dim}│${theme.text}\n`)
-      process.stdout.write(`${theme.dim}│${theme.text}  ${line2}  ${theme.dim}│${theme.text}\n`)
-      process.stdout.write(`${theme.dim}└${border}┘${theme.text}\n\n`)
+      return `✨ update available · run npm i -g ethagent`
     }
   } catch {
     // Silent fail for offline/timeout
   }
+  return null
 }
 
 function readVersion(): string {
@@ -70,7 +64,7 @@ type AppPhase =
   | { kind: 'cancelled' }
   | { kind: 'error'; message: string }
 
-const AppRoot: React.FC<{ setExitCode: (code: number) => void }> = ({ setExitCode }) => {
+const AppRoot: React.FC<{ setExitCode: (code: number) => void; updateNotice: string | null }> = ({ setExitCode, updateNotice }) => {
   const [phase, setPhase] = useState<AppPhase>({ kind: 'loading' })
   const { exit } = useApp()
 
@@ -109,11 +103,7 @@ const AppRoot: React.FC<{ setExitCode: (code: number) => void }> = ({ setExitCod
   })
 
   if (phase.kind === 'loading') {
-    return (
-      <Box padding={1}>
-        <Text color={theme.dim}>Preparing session...</Text>
-      </Box>
-    )
+    return null
   }
   if (phase.kind === 'setup') {
     return (
@@ -141,16 +131,17 @@ const AppRoot: React.FC<{ setExitCode: (code: number) => void }> = ({ setExitCod
     <ChatScreen
       config={phase.config}
       onReplaceConfig={next => setPhase({ kind: 'ready', config: next })}
+      updateNotice={updateNotice}
     />
   )
 }
 
-async function runDefault(): Promise<number> {
+async function runDefault(updateNotice: string | null): Promise<number> {
   let exitCode = 0
   const instance = render(
     <AppInputProvider>
       <KeybindingProvider>
-        <AppRoot setExitCode={code => { exitCode = code }} />
+        <AppRoot setExitCode={code => { exitCode = code }} updateNotice={updateNotice} />
       </KeybindingProvider>
     </AppInputProvider>,
     {
@@ -169,9 +160,9 @@ async function main(): Promise<number> {
   const argv = process.argv.slice(2)
   const [cmd, ...rest] = argv
 
-  await checkForUpdates()
+  const updateNotice = await checkForUpdates()
 
-  if (!cmd) return runDefault()
+  if (!cmd) return runDefault(updateNotice)
   if (cmd === '--version' || cmd === '-v') {
     process.stdout.write(`ethagent ${readVersion()}\n`)
     return 0

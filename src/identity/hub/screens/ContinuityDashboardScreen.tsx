@@ -4,49 +4,59 @@ import { Surface } from '../../../ui/Surface.js'
 import { Select } from '../../../ui/Select.js'
 import { theme } from '../../../ui/theme.js'
 import type { EthagentConfig, EthagentIdentity } from '../../../storage/config.js'
+import type { ContinuityWorkingTreeStatus } from '../../continuity/storage.js'
 import { IdentitySummary } from './IdentitySummary.js'
 import { shortCid } from '../identityHubModel.js'
 
-type PrivateAction = 'soul' | 'memory' | 'backup' | 'back'
-type PublicAction = 'edit' | 'skills' | 'publish' | 'back'
+type PrivateAction = 'soul' | 'memory' | 'back'
+type PublicAction = 'edit' | 'skills' | 'back'
 
 type CommonProps = {
   identity?: EthagentIdentity
   config?: EthagentConfig
+  workingStatus?: ContinuityWorkingTreeStatus | null
   ready: boolean
   notice?: string
   footer: React.ReactNode
   onBack: () => void
 }
 
+const SaveFromHubHint: React.FC<{ workingStatus?: ContinuityWorkingTreeStatus | null }> = ({ workingStatus }) => {
+  const needsBackup = workingStatus?.publishState === 'local-changes'
+    || workingStatus?.publishState === 'not-published'
+    || workingStatus?.publishState === 'verify-needed'
+  if (!needsBackup) return null
+  return (
+    <Box marginTop={1}>
+      <Text color={theme.accentPeach}>save these changes from the identity hub menu (esc to go back).</Text>
+    </Box>
+  )
+}
+
 export const PrivateContinuityScreen: React.FC<CommonProps & {
-  canBackup: boolean
   onOpenSoul: () => void
   onOpenMemory: () => void
-  onBackup: () => void
 }> = ({
   identity,
   config,
+  workingStatus,
   ready,
   notice,
   footer,
-  canBackup,
   onOpenSoul,
   onOpenMemory,
-  onBackup,
   onBack,
 }) => (
   <Surface title="Private Memory Files" subtitle={notice ?? privateSubtitle(ready)} footer={footer}>
-    <IdentitySummary identity={identity} config={config} compact />
+    <IdentitySummary identity={identity} config={config} workingStatus={workingStatus} compact />
     <PrivateRows identity={identity} ready={ready} />
+    <SaveFromHubHint workingStatus={workingStatus} />
     <Box marginTop={1}>
       <Select<PrivateAction>
         options={[
           { value: 'soul', role: 'section', prefix: '--', label: 'Open local files' },
           { value: 'soul', label: 'open SOUL.md', hint: 'edit persona and operating preferences', disabled: !ready },
           { value: 'memory', label: 'open MEMORY.md', hint: 'edit private working memory for this agent', disabled: !ready },
-          { value: 'backup', role: 'section', prefix: '--', label: 'Recovery' },
-          { value: 'backup', label: 'save snapshot now', hint: 'encrypts and publishes local SOUL.md and MEMORY.md changes, as well as skills.json and public metadata', disabled: !ready || !canBackup },
           { value: 'back', role: 'section', prefix: '--', label: 'Navigation' },
           { value: 'back', label: 'back to identity hub', hint: 'return without changing private files', role: 'utility' },
         ]}
@@ -54,7 +64,6 @@ export const PrivateContinuityScreen: React.FC<CommonProps & {
         onSubmit={choice => {
           if (choice === 'soul') return onOpenSoul()
           if (choice === 'memory') return onOpenMemory()
-          if (choice === 'backup') return onBackup()
           return onBack()
         }}
         onCancel={onBack}
@@ -64,14 +73,13 @@ export const PrivateContinuityScreen: React.FC<CommonProps & {
 )
 
 export const PublicSkillsScreen: React.FC<CommonProps & {
-  canPublish: boolean
   onEditProfile: () => void
   onOpenSkills: () => void
-  onPublish: () => void
-}> = ({ identity, config, notice, footer, canPublish, onEditProfile, onOpenSkills, onPublish, onBack }) => (
+}> = ({ identity, config, workingStatus, notice, footer, onEditProfile, onOpenSkills, onBack }) => (
   <Surface title="Public Profile" subtitle={notice ?? 'Manage public metadata, skills.json, and the agent card.'} footer={footer}>
-    <IdentitySummary identity={identity} config={config} compact />
+    <IdentitySummary identity={identity} config={config} workingStatus={workingStatus} compact />
     <PublicProfileRows identity={identity} />
+    <SaveFromHubHint workingStatus={workingStatus} />
     <Box marginTop={1}>
       <Select<PublicAction>
         options={[
@@ -79,8 +87,6 @@ export const PublicSkillsScreen: React.FC<CommonProps & {
           { value: 'edit', label: 'edit name, description, image', hint: 'upload a local image to IPFS automatically' },
           { value: 'skills', role: 'section', prefix: '--', label: 'Capabilities' },
           { value: 'skills', label: 'open skills.json', hint: 'edit public capabilities and notes' },
-          { value: 'publish', role: 'section', prefix: '--', label: 'Recovery' },
-          { value: 'publish', label: 'save snapshot now', hint: 'publishes local memory, skills, and metadata', disabled: !canPublish },
           { value: 'back', role: 'section', prefix: '--', label: 'Navigation' },
           { value: 'back', label: 'back to identity hub', hint: 'return without changing public metadata', role: 'utility' },
         ]}
@@ -88,7 +94,6 @@ export const PublicSkillsScreen: React.FC<CommonProps & {
         onSubmit={choice => {
           if (choice === 'edit') return onEditProfile()
           if (choice === 'skills') return onOpenSkills()
-          if (choice === 'publish') return onPublish()
           return onBack()
         }}
         onCancel={onBack}
@@ -114,11 +119,11 @@ const PublicProfileRows: React.FC<{ identity?: EthagentIdentity }> = ({ identity
   <Box flexDirection="column" marginTop={1}>
     <Text>
       <Text color={theme.dim}>{'skills.json'.padEnd(13)}</Text>
-      <Text color={identity?.publicSkills?.cid ? theme.text : theme.dim}>{identity?.publicSkills?.cid ? shortCid(identity.publicSkills.cid) : 'not published'}</Text>
+      <Text color={identity?.publicSkills?.cid ? theme.text : theme.dim}>{identity?.publicSkills?.cid ? shortCid(identity.publicSkills.cid) : 'not saved'}</Text>
     </Text>
     <Text>
       <Text color={theme.dim}>{'agent card'.padEnd(13)}</Text>
-      <Text color={identity?.publicSkills?.agentCardCid ? theme.text : theme.dim}>{identity?.publicSkills?.agentCardCid ? shortCid(identity.publicSkills.agentCardCid) : 'not published'}</Text>
+      <Text color={identity?.publicSkills?.agentCardCid ? theme.text : theme.dim}>{identity?.publicSkills?.agentCardCid ? shortCid(identity.publicSkills.agentCardCid) : 'not saved'}</Text>
     </Text>
     <Text>
       <Text color={theme.dim}>{'image'.padEnd(13)}</Text>

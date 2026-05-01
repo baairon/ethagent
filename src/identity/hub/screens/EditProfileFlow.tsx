@@ -70,7 +70,7 @@ export const EditProfileFlow: React.FC<EditProfileFlowProps> = ({
                 { value: 'choose', label: 'choose image file', hint: 'open the operating system file picker' },
                 { value: 'manual', label: 'enter path manually', hint: 'fallback if a file picker is unavailable' },
                 ...(currentImage ? [{ value: 'delete' as const, label: 'delete current image', hint: 'remove the attached image from public profile' }] : []),
-                { value: 'skip', label: currentImage ? 'keep current image' : 'no image', hint: 'publish without changing the image' },
+                { value: 'skip', label: currentImage ? 'keep current image' : 'no image', hint: 'save without changing the image' },
                 { value: 'back', role: 'section', prefix: '--', label: 'Navigation' },
                 { value: 'back', label: 'back', hint: 'return to description', role: 'utility' },
               ]}

@@ -19,7 +19,7 @@ export const ContinuityEditReviewView: React.FC<{
 }> = ({ review, onSelect, onCancel }) => (
   <Surface
     title="Private Continuity Updated"
-    subtitle="Review the file, then publish an encrypted snapshot."
+    subtitle="Review the file, then save an encrypted snapshot."
     footer="enter select · esc later"
   >
     <Box flexDirection="column">
@@ -37,8 +37,8 @@ export const ContinuityEditReviewView: React.FC<{
       <Select<ContinuityEditReviewAction>
         options={[
           { value: 'open', label: `open ${review.file}`, hint: 'review the edited private file now' },
-          { value: 'save-publish', label: 'publish snapshot now', hint: 'go directly to wallet approval' },
-          { value: 'later', label: 'later', hint: 'keep the local draft unpublished' },
+          { value: 'save-publish', label: 'save snapshot now', hint: 'go directly to wallet approval' },
+          { value: 'later', label: 'later', hint: 'keep the local draft unsaved' },
         ]}
         onSubmit={onSelect}
         onCancel={onCancel}

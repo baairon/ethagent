@@ -154,7 +154,7 @@ function formatPrivateContinuityEditResult(file: 'SOUL.md' | 'MEMORY.md', fullPa
     `- File: \`identity-vault/${file}\``,
     `- Review file: \`${fullPath}\``,
     '- Open: Identity Hub > Memory and Persona',
-    '- Publish: Identity Hub > Recovery > Publish Snapshot Now',
+    '- Save: Identity Hub > Recovery > Save Snapshot Now',
     '- History: previous version saved to private identity history; `/rewind` does not restore identity continuity',
   ].join('\n')
 }

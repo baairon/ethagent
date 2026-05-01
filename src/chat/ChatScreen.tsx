@@ -79,6 +79,7 @@ import { EMPTY_MCP_SNAPSHOT, McpManager, type McpSnapshot } from '../mcp/manager
 type ChatScreenProps = {
   config: EthagentConfig
   onReplaceConfig?: (next: EthagentConfig) => void
+  updateNotice?: string | null
 }
 
 type PendingPlan = {
@@ -122,7 +123,7 @@ async function ensureLocalProviderReady(config: EthagentConfig): Promise<{ ok: t
   return { ok: true }
 }
 
-export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, onReplaceConfig }) => {
+export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, onReplaceConfig, updateNotice }) => {
   useRegisterKeybindingContext('Chat')
   const { exit } = useApp()
   const [config, setConfig] = useState<EthagentConfig>(initialConfig)
@@ -1109,7 +1110,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
       }
       overlayRef.current = 'none'
       setOverlay('none')
-      pushNote('snapshot not published yet.', 'dim')
+      pushNote('snapshot not saved yet.', 'dim')
     },
     [continuityEditReview, pushNote],
   )
@@ -1118,7 +1119,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
     setContinuityEditReview(null)
     overlayRef.current = 'none'
     setOverlay('none')
-    pushNote('snapshot not published yet.', 'dim')
+    pushNote('snapshot not saved yet.', 'dim')
   }, [pushNote])
 
   const handleCopyDone = useCallback(
@@ -1402,7 +1403,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
       </Text>
     </Box>
   )
-  const header = <BrandSplash contextLine={contextLine} tipLine={tipLine} />
+  const header = <BrandSplash contextLine={contextLine} tipLine={tipLine} updateNotice={updateNotice ?? null} />
   return (
     <ConversationStack
       header={header}

@@ -720,7 +720,7 @@
     function chainLabel(hex) { const k = String(hex || "").toLowerCase(); return (CHAINS[k] && CHAINS[k].name) || ("chain " + k); }
     function shortAddr(addr) { if (!addr || typeof addr !== "string") return glyphs.emDash; if (addr.length <= 14) return addr; return addr.slice(0, 6) + glyphs.ellipsis + addr.slice(-4); }
     function isTransactionFlow() { return config.kind === "transaction" || config.kind === "sign-transaction"; }
-    function transactionActionLabel() { if (config.kind === "sign-transaction") return "publish identity snapshot"; if (config.kind === "transaction") return "submit transaction"; return "wallet request"; }
+    function transactionActionLabel() { if (config.kind === "sign-transaction") return "save identity snapshot"; if (config.kind === "transaction") return "submit transaction"; return "wallet request"; }
 
     const card = document.getElementById("card");
     const promptText = document.getElementById("prompt-text");

@@ -113,10 +113,11 @@ const Eyes = () => {
 type SplashProps = {
   contextLine?: string
   tipLine?: string
+  updateNotice?: string | null
   compact?: boolean
 }
 
-export const BrandSplash: React.FC<SplashProps> = ({ contextLine, tipLine, compact }) => {
+export const BrandSplash: React.FC<SplashProps> = ({ contextLine, tipLine, updateNotice, compact }) => {
   const [width, setWidth] = useState<number>(() => process.stdout.columns ?? 80)
 
   useEffect(() => {
@@ -138,6 +139,7 @@ export const BrandSplash: React.FC<SplashProps> = ({ contextLine, tipLine, compa
         <Text color={theme.dim}>{glyphs.tagline.trim()}</Text>
         {contextLine ? <Text color={theme.dim}>{contextLine}</Text> : null}
         {tipLine ? <Text color={theme.dim}>{tipLine}</Text> : null}
+        {updateNotice ? <Text color={theme.accentPeach}>{updateNotice}</Text> : null}
       </Box>
     )
   }
@@ -177,9 +179,10 @@ export const BrandSplash: React.FC<SplashProps> = ({ contextLine, tipLine, compa
       ) : (
         <Text color={theme.border}>{glyphs.frame.bottomLeft.slice(0, 1) + glyphs.frame.horizontal.repeat(w) + glyphs.frame.bottomRight}</Text>
       )}
-      {tipLine ? (
-        <Box marginTop={1}>
-          <Text color={theme.dim}>{tipLine}</Text>
+      {tipLine || updateNotice ? (
+        <Box marginTop={1} flexDirection="column">
+          {tipLine ? <Text color={theme.dim}>{tipLine}</Text> : null}
+          {updateNotice ? <Text color={theme.accentPeach}>{updateNotice}</Text> : null}
         </Box>
       ) : null}
     </Box>

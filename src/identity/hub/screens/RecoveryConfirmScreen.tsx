@@ -20,16 +20,16 @@ export const RecoveryConfirmScreen: React.FC<RecoveryConfirmScreenProps> = ({ mo
   const isPublish = mode === 'publish'
   const title = isPublish ? 'Save Snapshot?' : 'Refetch Latest From Chain?'
   const subtitle = isPublish
-    ? 'This replaces the current on-chain snapshot pointer.'
+    ? 'Saves any local edits to SOUL.md, MEMORY.md, skills.json, and public profile metadata.'
     : 'This overwrites local files with the on-chain version.'
 
   const headlineColor = isPublish ? theme.accentPeach : theme.accentMint
   const headline = isPublish
-    ? 'Saving replaces the on-chain pointer for this agent.'
+    ? 'Saving updates the on-chain pointer for this agent.'
     : 'Refetching replaces local SOUL.md, MEMORY.md, and skills.json with what is on chain.'
   const detail = isPublish
-    ? 'The old snapshot pointer is overwritten. Local edits become the saved state.'
-    : 'Unsaved local edits will be lost. Use this when local files are missing or out of sync with the latest published snapshot.'
+    ? 'Local edits to SOUL.md, MEMORY.md, skills.json, and public profile metadata become the saved state. The previous snapshot pointer is overwritten.'
+    : 'Unsaved local edits will be lost. Use this when local files are missing or out of sync with the latest saved snapshot.'
 
   const needsBackup = workingStatus?.publishState === 'local-changes' || workingStatus?.publishState === 'not-published' || workingStatus?.publishState === 'verify-needed'
   let changedFiles: string[] = []
@@ -50,8 +50,10 @@ export const RecoveryConfirmScreen: React.FC<RecoveryConfirmScreenProps> = ({ mo
         <Text color={theme.textSubtle}>{detail}</Text>
         {isPublish && changedFiles.length > 0 && (
           <Box marginTop={1}>
-            <Text color={theme.textSubtle}>unsaved changes: </Text>
-            <Text color="red" bold>{changedFiles.join(', ')}</Text>
+            <Text>
+              <Text color={theme.textSubtle}>ready to save: </Text>
+              <Text color={theme.accentMint} bold>{changedFiles.join(', ')}</Text>
+            </Text>
           </Box>
         )}
       </Box>
@@ -62,7 +64,7 @@ export const RecoveryConfirmScreen: React.FC<RecoveryConfirmScreenProps> = ({ mo
             {
               value: 'confirm',
               label: isPublish ? 'Yes, Save Snapshot Now' : 'Yes, Refetch From Chain',
-              hint: isPublish ? 'Sign and overwrite the on-chain pointer' : 'Wallet decrypts and overwrites local files',
+              hint: isPublish ? 'Sign and save the encrypted snapshot' : 'Wallet decrypts and overwrites local files',
             },
             { value: 'back', role: 'section', prefix: '--', label: 'Cancel' },
             {

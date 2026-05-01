@@ -196,7 +196,8 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
 
   useEffect(() => {
     let cancelled = false
-    if (!identity || step.kind !== 'menu') return
+    if (!identity) return
+    if (step.kind !== 'menu' && step.kind !== 'continuity-private' && step.kind !== 'continuity-public') return
 
     const checkStatus = async () => {
       try {
@@ -591,7 +592,7 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
     return (
       <WalletApprovalScreen
         title="Refetch Latest Snapshot"
-        subtitle="Wallet approval decrypts the latest published snapshot and overwrites local SOUL.md, MEMORY.md, and skills.json."
+        subtitle="Wallet approval decrypts the latest saved snapshot and overwrites local SOUL.md, MEMORY.md, and skills.json."
         walletSession={walletSession}
         label={restoreProgress?.label ?? 'fetching latest snapshot from chain...'}
         onCancel={() => setStep(step.back)}
@@ -604,13 +605,12 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
       <PrivateContinuityScreen
         identity={identity}
         config={config}
+        workingStatus={workingStatus}
         ready={continuityReady}
         notice={step.notice}
-        canBackup={canRebackup}
         footer={footer}
         onOpenSoul={() => { void openContinuityFile('soul') }}
         onOpenMemory={() => { void openContinuityFile('memory') }}
-        onBackup={() => setStep({ kind: 'rebackup-confirm', back: { kind: 'continuity-private' } })}
         onBack={back}
       />
     )
@@ -621,13 +621,12 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
       <PublicSkillsScreen
         identity={identity}
         config={config}
+        workingStatus={workingStatus}
         ready={continuityReady}
         notice={step.notice}
-        canPublish={canRebackup}
         footer={footer}
         onEditProfile={() => openPublicProfileEdit({ kind: 'continuity-public' })}
         onOpenSkills={() => { void openContinuityFile('skills') }}
-        onPublish={() => setStep({ kind: 'rebackup-confirm', back: { kind: 'continuity-public' } })}
         onBack={back}
       />
     )
@@ -784,7 +783,7 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
 
 async function readPublishedPublicSkills(identity: EthagentIdentity): Promise<string> {
   const cid = identity.publicSkills?.cid
-  if (!cid) throw new Error('no published public skills CID')
+  if (!cid) throw new Error('no saved public skills CID')
   return new TextDecoder().decode(await catFromIpfs(
     identity.backup?.ipfsApiUrl ?? DEFAULT_IPFS_API_URL,
     cid,

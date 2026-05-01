@@ -287,7 +287,7 @@ export function defaultContinuityFiles(identity: EthagentIdentity, now = new Dat
       '## Private Instructions',
       '',
       '- Keep owner-specific standing instructions in this file.',
-      '- Do not publish this file directly; use encrypted snapshot backup from Identity Hub.',
+      '- Do not share this file directly; save it via the Identity Hub encrypted snapshot.',
       '- Public capabilities belong in skills.json.',
       '',
       '## Boundaries',

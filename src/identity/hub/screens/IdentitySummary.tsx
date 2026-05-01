@@ -39,7 +39,7 @@ export const IdentitySummary: React.FC<{
   }
 
   const lastSavedRow = needsBackup
-    ? { label: 'unsaved changes', value: changedFiles.length > 0 ? changedFiles.join(', ') : 'markdown files', tone: 'warn' as const, highlight: true }
+    ? { label: 'unsaved', value: changedFiles.length > 0 ? changedFiles.join(', ') : 'markdown files', tone: 'warn' as const, highlight: true }
     : { label: 'last saved', value: lastBackup, tone: lastBackup === 'never' ? 'dim' as const : 'ok' as const }
 
   const summaryRows = [
@@ -48,8 +48,8 @@ export const IdentitySummary: React.FC<{
     { label: 'owner', value: row('owner')?.value ?? 'not connected', tone: row('owner')?.tone ?? 'dim' },
     { label: 'snapshot', value: row('state')?.value ?? 'not saved yet', tone: row('state')?.tone ?? 'dim', highlight: true },
     lastSavedRow,
-    { label: 'skills', value: row('skills')?.value ?? 'not published', tone: row('skills')?.tone ?? 'dim' },
-    { label: 'agent card', value: row('card')?.value ?? 'not published', tone: row('card')?.tone ?? 'dim' },
+    { label: 'skills', value: row('skills')?.value ?? 'not saved', tone: row('skills')?.tone ?? 'dim' },
+    { label: 'agent card', value: row('card')?.value ?? 'not saved', tone: row('card')?.tone ?? 'dim' },
     { label: 'image', value: row('image')?.value ?? 'not attached', tone: row('image')?.tone ?? 'dim' },
   ]
 

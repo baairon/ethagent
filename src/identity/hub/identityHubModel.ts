@@ -200,8 +200,8 @@ export function identitySummaryRows(
   const tokenValue = identity?.agentId ? `#${identity.agentId}` : 'not created'
   const chain = chainSummaryRow(config, identity)
   const stateValue = backup?.cid ? shortCid(backup.cid) : 'not saved yet'
-  const skillsValue = identity?.publicSkills?.cid ? shortCid(identity.publicSkills.cid) : 'not published'
-  const cardValue = identity?.publicSkills?.agentCardCid ? shortCid(identity.publicSkills.agentCardCid) : 'not published'
+  const skillsValue = identity?.publicSkills?.cid ? shortCid(identity.publicSkills.cid) : 'not saved'
+  const cardValue = identity?.publicSkills?.agentCardCid ? shortCid(identity.publicSkills.agentCardCid) : 'not saved'
   const imageValue = typeof identity?.state?.imageUrl === 'string' && identity.state.imageUrl.trim() ? 'attached' : 'not attached'
   return [
     { label: 'owner', value: ownerValue, tone: identity ? 'ok' : 'dim' },
@@ -232,8 +232,8 @@ export function identityDetailSections(
   const chain = chainSummaryRow(config, identity)
   const stateCid = backup?.cid ?? 'not saved yet'
   const registrationCid = identity?.metadataCid ?? 'not saved yet'
-  const publicSkillsCid = identity?.publicSkills?.cid ?? 'not published'
-  const agentCardCid = identity?.publicSkills?.agentCardCid ?? 'not published'
+  const publicSkillsCid = identity?.publicSkills?.cid ?? 'not saved'
+  const agentCardCid = identity?.publicSkills?.agentCardCid ?? 'not saved'
 
   return [
     {
