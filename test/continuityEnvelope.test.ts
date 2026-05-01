@@ -8,7 +8,7 @@ import {
   restoreContinuitySnapshotEnvelope,
   serializeContinuitySnapshotEnvelope,
 } from '../src/identity/continuity/envelope.js'
-import { addressFromPrivateKey, generatePrivateKey, signMessage } from '../src/identity/eth.js'
+import { addressFromPrivateKey, generatePrivateKey, signMessage } from '../src/identity/crypto/eth.js'
 
 test('continuity snapshot envelope encrypts and restores SOUL and MEMORY files', () => {
   const privateKey = generatePrivateKey()

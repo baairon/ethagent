@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
-test('root identity markdown files are ignored without hiding nested docs', () => {
+test('root identity continuity files are ignored without hiding nested docs', () => {
   const lines = readFileSync('.gitignore', 'utf8')
     .split(/\r?\n/)
     .map(line => line.trim())

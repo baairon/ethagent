@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { getAddress, type Address, type Hex } from 'viem'
-import { recoverAddressFromSignature } from './eth.js'
+import { recoverAddressFromSignature } from '../crypto/eth.js'
 
 const WALLET_PAGE_DIR = join(dirname(fileURLToPath(import.meta.url)), 'wallet-page')
 const WALLET_HTML = loadWalletHtml()
@@ -364,7 +364,7 @@ function loadWalletHtml(): string {
   try {
     return readFileSync(join(WALLET_PAGE_DIR, 'wallet.html'), 'utf8')
   } catch (err) {
-    const sourcePath = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'src', 'identity', 'wallet-page', 'wallet.html')
+    const sourcePath = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..', 'src', 'identity', 'wallet', 'wallet-page', 'wallet.html')
     try {
       return readFileSync(sourcePath, 'utf8')
     } catch {

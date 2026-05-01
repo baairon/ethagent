@@ -76,10 +76,10 @@ export function buildModelPickerOptions(
 
     const catalog = data.cloudCatalogs[provider]
     if (catalog?.status === 'fallback') {
-      const reason = catalog.error ? ` - ${catalog.error}` : ''
+      const reason = catalog.error ? ` · ${catalog.error}` : ''
       options.push(noticeOption(
         `hdr:cloud-fallback:${provider}`,
-        `catalog unavailable${reason} - showing configured model`,
+        `catalog unavailable${reason} · showing configured model`,
         CHILD_INDENT,
       ))
     }

@@ -8,7 +8,7 @@ import { runRuntimeTurn, type TurnEvent } from '../runtime/turn.js'
 import type { EthagentConfig } from '../storage/config.js'
 import type { SessionMessage } from '../storage/sessions.js'
 import type { SessionPermissionRule, ToolResult } from '../tools/contracts.js'
-import { readContinuityFiles, readPublicSkillsFile } from '../identity/continuity/storage.js'
+import { readContinuityFiles } from '../identity/continuity/storage.js'
 import type { MessageRow } from './MessageList.js'
 import {
   buildBaseMessages,
@@ -640,20 +640,15 @@ export async function buildIdentityContinuityContextMessages(
   if (!identity) return []
 
   try {
-    const [privateFiles, publicSkills] = await Promise.all([
-      readContinuityFiles(identity),
-      readPublicSkillsFile(identity),
-    ])
+    const privateFiles = await readContinuityFiles(identity)
     return [{
       role: 'system',
       content: [
         '<identity_continuity_files>',
-        'The active identity markdown files have been loaded automatically for this turn.',
+        'The active identity continuity files have been loaded automatically for this turn.',
         'SOUL.md is private owner continuity and is the authoritative persona, voice, and standing-behavior layer for this active identity.',
         'MEMORY.md is private owner continuity for durable preferences, facts, and project context.',
         'Apply SOUL.md and MEMORY.md over generic ethagent identity/style unless they conflict with safety, tool correctness, developer instructions, or the user\'s latest explicit request. Do not quote private continuity unless necessary.',
-        'skills.json is public agent discovery metadata; it is a local working file whose published copy is referenced from onchain tokenURI metadata.',
-        '',
         '<SOUL.md visibility="private">',
         privateFiles['SOUL.md'].trimEnd(),
         '</SOUL.md>',
@@ -661,10 +656,6 @@ export async function buildIdentityContinuityContextMessages(
         '<MEMORY.md visibility="private">',
         privateFiles['MEMORY.md'].trimEnd(),
         '</MEMORY.md>',
-        '',
-        '<skills.json visibility="public">',
-        publicSkills.trimEnd(),
-        '</skills.json>',
         '</identity_continuity_files>',
       ].join('\n'),
     }]
@@ -673,7 +664,7 @@ export async function buildIdentityContinuityContextMessages(
       role: 'system',
       content: [
         '<identity_continuity_files>',
-        `Automatic identity markdown load failed: ${(err as Error).message}`,
+        `Automatic identity continuity load failed: ${(err as Error).message}`,
         'If the user asks about continuity, surface this failure and route them to the identity hub.',
         '</identity_continuity_files>',
       ].join('\n'),

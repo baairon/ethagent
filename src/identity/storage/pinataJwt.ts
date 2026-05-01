@@ -1,4 +1,4 @@
-import { getSecret, hasSecret, rmSecret, setSecret, type KeyBackend } from '../storage/secrets.js'
+import { getSecret, hasSecret, rmSecret, setSecret, type KeyBackend } from '../../storage/secrets.js'
 import { extractPinataJwt, validatePinataJwt, type FetchLike } from './ipfs.js'
 
 const ACCOUNT = 'pinata:jwt'

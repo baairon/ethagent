@@ -1,12 +1,12 @@
-import type { EthagentConfig, EthagentIdentity, SelectableNetwork } from '../storage/config.js'
+import type { EthagentConfig, EthagentIdentity, SelectableNetwork } from '../../storage/config.js'
 import {
   RegisterAgentPreflightError,
   supportedErc8004ChainForId,
   type Erc8004AgentCandidate,
-} from './erc8004.js'
-import { AgentStateOwnerMismatchError } from './backupEnvelope.js'
-import { ContinuitySnapshotOwnerMismatchError } from './continuity/envelope.js'
-import { resolveSelectedNetwork } from './registryConfig.js'
+} from '../registry/erc8004.js'
+import { AgentStateOwnerMismatchError } from '../crypto/backupEnvelope.js'
+import { ContinuitySnapshotOwnerMismatchError } from '../continuity/envelope.js'
+import { resolveSelectedNetwork } from '../registry/registryConfig.js'
 
 export const PREFLIGHT_AGENT_URI = 'ipfs://bafybeigdyrztma2dbfczw7q6ooozbxlqzyw5r7w4f3qw2axvvxqg3w6y7q'
 
@@ -111,7 +111,7 @@ export function tokenCandidateHint(candidate: Erc8004AgentCandidate): string {
     network,
     candidate.backup?.createdAt ? `backup ${formatDate(candidate.backup.createdAt)}` : null,
   ].filter((part): part is string => Boolean(part))
-  return parts.join(' - ')
+  return parts.join(' · ')
 }
 
 export function isCurrentAgentCandidate(

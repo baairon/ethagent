@@ -67,8 +67,8 @@ export async function readContinuityFiles(identity: EthagentIdentity): Promise<C
 
 export async function writeContinuityFiles(identity: EthagentIdentity, files: ContinuityFiles): Promise<ContinuityVaultRef> {
   const ref = await ensureContinuityVault(identity)
-  await atomicWriteText(ref.soulPath, normalizeMarkdown(files['SOUL.md']), { mode: 0o600 })
-  await atomicWriteText(ref.memoryPath, normalizeMarkdown(files['MEMORY.md']), { mode: 0o600 })
+  await atomicWriteText(ref.soulPath, ensureTrailingNewline(files['SOUL.md']), { mode: 0o600 })
+  await atomicWriteText(ref.memoryPath, ensureTrailingNewline(files['MEMORY.md']), { mode: 0o600 })
   return ref
 }
 
@@ -151,7 +151,7 @@ export async function ensurePublicSkillsFile(
 
 
   const fallback = await resolvePublicSkillsFallback(identity, options.fallback)
-  await atomicWriteText(ref.publicSkillsPath, normalizeMarkdown(fallback), { mode: 0o644 })
+  await atomicWriteText(ref.publicSkillsPath, ensureTrailingNewline(fallback), { mode: 0o644 })
   return readPublicSkillsFile(identity)
 }
 
@@ -162,7 +162,7 @@ export async function readPublicSkillsFile(identity: EthagentIdentity): Promise<
 
 export async function writePublicSkillsFile(identity: EthagentIdentity, content: string): Promise<ContinuityVaultRef> {
   const ref = await ensureContinuityVault(identity)
-  await atomicWriteText(ref.publicSkillsPath, normalizeMarkdown(content), { mode: 0o644 })
+  await atomicWriteText(ref.publicSkillsPath, ensureTrailingNewline(content), { mode: 0o644 })
   return ref
 }
 
@@ -260,19 +260,12 @@ export function continuityAgentSnapshot(identity: EthagentIdentity): ContinuityA
 
 export function defaultContinuityFiles(identity: EthagentIdentity, now = new Date()): ContinuityFiles {
   const owner = identity.ownerAddress ?? identity.address
-  const state = identity.state ?? {}
-  const name = typeof state.name === 'string' && state.name.trim()
-    ? state.name.trim()
-    : identity.agentId ? `agent #${identity.agentId}` : 'ethagent'
-  const description = typeof state.description === 'string' ? state.description.trim() : ''
   const created = now.toISOString().slice(0, 10)
   const identityBlock = renderPrivateIdentityBlock({
-    name,
     owner,
     token: identity.agentId ? `#${identity.agentId}` : 'pending registration',
     chainId: identity.chainId ? identity.chainId.toString() : 'unknown',
     registry: identity.identityRegistryAddress ?? 'unknown',
-    description: description || 'not set',
   })
   return {
     'SOUL.md': [
@@ -282,22 +275,33 @@ export function defaultContinuityFiles(identity: EthagentIdentity, now = new Dat
       '',
       '## Persona',
       '',
-      '- Role: describe the agent identity, voice, and collaboration style here.',
-      '- Operating principles: keep durable values and decision preferences here.',
-      '- Boundaries: record private limits or owner-approved constraints here.',
+      '- Describe the private agent persona, voice, and collaboration style.',
+      '- Keep standing behavior that should survive model switches and device restores.',
+      '- Prefer stable guidance over session-specific preferences.',
+      '',
+      '## Operating Principles',
+      '',
+      '- Record durable values, decision preferences, and owner-approved working principles.',
+      '- Keep implementation-specific facts in MEMORY.md unless they define behavior.',
       '',
       '## Private Instructions',
       '',
-      '- Keep private continuity, persona, and owner-specific standing instructions in this file.',
+      '- Keep owner-specific standing instructions in this file.',
       '- Do not publish this file directly; use encrypted snapshot backup from Identity Hub.',
       '- Public capabilities belong in skills.json.',
+      '',
+      '## Boundaries',
+      '',
+      '- Record private behavioral limits and owner-approved constraints here.',
+      '- Do not store seed phrases, private keys, raw wallet signatures, or API keys.',
+      '- Do not place public delegation claims here; keep them in skills.json.',
       '',
       '## Maintenance Rules',
       '',
       '- Keep the generated Agent Identity block intact; edit owner-authored sections below it.',
       '- Do not duplicate the mutable public agent name here; it lives in token metadata and the Agent Card.',
-      '- Prefer durable guidance over session-specific notes.',
       '- Move factual project memory to MEMORY.md when it is not persona or instruction material.',
+      '- Revise or remove stale guidance instead of accumulating contradictions.',
       '',
       '## Change Notes',
       '',
@@ -312,7 +316,7 @@ export function defaultContinuityFiles(identity: EthagentIdentity, now = new Dat
       '',
       '## Durable User Preferences',
       '',
-      '- Add long-lived owner preferences that should survive across sessions.',
+      '- Add long-lived owner preferences that should survive across sessions and model switches.',
       '',
       '## Project Context',
       '',
@@ -324,19 +328,19 @@ export function defaultContinuityFiles(identity: EthagentIdentity, now = new Dat
       '',
       '## Facts to Revalidate',
       '',
-      '- Add time-sensitive facts that should be checked before reuse.',
+      '- Add time-sensitive facts that should be checked before reuse, with dates or source context when available.',
       '',
       '## Maintenance Rules',
       '',
       '- Prefer stable facts, preferences, and decisions over chat transcripts.',
       '- Do not duplicate the mutable public agent name here; it lives in token metadata and the Agent Card.',
-      '- Add dates or source context when a note may become stale.',
+      '- Add dates or source context when a note may become stale or environment-specific.',
       '- Remove or rewrite stale memory instead of accumulating contradictions.',
       '',
       '## Boundaries',
       '',
-      '- Do not store secrets unless the user explicitly asks for it.',
-      '- Do not store raw wallet signatures or private keys.',
+      '- Do not store seed phrases, private keys, raw wallet signatures, or API keys.',
+      '- Do not store secrets unless the user explicitly asks and the risk is clear.',
       '- Keep public capabilities in skills.json.',
       '',
       `Created: ${created}`,
@@ -361,7 +365,7 @@ function sanitizePathPart(value: string): string {
 
 async function writeMissingPrivateFile(file: string, content: string): Promise<void> {
   if (await exists(file)) return
-  await atomicWriteText(file, normalizeMarkdown(content), { mode: 0o600 })
+  await atomicWriteText(file, ensureTrailingNewline(content), { mode: 0o600 })
 }
 
 async function resolvePublicSkillsFallback(
@@ -405,7 +409,7 @@ async function statIfExists(file: string): Promise<import('node:fs').Stats | nul
   }
 }
 
-function normalizeMarkdown(value: string): string {
+function ensureTrailingNewline(value: string): string {
   return value.endsWith('\n') ? value : `${value}\n`
 }
 
@@ -415,12 +419,10 @@ type SyncBlock = {
 }
 
 function renderPrivateIdentityBlock(args: {
-  name: string
   owner: string
   token: string
   chainId: string
   registry: string
-  description: string
 }): string {
   return [
     '<!-- ethagent:identity:start -->',
@@ -439,7 +441,7 @@ function syncGeneratedMarkdown(existing: string, fresh: string, blocks: SyncBloc
   for (const block of blocks) {
     next = replaceOrInsertMarkedBlock(next, fresh, block)
   }
-  return normalizeMarkdown(next)
+  return ensureTrailingNewline(next)
 }
 
 function firstHeading(markdown: string): string {

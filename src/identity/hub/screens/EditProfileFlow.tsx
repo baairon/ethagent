@@ -1,9 +1,9 @@
 import React from 'react'
 import { Box, Text } from 'ink'
-import { Surface } from '../../ui/Surface.js'
-import { Select } from '../../ui/Select.js'
-import { TextInput } from '../../ui/TextInput.js'
-import { theme } from '../../ui/theme.js'
+import { Surface } from '../../../ui/Surface.js'
+import { Select } from '../../../ui/Select.js'
+import { TextInput } from '../../../ui/TextInput.js'
+import { theme } from '../../../ui/theme.js'
 import type { Step } from '../identityHubReducer.js'
 
 type EditProfileFlowProps = {
@@ -35,7 +35,7 @@ export const EditProfileFlow: React.FC<EditProfileFlowProps> = ({
       <Surface
         title="Rename Agent Identity"
         subtitle="This updates public token metadata and the Agent Card."
-        footer={footerHint('enter continues - esc back')}
+        footer={footerHint('enter continues · esc back')}
       >
         <Text color={theme.dim}>Currently: {currentName || '(unnamed)'}</Text>
         <TextInput
@@ -57,7 +57,7 @@ export const EditProfileFlow: React.FC<EditProfileFlowProps> = ({
         <Surface
           title="Upload Agent Image"
           subtitle="Choose a local image. ethagent uploads it to IPFS and attaches it to token metadata."
-          footer={footerHint('enter select - esc back')}
+          footer={footerHint('enter select · esc back')}
         >
           <Box flexDirection="column">
             <Text color={theme.dim}>Current: {currentImage || '(no image)'}</Text>
@@ -92,7 +92,7 @@ export const EditProfileFlow: React.FC<EditProfileFlowProps> = ({
       <Surface
         title="Enter Image Path"
         subtitle="Fallback path entry. URLs are rejected because ethagent uploads the local file itself."
-        footer={footerHint('enter saves - esc back')}
+        footer={footerHint('enter saves · esc back')}
       >
         <Text color={theme.dim}>Current: {currentImage || '(no image)'}</Text>
         <TextInput
@@ -112,7 +112,7 @@ export const EditProfileFlow: React.FC<EditProfileFlowProps> = ({
     <Surface
       title="Describe Agent Identity"
       subtitle="This updates public token metadata and the Agent Card."
-      footer={footerHint('enter continues - esc back')}
+      footer={footerHint('enter continues · esc back')}
     >
       <Text color={theme.dim}>Currently: {currentDescription || '(no description)'}</Text>
       <TextInput

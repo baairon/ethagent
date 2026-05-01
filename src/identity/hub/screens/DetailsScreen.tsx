@@ -1,8 +1,8 @@
 import React from 'react'
 import { Box } from 'ink'
-import { Surface } from '../../ui/Surface.js'
-import { Select, type SelectOption } from '../../ui/Select.js'
-import type { EthagentConfig, EthagentIdentity } from '../../storage/config.js'
+import { Surface } from '../../../ui/Surface.js'
+import { Select, type SelectOption } from '../../../ui/Select.js'
+import type { EthagentConfig, EthagentIdentity } from '../../../storage/config.js'
 import { copyableIdentityFields } from '../identityHubModel.js'
 import { IdentitySummary } from './IdentitySummary.js'
 

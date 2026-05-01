@@ -200,10 +200,10 @@ test('approved private continuity edit records identity history but no rewind ch
     assert.equal(outcome.result.ok, true)
     assert.match(outcome.result.content, /Saved private continuity/)
     assert.match(outcome.result.content, /previous version saved to private identity history/)
-    assert.match(outcome.result.content, /`\/rewind` does not restore identity markdown/)
+    assert.match(outcome.result.content, /`\/rewind` does not restore identity continuity/)
     assert.match(outcome.result.content, /Review file: `.*MEMORY\.md`/)
     assert.match(outcome.result.content, /Identity Hub > Memory and Persona/)
-    assert.match(outcome.result.content, /Identity Hub > Snapshots/)
+    assert.match(outcome.result.content, /Identity Hub > Recovery > Publish Snapshot Now/)
     assert.match((await readContinuityFiles(identity))['MEMORY.md'], /Identity history can restore private memory/)
 
     const history = await listPrivateContinuityHistory(identity)

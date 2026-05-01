@@ -1,8 +1,8 @@
 import React from 'react'
 import { Text } from 'ink'
-import { Surface } from '../../ui/Surface.js'
-import { Select } from '../../ui/Select.js'
-import { theme } from '../../ui/theme.js'
+import { Surface } from '../../../ui/Surface.js'
+import { Select } from '../../../ui/Select.js'
+import { theme } from '../../../ui/theme.js'
 import type { IdentityHubErrorView } from '../identityHubModel.js'
 import type { Step } from '../identityHubReducer.js'
 

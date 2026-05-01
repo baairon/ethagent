@@ -1,6 +1,6 @@
 import crypto from 'node:crypto'
 import { ml_kem1024 } from '@noble/post-quantum/ml-kem.js'
-import { recoverAddressFromSignature, toChecksumAddress } from '../eth.js'
+import { recoverAddressFromSignature, toChecksumAddress } from '../crypto/eth.js'
 
 export const CONTINUITY_SNAPSHOT_ENVELOPE_VERSION = 'ethagent-continuity-snapshot-v1'
 

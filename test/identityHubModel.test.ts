@@ -1,8 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { RegisterAgentPreflightError } from '../src/identity/erc8004.js'
-import { AgentStateOwnerMismatchError } from '../src/identity/backupEnvelope.js'
-import { STORAGE_CREDENTIAL_FORGET_COPY } from '../src/identity/screens/StorageCredentialScreen.js'
+import { RegisterAgentPreflightError } from '../src/identity/registry/erc8004.js'
+import { AgentStateOwnerMismatchError } from '../src/identity/crypto/backupEnvelope.js'
+import { STORAGE_CREDENTIAL_FORGET_COPY } from '../src/identity/hub/screens/StorageCredentialScreen.js'
 import {
   chainSummaryRow,
   copyableIdentityFields,
@@ -19,7 +19,7 @@ import {
   tokenCandidateHint,
   tokenCandidateLabel,
   tokenCandidateSelectLabel,
-} from '../src/identity/identityHubModel.js'
+} from '../src/identity/hub/identityHubModel.js'
 
 test('identity hub formats insufficient-funds preflight errors for compact display', () => {
   const view = identityHubErrorView(new RegisterAgentPreflightError({
@@ -244,7 +244,7 @@ test('token candidate hint stays terse so wallets with many agents stay scannabl
   } as const
 
   assert.equal(tokenCandidateLabel(candidate), 'research agent')
-  assert.equal(tokenCandidateHint(candidate), 'token #45744 - base - backup 2026-04-25')
+  assert.equal(tokenCandidateHint(candidate), 'token #45744 · base · backup 2026-04-25')
   assert.doesNotMatch(tokenCandidateHint(candidate), /owner/)
   assert.doesNotMatch(tokenCandidateHint(candidate), /state/)
 })

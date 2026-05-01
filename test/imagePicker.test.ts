@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { EventEmitter } from 'node:events'
 import { PassThrough } from 'node:stream'
 import type { spawn } from 'node:child_process'
-import { openImageFilePicker } from '../src/identity/imagePicker.js'
+import { openImageFilePicker } from '../src/identity/profile/imagePicker.js'
 
 test('image picker returns the selected file from the native picker', async () => {
   const result = await openImageFilePicker({

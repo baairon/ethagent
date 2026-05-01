@@ -1,10 +1,10 @@
 import React from 'react'
 import { Box, Text } from 'ink'
-import { theme } from '../../ui/theme.js'
-import type { EthagentConfig, EthagentIdentity } from '../../storage/config.js'
+import { theme } from '../../../ui/theme.js'
+import type { EthagentConfig, EthagentIdentity } from '../../../storage/config.js'
 import { identitySummaryRows, lastBackupLabel } from '../identityHubModel.js'
 
-import type { ContinuityWorkingTreeStatus } from '../continuity/storage.js'
+import type { ContinuityWorkingTreeStatus } from '../../continuity/storage.js'
 
 export const IdentitySummary: React.FC<{
   identity?: EthagentIdentity

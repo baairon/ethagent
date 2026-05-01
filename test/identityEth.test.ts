@@ -7,7 +7,7 @@ import {
   toChecksumAddress,
   signMessage,
   recoverAddressFromSignature,
-} from '../src/identity/eth.js'
+} from '../src/identity/crypto/eth.js'
 
 test('addressFromPrivateKey derives the canonical address for sk=1', () => {
   const pk = '0x0000000000000000000000000000000000000000000000000000000000000001'

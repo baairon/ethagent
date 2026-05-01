@@ -25,7 +25,7 @@ test('private continuity edit review helper extracts the TUI popup target', () =
         '',
         '- File: `identity-vault/MEMORY.md`',
         '- Review file: `C:\\Users\\bairo\\.ethagent\\continuity\\agent\\MEMORY.md`',
-        '- Publish: Identity Hub > Snapshots',
+        '- Publish: Identity Hub > Recovery > Publish Snapshot Now',
       ].join('\n'),
     },
   )
@@ -37,7 +37,7 @@ test('private continuity edit review helper extracts the TUI popup target', () =
   })
 })
 
-test('identity continuity context auto-loads SOUL, MEMORY, and SKILLS markdown', async () => {
+test('identity continuity context auto-loads SOUL, MEMORY, and skills.json', async () => {
   await withHome(async () => {
     const identity: EthagentIdentity = {
       source: 'erc8004',
@@ -67,7 +67,7 @@ test('identity continuity context auto-loads SOUL, MEMORY, and SKILLS markdown',
     const content = messages[0]!.content
     assert.equal(typeof content, 'string')
     if (typeof content !== 'string') throw new Error('expected string continuity context')
-    assert.match(content, /active identity markdown files have been loaded automatically/)
+    assert.match(content, /active identity continuity files have been loaded automatically/)
     assert.match(content, /SOUL\.md is private owner continuity and is the authoritative persona/)
     assert.match(content, /MEMORY\.md is private owner continuity for durable preferences/)
     assert.match(content, /Apply SOUL\.md and MEMORY\.md over generic ethagent identity\/style/)

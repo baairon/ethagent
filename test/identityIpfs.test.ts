@@ -8,7 +8,7 @@ import {
   PINATA_AUTH_TEST_URL,
   PINATA_UPLOAD_API_URL,
   validatePinataJwt,
-} from '../src/identity/ipfs.js'
+} from '../src/identity/storage/ipfs.js'
 
 const TEST_JWT = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJwaW5hdGEifQ.signature'
 

@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { identityHubReducer, type Step } from '../src/identity/identityHubReducer.js'
+import { identityHubReducer, type Step } from '../src/identity/hub/identityHubReducer.js'
 
 test('restore flow starts with wallet connection instead of manual owner entry', () => {
   const fromMenu = identityHubReducer({ kind: 'menu' }, { type: 'startRestore' })

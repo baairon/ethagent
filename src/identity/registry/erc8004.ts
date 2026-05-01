@@ -15,8 +15,8 @@ import {
   type PublicClient,
 } from 'viem'
 import { mainnet, arbitrum, base, optimism, polygon } from 'viem/chains'
-import type { SelectableNetwork } from '../storage/config.js'
-import { catFromIpfs, DEFAULT_IPFS_API_URL } from './ipfs.js'
+import type { SelectableNetwork } from '../../storage/config.js'
+import { catFromIpfs, DEFAULT_IPFS_API_URL } from '../storage/ipfs.js'
 
 export const DEFAULT_ERC8004_CHAIN_ID = 1
 export const DEFAULT_ETHEREUM_RPC_URL = 'https://ethereum.publicnode.com'
@@ -38,7 +38,7 @@ export type SupportedErc8004Chain = {
 export const SUPPORTED_ERC8004_CHAINS: SupportedErc8004Chain[] = [
   chainEntry(mainnet.id,  'Ethereum Mainnet', DEFAULT_ETHEREUM_RPC_URL,              [],                                DEFAULT_ERC8004_IDENTITY_REGISTRY_ADDRESS, 24_339_871n,  10_000n, 'mainnet', 'mainnet'),
   chainEntry(arbitrum.id, 'Arbitrum One',     'https://arbitrum-one.publicnode.com', [],                                DEFAULT_ERC8004_IDENTITY_REGISTRY_ADDRESS, 428_895_443n, 20_000n, 'l2',      'arbitrum'),
-  chainEntry(base.id,     'Base',             'https://base.llamarpc.com',           ['https://mainnet.base.org', 'https://base.publicnode.com'],    DEFAULT_ERC8004_IDENTITY_REGISTRY_ADDRESS, 41_663_783n,  10_000n,  'l2',      'base'),
+  chainEntry(base.id,     'Base',             'https://mainnet.base.org',            ['https://base.publicnode.com'],    DEFAULT_ERC8004_IDENTITY_REGISTRY_ADDRESS, 41_663_783n,  10_000n,  'l2',      'base'),
   chainEntry(optimism.id, 'Optimism',         'https://optimism.publicnode.com',     ['https://mainnet.optimism.io'],    DEFAULT_ERC8004_IDENTITY_REGISTRY_ADDRESS, 147_514_947n, 20_000n, 'l2',      'optimism'),
   chainEntry(polygon.id,  'Polygon',          'https://polygon-bor.publicnode.com',  ['https://polygon-rpc.com'],        DEFAULT_ERC8004_IDENTITY_REGISTRY_ADDRESS, 82_458_484n,  10_000n, 'l2',      'polygon'),
 ]
@@ -115,6 +115,12 @@ export type EthagentPublicDiscoveryPointer = {
   skillsCid?: string
   agentCardCid?: string
   updatedAt?: string
+}
+
+export type EthagentRegistrationPointer = {
+  chainId: number
+  identityRegistryAddress: Address
+  agentId?: string
 }
 
 export type Erc8004AgentCandidate = {
@@ -337,13 +343,13 @@ export async function discoverOwnedAgentBackupsAcrossSupportedNetworks(
     return candidates.sort(compareCandidatesByNetworkThenNewest)
   }
   const failures = results.filter(result => !result.ok)
+  if (failures.length === results.length && failures.length > 0) {
+    throw new Error(`lookup failed on all supported networks: ${cleanRpcError(failures[0]!.error)}`)
+  }
   const tokenIdRequired = failures
     .map(result => result.error)
     .find((err): err is AgentTokenIdRequiredError => err instanceof AgentTokenIdRequiredError)
   if (tokenIdRequired) throw tokenIdRequired
-  if (failures.length === results.length && failures.length > 0) {
-    throw new Error(`lookup failed on all supported networks: ${cleanRpcError(failures[0]!.error)}`)
-  }
   return []
 }
 
@@ -419,8 +425,9 @@ export function withEthagentBackupPointer(
   registration: Record<string, unknown> | null,
   backup: EthagentBackupPointer,
   publicDiscovery?: EthagentPublicDiscoveryPointer,
+  registrationPointer?: EthagentRegistrationPointer,
 ): Record<string, unknown> {
-  return withEthagentPointers(registration, { backup, publicDiscovery })
+  return withEthagentPointers(registration, { backup, publicDiscovery, registration: registrationPointer })
 }
 
 export function withEthagentPointers(
@@ -428,11 +435,12 @@ export function withEthagentPointers(
   pointers: {
     backup?: EthagentBackupPointer
     publicDiscovery?: EthagentPublicDiscoveryPointer
+    registration?: EthagentRegistrationPointer
   },
 ): Record<string, unknown> {
   const next: Record<string, unknown> = registration ? { ...registration } : {}
   const prior = objectField(next, 'x-ethagent') ?? {}
-  const { backup, publicDiscovery } = pointers
+  const { backup, publicDiscovery, registration: registrationPointer } = pointers
   const updatedAt = publicDiscovery?.updatedAt ?? backup?.createdAt
   next['x-ethagent'] = {
     ...prior,
@@ -443,7 +451,6 @@ export function withEthagentPointers(
         cid: backup.cid,
         ...(backup.envelopeVersion ? { envelopeVersion: backup.envelopeVersion } : {}),
         ...(backup.createdAt ? { createdAt: backup.createdAt } : {}),
-        ...(backup.pastBackups && backup.pastBackups.length > 0 ? { pastBackups: backup.pastBackups } : {}),
       },
     } : {}),
     ...(publicDiscovery?.skillsCid ? {
@@ -463,6 +470,9 @@ export function withEthagentPointers(
   }
   if (publicDiscovery) {
     next.services = withPublicDiscoveryServices(next.services, publicDiscovery)
+  }
+  if (registrationPointer?.agentId) {
+    next.registrations = withRegistrationsArray(next.registrations, registrationPointer)
   }
   return next
 }
@@ -1000,18 +1010,23 @@ function stringField(input: Record<string, unknown> | null, key: string): string
 
 function withPublicDiscoveryServices(input: unknown, publicDiscovery: EthagentPublicDiscoveryPointer): unknown[] {
   const prior = Array.isArray(input) ? input.filter(item => item && typeof item === 'object') : []
-  const services = [...prior] as unknown[]
+  const services = prior.filter(item => !isEthagentManagedService(item)) as unknown[]
   if (publicDiscovery.agentCardCid) {
+    const endpoint = `ipfs://${publicDiscovery.agentCardCid}`
     pushUniqueService(services, {
       type: 'a2a',
-      url: `ipfs://${publicDiscovery.agentCardCid}`,
+      name: 'agent-card',
+      endpoint,
+      url: endpoint,
     })
   }
   if (publicDiscovery.skillsCid) {
+    const endpoint = `ipfs://${publicDiscovery.skillsCid}`
     pushUniqueService(services, {
-      type: 'ipfs',
+      type: 'A2A-skills',
       name: 'public-skills',
-      url: `ipfs://${publicDiscovery.skillsCid}`,
+      endpoint,
+      url: endpoint,
     })
   }
   return services
@@ -1021,9 +1036,25 @@ function pushUniqueService(services: unknown[], service: Record<string, string>)
   const duplicate = services.some(item => {
     if (!item || typeof item !== 'object' || Array.isArray(item)) return false
     const obj = item as Record<string, unknown>
-    return obj.type === service.type && obj.url === service.url && obj.name === service.name
+    return obj.type === service.type && obj.endpoint === service.endpoint
   })
   if (!duplicate) services.push(service)
+}
+
+function isEthagentManagedService(item: unknown): boolean {
+  if (!item || typeof item !== 'object' || Array.isArray(item)) return false
+  const obj = item as Record<string, unknown>
+  const type = obj.type
+  const name = obj.name
+  if (type === 'a2a' && (name === undefined || name === 'agent-card')) return true
+  return (type === 'A2A-skills' || type === 'ipfs') && name === 'public-skills'
+}
+
+function withRegistrationsArray(_input: unknown, registration: EthagentRegistrationPointer): unknown[] {
+  return [{
+    agentId: registration.agentId,
+    agentRegistry: `eip155:${registration.chainId}:${registration.identityRegistryAddress}`,
+  }]
 }
 
 function cleanRpcError(err: unknown): string {

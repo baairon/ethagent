@@ -17,7 +17,7 @@ import {
   type ProviderId,
 } from '../storage/config.js'
 import { setKey } from '../storage/secrets.js'
-import { IdentityHub, type IdentityHubResult } from '../identity/IdentityHub.js'
+import { IdentityHub, type IdentityHubResult } from '../identity/hub/IdentityHub.js'
 
 type Step =
   | { kind: 'detecting' }
@@ -380,7 +380,7 @@ export const FirstRun: React.FC<FirstRunProps> = ({ onComplete, onCancel }) => {
   if (step.kind === 'done') {
     return (
       <Box flexDirection="column" padding={1}>
-        <Splash tipLine={`ready - ${step.config.provider} - ${formatModelDisplayName(step.config.provider, step.config.model, { maxLength: 48 })}`} />
+        <Splash tipLine={`ready · ${step.config.provider} · ${formatModelDisplayName(step.config.provider, step.config.model, { maxLength: 48 })}`} />
         <Text color={theme.accentSecondary}>all set.</Text>
       </Box>
     )

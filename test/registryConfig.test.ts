@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import type { EthagentConfig } from '../src/storage/config.js'
-import { registryConfigFromConfig, resolveSelectedNetwork } from '../src/identity/registryConfig.js'
+import { registryConfigFromConfig, resolveSelectedNetwork } from '../src/identity/registry/registryConfig.js'
 
 const baseConfig: EthagentConfig = {
   version: 1,

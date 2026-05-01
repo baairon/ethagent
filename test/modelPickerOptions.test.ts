@@ -427,7 +427,7 @@ test('fallback catalogs show provider-level notice and still expose the configur
 
   assert.equal(
     optionByValue(options, 'hdr:cloud-fallback:gemini').label,
-    'catalog unavailable - HTTP 400 - showing configured model',
+    'catalog unavailable · HTTP 400 · showing configured model',
   )
   assert.deepEqual(valuesFor(options, 'gemini'), ['gemini-2.0-flash'])
   assert.equal(optionByValue(options, 'c:gemini:gemini-2.0-flash').hint, undefined)

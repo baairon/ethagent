@@ -1,13 +1,13 @@
 import React, { useEffect, useReducer, useState } from 'react'
 import { Text } from 'ink'
-import { theme } from '../ui/theme.js'
-import { type EthagentConfig, type EthagentIdentity, type SelectableNetwork } from '../storage/config.js'
-import { clearIdentity, setTokenIdentity } from '../storage/identity.js'
-import { copyToClipboard } from '../utils/clipboard.js'
-import { catFromIpfs, DEFAULT_IPFS_API_URL } from './ipfs.js'
-import { openImageFilePicker } from './imagePicker.js'
-import { hasPinataJwt, clearPinataJwt, savePinataJwt } from './pinataJwt.js'
-import { registryConfigFromConfig } from './registryConfig.js'
+import { theme } from '../../ui/theme.js'
+import { type EthagentConfig, type EthagentIdentity, type SelectableNetwork } from '../../storage/config.js'
+import { clearIdentity, setTokenIdentity } from '../../storage/identity.js'
+import { copyToClipboard } from '../../utils/clipboard.js'
+import { catFromIpfs, DEFAULT_IPFS_API_URL } from '../storage/ipfs.js'
+import { openImageFilePicker } from '../profile/imagePicker.js'
+import { hasPinataJwt, clearPinataJwt, savePinataJwt } from '../storage/pinataJwt.js'
+import { registryConfigFromConfig } from '../registry/registryConfig.js'
 import { identityHubErrorView, isRegistrationPreflightError, pinataErrorText } from './identityHubModel.js'
 import { identityHubReducer, type ProfileUpdates, type Step } from './identityHubReducer.js'
 import {
@@ -28,6 +28,7 @@ import {
   runPublicProfileSigning,
   runPublicProfileStorageSubmit,
   runContinuityUnlock,
+  runRecoveryRefetch,
   isAgentTokenIdRequiredError,
   type EffectCallbacks,
   type RestoreProgress,
@@ -37,18 +38,11 @@ import {
   continuityVaultStatus,
   continuityWorkingTreeStatus,
   ensurePublicSkillsFile,
-} from './continuity/storage.js'
-import { openFileInEditor } from './continuity/editor.js'
-import {
-  listPrivateContinuityHistory,
-  restorePrivateContinuityHistorySnapshot,
-  type PrivateContinuityHistorySnapshot,
-} from './continuity/history.js'
-import {
-  listPublishedContinuitySnapshots,
-  type PublishedContinuitySnapshot,
-} from './continuity/snapshots.js'
-import type { BrowserWalletReady } from './browserWallet.js'
+  type ContinuityWorkingTreeStatus,
+} from '../continuity/storage.js'
+import { openFileInEditor } from '../continuity/editor.js'
+import { listPublishedContinuitySnapshots } from '../continuity/snapshots.js'
+import type { BrowserWalletReady } from '../wallet/browserWallet.js'
 import { MenuScreen } from './screens/MenuScreen.js'
 import { CreateFlow } from './screens/CreateFlow.js'
 import { RestoreFlow } from './screens/RestoreFlow.js'
@@ -64,12 +58,8 @@ import {
   PrivateContinuityScreen,
   PublicSkillsScreen,
 } from './screens/ContinuityDashboardScreen.js'
-import {
-  SnapshotManagerScreen,
-  SnapshotRestoreConfirmScreen,
-  type SnapshotWorkingStatus,
-} from './screens/SnapshotManagerScreen.js'
-import { chainIdForNetwork, erc8004ConfigForSupportedChain, type Erc8004RegistryConfig } from './erc8004.js'
+import { RecoveryConfirmScreen } from './screens/RecoveryConfirmScreen.js'
+import { chainIdForNetwork, erc8004ConfigForSupportedChain, type Erc8004RegistryConfig } from '../registry/erc8004.js'
 
 const MIN_BUSY_ERROR_MS = 2000
 
@@ -117,9 +107,7 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
   const [jwtSaved, setJwtSaved] = useState<boolean>(false)
   const [copyNotice, setCopyNotice] = useState<string | null>(null)
   const [continuityReady, setContinuityReady] = useState<boolean>(false)
-  const [snapshotHistory, setSnapshotHistory] = useState<PrivateContinuityHistorySnapshot[]>([])
-  const [publishedSnapshots, setPublishedSnapshots] = useState<PublishedContinuitySnapshot[]>([])
-  const [workingStatus, setWorkingStatus] = useState<SnapshotWorkingStatus | null>(null)
+  const [workingStatus, setWorkingStatus] = useState<ContinuityWorkingTreeStatus | null>(null)
   const canRebackup = Boolean(identity?.agentId && (identity?.identityRegistryAddress || config?.erc8004?.identityRegistryAddress))
 
   const setStep = (s: Step) => dispatch({ type: 'preflightResolved', step: s })
@@ -221,28 +209,17 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
 
   useEffect(() => {
     let cancelled = false
-    let timeoutId: NodeJS.Timeout | undefined
-    if (!identity || (step.kind !== 'menu' && step.kind !== 'continuity-onchain-backups' && step.kind !== 'continuity-full-history' && step.kind !== 'continuity-history-restore-confirm')) return
+    if (!identity || step.kind !== 'menu') return
 
     const checkStatus = async () => {
       try {
-        const [history, published] = await Promise.all([
-          listPrivateContinuityHistory(identity, 40),
-          listPublishedContinuitySnapshots(identity, 40),
-        ])
-        const status = await continuityWorkingTreeStatus(identity, published[0])
+        const [latest] = await listPublishedContinuitySnapshots(identity, 1)
+        const status = await continuityWorkingTreeStatus(identity, latest)
         if (cancelled) return
-        setSnapshotHistory(history)
-        setPublishedSnapshots(published)
         setWorkingStatus(status)
       } catch {
         if (cancelled) return
-        setSnapshotHistory([])
-        setPublishedSnapshots([])
         setWorkingStatus(null)
-      }
-      if (!cancelled) {
-        timeoutId = setTimeout(() => { void checkStatus() }, 1500)
       }
     }
 
@@ -250,7 +227,6 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
 
     return () => {
       cancelled = true
-      if (timeoutId) clearTimeout(timeoutId)
     }
   }, [identity, step.kind])
 
@@ -394,7 +370,20 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
         if (!cancelled) setContinuityReady(true)
       })
       .catch((err: unknown) => {
-        if (!cancelled) handleStepError(err, step.returnTo === 'snapshots' ? { kind: 'continuity-onchain-backups' } : { kind: 'continuity-private' })
+        if (!cancelled) handleStepError(err, { kind: 'continuity-private' })
+      })
+    return () => { cancelled = true }
+  }, [step])
+
+  useEffect(() => {
+    if (step.kind !== 'recovery-refetching') return
+    let cancelled = false
+    runRecoveryRefetch(step.identity, step.registry, callbacks)
+      .then(() => {
+        if (!cancelled) setContinuityReady(true)
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) handleStepError(err, { kind: 'menu' })
       })
     return () => { cancelled = true }
   }, [step])
@@ -422,7 +411,7 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
     }
   }
 
-  const footer = <Text color={theme.dim}>enter select - esc back</Text>
+  const footer = <Text color={theme.dim}>enter select · esc back</Text>
 
   if (step.kind === 'menu') {
     return (
@@ -441,10 +430,10 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
           setCopyNotice(null)
           setStep({ kind: 'restore-wallet', purpose: identity ? 'switch' : 'restore' })
         }}
-        onBackupNow={() => triggerRebackup({ kind: 'menu' })}
+        onBackupNow={() => setStep({ kind: 'rebackup-confirm' })}
+        onRefetchLatest={() => setStep({ kind: 'recovery-refetch-confirm' })}
         onPublicProfile={() => setStep({ kind: 'continuity-public' })}
         onPrivateMemory={() => setStep({ kind: 'continuity-private' })}
-        onOnchainBackups={() => setStep({ kind: 'continuity-onchain-backups' })}
         onCopyValues={() => setStep({ kind: 'details' })}
         onStorageCredential={() => setStep({ kind: 'storage-credential' })}
         onSkip={() => onComplete({ kind: 'skip' })}
@@ -590,65 +579,46 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
     setStep({ kind: 'edit-profile-name', identity, registry, returnTo: backStep })
   }
 
-  if (step.kind === 'continuity-onchain-backups' || step.kind === 'continuity-full-history') {
+  if (step.kind === 'rebackup-confirm') {
     return (
-      <SnapshotManagerScreen
-        mode={step.kind === 'continuity-full-history' ? 'full-history' : 'onchain-backups'}
-        identity={identity}
-        config={config}
-        ready={continuityReady}
-        notice={step.notice}
+      <RecoveryConfirmScreen
+        mode="publish"
         workingStatus={workingStatus}
-        publishedSnapshots={publishedSnapshots}
-        localHistory={snapshotHistory}
-        canBackup={canRebackup}
         footer={footer}
-        onPublish={() => triggerRebackup({ kind: 'continuity-onchain-backups' })}
-        onFullHistory={() => setStep({ kind: 'continuity-full-history' })}
-        onRestorePublished={snapshotId => {
+        onConfirm={() => triggerRebackup({ kind: 'menu' })}
+        onBack={back}
+      />
+    )
+  }
+
+  if (step.kind === 'recovery-refetch-confirm') {
+    return (
+      <RecoveryConfirmScreen
+        mode="refetch"
+        workingStatus={workingStatus}
+        footer={footer}
+        onConfirm={() => {
           if (!identity) return
-          let cid: string | undefined
-          if (snapshotId === identity.backup?.cid) {
-            cid = identity.backup.cid
-          } else {
-            const past = identity.backup?.pastBackups?.find(b => b.cid === snapshotId)
-            if (past) cid = past.cid
-            else {
-              const local = publishedSnapshots.find(item => item.id === snapshotId || item.cid === snapshotId)
-              if (local) cid = local.cid
-            }
+          const registry = resolveRegistryForIdentity(identity)
+          if (!registry) {
+            errorStep(new Error('no agent registry configured for this identity'), { kind: 'menu' })
+            return
           }
-          if (cid) setStep({
-            kind: 'continuity-unlocking',
-            identity,
-            cid,
-            returnTo: 'snapshots'
-          })
-        }}
-        onRestoreHistory={snapshotId => {
-          setStep({ kind: 'continuity-history-restore-confirm', snapshotId })
+          setStep({ kind: 'recovery-refetching', identity, registry })
         }}
         onBack={back}
       />
     )
   }
 
-  if (step.kind === 'continuity-history-restore-confirm') {
-    const snapshot = snapshotHistory.find(s => s.id === step.snapshotId)
+  if (step.kind === 'recovery-refetching') {
     return (
-      <SnapshotRestoreConfirmScreen
-        snapshot={snapshot}
-        footer={footer}
-        onConfirm={() => {
-          if (!identity || !snapshot) return
-          void restorePrivateContinuityHistorySnapshot(identity, snapshot.id)
-            .then(() => {
-              setContinuityReady(true)
-              setStep({ kind: 'continuity-onchain-backups', notice: 'local checkpoint restored. review, then publish when ready.' })
-            })
-            .catch((err: unknown) => errorStep(err, { kind: 'continuity-onchain-backups' }))
-        }}
-        onBack={back}
+      <WalletApprovalScreen
+        title="Refetch Latest Snapshot"
+        subtitle="Wallet approval decrypts the latest published snapshot and overwrites local SOUL.md, MEMORY.md, and skills.json."
+        walletSession={walletSession}
+        label={restoreProgress?.label ?? 'fetching latest snapshot from chain...'}
+        onCancel={() => setStep({ kind: 'menu' })}
       />
     )
   }
@@ -799,7 +769,7 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
         subtitle="Wallet approval decrypts the encrypted snapshot into local SOUL.md and MEMORY.md working files."
         walletSession={walletSession}
         label="waiting for wallet approval..."
-        onCancel={() => setStep(step.returnTo === 'snapshots' ? { kind: 'continuity-onchain-backups' } : { kind: 'continuity-private' })}
+        onCancel={() => setStep({ kind: 'continuity-private' })}
       />
     )
   }

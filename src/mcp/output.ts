@@ -32,7 +32,7 @@ export function formatMcpResourceResult(result: unknown): string {
 
 export function truncateMcpOutput(value: string): string {
   if (value.length <= MAX_MCP_OUTPUT_CHARS) return value
-  return `${value.slice(0, MAX_MCP_OUTPUT_CHARS)}\n\n[OUTPUT TRUNCATED - exceeded ${MAX_MCP_OUTPUT_CHARS.toLocaleString()} characters. If this MCP server supports pagination or filters, call it again for a narrower result.]`
+  return `${value.slice(0, MAX_MCP_OUTPUT_CHARS)}\n\n[OUTPUT TRUNCATED · exceeded ${MAX_MCP_OUTPUT_CHARS.toLocaleString()} characters. If this MCP server supports pagination or filters, call it again for a narrower result.]`
 }
 
 export function promptMessagesToText(result: unknown): string {

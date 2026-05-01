@@ -1,9 +1,9 @@
 import React from 'react'
 import { Box, Text } from 'ink'
-import { Surface } from '../../ui/Surface.js'
-import { Select } from '../../ui/Select.js'
-import { theme } from '../../ui/theme.js'
-import type { EthagentConfig, EthagentIdentity } from '../../storage/config.js'
+import { Surface } from '../../../ui/Surface.js'
+import { Select } from '../../../ui/Select.js'
+import { theme } from '../../../ui/theme.js'
+import type { EthagentConfig, EthagentIdentity } from '../../../storage/config.js'
 import { IdentitySummary } from './IdentitySummary.js'
 import { shortCid } from '../identityHubModel.js'
 

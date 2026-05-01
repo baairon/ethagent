@@ -69,7 +69,7 @@ export function resolveModelSelection(
   return {
     kind: 'switch',
     config: nextConfig,
-    notice: `${selection.keyJustSet ? `${selection.provider} key saved.` : `${selection.provider} ready.`} now using ${nextConfig.provider} - ${formatModelDisplayName(nextConfig.provider, nextConfig.model, { maxLength: 64 })}.`,
+    notice: `${selection.keyJustSet ? `${selection.provider} key saved.` : `${selection.provider} ready.`} now using ${nextConfig.provider} · ${formatModelDisplayName(nextConfig.provider, nextConfig.model, { maxLength: 64 })}.`,
     tone: 'dim',
   }
 }

@@ -30,6 +30,9 @@ test('public skills json contains public capabilities only', () => {
   assert.equal(parsed.schema, 'ethagent.public-skills.v1')
   assert.equal(parsed.visibility, 'public')
   assert.equal(parsed.boundary, 'Public discovery metadata only. This is not executable code, private memory, or a skill installation manifest.')
+  assert.equal(parsed.privacy.publicOnly, true)
+  assert.equal(parsed.privacy.includesPrivateMemory, false)
+  assert.equal(parsed.privacy.includesSecrets, false)
   assert.ok(parsed.skills.some((s: any) => s.name === 'Software engineering'))
   assert.equal(jsonContent.includes('private memory marker'), false)
 })
@@ -41,6 +44,8 @@ test('public skills json exposes a parseable agent summary for other agents', ()
     schema?: string
     name?: string
     description?: string
+    capabilities?: { workspaceTools?: string; mcp?: boolean; ethereumIdentity?: string }
+    delegation?: { bestFor?: string[]; requiresApprovalFor?: string[] }
     skills?: Array<{ id: string; inputModes: string[]; outputModes: string[] }>
   }
 
@@ -48,6 +53,11 @@ test('public skills json exposes a parseable agent summary for other agents', ()
   assert.equal(summary.name, 'public agent')
   assert.equal(summary.description, 'public description')
   assert.equal((summary as { imageUrl?: string }).imageUrl, 'ipfs://bafy-agent-image')
+  assert.equal(summary.capabilities?.workspaceTools, 'permissioned')
+  assert.equal(summary.capabilities?.mcp, true)
+  assert.equal(summary.capabilities?.ethereumIdentity, 'ERC-8004')
+  assert.ok(summary.delegation?.bestFor?.includes('tests'))
+  assert.ok(summary.delegation?.requiresApprovalFor?.includes('workspace edits'))
   assert.ok(summary.skills?.some(skill => skill.id === 'software-engineering'))
   assert.ok(summary.skills?.every(skill => Array.isArray(skill.inputModes) && Array.isArray(skill.outputModes)))
 })

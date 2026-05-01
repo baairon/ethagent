@@ -46,7 +46,7 @@ export const privateContinuityReadTool: Tool<typeof schema> = {
       directoryPath: prepared.directoryPath,
       title: 'allow private continuity read?',
       subtitle: input.startLine || input.endLine
-        ? `${prepared.fullPath} - lines ${input.startLine ?? 1}-${input.endLine ?? 'end'}`
+        ? `${prepared.fullPath} · lines ${input.startLine ?? 1}-${input.endLine ?? 'end'}`
         : prepared.fullPath,
       file: input.file,
       range: input.startLine || input.endLine

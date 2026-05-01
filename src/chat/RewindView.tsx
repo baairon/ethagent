@@ -288,7 +288,7 @@ function buildEntryOptions(entries: RewindEntry[], hasMore: boolean): Array<Sele
   const options = entries.map(entry => ({
     value: entry.id,
     label: entry.checkpointLabel || 'checkpoint',
-    hint: `${formatTimestamp(entry.createdAt)} - ${entry.changeSummary}`,
+    hint: `${formatTimestamp(entry.createdAt)} · ${entry.changeSummary}`,
   }))
   if (hasMore) {
     options.push({
@@ -324,7 +324,7 @@ const ActionPreview: React.FC<{
 }> = ({ entry, selectedAction, canRestoreConversation }) => (
   <Box flexDirection="column" marginTop={1}>
     <Text color={theme.accentPrimary}>{entry.relativePath}</Text>
-    <Text color={theme.dim}>{formatTimestamp(entry.createdAt)} - {entry.changeSummary}</Text>
+    <Text color={theme.dim}>{formatTimestamp(entry.createdAt)} · {entry.changeSummary}</Text>
     <Text color={theme.textSubtle}>
       {selectedAction === 'both'
         ? 'restore the selected file checkpoint and roll the current conversation back to before this prompt.'

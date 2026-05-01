@@ -96,7 +96,7 @@ function applyPrivateContinuityEdit(input: PrivateContinuityEditInput, before: s
 
 export async function writePreparedPrivateContinuityEdit(edit: PreparedPrivateContinuityEdit): Promise<void> {
   await ensureContinuityVault(edit.identity)
-  await atomicWriteText(edit.fullPath, normalizeMarkdown(edit.after), { mode: 0o600 })
+  await atomicWriteText(edit.fullPath, ensureTrailingNewline(edit.after), { mode: 0o600 })
 }
 
 function privateContinuityPath(identity: EthagentIdentity, file: PrivateContinuityFile): string {
@@ -223,8 +223,8 @@ function appendToMarkdownSection(
   const { start, end: insertAt } = bounds
   const prefix = lines.slice(0, insertAt).join('\n').replace(/\s+$/g, '')
   const suffix = insertAt >= lines.length ? '' : lines.slice(insertAt).join('\n').replace(/^\s+/g, '')
-  const normalizedAppend = normalizeMarkdown(appendText.trim())
-  const after = normalizeMarkdown(suffix
+  const normalizedAppend = ensureTrailingNewline(appendText.trim())
+  const after = ensureTrailingNewline(suffix
     ? `${prefix}\n${normalizedAppend}\n${suffix}`
     : `${prefix}\n${normalizedAppend}`)
   const afterLines = after.split(/\r?\n/)
@@ -285,8 +285,8 @@ function insertSectionAtLine(markdown: string, lineIndex: number, section: strin
   const before = lines.slice(0, lineIndex).join('\n').replace(/\s+$/g, '')
   const after = lines.slice(lineIndex).join('\n').replace(/^\s+/g, '')
   const block = section.trim()
-  if (!before) return normalizeMarkdown(after ? `${block}\n\n${after}` : block)
-  return normalizeMarkdown(after ? `${before}\n\n${block}\n\n${after}` : `${before}\n\n${block}`)
+  if (!before) return ensureTrailingNewline(after ? `${block}\n\n${after}` : block)
+  return ensureTrailingNewline(after ? `${before}\n\n${block}\n\n${after}` : `${before}\n\n${block}`)
 }
 
 function extractMarkdownSection(markdown: string, heading: string): string | null {
@@ -324,7 +324,7 @@ function markdownLines(value: string): string[] {
   return lines
 }
 
-function normalizeMarkdown(value: string): string {
+function ensureTrailingNewline(value: string): string {
   return value.endsWith('\n') ? value : `${value}\n`
 }
 

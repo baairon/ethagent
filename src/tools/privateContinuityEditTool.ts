@@ -83,7 +83,6 @@ export const privateContinuityEditTool: Tool<typeof schema> = {
     'Prefer appendToSection+appendText to build on an existing scaffold section; use oldText+newText only for targeted replacement after exact text is known.',
     'Whole-file replacement is disabled for private continuity.',
     'Approved private continuity edits are not managed by /rewind; the previous version is saved to private identity history before writing.',
-    'Do not use this for public skills.json; suggest skills.json changes in chat for the user to apply manually.',
   ].join(' '),
   inputSchema: schema,
   inputSchemaJson: {
@@ -155,8 +154,8 @@ function formatPrivateContinuityEditResult(file: 'SOUL.md' | 'MEMORY.md', fullPa
     `- File: \`identity-vault/${file}\``,
     `- Review file: \`${fullPath}\``,
     '- Open: Identity Hub > Memory and Persona',
-    '- Publish: Identity Hub > Snapshots',
-    '- History: previous version saved to private identity history; `/rewind` does not restore identity markdown',
+    '- Publish: Identity Hub > Recovery > Publish Snapshot Now',
+    '- History: previous version saved to private identity history; `/rewind` does not restore identity continuity',
   ].join('\n')
 }
 

@@ -210,13 +210,13 @@ const COMMANDS: CommandSpec[] = [
       }
       await saveConfig(next)
       ctx.onReplaceConfig(next)
-      return { kind: 'note', text: `now using ${next.provider} - ${formatModelDisplayName(next.provider, name, { maxLength: 64 })}.` }
+      return { kind: 'note', text: `now using ${next.provider} · ${formatModelDisplayName(next.provider, name, { maxLength: 64 })}.` }
     },
   },
   {
     name: 'hf',
     enterBehavior: 'fill',
-    summary: 'local model files - /hf [installed|download <link>]',
+    summary: 'local model files · /hf [installed|download <link>]',
     run: async (args, ctx) => runHuggingFace(args, ctx),
   },
   {
@@ -520,7 +520,7 @@ function renderHelp(): string {
     'slash commands:',
     ...lines,
     '',
-    'shortcuts: esc cancels - ctrl+c twice exits - alt+p model - alt+i identity - shift+tab mode.',
+    'shortcuts: esc cancels · ctrl+c twice exits · alt+p model · alt+i identity · shift+tab mode.',
   ].join('\n')
 }
 
@@ -559,7 +559,7 @@ function renderContext(ctx: SlashContext): string {
         : 'Context has comfortable room.'
   return [
     'context usage:',
-    `  model      ${ctx.config.provider} - ${formatModelDisplayName(ctx.config.provider, ctx.config.model, { maxLength: 72 })}`,
+    `  model      ${ctx.config.provider} · ${formatModelDisplayName(ctx.config.provider, ctx.config.model, { maxLength: 72 })}`,
     `  used       ~${usage.usedTokens} / ${usage.windowTokens} tokens (${usage.percent}%)`,
     `  free       ~${free} tokens`,
     `  estimate   ${usage.confidence} (${usage.source})`,
@@ -580,7 +580,7 @@ function renderDoctor(
   const lines: string[] = ['diagnostics:']
   lines.push(`  platform   ${spec.platform}/${spec.arch}${spec.isAppleSilicon ? ' (apple silicon)' : ''}`)
   lines.push(`  ram        ${formatGB(spec.effectiveRamBytes)}${spec.gpuVramBytes ? ` · vram ${formatGB(spec.gpuVramBytes)}` : ''}`)
-  lines.push(`  local run  ${llamaCpp.binaryPresent ? 'installed' : 'not installed'} - server ${llamaCpp.serverUp ? 'up' : 'down'}`)
+  lines.push(`  local run  ${llamaCpp.binaryPresent ? 'installed' : 'not installed'} · server ${llamaCpp.serverUp ? 'up' : 'down'}`)
   lines.push(`  hf models  ${hfModelCount} downloaded`)
   lines.push('')
   lines.push('config:')

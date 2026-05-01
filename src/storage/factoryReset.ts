@@ -97,10 +97,10 @@ export function formatFactoryResetPlan(plan: FactoryResetPlan): string {
     ...formatPaths(plan.deletePaths, plan.configDir),
     '',
     'will keep:',
-    ...plan.preservedDescriptions.map(item => `  - ${item}`),
+    ...plan.preservedDescriptions.map(item => `  · ${item}`),
     '',
     'not touched:',
-    ...plan.remoteDescriptions.map(item => `  - ${item}`),
+    ...plan.remoteDescriptions.map(item => `  · ${item}`),
     '',
     'type confirm to reset this machine.',
   ].join('\n')
@@ -116,9 +116,9 @@ async function readConfigEntries(configDir: string): Promise<string[]> {
 }
 
 function formatPaths(paths: string[], configDir: string): string[] {
-  if (paths.length === 0) return ['  - no local ethagent data found']
+  if (paths.length === 0) return ['  · no local ethagent data found']
   return paths
-    .map(target => `  - ${path.relative(configDir, target) || path.basename(target)}`)
+    .map(target => `  · ${path.relative(configDir, target) || path.basename(target)}`)
     .sort()
 }
 

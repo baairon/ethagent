@@ -5,7 +5,7 @@ import {
   __testWalletPage,
   requestBrowserWalletAccount,
   requestBrowserWalletSignature,
-} from '../src/identity/browserWallet.js'
+} from '../src/identity/wallet/browserWallet.js'
 
 test('browser wallet bridge exposes a clean localhost approval URL', async () => {
   let resolveReady: (ready: { url: string }) => void
@@ -51,7 +51,8 @@ test('browser wallet page explains the wallet approval', () => {
   assert.match(page, /window\.__WALLET_CONFIG__/)
   assert.match(page, /"sessionToken":"hidden-token"/)
   assert.match(page, /"chainIdHex":"0x1"/)
-  assert.match(page, /<div class="head">[\s\S]*signature request[\s\S]*network/)
+  assert.match(page, /<div class="head">[\s\S]*signature request/)
+  assert.match(page, /id="network-row"/)
   assert.match(page, /Sign a message to prove ownership/)
   assert.match(page, /wrong network/)
   assert.match(page, /cancelled/)
@@ -59,8 +60,8 @@ test('browser wallet page explains the wallet approval', () => {
   assert.doesNotMatch(page, /localhost only/)
   assert.doesNotMatch(page, /import private key/i)
   assert.match(page, /personal_sign/)
-  assert.match(page, /post\('\/complete'/)
-  assert.match(page, /post\('\/cancel'/)
+  assert.match(page, /post\("\/complete"/)
+  assert.match(page, /post\("\/cancel"/)
   assert.match(page, /setTimeout\(runWalletFlow, 150\)/)
   assert.match(page, /glyphs/)
   assert.match(page, /CLOSE_DELAY_MS = 1800/)
@@ -87,8 +88,7 @@ test('browser wallet page differentiates transaction requests', () => {
   assert.match(page, /eth_sendTransaction/)
   assert.match(page, /Base/)
   assert.match(page, /registry/)
-  assert.match(page, /\['action', transactionActionLabel\(\)\]/)
-  assert.match(page, /\['network', chainLabel\(config\.chainIdHex\)\]/)
+  assert.match(page, /\[\["action", transactionActionLabel\(\)\], \["network", chainLabel\(config\.chainIdHex\)\]\]/)
   assert.doesNotMatch(page, /\['wallet'/)
   assert.doesNotMatch(page, /\['registry'/)
   assert.doesNotMatch(page, /\['data'/)
@@ -105,7 +105,7 @@ test('browser wallet page supports the single signature and transaction flow', (
 
   assert.match(page, /identity approval/)
   assert.match(page, /Sign and submit in one wallet flow/)
-  assert.match(page, /post\('\/prepare-transaction'/)
+  assert.match(page, /post\("\/prepare-transaction"/)
   assert.match(page, /approve-sign/)
   assert.match(page, /approve-transaction/)
   assert.match(page, /saving encrypted IPFS backup/)
@@ -130,7 +130,7 @@ test('browser wallet page supports account-only connection requests', () => {
 
   assert.match(page, /wallet request/)
   assert.match(page, /Connect wallet to find your agent/)
-  assert.match(page, /selected in wallet/)
+  assert.match(page, /selected address will be used to search for owned agents/)
   assert.match(page, /"kind":"account"/)
 })
 
@@ -163,7 +163,7 @@ test('browser wallet account requests return the connected address without a sig
 })
 
 test('shipped wallet page does not depend on removed manual preview assets', () => {
-  const wallet = readFileSync('src/identity/wallet-page/wallet.html', 'utf8')
+  const wallet = readFileSync('src/identity/wallet/wallet-page/wallet.html', 'utf8')
 
   assert.doesNotMatch(wallet, /tweaks-panel/)
   assert.doesNotMatch(wallet, /wallet-preview/)

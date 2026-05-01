@@ -7,7 +7,7 @@ import {
   normalizeErc8004RegistryConfig,
   supportedErc8004ChainForId,
   SUPPORTED_ERC8004_CHAINS,
-} from '../src/identity/erc8004.js'
+} from '../src/identity/registry/erc8004.js'
 
 test('SUPPORTED_ERC8004_CHAINS is the curated 5, ranked by TVL', () => {
   assert.equal(SUPPORTED_ERC8004_CHAINS.length, 5)

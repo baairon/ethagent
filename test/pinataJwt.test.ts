@@ -11,7 +11,7 @@ import {
   resolvePinataJwt,
   resolveValidatedPinataJwt,
   savePinataJwt,
-} from '../src/identity/pinataJwt.js'
+} from '../src/identity/storage/pinataJwt.js'
 
 const TEST_JWT = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJwaW5hdGEifQ.signature'
 const validPinataFetch = async (): Promise<Response> => new Response(JSON.stringify({ message: 'ok' }), {

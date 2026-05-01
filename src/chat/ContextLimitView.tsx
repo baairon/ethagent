@@ -67,7 +67,7 @@ export const ContextLimitView: React.FC<ContextLimitViewProps> = ({
     <Box flexDirection="column" borderStyle="round" borderColor={theme.accentPeach} paddingX={1}>
       <Text color={theme.accentPeach} bold>context limit</Text>
       <Text color={theme.dim}>
-        {`Context ${usage.percent}% - ~${formatTokens(usage.usedTokens)} / ${formatTokens(usage.windowTokens)} tokens (${usage.source}).`}
+        {`Context ${usage.percent}% · ~${formatTokens(usage.usedTokens)} / ${formatTokens(usage.windowTokens)} tokens (${usage.source}).`}
       </Text>
       {usage.percent >= 100 ? (
         <Text color={theme.accentPeach}>
@@ -80,7 +80,7 @@ export const ContextLimitView: React.FC<ContextLimitViewProps> = ({
           <Text key={option.action} color={index === selected ? theme.accentPrimary : theme.text}>
             {index === selected ? '> ' : '  '}
             {option.label}
-            <Text color={theme.dim}>{` - ${option.detail}`}</Text>
+            <Text color={theme.dim}>{` · ${option.detail}`}</Text>
           </Text>
         ))}
       </Box>

@@ -1,9 +1,9 @@
 import React from 'react'
 import { Box } from 'ink'
-import { Surface } from '../../ui/Surface.js'
-import { Select, type SelectOption } from '../../ui/Select.js'
-import type { EthagentConfig, EthagentIdentity } from '../../storage/config.js'
-import type { ContinuityWorkingTreeStatus } from '../continuity/storage.js'
+import { Surface } from '../../../ui/Surface.js'
+import { Select, type SelectOption } from '../../../ui/Select.js'
+import type { EthagentConfig, EthagentIdentity } from '../../../storage/config.js'
+import type { ContinuityWorkingTreeStatus } from '../../continuity/storage.js'
 import { IdentitySummary } from './IdentitySummary.js'
 
 type MenuScreenProps = {
@@ -16,9 +16,9 @@ type MenuScreenProps = {
   onCreate: () => void
   onLoad: () => void
   onBackupNow: () => void
+  onRefetchLatest: () => void
   onPublicProfile: () => void
   onPrivateMemory: () => void
-  onOnchainBackups: () => void
   onCopyValues: () => void
   onStorageCredential: () => void
   onSkip: () => void
@@ -28,8 +28,8 @@ type MenuScreenProps = {
 type Action =
   | 'public-profile'
   | 'private-memory'
-  | 'continuity-onchain-backups'
   | 'backup'
+  | 'refetch'
   | 'copy'
   | 'storage-credential'
   | 'create'
@@ -47,9 +47,9 @@ export const MenuScreen: React.FC<MenuScreenProps> = ({
   onCreate,
   onLoad,
   onBackupNow,
+  onRefetchLatest,
   onPublicProfile,
   onPrivateMemory,
-  onOnchainBackups,
   onCopyValues,
   onStorageCredential,
   onSkip,
@@ -60,7 +60,7 @@ export const MenuScreen: React.FC<MenuScreenProps> = ({
     ? 'Create a portable agent or load one you already own.'
     : 'Public, private, recovery, storage, and device controls are separate.'
 
-  const needsBackup = workingStatus?.publishState === 'local-changes' || workingStatus?.publishState === 'not-published'
+  const canRefetch = Boolean(canRebackup && identity?.backup?.cid)
 
   const options: Array<SelectOption<Action>> = identity
     ? [
@@ -68,9 +68,9 @@ export const MenuScreen: React.FC<MenuScreenProps> = ({
         { value: 'public-profile', label: 'public profile', hint: 'name, image, skills.json, agent card' },
         { value: 'private-memory', role: 'section', prefix: '--', label: 'Private local files' },
         { value: 'private-memory', label: 'memory and persona', hint: 'SOUL.md and MEMORY.md only on this device' },
-        { value: 'continuity-onchain-backups', role: 'section', prefix: '--', label: 'Recovery' },
-        { value: 'backup', label: 'publish snapshot now', hint: 'pins local SOUL, MEMORY, and SKILLS edits', disabled: !canRebackup },
-        { value: 'continuity-onchain-backups', label: 'onchain backups', hint: 'view and restore onchain encrypted backups' },
+        { value: 'backup', role: 'section', prefix: '--', label: 'Recovery' },
+        { value: 'backup', label: 'publish snapshot now', hint: 'encrypts and publishes local SOUL.md and MEMORY.md changes', disabled: !canRebackup },
+        { value: 'refetch', label: 'refetch latest snapshot', hint: 'restore local files from the latest published snapshot', disabled: !canRefetch },
         { value: 'storage-credential', role: 'section', prefix: '--', label: 'Storage' },
         { value: 'storage-credential', label: 'IPFS credential', hint: 'save, replace, or forget Pinata JWT' },
         { value: 'copy', role: 'section', prefix: '--', label: 'Agent token' },
@@ -102,8 +102,8 @@ export const MenuScreen: React.FC<MenuScreenProps> = ({
             if (choice === 'cancel') return onCancel()
             if (choice === 'public-profile') return onPublicProfile()
             if (choice === 'private-memory') return onPrivateMemory()
-            if (choice === 'continuity-onchain-backups') return onOnchainBackups()
             if (choice === 'backup') return onBackupNow()
+            if (choice === 'refetch') return onRefetchLatest()
             if (choice === 'copy') return onCopyValues()
             if (choice === 'storage-credential') return onStorageCredential()
             if (choice === 'load') return onLoad()

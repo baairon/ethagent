@@ -133,7 +133,7 @@ export async function restorePrivateContinuityHistorySnapshot(
 
   await ensureContinuityVault(identity)
   if (snapshot.existedBefore) {
-    await atomicWriteText(snapshot.filePath, normalizeMarkdown(snapshot.previousContent), { mode: 0o600 })
+    await atomicWriteText(snapshot.filePath, ensureTrailingNewline(snapshot.previousContent), { mode: 0o600 })
   } else {
     await fs.rm(snapshot.filePath, { force: true })
   }
@@ -148,6 +148,6 @@ function normalizeSnippet(input: string): string {
   return normalized.length <= 120 ? normalized : `${normalized.slice(0, 117)}...`
 }
 
-function normalizeMarkdown(value: string): string {
+function ensureTrailingNewline(value: string): string {
   return value.endsWith('\n') ? value : `${value}\n`
 }

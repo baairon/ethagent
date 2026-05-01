@@ -1,4 +1,4 @@
-import type { EthagentConfig, SelectableNetwork } from '../storage/config.js'
+import type { EthagentConfig, SelectableNetwork } from '../../storage/config.js'
 import {
   chainIdForNetwork,
   DEFAULT_ERC8004_CHAIN_ID,

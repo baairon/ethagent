@@ -18,8 +18,8 @@ export const ContinuityEditReviewView: React.FC<{
   onCancel: () => void
 }> = ({ review, onSelect, onCancel }) => (
   <Surface
-    title="private markdown updated"
-    subtitle="review the file, then publish an encrypted snapshot."
+    title="Private Continuity Updated"
+    subtitle="Review the file, then publish an encrypted snapshot."
     footer="enter select · esc later"
   >
     <Box flexDirection="column">
@@ -30,14 +30,14 @@ export const ContinuityEditReviewView: React.FC<{
       </Box>
       <Box marginTop={1} flexDirection="column">
         <Text color={theme.textSubtle}>saved locally</Text>
-        <Text color={theme.dim}>previous version saved in identity history. /rewind does not restore identity markdown.</Text>
+        <Text color={theme.dim}>Previous version saved in identity history. /rewind does not restore identity continuity.</Text>
       </Box>
     </Box>
     <Box marginTop={1}>
       <Select<ContinuityEditReviewAction>
         options={[
-          { value: 'open', label: `open ${review.file}`, hint: 'review the edited markdown file now' },
-          { value: 'save-publish', label: 'save snapshot and publish', hint: 'go directly to wallet approval' },
+          { value: 'open', label: `open ${review.file}`, hint: 'review the edited private file now' },
+          { value: 'save-publish', label: 'publish snapshot now', hint: 'go directly to wallet approval' },
           { value: 'later', label: 'later', hint: 'keep the local draft unpublished' },
         ]}
         onSubmit={onSelect}

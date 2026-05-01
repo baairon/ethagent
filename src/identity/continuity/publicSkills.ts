@@ -59,16 +59,16 @@ export function defaultPublicSkillsProfile(identity: EthagentIdentity): PublicSk
       {
         id: 'software-engineering',
         name: 'Software engineering',
-        description: 'Assist with code reading, implementation planning, debugging, refactors, and tests.',
+        description: 'Read code, plan implementations, debug failures, refactor safely, and run focused tests.',
         inputModes: ['text/markdown'],
         outputModes: ['text/markdown'],
       },
       {
         id: 'workspace-tools',
         name: 'Workspace tools',
-        description: 'Operate on local project files through permissioned read, edit, write, delete, and shell tools.',
+        description: 'Use permissioned local file, shell, clipboard, and MCP tools for project work.',
         inputModes: ['text/markdown'],
-        outputModes: ['text/markdown'],
+        outputModes: ['text/markdown', 'application/json'],
       },
       {
         id: 'ethereum-identity',
@@ -82,6 +82,8 @@ export function defaultPublicSkillsProfile(identity: EthagentIdentity): PublicSk
 }
 
 export function renderPublicSkillsJson(profile: PublicSkillsProfile): string {
+  const inputModes = unique(profile.skills.flatMap(skill => skill.inputModes))
+  const outputModes = unique(profile.skills.flatMap(skill => skill.outputModes))
   const summary = {
     schema: 'ethagent.public-skills.v1',
     visibility: 'public',
@@ -89,9 +91,38 @@ export function renderPublicSkillsJson(profile: PublicSkillsProfile): string {
     description: profile.description,
     version: profile.version,
     ...(profile.imageUrl ? { imageUrl: profile.imageUrl } : {}),
-    inputModes: unique(profile.skills.flatMap(skill => skill.inputModes)),
-    outputModes: unique(profile.skills.flatMap(skill => skill.outputModes)),
+    inputModes,
+    outputModes,
     boundary: 'Public discovery metadata only. This is not executable code, private memory, or a skill installation manifest.',
+    capabilities: {
+      softwareEngineering: true,
+      workspaceTools: 'permissioned',
+      mcp: true,
+      streaming: true,
+      ethereumIdentity: 'ERC-8004',
+      encryptedContinuity: true,
+    },
+    delegation: {
+      bestFor: [
+        'code reading',
+        'implementation planning',
+        'debugging',
+        'refactors',
+        'tests',
+        'workspace automation',
+      ],
+      requiresApprovalFor: [
+        'workspace edits',
+        'shell commands',
+        'private continuity changes',
+      ],
+    },
+    privacy: {
+      publicOnly: true,
+      includesPrivateMemory: false,
+      includesExecutableCode: false,
+      includesSecrets: false,
+    },
     skills: profile.skills.map(skill => ({
       id: skill.id,
       name: skill.name,

@@ -61,7 +61,7 @@ import {
 } from './chatScreenUtils.js'
 import { ChatBottomPane, type ContextLimitState, type CopyPickerState, type IdentityOverlayState, type Overlay } from './ChatBottomPane.js'
 import { setTokenIdentity, getIdentityStatus } from '../storage/identity.js'
-import type { IdentityHubResult } from '../identity/IdentityHub.js'
+import type { IdentityHubResult } from '../identity/hub/IdentityHub.js'
 import {
   buildResumedSessionState,
   promptHistoryFromSessionMessages,

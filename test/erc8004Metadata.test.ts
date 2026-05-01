@@ -19,7 +19,7 @@ import {
   preflightRegisterAgent,
   registeredAgentFromReceipt,
   withEthagentBackupPointer,
-} from '../src/identity/erc8004.js'
+} from '../src/identity/registry/erc8004.js'
 
 test('cidFromUri accepts standard IPFS agent URIs', () => {
   assert.equal(cidFromUri('ipfs://bafy-agent'), 'bafy-agent')
@@ -74,22 +74,71 @@ test('ethagent public discovery pointers are written to registration metadata an
       agentCardCid: 'bafy-card',
       updatedAt: new Date(0).toISOString(),
     },
+    {
+      chainId: 8453,
+      identityRegistryAddress: '0x8004A169FB4a3325136EB29fA0ceB6D2e539a432',
+      agentId: '7',
+    },
   )
   const pointer = parseEthagentPublicDiscoveryPointer(updated)
   const ext = updated['x-ethagent'] as {
     publicSkills: { cid: string; format: string }
     agentCard: { cid: string; format: string }
   }
-  const services = updated.services as Array<{ type: string; name?: string; url: string }>
+  const services = updated.services as Array<{ type: string; name?: string; endpoint: string; url: string }>
+  const registrations = updated.registrations as Array<{ agentId: string; agentRegistry: string }>
 
   assert.equal(pointer?.skillsCid, 'bafy-skills')
   assert.equal(pointer?.agentCardCid, 'bafy-card')
-  assert.equal(ext.publicSkills.format, 'text/markdown')
+  assert.equal(ext.publicSkills.format, 'application/json')
   assert.equal(ext.agentCard.format, 'application/json')
-  assert.ok(services.some(service => service.type === 'a2a' && service.url === 'ipfs://bafy-card'))
-  assert.ok(services.some(service => service.type === 'ipfs' && service.name === 'public-skills' && service.url === 'ipfs://bafy-skills'))
+  assert.ok(services.some(service => service.type === 'a2a' && service.endpoint === 'ipfs://bafy-card' && service.url === 'ipfs://bafy-card'))
+  assert.ok(services.some(service => service.type === 'A2A-skills' && service.name === 'public-skills' && service.endpoint === 'ipfs://bafy-skills' && service.url === 'ipfs://bafy-skills'))
+  assert.ok(services.every(service => typeof service.endpoint === 'string' && service.endpoint.length > 0))
+  assert.equal(registrations.length, 1)
+  assert.equal(registrations[0]?.agentId, '7')
+  assert.equal(registrations[0]?.agentRegistry, 'eip155:8453:0x8004A169FB4a3325136EB29fA0ceB6D2e539a432')
   assert.equal(JSON.stringify(updated).includes('SOUL.md'), false)
   assert.equal(JSON.stringify(updated).includes('MEMORY.md'), false)
+})
+
+test('registration metadata replaces managed history with current state on republish', () => {
+  const first = withEthagentBackupPointer(
+    {
+      type: 'https://eips.ethereum.org/EIPS/eip-8004#registration-v1',
+      name: 'agent',
+      services: [{ type: 'website', name: 'docs', endpoint: 'https://example.com', url: 'https://example.com' }],
+      registrations: [{ agentId: '1', agentRegistry: 'eip155:1:0x1111111111111111111111111111111111111111' }],
+    },
+    { cid: 'bafy-1', envelopeVersion: 'ethagent-continuity-snapshot-v1', createdAt: new Date(0).toISOString() },
+    { skillsCid: 'bafy-skills-1', agentCardCid: 'bafy-card-1', updatedAt: new Date(0).toISOString() },
+    { chainId: 8453, identityRegistryAddress: '0x8004A169FB4a3325136EB29fA0ceB6D2e539a432', agentId: '7' },
+  )
+  const second = withEthagentBackupPointer(
+    first,
+    {
+      cid: 'bafy-2',
+      envelopeVersion: 'ethagent-continuity-snapshot-v1',
+      createdAt: new Date(1).toISOString(),
+      pastBackups: [{ cid: 'bafy-1', createdAt: new Date(0).toISOString() }],
+    },
+    { skillsCid: 'bafy-skills-2', agentCardCid: 'bafy-card-2', updatedAt: new Date(1).toISOString() },
+    { chainId: 8453, identityRegistryAddress: '0x8004A169FB4a3325136EB29fA0ceB6D2e539a432', agentId: '8' },
+  )
+  const ext = second['x-ethagent'] as { backup: { cid: string; pastBackups?: unknown } }
+  const services = second.services as Array<{ type: string; name?: string; endpoint: string }>
+  const registrations = second.registrations as Array<{ agentId: string; agentRegistry: string }>
+
+  assert.equal(ext.backup.cid, 'bafy-2')
+  assert.equal(ext.backup.pastBackups, undefined)
+  assert.ok(services.some(service => service.type === 'website' && service.endpoint === 'https://example.com'))
+  assert.equal(services.some(service => service.endpoint === 'ipfs://bafy-card-1'), false)
+  assert.equal(services.some(service => service.endpoint === 'ipfs://bafy-skills-1'), false)
+  assert.ok(services.some(service => service.type === 'a2a' && service.name === 'agent-card' && service.endpoint === 'ipfs://bafy-card-2'))
+  assert.ok(services.some(service => service.type === 'A2A-skills' && service.name === 'public-skills' && service.endpoint === 'ipfs://bafy-skills-2'))
+  assert.equal(registrations.length, 1)
+  assert.equal(registrations[0]?.agentId, '8')
+  assert.equal(registrations[0]?.agentRegistry, 'eip155:8453:0x8004A169FB4a3325136EB29fA0ceB6D2e539a432')
 })
 
 test('encodeRegisterAgent encodes ERC-8004 register(string)', () => {

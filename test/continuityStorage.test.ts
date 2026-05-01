@@ -49,12 +49,16 @@ test('continuity storage creates private default SOUL and MEMORY files in an age
     assert.match(files['SOUL.md'], /^# SOUL\.md/)
     assert.match(files['SOUL.md'], /Owner wallet: 0x000000000000000000000000000000000000dEaD/)
     assert.match(files['SOUL.md'], /ERC-8004 token: #42/)
+    assert.match(files['SOUL.md'], /## Operating Principles/)
+    assert.match(files['SOUL.md'], /Do not store seed phrases/)
     assert.match(files['MEMORY.md'], /^# MEMORY\.md/)
+    assert.match(files['MEMORY.md'], /## Facts to Revalidate/)
+    assert.match(files['MEMORY.md'], /Do not store seed phrases/)
     assert.equal((await continuityVaultStatus(identity)).ready, true)
   })
 })
 
-test('identity markdown scaffold creates SOUL, MEMORY, and SKILLS files for a linked agent', async () => {
+test('identity scaffold creates SOUL, MEMORY, and skills.json files for a linked agent', async () => {
   await withHome(async () => {
     const files = await ensureIdentityMarkdownScaffold(identity)
     const ref = continuityVaultRef(identity)
@@ -70,7 +74,7 @@ test('identity markdown scaffold creates SOUL, MEMORY, and SKILLS files for a li
   })
 })
 
-test('identity markdown sync updates generated profile blocks without overwriting notes', async () => {
+test('identity continuity sync updates generated profile blocks without overwriting notes', async () => {
   await withHome(async () => {
     const scaffold = await ensureIdentityMarkdownScaffold(identity)
     await writeContinuityFiles(identity, {
@@ -97,7 +101,7 @@ test('identity markdown sync updates generated profile blocks without overwritin
   })
 })
 
-test('identity markdown scaffold writes the exact prepared mint scaffold', async () => {
+test('identity continuity scaffold writes the exact prepared mint scaffold', async () => {
   await withHome(async () => {
     await writeIdentityMarkdownScaffold(identity, {
       'SOUL.md': '# Prepared Soul\nminted soul\n',

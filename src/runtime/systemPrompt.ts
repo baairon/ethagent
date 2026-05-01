@@ -95,7 +95,6 @@ function buildToolEnabledPrompt(ctx: SystemPromptContext): string {
                     'For private continuity, edit the existing scaffold and build on top of it: prefer `appendToSection`+`appendText` for new notes or use `oldText`+`newText` for targeted replacement. Never omit the edit anchor, never create a new file, and never replace the whole file.',
                     'If the user asks to remember preferences or facts, call exactly one private continuity append such as `{"file":"MEMORY.md","appendToSection":"Durable User Preferences","appendText":"- User preference or durable memory."}`.',
                     'If the user asks to change persona or standing behavior, call exactly one private continuity append such as `{"file":"SOUL.md","appendToSection":"Persona","appendText":"- Persona or standing behavior."}`.',
-                    'Do not edit public skills metadata directly; suggest skills.json changes in chat for the user to apply or publish manually.',
                   ]
                 : ['No agent identity is linked in this session. Do not attempt private identity continuity edits; ask the user to create or load an agent first.']),
               'Use `run_bash` **only** when true shell execution is necessary.',

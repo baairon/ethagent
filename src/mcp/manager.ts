@@ -280,8 +280,8 @@ export class McpManager implements McpRuntime {
     } else {
       for (const server of this.snapshot.servers) {
         const counts = server.status === 'connected'
-          ? ` - ${server.tools} tools, ${server.resources} resources, ${server.prompts} prompts`
-          : server.message ? ` - ${server.message}` : ''
+          ? ` · ${server.tools} tools, ${server.resources} resources, ${server.prompts} prompts`
+          : server.message ? ` · ${server.message}` : ''
         lines.push(`  ${server.name}  ${server.status}  ${server.scope}/${server.transport}${counts}`)
       }
     }
@@ -349,7 +349,7 @@ export class McpManager implements McpRuntime {
       } else {
         for (const resource of connection.resources) {
           const mime = resource.mimeType ? ` ${resource.mimeType}` : ''
-          const desc = resource.description ? ` - ${resource.description}` : ''
+          const desc = resource.description ? ` · ${resource.description}` : ''
           lines.push(`  ${resource.uri}${mime}${desc}`)
         }
       }

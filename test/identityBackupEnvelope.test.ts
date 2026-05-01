@@ -11,8 +11,8 @@ import {
   restoreIdentityBackupEnvelope,
   serializeAgentStateBackupEnvelope,
   serializeIdentityBackupEnvelope,
-} from '../src/identity/backupEnvelope.js'
-import { addressFromPrivateKey, generatePrivateKey, signMessage } from '../src/identity/eth.js'
+} from '../src/identity/crypto/backupEnvelope.js'
+import { addressFromPrivateKey, generatePrivateKey, signMessage } from '../src/identity/crypto/eth.js'
 
 test('identity backup envelope encrypts and restores the same identity', () => {
   const privateKey = generatePrivateKey()

@@ -1,22 +1,22 @@
 import React from 'react'
 import { Text } from 'ink'
-import { Surface } from '../../ui/Surface.js'
-import { Select } from '../../ui/Select.js'
-import { TextInput } from '../../ui/TextInput.js'
-import { theme } from '../../ui/theme.js'
-import { normalizeErc8004RegistryConfig } from '../erc8004.js'
+import { Surface } from '../../../ui/Surface.js'
+import { Select } from '../../../ui/Select.js'
+import { TextInput } from '../../../ui/TextInput.js'
+import { theme } from '../../../ui/theme.js'
+import { normalizeErc8004RegistryConfig } from '../../registry/erc8004.js'
 import {
   isCurrentAgentCandidate,
   networkLabel,
   tokenCandidateHint,
   tokenCandidateSelectLabel,
 } from '../identityHubModel.js'
-import { registryConfigFromConfig } from '../registryConfig.js'
+import { registryConfigFromConfig } from '../../registry/registryConfig.js'
 import type { Step } from '../identityHubReducer.js'
 import { WalletApprovalScreen } from './WalletApprovalScreen.js'
 import { BusyScreen } from './BusyScreen.js'
-import type { BrowserWalletReady } from '../browserWallet.js'
-import type { EthagentConfig } from '../../storage/config.js'
+import type { BrowserWalletReady } from '../../wallet/browserWallet.js'
+import type { EthagentConfig } from '../../../storage/config.js'
 import type { RestoreProgress } from '../identityHubEffects.js'
 
 type RestoreStep = Exclude<Extract<Step, { kind: `restore-${string}` }>, { kind: 'restore-wallet' | 'restore-network' }>
@@ -54,7 +54,7 @@ export const RestoreFlow: React.FC<RestoreFlowProps> = ({
       <Surface
         title={isSwitch ? 'Switch Agent Identity' : 'Restore an Agent'}
         subtitle="Connect the wallet that owns the agent you want to load."
-        footer={footerHint('enter select - esc back')}
+        footer={footerHint('enter select · esc back')}
       >
         <Select<'connect'>
           options={[
@@ -74,8 +74,8 @@ export const RestoreFlow: React.FC<RestoreFlowProps> = ({
     return (
       <Surface
         title={`${resolution.network ? networkLabel(resolution.network).charAt(0).toUpperCase() + networkLabel(resolution.network).slice(1) : ''} Agent Registry`}
-        subtitle={step.error ? `lookup failed: ${step.error}` : 'Paste the agent registry address for this network.'}
-        footer={footerHint('enter discover - esc back')}
+        subtitle={step.error ? `Lookup failed: ${step.error}` : 'Paste the agent registry address for this network.'}
+        footer={footerHint('enter discover · esc back')}
       >
         <Text color={theme.dim}>RPC defaults to {resolution.defaultRpcUrl}</Text>
         <TextInput
@@ -115,8 +115,8 @@ export const RestoreFlow: React.FC<RestoreFlowProps> = ({
     return (
       <Surface
         title="Enter Agent Token ID"
-        subtitle={step.error ?? `${networkLabelForRegistry(step.registry)} lookup needs the token id.`}
-        footer={footerHint('enter continue - esc back')}
+        subtitle={step.error ?? `${networkLabelForRegistry(step.registry)} lookup needs the token ID.`}
+        footer={footerHint('enter continue · esc back')}
       >
         <TextInput
           placeholder="#45744"
@@ -133,7 +133,7 @@ export const RestoreFlow: React.FC<RestoreFlowProps> = ({
       <Surface
         title={isSwitch ? 'Switch to an Agent' : 'Choose Your Agent'}
         subtitle={step.ownerHandle}
-        footer={footerHint('enter select - esc back')}
+        footer={footerHint('enter select · esc back')}
       >
         <Select<string>
           options={[
@@ -171,7 +171,7 @@ export const RestoreFlow: React.FC<RestoreFlowProps> = ({
       return (
         <BusyScreen
           title={isSwitch ? 'Switching Agent Identity' : 'Restoring Your Agent'}
-          subtitle="wallet signature received"
+          subtitle="Wallet Signature Received"
           label={restoreProgress.label}
         />
       )

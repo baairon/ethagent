@@ -2,13 +2,13 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import type { Address, Hex } from 'viem'
-import type { EthagentConfig, EthagentIdentity, SelectableNetwork } from '../storage/config.js'
-import { saveConfig } from '../storage/config.js'
+import type { EthagentConfig, EthagentIdentity, SelectableNetwork } from '../../storage/config.js'
+import { saveConfig } from '../../storage/config.js'
 import {
   assertAgentStateBackupOwner,
   parseAgentStateBackupEnvelope,
   restoreAgentStateBackupEnvelope,
-} from './backupEnvelope.js'
+} from '../crypto/backupEnvelope.js'
 import {
   CONTINUITY_SNAPSHOT_ENVELOPE_VERSION,
   assertContinuitySnapshotOwner,
@@ -18,7 +18,7 @@ import {
   restoreContinuitySnapshotEnvelope,
   serializeContinuitySnapshotEnvelope,
   type ContinuitySnapshotEnvelope,
-} from './continuity/envelope.js'
+} from '../continuity/envelope.js'
 import {
   continuityAgentSnapshot,
   continuityVaultStatus,
@@ -37,18 +37,18 @@ import {
   writeIdentityMarkdownScaffold,
   writePublicSkillsFile,
   type IdentityMarkdownScaffold,
-} from './continuity/storage.js'
+} from '../continuity/storage.js'
 import {
   createAgentCard,
   defaultPublicSkillsProfile,
   renderPublicSkillsJson,
   serializeAgentCard,
-} from './continuity/publicSkills.js'
+} from '../continuity/publicSkills.js'
 import {
   recordPublishedContinuitySnapshot,
   updatePublishedContinuitySnapshotContentHashes,
-} from './continuity/snapshots.js'
-import { addFileToIpfs, addToIpfs, catFromIpfs, DEFAULT_IPFS_API_URL, isPinataUploadUrl, type IpfsAddResult } from './ipfs.js'
+} from '../continuity/snapshots.js'
+import { addFileToIpfs, addToIpfs, catFromIpfs, DEFAULT_IPFS_API_URL, isPinataUploadUrl, type IpfsAddResult } from '../storage/ipfs.js'
 import {
   AgentTokenIdRequiredError,
   chainIdForNetwork,
@@ -66,17 +66,17 @@ import {
   withEthagentPointers,
   type Erc8004AgentCandidate,
   type Erc8004RegistryConfig,
-} from './erc8004.js'
+} from '../registry/erc8004.js'
 import { getAddress } from 'viem'
-import { registryConfigFromConfig, type RegistryResolution } from './registryConfig.js'
-import { resolveValidatedPinataJwt, savePinataJwt } from './pinataJwt.js'
+import { registryConfigFromConfig, type RegistryResolution } from '../registry/registryConfig.js'
+import { resolveValidatedPinataJwt, savePinataJwt } from '../storage/pinataJwt.js'
 import {
   requestBrowserWalletAccount,
   requestBrowserWalletSignature,
   requestBrowserWalletSignatureAndTransaction,
   sendBrowserWalletTransaction,
   type BrowserWalletReady,
-} from './browserWallet.js'
+} from '../wallet/browserWallet.js'
 import { initialAgentState, PREFLIGHT_AGENT_URI } from './identityHubModel.js'
 import type { Step, ProfileUpdates, RestorePurpose } from './identityHubReducer.js'
 
@@ -250,6 +250,9 @@ export async function runCreateSigning(
         skillsCid: publicSkills.cid,
         agentCardCid: publicSkills.agentCardCid,
         updatedAt: publicSkills.updatedAt,
+      }, {
+        chainId: step.registry.chainId,
+        identityRegistryAddress: step.registry.identityRegistryAddress,
       })
       const metadataPin = await addToIpfs(DEFAULT_IPFS_API_URL, JSON.stringify(registration, null, 2), fetch, { pinataJwt: step.pinataJwt })
       assertVerifiedPin(metadataPin)
@@ -304,7 +307,7 @@ export async function runCreateSigning(
     'skills.json': result.prepared.publicSkillsJson,
   })
   await recordPublishedContinuitySnapshot({ identity: nextIdentity, label: 'initial published snapshot' }).catch(() => null)
-  await callbacks.onIdentityComplete(nextIdentity, `ERC-8004 agent registered - #${registered.agentId.toString()}`)
+  await callbacks.onIdentityComplete(nextIdentity, `ERC-8004 agent registered · #${registered.agentId.toString()}`)
 }
 
 export async function runRestoreDiscover(
@@ -415,7 +418,7 @@ export async function runRestoreAuthorize(
     onReady: callbacks.onWalletReady,
   })
   callbacks.onWalletReady(null)
-  callbacks.onRestoreProgress?.({ phase: 'decrypting', label: 'signature received - decrypting encrypted snapshot...' })
+  callbacks.onRestoreProgress?.({ phase: 'decrypting', label: 'signature received · decrypting encrypted snapshot...' })
   let restored: ReturnType<typeof restoreAgentStateBackupEnvelope> | ReturnType<typeof restoreContinuitySnapshotEnvelope>
   let continuityFiles: ReturnType<typeof restoreContinuitySnapshotEnvelope>['files'] | undefined
   if (isContinuitySnapshotEnvelope(step.envelope)) {
@@ -480,7 +483,7 @@ export async function runRestoreAuthorize(
   await restorePublishedPublicSkills(nextIdentity, step.apiUrl, step.candidate.publicDiscovery?.skillsCid)
   await ensureIdentityMarkdownScaffold(nextIdentity)
   await recordPublishedContinuitySnapshot({ identity: nextIdentity, label: 'restored from agent backup' }).catch(() => null)
-  await callbacks.onIdentityComplete(nextIdentity, `ERC-8004 agent restored - #${step.candidate.agentId.toString()}`)
+  await callbacks.onIdentityComplete(nextIdentity, `ERC-8004 agent restored · #${step.candidate.agentId.toString()}`)
 }
 
 export async function runRegistrySubmit(
@@ -654,12 +657,6 @@ export async function runRebackupSigning(
       const statePin = await addToIpfs(DEFAULT_IPFS_API_URL, serializeContinuitySnapshotEnvelope(envelope), fetch, { pinataJwt: step.pinataJwt })
       assertVerifiedPin(statePin)
       const cid = statePin.cid
-      const previousBackup = step.identity.backup
-      const pastBackups = previousBackup?.cid ? [
-        { cid: previousBackup.cid, createdAt: previousBackup.createdAt },
-        ...(previousBackup.pastBackups ?? []),
-      ].slice(0, 30) : undefined
-
       const backup: BackupMetadata = {
         cid,
         createdAt: envelope.createdAt,
@@ -671,7 +668,6 @@ export async function runRebackupSigning(
         rpcUrl: step.registry.rpcUrl,
         identityRegistryAddress: step.registry.identityRegistryAddress,
         agentId: step.identity.agentId,
-        ...(pastBackups ? { pastBackups } : {}),
       }
       const publicSkills: PublicSkillsMetadata = {
         cid: publicSkillsPin.cid,
@@ -688,11 +684,14 @@ export async function runRebackupSigning(
         cid,
         envelopeVersion: envelope.envelopeVersion,
         createdAt: envelope.createdAt,
-        ...(pastBackups ? { pastBackups } : {}),
       }, {
         skillsCid: publicSkills.cid,
         agentCardCid: publicSkills.agentCardCid,
         updatedAt: publicSkills.updatedAt,
+      }, {
+        chainId: step.registry.chainId,
+        identityRegistryAddress: step.registry.identityRegistryAddress,
+        agentId: step.identity.agentId,
       })
       const metadataPin = await addToIpfs(DEFAULT_IPFS_API_URL, JSON.stringify(registration, null, 2), fetch, { pinataJwt: step.pinataJwt })
       assertVerifiedPin(metadataPin)
@@ -854,9 +853,7 @@ export async function runContinuityUnlock(
       const payload = restoreContinuitySnapshotEnvelope({ envelope, walletSignature: wallet.signature })
       await writeContinuityFiles({ ...identity, state: payload.state }, payload.files)
       await restorePublishedPublicSkills(identity, identity.backup?.ipfsApiUrl ?? DEFAULT_IPFS_API_URL, step.publicSkillsCid)
-      callbacks.onStep(step.returnTo === 'snapshots'
-        ? { kind: 'continuity-onchain-backups', notice: 'published snapshot restored locally. review, then publish when ready.' }
-        : { kind: 'continuity-private', notice: 'published snapshot restored locally. review, then publish when ready.' })
+      callbacks.onStep({ kind: 'continuity-private', notice: 'published snapshot restored locally. review, then publish when ready.' })
       return
     }
     assertAgentStateBackupOwner(envelope, ownerAddress)
@@ -877,9 +874,90 @@ export async function runContinuityUnlock(
     void wallet.signature
   }
   await ensureContinuityFiles(identity)
-  callbacks.onStep(step.returnTo === 'snapshots'
-    ? { kind: 'continuity-onchain-backups', notice: 'local private working files are ready on this machine.' }
-    : { kind: 'continuity-private', notice: 'local private working files are ready on this machine.' })
+  callbacks.onStep({ kind: 'continuity-private', notice: 'local private working files are ready on this machine.' })
+}
+
+
+export async function runRecoveryRefetch(
+  identity: EthagentIdentity,
+  registry: Erc8004RegistryConfig,
+  callbacks: EffectCallbacks,
+): Promise<void> {
+  if (!identity.agentId) throw new Error('cannot refetch: identity is missing an agent token id')
+  const ownerAddress = getAddress(identity.ownerAddress ?? identity.address)
+  const candidate = await discoverOwnedAgentBackupByTokenId({
+    ...registry,
+    ownerHandle: ownerAddress,
+    tokenId: BigInt(identity.agentId),
+    ipfsApiUrl: identity.backup?.ipfsApiUrl ?? DEFAULT_IPFS_API_URL,
+  })
+  if (!candidate.backup?.cid) {
+    throw new Error('the published agent does not have a recoverable encrypted snapshot')
+  }
+  const apiUrl = identity.backup?.ipfsApiUrl ?? DEFAULT_IPFS_API_URL
+  const raw = await catFromIpfs(apiUrl, candidate.backup.cid)
+  const envelope = parseRestorableEnvelope(raw)
+  if (!isContinuitySnapshotEnvelope(envelope)) {
+    throw new Error('on-chain backup is in a legacy format and cannot be refetched here; use switch agent')
+  }
+  assertContinuitySnapshotOwner(envelope, ownerAddress)
+  const wallet = await requestBrowserWalletSignature({
+    chainId: candidate.chainId,
+    expectedAccount: ownerAddress,
+    message: envelope.challenge,
+    onReady: callbacks.onWalletReady,
+  })
+  callbacks.onWalletReady(null)
+  callbacks.onRestoreProgress?.({ phase: 'decrypting', label: 'signature received · decrypting on-chain snapshot...' })
+  const payload = restoreContinuitySnapshotEnvelope({ envelope, walletSignature: wallet.signature })
+  callbacks.onRestoreProgress?.({ phase: 'writing', label: 'overwriting local SOUL.md, MEMORY.md, skills.json...' })
+  const refreshedBackup: BackupMetadata = {
+    cid: candidate.backup.cid,
+    createdAt: envelope.createdAt,
+    envelopeVersion: envelope.envelopeVersion,
+    ipfsApiUrl: apiUrl,
+    status: 'restored',
+    ownerAddress,
+    chainId: candidate.chainId,
+    rpcUrl: candidate.rpcUrl,
+    identityRegistryAddress: candidate.identityRegistryAddress,
+    agentId: candidate.agentId.toString(),
+    agentUri: candidate.agentUri,
+    metadataCid: candidate.metadataCid,
+  }
+  const nextIdentity: EthagentIdentity = {
+    ...identity,
+    source: 'erc8004',
+    address: ownerAddress,
+    ownerAddress,
+    chainId: candidate.chainId,
+    rpcUrl: candidate.rpcUrl,
+    identityRegistryAddress: candidate.identityRegistryAddress,
+    agentId: candidate.agentId.toString(),
+    agentUri: candidate.agentUri,
+    metadataCid: candidate.metadataCid,
+    state: {
+      ...payload.state,
+      ...(candidate.name ? { name: candidate.name } : {}),
+      ...(candidate.description ? { description: candidate.description } : {}),
+      ...(candidate.imageUrl ? { imageUrl: candidate.imageUrl } : {}),
+    },
+    backup: refreshedBackup,
+    ...(candidate.publicDiscovery ? {
+      publicSkills: {
+        ...(candidate.publicDiscovery.skillsCid ? { cid: candidate.publicDiscovery.skillsCid } : {}),
+        ...(candidate.publicDiscovery.agentCardCid ? { agentCardCid: candidate.publicDiscovery.agentCardCid } : {}),
+        ...(candidate.publicDiscovery.updatedAt ? { updatedAt: candidate.publicDiscovery.updatedAt } : {}),
+        status: 'pinned',
+      },
+    } : {}),
+  }
+  await writeContinuityFiles(nextIdentity, payload.files)
+  callbacks.onRestoreProgress?.({ phase: 'finishing', label: 'finalizing refreshed identity...' })
+  await restorePublishedPublicSkills(nextIdentity, apiUrl, candidate.publicDiscovery?.skillsCid)
+  await ensureIdentityMarkdownScaffold(nextIdentity)
+  await recordPublishedContinuitySnapshot({ identity: nextIdentity, label: 'refetched latest snapshot from chain' }).catch(() => null)
+  await callbacks.onIdentityComplete(nextIdentity, 'latest published snapshot restored from chain')
 }
 
 
@@ -951,6 +1029,11 @@ async function preparePublicProfileTransaction(
       skillsCid: publicSkills.cid,
       agentCardCid: publicSkills.agentCardCid,
       updatedAt,
+    },
+    registration: {
+      chainId: step.registry.chainId,
+      identityRegistryAddress: step.registry.identityRegistryAddress,
+      agentId: step.identity.agentId,
     },
   })
   const metadataPin = await addToIpfs(DEFAULT_IPFS_API_URL, JSON.stringify(registration, null, 2), fetch, { pinataJwt: step.pinataJwt })

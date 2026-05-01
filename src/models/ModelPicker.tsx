@@ -235,9 +235,9 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
           <Text color={theme.text}>{plan.displayName}</Text>
           <Text color={theme.dim}>source: huggingface.co/{plan.repoId}</Text>
           <Text color={theme.dim}>file: {friendlyFileName(plan.filename)}</Text>
-          <Text color={theme.dim}>license: {plan.repo.license ?? 'unknown'} - size: {formatBytes(plan.sizeBytes)}</Text>
+          <Text color={theme.dim}>license: {plan.repo.license ?? 'unknown'} · size: {formatBytes(plan.sizeBytes)}</Text>
           {fit ? <Text color={fitColor(fit.fit)}>fit: {fitLabel(fit.fit, recommended?.file.filename === plan.filename)}</Text> : null}
-          <Text color={riskColor(plan.review.risk)}>safety: {safetyLabel(plan.review.risk)} - source: {credibilityLabel(plan.review.credibility)}</Text>
+          <Text color={riskColor(plan.review.risk)}>safety: {safetyLabel(plan.review.risk)} · source: {credibilityLabel(plan.review.credibility)}</Text>
           <Text color={theme.dim}>signals: {formatSignals(plan.repo.downloads, plan.repo.likes)}</Text>
           <Text color={theme.dim}>notes: {friendlyReasons(plan.review.reasons).join('; ')}</Text>
         </Box>

@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { restoreTokenSelectionStep } from '../src/identity/identityHubEffects.js'
-import type { Erc8004AgentCandidate, Erc8004RegistryConfig } from '../src/identity/erc8004.js'
+import { restoreTokenSelectionStep } from '../src/identity/hub/identityHubEffects.js'
+import type { Erc8004AgentCandidate, Erc8004RegistryConfig } from '../src/identity/registry/erc8004.js'
 
 const registry: Erc8004RegistryConfig = {
   chainId: 1,

@@ -1,10 +1,10 @@
 import React from 'react'
 import { Box, Text } from 'ink'
-import { Surface } from '../../ui/Surface.js'
-import { Spinner } from '../../ui/Spinner.js'
-import { theme } from '../../ui/theme.js'
-import { useAppInput } from '../../app/input/AppInputProvider.js'
-import type { BrowserWalletReady } from '../browserWallet.js'
+import { Surface } from '../../../ui/Surface.js'
+import { Spinner } from '../../../ui/Spinner.js'
+import { theme } from '../../../ui/theme.js'
+import { useAppInput } from '../../../app/input/AppInputProvider.js'
+import type { BrowserWalletReady } from '../../wallet/browserWallet.js'
 
 type WalletApprovalScreenProps = {
   title: string
