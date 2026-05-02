@@ -11,7 +11,7 @@ ethagent requires Node.js 20 or newer. Install it from npm with `npm install -g 
 
 ## First Run
 
-First run walks model setup, then identity setup. You can use a local GGUF model through llama.cpp, or connect OpenAI, Anthropic, or Gemini.
+First run walks identity setup, then model setup. You can use a local GGUF model through llama.cpp, or connect OpenAI, Anthropic, or Gemini.
 
 Create a new ERC-8004 agent with a browser wallet, load an agent token you already own, or skip identity setup and add it later from the Identity Hub.
 
@@ -30,6 +30,8 @@ The Identity Hub manages the portable identity. Each identity gets a local conti
 `SOUL.md` and `MEMORY.md` are encrypted before they reach IPFS. They are never published as plaintext in token metadata.
 
 **Save Snapshot Now** encrypts the current private continuity, pins the public discovery files, writes registration metadata, and updates the ERC-8004 tokenURI. **Refetch Latest Snapshot** reads the current tokenURI from chain, asks the owner wallet to sign the decrypt challenge, and restores local files from the published state. The current tokenURI is the source of truth.
+
+Agents can also be looked up by token ID on [8004scan](https://8004scan.io/).
 
 ## Models
 

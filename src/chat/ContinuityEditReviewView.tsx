@@ -8,6 +8,7 @@ export type ContinuityEditReviewState = {
   file: 'SOUL.md' | 'MEMORY.md'
   filePath: string
   summary: string
+  editorOpened?: boolean
 }
 
 export type ContinuityEditReviewAction = 'open' | 'save-publish' | 'later'
@@ -28,6 +29,11 @@ export const ContinuityEditReviewView: React.FC<{
         <Text color={theme.textSubtle}>review file</Text>
         <Text color={theme.text}>{review.filePath}</Text>
       </Box>
+      {review.editorOpened && (
+        <Box marginTop={1}>
+          <Text color={theme.accentPeach}>Save with ctrl+s in your editor</Text>
+        </Box>
+      )}
       <Box marginTop={1} flexDirection="column">
         <Text color={theme.textSubtle}>saved locally</Text>
         <Text color={theme.dim}>Previous version saved in identity history. /rewind does not restore identity continuity.</Text>

@@ -381,8 +381,8 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
         ? `opened ${kind === 'soul' ? 'SOUL.md' : kind === 'memory' ? 'MEMORY.md' : 'skills.json'} with ${result.method}.`
         : `open failed: ${result.error}`
       setStep(kind === 'skills'
-        ? { kind: 'continuity-public', notice: message }
-        : { kind: 'continuity-private', notice: message })
+        ? { kind: 'continuity-public', notice: message, editorOpened: result.ok }
+        : { kind: 'continuity-private', notice: message, editorOpened: result.ok })
     } catch (err: unknown) {
       errorStep(err, kind === 'skills' ? { kind: 'continuity-public' } : { kind: 'continuity-private' })
     }
@@ -609,6 +609,7 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
         ready={continuityReady}
         notice={step.notice}
         footer={footer}
+        editorOpened={step.editorOpened}
         onOpenSoul={() => { void openContinuityFile('soul') }}
         onOpenMemory={() => { void openContinuityFile('memory') }}
         onBack={back}
@@ -625,6 +626,7 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
         ready={continuityReady}
         notice={step.notice}
         footer={footer}
+        editorOpened={step.editorOpened}
         onEditProfile={() => openPublicProfileEdit({ kind: 'continuity-public' })}
         onOpenSkills={() => { void openContinuityFile('skills') }}
         onBack={back}

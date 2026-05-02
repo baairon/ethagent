@@ -12,6 +12,7 @@ type ConversationStackProps = {
   status?: React.ReactNode
   sessionKey: number
   onVisibleReasoningIdsChange?: (ids: string[]) => void
+  onTranscriptScrollabilityChange?: (canScroll: boolean) => void
 }
 
 export const ConversationStack: React.FC<ConversationStackProps> = ({
@@ -23,6 +24,7 @@ export const ConversationStack: React.FC<ConversationStackProps> = ({
   status,
   sessionKey,
   onVisibleReasoningIdsChange,
+  onTranscriptScrollabilityChange,
 }) => {
   return (
     <Box flexDirection="column" padding={1}>
@@ -33,6 +35,7 @@ export const ConversationStack: React.FC<ConversationStackProps> = ({
         active={transcriptActive}
         bottomVariant={bottomVariant}
         onVisibleReasoningIdsChange={onVisibleReasoningIdsChange}
+        onScrollabilityChange={onTranscriptScrollabilityChange}
       />
       <Box marginTop={1} width="100%">
         {bottom}

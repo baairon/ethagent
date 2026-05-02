@@ -120,6 +120,7 @@ export const EditProfileFlow: React.FC<EditProfileFlowProps> = ({
         initialValue={currentDescription}
         placeholder="description"
         allowEmpty
+        multiline
         onSubmit={value => onDescriptionSubmit(value.trim())}
         onCancel={onBack}
       />

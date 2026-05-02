@@ -12,6 +12,7 @@ import {
   identitySummaryRows,
   isCurrentAgentCandidate,
   lastBackupLabel,
+  localChangeStatusView,
   networkLabel,
   networkMenuTagline,
   networkSubtitle,
@@ -94,6 +95,40 @@ test('identity hub summary collapses gracefully when no identity is loaded', () 
   assert.equal(rows[4]?.value, 'not saved')
   assert.equal(rows[5]?.value, 'not saved')
   assert.equal(rows[6]?.value, 'not attached')
+})
+
+test('identity hub local change status distinguishes clean and changed files', () => {
+  const published = {
+    'SOUL.md': 'soul-a',
+    'MEMORY.md': 'memory-a',
+    'skills.json': 'skills-a',
+  }
+  const clean = localChangeStatusView({
+    ready: true,
+    localChangedAfterBackup: false,
+    publishState: 'published',
+    localContentHashes: published,
+    publishedContentHashes: published,
+  })
+  assert.equal(clean.detail, 'None detected')
+  assert.equal(clean.tone, 'ok')
+  assert.equal(clean.hasLocalChanges, false)
+
+  const changed = localChangeStatusView({
+    ready: true,
+    localChangedAfterBackup: true,
+    publishState: 'local-changes',
+    localContentHashes: {
+      'SOUL.md': 'soul-b',
+      'MEMORY.md': 'memory-a',
+      'skills.json': 'skills-b',
+    },
+    publishedContentHashes: published,
+  })
+  assert.equal(changed.detail, 'Detected: SOUL.md, skills.json')
+  assert.deepEqual(changed.files, ['SOUL.md', 'skills.json'])
+  assert.equal(changed.tone, 'warn')
+  assert.equal(changed.hasLocalChanges, true)
 })
 
 

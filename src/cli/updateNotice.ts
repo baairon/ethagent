@@ -24,7 +24,7 @@ export function isNewerVersion(candidate: string, current: string): boolean {
 
 export function formatUpdateNotice(currentVersion: string, latestVersion: string): string | null {
   if (!isNewerVersion(latestVersion, currentVersion)) return null
-  return `update available: ethagent ${currentVersion} -> ${latestVersion}; run npm i -g ethagent`
+  return `✨ update available: ethagent ${currentVersion} -> ${latestVersion} · run npm i -g ethagent@latest`
 }
 
 export async function checkForUpdates(

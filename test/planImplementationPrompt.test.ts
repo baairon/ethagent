@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import {
   buildPlanImplementationPrompt,
   buildPlanTransferSeedMessages,
+  chatFooterShortcutText,
 } from '../src/chat/ChatScreen.js'
 import { PLAN_APPROVAL_OPTIONS } from '../src/chat/PlanApprovalView.js'
 import { CONTEXT_LIMIT_OPTIONS } from '../src/chat/ContextLimitView.js'
@@ -70,4 +71,9 @@ test('context limit options keep explicit send override available', () => {
     CONTEXT_LIMIT_OPTIONS.find(option => option.action === 'send')?.detail ?? '',
     /rate\/context limits|degrade local\/cloud model behavior/,
   )
+})
+
+test('chat footer only shows transcript scroll shortcut when scrolling is available', () => {
+  assert.equal(chatFooterShortcutText(false), 'alt+p model · alt+i identity')
+  assert.equal(chatFooterShortcutText(true), 'pgup/pgdn scroll · alt+p model · alt+i identity')
 })

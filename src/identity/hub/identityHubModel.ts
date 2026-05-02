@@ -6,6 +6,7 @@ import {
 } from '../registry/erc8004.js'
 import { AgentStateOwnerMismatchError } from '../crypto/backupEnvelope.js'
 import { ContinuitySnapshotOwnerMismatchError } from '../continuity/envelope.js'
+import type { ContinuityWorkingTreeStatus } from '../continuity/storage.js'
 import { resolveSelectedNetwork } from '../registry/registryConfig.js'
 
 export const PREFLIGHT_AGENT_URI = 'ipfs://bafybeigdyrztma2dbfczw7q6ooozbxlqzyw5r7w4f3qw2axvvxqg3w6y7q'
@@ -212,6 +213,85 @@ export function identitySummaryRows(
     { label: 'card', value: cardValue, tone: identity?.publicSkills?.agentCardCid ? 'ok' : 'dim' },
     { label: 'image', value: imageValue, tone: imageValue === 'attached' ? 'ok' : 'dim' },
   ]
+}
+
+export type LocalChangeStatusView = {
+  label: string
+  detail: string
+  tone: 'ok' | 'warn' | 'dim'
+  files: string[]
+  hasLocalChanges: boolean
+}
+
+export function changedContinuitySnapshotFiles(
+  workingStatus?: ContinuityWorkingTreeStatus | null,
+): string[] {
+  if (!workingStatus?.localContentHashes || !workingStatus.publishedContentHashes) return []
+  const files: Array<keyof typeof workingStatus.localContentHashes> = ['SOUL.md', 'MEMORY.md', 'skills.json']
+  return files.filter(file => workingStatus.localContentHashes?.[file] !== workingStatus.publishedContentHashes?.[file])
+}
+
+export function localChangeStatusView(
+  workingStatus?: ContinuityWorkingTreeStatus | null,
+): LocalChangeStatusView {
+  if (!workingStatus) {
+    return {
+      label: 'Local Changes',
+      detail: 'Checking status...',
+      tone: 'dim',
+      files: [],
+      hasLocalChanges: false,
+    }
+  }
+
+  if (workingStatus.publishState === 'published') {
+    return {
+      label: 'Local Changes',
+      detail: 'None detected',
+      tone: 'ok',
+      files: [],
+      hasLocalChanges: false,
+    }
+  }
+
+  if (workingStatus.publishState === 'local-changes') {
+    const files = changedContinuitySnapshotFiles(workingStatus)
+    return {
+      label: 'Local Changes',
+      detail: files.length > 0 ? `Detected: ${files.join(', ')}` : 'Detected: local files differ from saved snapshot',
+      tone: 'warn',
+      files,
+      hasLocalChanges: true,
+    }
+  }
+
+  if (workingStatus.publishState === 'not-published') {
+    return {
+      label: 'Local Changes',
+      detail: 'Snapshot not saved yet',
+      tone: 'warn',
+      files: [],
+      hasLocalChanges: false,
+    }
+  }
+
+  if (workingStatus.publishState === 'verify-needed') {
+    return {
+      label: 'Local Changes',
+      detail: 'Unable to verify saved snapshot',
+      tone: 'warn',
+      files: [],
+      hasLocalChanges: false,
+    }
+  }
+
+  return {
+    label: 'Local Changes',
+    detail: 'Local files not restored',
+    tone: 'warn',
+    files: [],
+    hasLocalChanges: false,
+  }
 }
 
 export type IdentityDetailSection = {

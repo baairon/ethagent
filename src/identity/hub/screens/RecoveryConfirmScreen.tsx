@@ -3,6 +3,7 @@ import { Box, Text } from 'ink'
 import { Surface } from '../../../ui/Surface.js'
 import { Select } from '../../../ui/Select.js'
 import { theme } from '../../../ui/theme.js'
+import { localChangeStatusView, type LocalChangeStatusView } from '../identityHubModel.js'
 
 import type { ContinuityWorkingTreeStatus } from '../../continuity/storage.js'
 
@@ -31,29 +32,21 @@ export const RecoveryConfirmScreen: React.FC<RecoveryConfirmScreenProps> = ({ mo
     ? 'Any local edits to SOUL.md, MEMORY.md, skills.json, and public profile become the saved state. The previous snapshot pointer is overwritten.'
     : 'Unsaved local edits will be lost. Use this when local files are missing or out of sync with the latest saved snapshot.'
 
-  const needsBackup = workingStatus?.publishState === 'local-changes' || workingStatus?.publishState === 'not-published' || workingStatus?.publishState === 'verify-needed'
-  let changedFiles: string[] = []
-  if (isPublish && needsBackup) {
-    if (workingStatus?.localContentHashes && workingStatus?.publishedContentHashes) {
-      if (workingStatus.localContentHashes['SOUL.md'] !== workingStatus.publishedContentHashes['SOUL.md']) changedFiles.push('SOUL.md')
-      if (workingStatus.localContentHashes['MEMORY.md'] !== workingStatus.publishedContentHashes['MEMORY.md']) changedFiles.push('MEMORY.md')
-      if (workingStatus.localContentHashes['skills.json'] !== workingStatus.publishedContentHashes['skills.json']) changedFiles.push('skills.json')
-    } else {
-      changedFiles = ['SOUL.md', 'MEMORY.md', 'skills.json']
-    }
-  }
+  const localChangeStatus = localChangeStatusView(workingStatus)
 
   return (
     <Surface title={title} subtitle={subtitle} footer={footer} tone="primary">
       <Box flexDirection="column">
         <Text color={headlineColor}>{headline}</Text>
         <Text color={theme.textSubtle}>{detail}</Text>
-        {isPublish && changedFiles.length > 0 && (
+        {isPublish && (
           <Box marginTop={1}>
-            <Text>
-              <Text color={theme.textSubtle}>ready to save: </Text>
-              <Text color={theme.accentMint} bold>{changedFiles.join(', ')}</Text>
-            </Text>
+            <SaveSnapshotStatusLine status={localChangeStatus} />
+          </Box>
+        )}
+        {!isPublish && (
+          <Box marginTop={1}>
+            <Text color={theme.accentPeach}>Overwrite your local files?</Text>
           </Box>
         )}
       </Box>
@@ -84,4 +77,19 @@ export const RecoveryConfirmScreen: React.FC<RecoveryConfirmScreenProps> = ({ mo
       </Box>
     </Surface>
   )
+}
+
+const SaveSnapshotStatusLine: React.FC<{ status: LocalChangeStatusView }> = ({ status }) => {
+  if (status.hasLocalChanges) {
+    return (
+      <Text>
+        <Text color={theme.textSubtle}>Local changes detected: </Text>
+        <Text color="#e87070" bold>{status.files.length > 0 ? status.files.join(', ') : 'local files differ from saved snapshot'}</Text>
+      </Text>
+    )
+  }
+
+  const color = status.tone === 'ok' ? theme.accentMint : status.tone === 'warn' ? theme.accentPeach : theme.dim
+  const label = status.detail === 'None detected' ? 'No local changes detected.' : status.detail
+  return <Text color={color}>{label}</Text>
 }

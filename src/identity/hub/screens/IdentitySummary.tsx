@@ -2,9 +2,21 @@ import React from 'react'
 import { Box, Text } from 'ink'
 import { theme } from '../../../ui/theme.js'
 import type { EthagentConfig, EthagentIdentity } from '../../../storage/config.js'
-import { identitySummaryRows, lastBackupLabel } from '../identityHubModel.js'
+import {
+  identitySummaryRows,
+  lastBackupLabel,
+  localChangeStatusView,
+  type LocalChangeStatusView,
+} from '../identityHubModel.js'
 
 import type { ContinuityWorkingTreeStatus } from '../../continuity/storage.js'
+
+type SummaryRow = {
+  label: string
+  value: string
+  tone: 'ok' | 'dim' | 'warn'
+  highlight?: boolean
+}
 
 export const IdentitySummary: React.FC<{
   identity?: EthagentIdentity
@@ -25,24 +37,10 @@ export const IdentitySummary: React.FC<{
     : ''
 
   const row = (label: string) => rows.find(item => item.label === label)
-  
-  const needsBackup = workingStatus?.publishState === 'local-changes' || workingStatus?.publishState === 'not-published' || workingStatus?.publishState === 'verify-needed'
-  let changedFiles: string[] = []
-  if (needsBackup) {
-    if (workingStatus?.localContentHashes && workingStatus?.publishedContentHashes) {
-      if (workingStatus.localContentHashes['SOUL.md'] !== workingStatus.publishedContentHashes['SOUL.md']) changedFiles.push('SOUL.md')
-      if (workingStatus.localContentHashes['MEMORY.md'] !== workingStatus.publishedContentHashes['MEMORY.md']) changedFiles.push('MEMORY.md')
-      if (workingStatus.localContentHashes['skills.json'] !== workingStatus.publishedContentHashes['skills.json']) changedFiles.push('skills.json')
-    } else {
-      changedFiles = ['SOUL.md', 'MEMORY.md', 'skills.json']
-    }
-  }
+  const localChangeStatus = localChangeStatusView(workingStatus)
+  const lastSavedRow: SummaryRow = { label: 'Last Saved', value: lastBackup, tone: lastBackup === 'never' ? 'dim' : 'ok' }
 
-  const lastSavedRow = needsBackup
-    ? { label: 'Unsaved', value: changedFiles.length > 0 ? changedFiles.join(', ') : 'Markdown files', tone: 'warn' as const, highlight: true }
-    : { label: 'Last Saved', value: lastBackup, tone: lastBackup === 'never' ? 'dim' as const : 'ok' as const }
-
-  const summaryRows = [
+  const summaryRows: SummaryRow[] = [
     { label: 'Token', value: row('token')?.value ?? 'Not Created', tone: row('token')?.tone ?? 'dim', highlight: true },
     { label: 'Network', value: row('network')?.value ?? 'Unknown', tone: row('network')?.tone ?? 'dim' },
     { label: 'Owner', value: row('owner')?.value ?? 'Not Connected', tone: row('owner')?.tone ?? 'dim' },
@@ -57,16 +55,34 @@ export const IdentitySummary: React.FC<{
     <Box flexDirection="column">
       <Text color={theme.accentPrimary} bold>{stateName || 'Active Agent'}</Text>
       {summaryRows.map(row => {
-        const valueColor = row.tone === 'warn' ? 'red' : (row.tone === 'ok' ? theme.text : theme.dim)
+        const valueColor = row.tone === 'warn' ? '#e87070' : (row.tone === 'ok' ? theme.text : theme.dim)
         return (
           <Text key={row.label}>
             <Text color={theme.dim}>{row.label.padEnd(12)}</Text>
-            <Text color={valueColor} bold={row.highlight}>{displayValue(row.value)}</Text>
+            <Text color={valueColor} bold={row.highlight ?? false}>{displayValue(row.value)}</Text>
           </Text>
         )
       })}
+      <Box marginTop={1}>
+        <LocalChangeStatusLine status={localChangeStatus} />
+      </Box>
     </Box>
   )
+}
+
+const LocalChangeStatusLine: React.FC<{ status: LocalChangeStatusView }> = ({ status }) => {
+  if (status.hasLocalChanges) {
+    return (
+      <Text color="#e87070" bold>
+        Local changes detected
+        {status.files.length > 0 ? `: ${status.files.join(', ')}` : ''}
+      </Text>
+    )
+  }
+
+  const color = status.tone === 'ok' ? theme.accentMint : status.tone === 'warn' ? theme.accentPeach : theme.dim
+  const label = status.detail === 'None detected' ? 'No local changes detected' : status.detail
+  return <Text color={color}>{label}</Text>
 }
 
 function displayValue(value: string): string {

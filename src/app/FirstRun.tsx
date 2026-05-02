@@ -289,6 +289,7 @@ export const FirstRun: React.FC<FirstRunProps> = ({ onComplete, onCancel }) => {
           <TextInput
             isSecret
             placeholder={provider === 'openai' ? 'sk-...' : 'paste key and press enter'}
+            chromeWidth={4}
             validate={v => v.trim().length >= 8 ? null : 'key looks too short'}
             onSubmit={async value => {
               const trimmed = value.trim()
@@ -326,6 +327,7 @@ export const FirstRun: React.FC<FirstRunProps> = ({ onComplete, onCancel }) => {
           <TextInput
             initialValue={defaultModel}
             placeholder={defaultModel}
+            chromeWidth={4}
             onSubmit={model => goTo({
               kind: 'saving',
               config: withFirstRunIdentity({

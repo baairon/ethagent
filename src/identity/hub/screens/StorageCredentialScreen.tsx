@@ -83,6 +83,9 @@ export const StorageCredentialScreen: React.FC<StorageCredentialScreenProps> = (
           ))}
         </Box>
         <Box marginTop={1}>
+          <Text color={theme.accentPeach}>Remove the token from this machine?</Text>
+        </Box>
+        <Box marginTop={1}>
           <Select<StorageCredentialAction>
             options={[
               { value: 'forget', role: 'section', prefix: '--', label: 'Credential' },

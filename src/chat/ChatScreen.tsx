@@ -143,6 +143,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
   const [mode, setMode] = useState<SessionMode>('chat')
   const [pendingPlan, setPendingPlan] = useState<PendingPlan | null>(null)
   const [compactionUi, setCompactionUi] = useState<CompactionUiState | null>(null)
+  const [canScrollTranscript, setCanScrollTranscript] = useState(false)
   const [sessionId, setSessionId] = useState<string>(() => newSessionId())
   const [sessionKey, setSessionKey] = useState<number>(0)
   const [cwd, setCwd] = useState<string>(() => syncCwdFromProcess())
@@ -1094,6 +1095,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
             : `open failed: ${result.error}`,
           result.ok ? 'dim' : 'error',
         )
+        if (result.ok) setContinuityEditReview(prev => prev ? { ...prev, editorOpened: true } : null)
         return
       }
       setContinuityEditReview(null)
@@ -1398,9 +1400,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
           <Text color={theme.dim}> · </Text>
         </>
       )}
-      <Text color={theme.dim}>
-        {'pgup/pgdn scroll · alt+p model · alt+i identity'}
-      </Text>
+      <Text color={theme.dim}>{chatFooterShortcutText(canScrollTranscript)}</Text>
     </Box>
   )
   const header = <BrandSplash contextLine={contextLine} tipLine={tipLine} updateNotice={updateNotice ?? null} />
@@ -1466,8 +1466,13 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
       )}
       sessionKey={sessionKey}
       onVisibleReasoningIdsChange={updateVisibleReasoningIds}
+      onTranscriptScrollabilityChange={setCanScrollTranscript}
     />
   )
+}
+
+export function chatFooterShortcutText(canScrollTranscript: boolean): string {
+  return `${canScrollTranscript ? 'pgup/pgdn scroll · ' : ''}alt+p model · alt+i identity`
 }
 
 function formatContextLabel(usage: ContextUsage): string {

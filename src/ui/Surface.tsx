@@ -27,7 +27,7 @@ export const Surface: React.FC<SurfaceProps> = ({
 }) => {
   const borderColor = toneColor[tone]
   return (
-    <Box flexDirection="column" borderStyle="round" borderColor={borderColor} paddingX={2} paddingY={0}>
+    <Box flexDirection="column" borderStyle="round" borderColor={borderColor} paddingX={2} paddingY={0} width="100%">
       <Box flexDirection="column">
         <Text color={borderColor} bold>{title}</Text>
         {subtitle ? (

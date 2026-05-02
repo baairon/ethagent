@@ -17,6 +17,7 @@ type CommonProps = {
   workingStatus?: ContinuityWorkingTreeStatus | null
   ready: boolean
   notice?: string
+  editorOpened?: boolean
   footer: React.ReactNode
   onBack: () => void
 }
@@ -42,6 +43,7 @@ export const PrivateContinuityScreen: React.FC<CommonProps & {
   workingStatus,
   ready,
   notice,
+  editorOpened,
   footer,
   onOpenSoul,
   onOpenMemory,
@@ -51,6 +53,11 @@ export const PrivateContinuityScreen: React.FC<CommonProps & {
     <IdentitySummary identity={identity} config={config} workingStatus={workingStatus} compact />
     <PrivateRows identity={identity} ready={ready} />
     <SaveFromHubHint workingStatus={workingStatus} />
+    {editorOpened && (
+      <Box marginTop={1}>
+        <Text color={theme.accentPeach}>Save with ctrl+s in your editor</Text>
+      </Box>
+    )}
     <Box marginTop={1}>
       <Select<PrivateAction>
         options={[
@@ -75,11 +82,16 @@ export const PrivateContinuityScreen: React.FC<CommonProps & {
 export const PublicSkillsScreen: React.FC<CommonProps & {
   onEditProfile: () => void
   onOpenSkills: () => void
-}> = ({ identity, config, workingStatus, notice, footer, onEditProfile, onOpenSkills, onBack }) => (
+}> = ({ identity, config, workingStatus, notice, editorOpened, footer, onEditProfile, onOpenSkills, onBack }) => (
   <Surface title="Public Profile" subtitle={notice ?? 'Manage public metadata, skills.json, and the agent card.'} footer={footer}>
     <IdentitySummary identity={identity} config={config} workingStatus={workingStatus} compact />
     <PublicProfileRows identity={identity} />
     <SaveFromHubHint workingStatus={workingStatus} />
+    {editorOpened && (
+      <Box marginTop={1}>
+        <Text color={theme.accentPeach}>Save with ctrl+s in your editor</Text>
+      </Box>
+    )}
     <Box marginTop={1}>
       <Select<PublicAction>
         options={[

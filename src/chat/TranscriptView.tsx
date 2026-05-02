@@ -21,6 +21,7 @@ type TranscriptViewProps = {
   active?: boolean
   bottomVariant?: 'prompt' | 'overlay'
   onVisibleReasoningIdsChange?: (ids: string[]) => void
+  onScrollabilityChange?: (canScroll: boolean) => void
 }
 
 const PROMPT_RESERVED_LINES = 11
@@ -33,6 +34,7 @@ export const TranscriptView: React.FC<TranscriptViewProps> = ({
   active = true,
   bottomVariant = 'prompt',
   onVisibleReasoningIdsChange,
+  onScrollabilityChange,
 }) => {
   const { stdout } = useStdout()
   const columns = stdout.columns ?? process.stdout.columns ?? 80
@@ -88,6 +90,10 @@ export const TranscriptView: React.FC<TranscriptViewProps> = ({
   useEffect(() => {
     onVisibleReasoningIdsChange?.(visibleReasoningIds)
   }, [onVisibleReasoningIdsChange, visibleReasoningIds])
+
+  useEffect(() => {
+    onScrollabilityChange?.(metrics.maxScrollTop > 0)
+  }, [metrics.maxScrollTop, onScrollabilityChange])
 
   useAppInput((_input, key) => {
     if (key.pageUp) {

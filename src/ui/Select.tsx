@@ -73,7 +73,7 @@ export function Select<T>({
     else if (key.return) {
       const selected = options[index]
       if (isSelectableOption(selected)) onSubmit(selected.value)
-    } else if (key.escape) {
+    } else if (key.escape || (key.ctrl && input === 'c')) {
       onCancel?.()
     }
   })
