@@ -28,7 +28,7 @@ test('update notice includes current and latest versions only when latest is new
     timeoutMs: 1,
   })
 
-  assert.equal(notice, 'update available: ethagent 1.1.0 -> 1.1.1; run npm i -g ethagent')
+  assert.equal(notice, '✨ update available: ethagent 1.1.0 -> 1.1.1 · run npm i -g ethagent@latest')
 })
 
 test('update notice fails closed for registry errors', async () => {

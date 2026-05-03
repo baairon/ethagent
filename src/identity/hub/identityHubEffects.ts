@@ -751,8 +751,134 @@ export async function runRebackupStorageSubmit(
   callbacks.onStep({ kind: 'rebackup-signing', identity: step.identity, registry: step.registry, pinataJwt, profileUpdates: step.profileUpdates, returnTo: step.returnTo })
 }
 
+export async function runPublicProfileSigning(
+  step: Extract<Step, { kind: 'public-profile-signing' }>,
+  callbacks: EffectCallbacks,
+): Promise<void> {
+  const expectedOwner = step.identity.ownerAddress ?? step.identity.address
+  const result = await requestBrowserWalletSignatureAndTransaction<PublicProfilePreparedTransaction>({
+    chainId: step.registry.chainId,
+    messageForAccount: account => `Authorize public profile update for agent #${step.identity.agentId ?? 'unknown'} (${account})`,
+    onReady: callbacks.onWalletReady,
+    ...(expectedOwner ? { expectedAccount: getAddress(expectedOwner) } : {}),
+    prepareTransaction: async wallet => {
+      if (!step.identity.agentId) throw new Error('cannot update public profile: identity is missing an agent token id')
+      if (expectedOwner && wallet.account.toLowerCase() !== expectedOwner.toLowerCase()) {
+        throw new Error(`connect the wallet that owns this agent (${expectedOwner}) and try again`)
+      }
+      const baseState = (step.identity.state ?? {}) as Record<string, unknown>
+      const profile = step.profileUpdates ?? {}
+      const nextName = typeof profile.name === 'string' && profile.name.trim() ? profile.name.trim() : (typeof baseState.name === 'string' ? baseState.name : undefined)
+      const nextDescription = profile.description !== undefined ? profile.description.trim() : (typeof baseState.description === 'string' ? baseState.description : '')
+      const uploadedImageUri = profile.imagePath === 'delete'
+        ? ''
+        : profile.imagePath
+          ? await uploadAgentImage(profile.imagePath, step.pinataJwt)
+          : typeof baseState.imageUrl === 'string' && baseState.imageUrl.trim()
+            ? baseState.imageUrl.trim()
+            : undefined
+      const state: Record<string, unknown> = {
+        ...baseState,
+        ...(nextName !== undefined ? { name: nextName } : {}),
+        description: nextDescription,
+      }
+      if (uploadedImageUri === '') {
+        delete state.imageUrl
+      } else if (uploadedImageUri) {
+        state.imageUrl = uploadedImageUri
+      }
+      const nextIdentityForFiles: EthagentIdentity = { ...step.identity, state }
+      const publicSkillsJson = await prepareSyncedPublicSkillsJson(nextIdentityForFiles)
+      const publicSkillsPin = await addToIpfs(DEFAULT_IPFS_API_URL, publicSkillsJson, fetch, { pinataJwt: step.pinataJwt })
+      assertVerifiedPin(publicSkillsPin)
+      const agentCardPin = await addToIpfs(
+        DEFAULT_IPFS_API_URL,
+        serializeAgentCard(createAgentCard(defaultPublicSkillsProfile(nextIdentityForFiles))),
+        fetch,
+        { pinataJwt: step.pinataJwt },
+      )
+      assertVerifiedPin(agentCardPin)
+      const updatedAt = new Date().toISOString()
+      const publicSkills: PublicSkillsMetadata = {
+        cid: publicSkillsPin.cid,
+        agentCardCid: agentCardPin.cid,
+        updatedAt,
+        status: 'pinned',
+      }
+      const existingBackup = step.identity.backup ? {
+        cid: step.identity.backup.cid,
+        ...(step.identity.backup.envelopeVersion ? { envelopeVersion: step.identity.backup.envelopeVersion } : {}),
+        ...(step.identity.backup.createdAt ? { createdAt: step.identity.backup.createdAt } : {}),
+      } : undefined
+      const registration = withEthagentPointers({
+        type: 'https://eips.ethereum.org/EIPS/eip-8004#registration-v1',
+        name: nextName ?? deriveAgentName(step.identity),
+        ...(nextDescription ? { description: nextDescription } : {}),
+        ...(uploadedImageUri ? { image: uploadedImageUri } : {}),
+      }, {
+        backup: existingBackup,
+        publicDiscovery: {
+          skillsCid: publicSkills.cid,
+          agentCardCid: publicSkills.agentCardCid,
+          updatedAt,
+        },
+        registration: {
+          chainId: step.registry.chainId,
+          identityRegistryAddress: step.registry.identityRegistryAddress,
+          agentId: step.identity.agentId,
+        },
+      })
+      const metadataPin = await addToIpfs(DEFAULT_IPFS_API_URL, JSON.stringify(registration, null, 2), fetch, { pinataJwt: step.pinataJwt })
+      assertVerifiedPin(metadataPin)
+      const metadataCid = metadataPin.cid
+      const agentUri = `ipfs://${metadataCid}`
+      const agentId = BigInt(step.identity.agentId)
+      await preflightSetAgentUri({
+        ...step.registry,
+        account: wallet.account,
+        agentId,
+        newUri: agentUri,
+      })
+      return {
+        to: step.registry.identityRegistryAddress,
+        data: encodeSetAgentUri({ agentId, newUri: agentUri }),
+        prepared: {
+          ownerAddress: wallet.account,
+          agentUri,
+          metadataCid,
+          publicSkills,
+          identity: { ...step.identity, state },
+          publicSkillsJson,
+        },
+      }
+    },
+  })
+  const client = createErc8004PublicClient(step.registry)
+  await client.waitForTransactionReceipt({ hash: result.txHash })
+  const nextIdentity: EthagentIdentity = {
+    ...result.prepared.identity,
+    source: 'erc8004',
+    address: getAddress(result.prepared.ownerAddress),
+    ownerAddress: getAddress(result.prepared.ownerAddress),
+    chainId: step.registry.chainId,
+    rpcUrl: step.registry.rpcUrl,
+    identityRegistryAddress: step.registry.identityRegistryAddress,
+    agentUri: result.prepared.agentUri,
+    metadataCid: result.prepared.metadataCid,
+    publicSkills: result.prepared.publicSkills,
+  }
+  await writePublicSkillsFile(nextIdentity, result.prepared.publicSkillsJson)
+  await callbacks.onIdentityComplete(nextIdentity, 'public profile updated')
+}
 
-
+export async function runPublicProfileStorageSubmit(
+  input: string,
+  step: Extract<Step, { kind: 'public-profile-storage' }>,
+  callbacks: EffectCallbacks,
+): Promise<void> {
+  const { jwt: pinataJwt } = await savePinataJwt(input)
+  callbacks.onStep({ kind: 'public-profile-signing', identity: step.identity, registry: step.registry, pinataJwt, profileUpdates: step.profileUpdates, returnTo: step.returnTo })
+}
 
 export async function runRecoveryRefetch(
   identity: EthagentIdentity,

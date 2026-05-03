@@ -12,8 +12,10 @@ export function compareVersions(left: string, right: string): number {
   const b = parseVersion(right)
   if (!a || !b) return 0
   for (let i = 0; i < 3; i++) {
-    if (a[i] > b[i]) return 1
-    if (a[i] < b[i]) return -1
+    const av = a[i as 0 | 1 | 2]
+    const bv = b[i as 0 | 1 | 2]
+    if (av > bv) return 1
+    if (av < bv) return -1
   }
   return 0
 }

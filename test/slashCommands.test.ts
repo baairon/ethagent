@@ -57,7 +57,7 @@ test('/hf download opens the model picker without exposing a remote catalog', as
   assert.equal(result?.kind, 'note')
   if (result?.kind !== 'note') return
   assert.equal(requested, true)
-  assert.match(result.text, /add local model file/)
+  assert.match(result.text, /add local model file/i)
   assert.doesNotMatch(result.text, /catalog/i)
 })
 

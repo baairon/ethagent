@@ -31,6 +31,8 @@ export type Step =
   | { kind: 'restore-authorizing'; cid: string; apiUrl: string; envelope: RestorableBackupEnvelope; candidate: Erc8004AgentCandidate; purpose?: RestorePurpose }
   | { kind: 'rebackup-signing'; identity: EthagentIdentity; registry: Erc8004RegistryConfig; pinataJwt?: string; profileUpdates?: ProfileUpdates; returnTo?: Step }
   | { kind: 'rebackup-storage'; identity: EthagentIdentity; registry: Erc8004RegistryConfig; error?: string; pinataJwt?: string; profileUpdates?: ProfileUpdates; returnTo?: Step }
+  | { kind: 'public-profile-signing'; identity: EthagentIdentity; registry: Erc8004RegistryConfig; pinataJwt?: string; profileUpdates?: ProfileUpdates; returnTo?: Step }
+  | { kind: 'public-profile-storage'; identity: EthagentIdentity; registry: Erc8004RegistryConfig; error?: string; pinataJwt?: string; profileUpdates?: ProfileUpdates; returnTo?: Step }
   | { kind: 'continuity-private'; notice?: string; editorOpened?: boolean }
   | { kind: 'continuity-public'; notice?: string; editorOpened?: boolean }
   | { kind: 'rebackup-confirm'; back: Step }

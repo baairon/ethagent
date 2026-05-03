@@ -8,7 +8,7 @@ import { runRuntimeTurn, type TurnEvent } from '../runtime/turn.js'
 import type { EthagentConfig } from '../storage/config.js'
 import type { SessionMessage } from '../storage/sessions.js'
 import type { SessionPermissionRule, ToolResult } from '../tools/contracts.js'
-import { readContinuityFiles } from '../identity/continuity/storage.js'
+import { readContinuityFiles, readPublicSkillsFile } from '../identity/continuity/storage.js'
 import type { MessageRow } from './MessageList.js'
 import {
   buildBaseMessages,
@@ -641,23 +641,34 @@ export async function buildIdentityContinuityContextMessages(
 
   try {
     const privateFiles = await readContinuityFiles(identity)
+    const publicSkillsContent = await readPublicSkillsFile(identity).catch(() => null)
+    const parts: string[] = [
+      '<identity_continuity_files>',
+      'The active identity continuity files have been loaded automatically for this turn.',
+      'SOUL.md is private owner continuity and is the authoritative persona, voice, and standing-behavior layer for this active identity.',
+      'MEMORY.md is private owner continuity for durable preferences, facts, and project context.',
+      'Apply SOUL.md and MEMORY.md over generic ethagent identity/style unless they conflict with safety, tool correctness, developer instructions, or the user\'s latest explicit request. Do not quote private continuity unless necessary.',
+      '<SOUL.md visibility="private">',
+      privateFiles['SOUL.md'].trimEnd(),
+      '</SOUL.md>',
+      '',
+      '<MEMORY.md visibility="private">',
+      privateFiles['MEMORY.md'].trimEnd(),
+      '</MEMORY.md>',
+    ]
+    if (publicSkillsContent) {
+      parts.push(
+        '',
+        'skills.json is the public-facing agent profile; the published copy is referenced from onchain tokenURI metadata.',
+        '<skills.json visibility="public">',
+        publicSkillsContent.trimEnd(),
+        '</skills.json>',
+      )
+    }
+    parts.push('</identity_continuity_files>')
     return [{
       role: 'system',
-      content: [
-        '<identity_continuity_files>',
-        'The active identity continuity files have been loaded automatically for this turn.',
-        'SOUL.md is private owner continuity and is the authoritative persona, voice, and standing-behavior layer for this active identity.',
-        'MEMORY.md is private owner continuity for durable preferences, facts, and project context.',
-        'Apply SOUL.md and MEMORY.md over generic ethagent identity/style unless they conflict with safety, tool correctness, developer instructions, or the user\'s latest explicit request. Do not quote private continuity unless necessary.',
-        '<SOUL.md visibility="private">',
-        privateFiles['SOUL.md'].trimEnd(),
-        '</SOUL.md>',
-        '',
-        '<MEMORY.md visibility="private">',
-        privateFiles['MEMORY.md'].trimEnd(),
-        '</MEMORY.md>',
-        '</identity_continuity_files>',
-      ].join('\n'),
+      content: parts.join('\n'),
     }]
   } catch (err: unknown) {
     return [{

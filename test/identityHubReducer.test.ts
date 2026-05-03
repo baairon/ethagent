@@ -70,8 +70,8 @@ test('identityHubReducer: top-level identity subviews back to hub', () => {
   assert.equal(identityHubReducer({ kind: 'details' }, { type: 'back', from: { kind: 'details' } }).kind, 'menu')
   assert.equal(identityHubReducer({ kind: 'continuity-public' }, { type: 'back', from: { kind: 'continuity-public' } }).kind, 'menu')
   assert.equal(identityHubReducer({ kind: 'continuity-private' }, { type: 'back', from: { kind: 'continuity-private' } }).kind, 'menu')
-  assert.equal(identityHubReducer({ kind: 'rebackup-confirm' }, { type: 'back', from: { kind: 'rebackup-confirm' } }).kind, 'menu')
-  assert.equal(identityHubReducer({ kind: 'recovery-refetch-confirm' }, { type: 'back', from: { kind: 'recovery-refetch-confirm' } }).kind, 'menu')
+  assert.equal(identityHubReducer({ kind: 'rebackup-confirm', back: { kind: 'menu' } }, { type: 'back', from: { kind: 'rebackup-confirm', back: { kind: 'menu' } } }).kind, 'menu')
+  assert.equal(identityHubReducer({ kind: 'recovery-refetch-confirm', back: { kind: 'menu' } }, { type: 'back', from: { kind: 'recovery-refetch-confirm', back: { kind: 'menu' } } }).kind, 'menu')
   assert.equal(identityHubReducer({ kind: 'storage-credential-input' }, { type: 'back', from: { kind: 'storage-credential-input' } }).kind, 'menu')
 })
 

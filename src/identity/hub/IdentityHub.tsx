@@ -24,6 +24,8 @@ import {
   runRebackupPreflight,
   runRebackupSigning,
   runRebackupStorageSubmit,
+  runPublicProfileSigning,
+  runPublicProfileStorageSubmit,
   runRecoveryRefetch,
   isAgentTokenIdRequiredError,
   type EffectCallbacks,
@@ -737,6 +739,23 @@ export const IdentityHub: React.FC<IdentityHubProps> = ({ mode, config, initialA
         onSubmit={async input => {
           try {
             await runRebackupStorageSubmit(input, step, callbacks)
+          } catch (err: unknown) {
+            setStep({ ...step, error: (err as Error).message })
+          }
+        }}
+        onCancel={back}
+      />
+    )
+  }
+
+  if (step.kind === 'public-profile-storage') {
+    return (
+      <RebackupStorageScreen
+        step={step}
+        footer={footer}
+        onSubmit={async input => {
+          try {
+            await runPublicProfileStorageSubmit(input, step, callbacks)
           } catch (err: unknown) {
             setStep({ ...step, error: (err as Error).message })
           }
