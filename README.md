@@ -1,8 +1,4 @@
-<img src="https://raw.githubusercontent.com/baairon/ethagent/master/preview/image.png" alt="ethagent" />
-
-[![npm version](https://img.shields.io/npm/v/ethagent.svg)](https://www.npmjs.com/package/ethagent)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![npm downloads](https://img.shields.io/npm/dm/ethagent.svg)](https://www.npmjs.com/package/ethagent)
+<img src="https://raw.githubusercontent.com/baairon/ethagent/refs/heads/master/preview/image.png" alt="ethagent" />
 
 A privacy-first AI agent with a portable Ethereum identity.
 
