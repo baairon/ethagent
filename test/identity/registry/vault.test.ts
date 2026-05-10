@@ -13,17 +13,17 @@ import {
   encodeUnwrapAgent,
   isAgentInVault,
   readMetadataOperators,
-  resolveConfiguredOperatorVaultAddress,
-  OPERATOR_VAULT_ABI,
-  OPERATOR_VAULT_ADDRESSES,
-  OPERATOR_VAULT_DEPLOY_BYTECODE,
-  OPERATOR_VAULT_RUNTIME_BYTECODE,
-  OPERATOR_VAULT_RUNTIME_BYTECODE_HASH,
-  OperatorVaultBytecodeMismatchError,
-  formatOperatorVaultBytecodeMismatchDetail,
-  operatorVaultAddressForChain,
+  resolveConfiguredVaultAddress,
+  VAULT_ABI,
+  VAULT_ADDRESSES,
+  VAULT_DEPLOY_BYTECODE,
+  VAULT_RUNTIME_BYTECODE,
+  VAULT_RUNTIME_BYTECODE_HASH,
+  VaultBytecodeMismatchError,
+  formatVaultBytecodeMismatchDetail,
+  vaultAddressForChain,
   type AssertVaultBytecodeClient,
-} from '../../../src/identity/registry/operatorVault.js'
+} from '../../../src/identity/registry/vault.js'
 
 const REGISTRY = '0x8004A169fb4a3325136Eb29fA0CEB6D2e539a432' as `0x${string}`
 const VAULT = '0x00000000000000000000000000000000000077ab' as `0x${string}`
@@ -62,7 +62,7 @@ test('encodeSetMetadataOperator encodes vault.setMetadataOperator(registry, agen
   })
 
   assert.equal(to.toLowerCase(), VAULT.toLowerCase())
-  const decoded = decodeFunctionData({ abi: OPERATOR_VAULT_ABI, data })
+  const decoded = decodeFunctionData({ abi: VAULT_ABI, data })
   assert.equal(decoded.functionName, 'setMetadataOperator')
   const args = decoded.args as readonly [`0x${string}`, bigint, `0x${string}`, boolean]
   assert.equal(args[0].toLowerCase(), REGISTRY.toLowerCase())
@@ -79,7 +79,7 @@ test('encodeSetMetadataOperator with approved=false encodes the revoke variant',
     approved: false,
     vaultAddress: VAULT,
   })
-  const decoded = decodeFunctionData({ abi: OPERATOR_VAULT_ABI, data })
+  const decoded = decodeFunctionData({ abi: VAULT_ABI, data })
   const args = decoded.args as readonly [`0x${string}`, bigint, `0x${string}`, boolean]
   assert.equal(args[3], false)
 })
@@ -94,7 +94,7 @@ test('encodeRotateAgentURI encodes vault.rotateAgentURI(registry, agentId, newUR
   })
 
   assert.equal(to.toLowerCase(), VAULT.toLowerCase())
-  const decoded = decodeFunctionData({ abi: OPERATOR_VAULT_ABI, data })
+  const decoded = decodeFunctionData({ abi: VAULT_ABI, data })
   assert.equal(decoded.functionName, 'rotateAgentURI')
   const args = decoded.args as readonly [`0x${string}`, bigint, string]
   assert.equal(args[0].toLowerCase(), REGISTRY.toLowerCase())
@@ -111,7 +111,7 @@ test('encodeUnwrapAgent encodes vault.unwrap(registry, agentId, recipient)', () 
   })
 
   assert.equal(to.toLowerCase(), VAULT.toLowerCase())
-  const decoded = decodeFunctionData({ abi: OPERATOR_VAULT_ABI, data })
+  const decoded = decodeFunctionData({ abi: VAULT_ABI, data })
   assert.equal(decoded.functionName, 'unwrap')
   const args = decoded.args as readonly [`0x${string}`, bigint, `0x${string}`]
   assert.equal(args[0].toLowerCase(), REGISTRY.toLowerCase())
@@ -166,39 +166,39 @@ test('readMetadataOperators returns per-address authorization map and treats RPC
   assert.equal(result[RECIPIENT], false)
 })
 
-test('operatorVaultAddressForChain returns undefined when no deployment is recorded', () => {
+test('vaultAddressForChain returns undefined when no deployment is recorded', () => {
   for (const chainId of [1, 8453]) {
-    if (OPERATOR_VAULT_ADDRESSES[chainId]) continue
-    assert.equal(operatorVaultAddressForChain(chainId), undefined)
+    if (VAULT_ADDRESSES[chainId]) continue
+    assert.equal(vaultAddressForChain(chainId), undefined)
   }
 })
 
-test('OPERATOR_VAULT_DEPLOY_BYTECODE is a 0x-prefixed even-length hex string', () => {
-  assert.match(OPERATOR_VAULT_DEPLOY_BYTECODE, /^0x[0-9a-f]+$/i)
-  assert.equal((OPERATOR_VAULT_DEPLOY_BYTECODE.length - 2) % 2, 0, 'bytecode hex must have even length')
-  assert.ok(OPERATOR_VAULT_DEPLOY_BYTECODE.length > 1000, 'bytecode looks too short')
+test('VAULT_DEPLOY_BYTECODE is a 0x-prefixed even-length hex string', () => {
+  assert.match(VAULT_DEPLOY_BYTECODE, /^0x[0-9a-f]+$/i)
+  assert.equal((VAULT_DEPLOY_BYTECODE.length - 2) % 2, 0, 'bytecode hex must have even length')
+  assert.ok(VAULT_DEPLOY_BYTECODE.length > 1000, 'bytecode looks too short')
 })
 
-test('resolveConfiguredOperatorVaultAddress prefers user config over hardcoded map', () => {
+test('resolveConfiguredVaultAddress prefers user config over hardcoded map', () => {
   const userVault = '0x1111111111111111111111111111111111111111' as `0x${string}`
   const cfg = { '8453': userVault }
   assert.equal(
-    resolveConfiguredOperatorVaultAddress(cfg, 8453)?.toLowerCase(),
+    resolveConfiguredVaultAddress(cfg, 8453)?.toLowerCase(),
     userVault.toLowerCase(),
   )
 })
 
-test('resolveConfiguredOperatorVaultAddress falls back to hardcoded map when config is empty', () => {
+test('resolveConfiguredVaultAddress falls back to hardcoded map when config is empty', () => {
   for (const chainId of [1, 8453]) {
-    if (OPERATOR_VAULT_ADDRESSES[chainId]) continue
-    assert.equal(resolveConfiguredOperatorVaultAddress(undefined, chainId), undefined)
-    assert.equal(resolveConfiguredOperatorVaultAddress({}, chainId), undefined)
+    if (VAULT_ADDRESSES[chainId]) continue
+    assert.equal(resolveConfiguredVaultAddress(undefined, chainId), undefined)
+    assert.equal(resolveConfiguredVaultAddress({}, chainId), undefined)
   }
 })
 
-test('resolveConfiguredOperatorVaultAddress checksums the address regardless of input casing', () => {
+test('resolveConfiguredVaultAddress checksums the address regardless of input casing', () => {
   const lower = '0xd8da6bf26964af9d7eed9e03e53415d37aa96045'
-  const result = resolveConfiguredOperatorVaultAddress({ '1': lower }, 1)
+  const result = resolveConfiguredVaultAddress({ '1': lower }, 1)
   assert.ok(result, 'expected an address')
   assert.equal(result, '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045')
 })
@@ -217,45 +217,45 @@ test('readMetadataOperators with empty candidates list returns an empty map', as
   assert.deepEqual(result, {})
 })
 
-test('OperatorVault gating error message names the chain so the user sees why advanced is disabled', async () => {
-  const { OperatorVaultUnavailableError } = await import('../../../src/identity/hub/effects/vault/preflight.js')
-  const err = new OperatorVaultUnavailableError(8453)
-  assert.match(err.message, /OperatorVault is not deployed for chainId 8453/)
-  assert.equal(err.name, 'OperatorVaultUnavailableError')
+test('Vault gating error message names the chain so the user sees why advanced is disabled', async () => {
+  const { VaultUnavailableError } = await import('../../../src/identity/hub/effects/vault/preflight.js')
+  const err = new VaultUnavailableError(8453)
+  assert.match(err.message, /Vault is not deployed for chainId 8453/)
+  assert.equal(err.name, 'VaultUnavailableError')
 })
 
 test('TS bytecode constants match the on-disk Foundry artifact (drift guard)', () => {
   const artifact = JSON.parse(
-    readFileSync('contracts/out/OperatorVault.sol/OperatorVault.json', 'utf8'),
+    readFileSync('contracts/out/Vault.sol/Vault.json', 'utf8'),
   ) as { bytecode: { object: Hex }; deployedBytecode: { object: Hex } }
   assert.equal(
     artifact.bytecode.object.toLowerCase(),
-    OPERATOR_VAULT_DEPLOY_BYTECODE.toLowerCase(),
-    'OPERATOR_VAULT_DEPLOY_BYTECODE has drifted from contracts/out artifact; recompile and repaste',
+    VAULT_DEPLOY_BYTECODE.toLowerCase(),
+    'VAULT_DEPLOY_BYTECODE has drifted from contracts/out artifact; recompile and repaste',
   )
   assert.equal(
     artifact.deployedBytecode.object.toLowerCase(),
-    OPERATOR_VAULT_RUNTIME_BYTECODE.toLowerCase(),
-    'OPERATOR_VAULT_RUNTIME_BYTECODE has drifted from contracts/out artifact; recompile and repaste',
+    VAULT_RUNTIME_BYTECODE.toLowerCase(),
+    'VAULT_RUNTIME_BYTECODE has drifted from contracts/out artifact; recompile and repaste',
   )
   assert.equal(
     keccak256(artifact.deployedBytecode.object).toLowerCase(),
-    OPERATOR_VAULT_RUNTIME_BYTECODE_HASH.toLowerCase(),
+    VAULT_RUNTIME_BYTECODE_HASH.toLowerCase(),
   )
 })
 
-test('OperatorVaultBytecodeMismatchError carries diagnostic fields and renders a useful detail', () => {
+test('VaultBytecodeMismatchError carries diagnostic fields and renders a useful detail', () => {
   const txHash = ('0x' + 'ab'.repeat(32)) as Hex
   const observed = ('0x' + '11'.repeat(32)) as Hex
-  const err = new OperatorVaultBytecodeMismatchError(VAULT, observed, 1234, txHash)
-  assert.equal(err.name, 'OperatorVaultBytecodeMismatchError')
+  const err = new VaultBytecodeMismatchError(VAULT, observed, 1234, txHash)
+  assert.equal(err.name, 'VaultBytecodeMismatchError')
   assert.equal(err.vaultAddress, VAULT)
   assert.equal(err.observedHash, observed)
   assert.equal(err.observedLength, 1234)
   assert.equal(err.txHash, txHash)
-  assert.equal(err.expectedHash, OPERATOR_VAULT_RUNTIME_BYTECODE_HASH)
-  assert.equal(err.expectedLength, (OPERATOR_VAULT_RUNTIME_BYTECODE.length - 2) / 2)
-  const detail = formatOperatorVaultBytecodeMismatchDetail(err)
+  assert.equal(err.expectedHash, VAULT_RUNTIME_BYTECODE_HASH)
+  assert.equal(err.expectedLength, (VAULT_RUNTIME_BYTECODE.length - 2) / 2)
+  const detail = formatVaultBytecodeMismatchDetail(err)
   assert.match(detail, /Vault address:\s+0x[0-9a-fA-F]+/)
   assert.match(detail, /Deploy tx:\s+0xab/)
   assert.match(detail, /Expected hash:/)
@@ -263,9 +263,9 @@ test('OperatorVaultBytecodeMismatchError carries diagnostic fields and renders a
   assert.match(detail, /Observed length:\s+1234 bytes/)
 })
 
-test('formatOperatorVaultBytecodeMismatchDetail surfaces the no-code case explicitly', () => {
-  const err = new OperatorVaultBytecodeMismatchError(VAULT, null, 0)
-  const detail = formatOperatorVaultBytecodeMismatchDetail(err)
+test('formatVaultBytecodeMismatchDetail surfaces the no-code case explicitly', () => {
+  const err = new VaultBytecodeMismatchError(VAULT, null, 0)
+  const detail = formatVaultBytecodeMismatchDetail(err)
   assert.match(detail, /Observed code:\s+none/)
   assert.doesNotMatch(detail, /Observed hash:/)
   assert.doesNotMatch(detail, /Deploy tx:/)
@@ -276,7 +276,7 @@ test('assertVaultBytecode never passes blockNumber to getBytecode (latest only, 
   const client = {
     getBytecode: async (args: Record<string, unknown>) => {
       observedKeys.push(Object.keys(args))
-      return OPERATOR_VAULT_RUNTIME_BYTECODE
+      return VAULT_RUNTIME_BYTECODE
     },
   } as unknown as AssertVaultBytecodeClient
   await assertVaultBytecode(client, VAULT)
@@ -294,7 +294,7 @@ test('assertVaultBytecode polls past a transient BlockNotFoundError before succe
         err.name = 'BlockNotFoundError'
         throw err
       }
-      return OPERATOR_VAULT_RUNTIME_BYTECODE
+      return VAULT_RUNTIME_BYTECODE
     },
   } as unknown as AssertVaultBytecodeClient
   await assertVaultBytecode(client, VAULT)
@@ -311,7 +311,7 @@ test('assertVaultBytecode polls past an InvalidParamsRpcError-shaped throw (publ
         err.name = 'InvalidParamsRpcError'
         throw err
       }
-      return OPERATOR_VAULT_RUNTIME_BYTECODE
+      return VAULT_RUNTIME_BYTECODE
     },
   } as unknown as AssertVaultBytecodeClient
   await assertVaultBytecode(client, VAULT)
@@ -324,7 +324,7 @@ test('assertVaultBytecode polls past arbitrary throws (any provider error during
     getBytecode: async () => {
       calls += 1
       if (calls === 1) throw new Error('completely unrelated provider message')
-      return OPERATOR_VAULT_RUNTIME_BYTECODE
+      return VAULT_RUNTIME_BYTECODE
     },
   } as unknown as AssertVaultBytecodeClient
   await assertVaultBytecode(client, VAULT)
@@ -337,7 +337,7 @@ test('assertVaultBytecode retries on empty code (follower latest behind newly-de
     getBytecode: async () => {
       calls += 1
       if (calls === 1) return '0x' as Hex
-      return OPERATOR_VAULT_RUNTIME_BYTECODE
+      return VAULT_RUNTIME_BYTECODE
     },
   } as unknown as AssertVaultBytecodeClient
   await assertVaultBytecode(client, VAULT)
@@ -372,7 +372,7 @@ test('assertVaultBytecode never retries a real bytecode mismatch', async () => {
   } as unknown as AssertVaultBytecodeClient
   await assert.rejects(
     () => assertVaultBytecode(client, VAULT),
-    (err: unknown) => err instanceof OperatorVaultBytecodeMismatchError,
+    (err: unknown) => err instanceof VaultBytecodeMismatchError,
   )
   assert.equal(calls, 1)
 })

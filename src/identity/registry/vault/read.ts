@@ -1,11 +1,11 @@
 import { getAddress, parseAbi, parseAbiItem, type Address, type PublicClient } from 'viem'
-import { OPERATOR_VAULT_ABI } from './constants.js'
-import { delayMs, OPERATOR_VAULT_POLL_DELAY_MS, OPERATOR_VAULT_POLL_MAX_ATTEMPTS } from './bytecode.js'
+import { VAULT_ABI } from './constants.js'
+import { delayMs, VAULT_POLL_DELAY_MS, VAULT_POLL_MAX_ATTEMPTS } from './bytecode.js'
 
 const DISCOVER_LOG_WINDOW_MAX_ATTEMPTS = 3
 const DISCOVER_LOG_WINDOW_DELAY_MS = 2000
 
-export type OperatorVaultReadClient = Pick<PublicClient, 'readContract'>
+export type VaultReadClient = Pick<PublicClient, 'readContract'>
 
 const ERC721_OWNER_OF_ABI = parseAbi([
   'function ownerOf(uint256 tokenId) view returns (address)',
@@ -44,7 +44,7 @@ export async function discoverPriorVaultFromTokenOwner(
   try {
     vaultLevelOwner = await args.client.readContract({
       address: candidate,
-      abi: OPERATOR_VAULT_ABI,
+      abi: VAULT_ABI,
       functionName: 'agentOwner',
       args: [registryAddr, args.agentId],
     }) as Address
@@ -58,7 +58,7 @@ export async function discoverPriorVaultFromTokenOwner(
 }
 
 export type IsAgentInVaultArgs = {
-  client: OperatorVaultReadClient
+  client: VaultReadClient
   vaultAddress: Address
   registry: Address
   agentId: bigint
@@ -69,7 +69,7 @@ export async function isAgentInVault(
 ): Promise<{ inVault: boolean; ownerAddress?: Address }> {
   const owner = await args.client.readContract({
     address: getAddress(args.vaultAddress),
-    abi: OPERATOR_VAULT_ABI,
+    abi: VAULT_ABI,
     functionName: 'agentOwner',
     args: [getAddress(args.registry), args.agentId],
   }) as Address
@@ -83,8 +83,8 @@ export async function confirmAgentInVault(
   args: IsAgentInVaultArgs,
 ): Promise<{ inVault: true; ownerAddress: Address }> {
   let lastErr: unknown
-  for (let attempt = 0; attempt < OPERATOR_VAULT_POLL_MAX_ATTEMPTS; attempt++) {
-    if (attempt > 0) await delayMs(OPERATOR_VAULT_POLL_DELAY_MS)
+  for (let attempt = 0; attempt < VAULT_POLL_MAX_ATTEMPTS; attempt++) {
+    if (attempt > 0) await delayMs(VAULT_POLL_DELAY_MS)
     try {
       const status = await isAgentInVault(args)
       lastErr = undefined
@@ -97,7 +97,7 @@ export async function confirmAgentInVault(
   }
   if (lastErr) throw lastErr
   throw new Error(
-    `OperatorVault ${getAddress(args.vaultAddress)} does not hold agent token #${args.agentId.toString()} for registry ${getAddress(args.registry)} after the deposit-confirmation budget was exhausted. The deposit transaction may have been re-orged or applied to the wrong vault. Re-run the switch.`,
+    `Vault ${getAddress(args.vaultAddress)} does not hold agent token #${args.agentId.toString()} for registry ${getAddress(args.registry)} after the deposit-confirmation budget was exhausted. The deposit transaction may have been re-orged or applied to the wrong vault. Re-run the switch.`,
   )
 }
 
@@ -111,8 +111,8 @@ export async function confirmAgentWithdrawnFromVault(
   const recipient = getAddress(args.recipient)
   let lastErr: unknown
   let lastObserved: string | undefined
-  for (let attempt = 0; attempt < OPERATOR_VAULT_POLL_MAX_ATTEMPTS; attempt++) {
-    if (attempt > 0) await delayMs(OPERATOR_VAULT_POLL_DELAY_MS)
+  for (let attempt = 0; attempt < VAULT_POLL_MAX_ATTEMPTS; attempt++) {
+    if (attempt > 0) await delayMs(VAULT_POLL_DELAY_MS)
     try {
       const status = await isAgentInVault(args)
       const tokenOwner = await args.client.readContract({
@@ -135,7 +135,7 @@ export async function confirmAgentWithdrawnFromVault(
   }
   if (lastErr) throw lastErr
   throw new Error(
-    `OperatorVault ${getAddress(args.vaultAddress)} did not release agent token #${args.agentId.toString()} to ${recipient} after the withdraw-confirmation budget was exhausted. Last observed: ${lastObserved ?? 'unknown'}.`,
+    `Vault ${getAddress(args.vaultAddress)} did not release agent token #${args.agentId.toString()} to ${recipient} after the withdraw-confirmation budget was exhausted. Last observed: ${lastObserved ?? 'unknown'}.`,
   )
 }
 
@@ -218,7 +218,7 @@ export async function discoverVaultedTokens(
 }
 
 export type ReadMetadataOperatorsArgs = {
-  client: OperatorVaultReadClient
+  client: VaultReadClient
   vaultAddress: Address
   registry: Address
   agentId: bigint
@@ -233,7 +233,7 @@ export async function readMetadataOperators(
     try {
       const approved = await args.client.readContract({
         address: getAddress(args.vaultAddress),
-        abi: OPERATOR_VAULT_ABI,
+        abi: VAULT_ABI,
         functionName: 'metadataOperators',
         args: [getAddress(args.registry), args.agentId, getAddress(candidate)],
       }) as boolean

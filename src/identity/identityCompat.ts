@@ -17,15 +17,15 @@ export function clearOwnerAddressField(target: Record<string, unknown>): void {
   delete target[LEGACY_OWNER_ADDRESS_KEY]
 }
 
-export function readOperatorVaultAddressField(input: Record<string, unknown> | null | undefined): string | undefined {
+export function readVaultAddressField(input: Record<string, unknown> | null | undefined): string | undefined {
   return stringValue(input?.[OPERATOR_VAULT_ADDRESS_KEY])
 }
 
-export function setOperatorVaultAddressField(target: Record<string, unknown>, value: string): void {
+export function setVaultAddressField(target: Record<string, unknown>, value: string): void {
   target[OPERATOR_VAULT_ADDRESS_KEY] = value
 }
 
-export function clearOperatorVaultAddressField(target: Record<string, unknown>): void {
+export function clearVaultAddressField(target: Record<string, unknown>): void {
   delete target[OPERATOR_VAULT_ADDRESS_KEY]
 }
 

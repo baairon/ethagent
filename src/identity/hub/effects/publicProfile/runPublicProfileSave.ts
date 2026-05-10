@@ -25,9 +25,9 @@ import {
   type Erc8004RegistryConfig,
 } from '../../../registry/erc8004.js'
 import {
-  OPERATOR_VAULT_ABI,
+  VAULT_ABI,
   encodeRotateAgentURI,
-} from '../../../registry/operatorVault.js'
+} from '../../../registry/vault.js'
 import { resolveValidatedPinataJwt, savePinataJwt } from '../../../storage/pinataJwt.js'
 import {
   openBrowserWalletSession,
@@ -435,7 +435,7 @@ async function runOperatorWalletVaultPublicProfileSave(args: {
 
     await callbacks.onIdentityComplete(
       nextIdentity,
-      'Profile updated. ERC-8004 metadata published through the OperatorVault.',
+      'Profile updated. ERC-8004 metadata published through the Vault.',
       'update',
     )
   } finally {
@@ -611,28 +611,28 @@ async function assertVaultSignerCanRotateAgentUri(args: {
   try {
     vaultOwner = getAddress(await client.readContract({
       address: vaultAddress,
-      abi: OPERATOR_VAULT_ABI,
+      abi: VAULT_ABI,
       functionName: 'agentOwner',
       args: [registryAddress, args.agentId],
     }) as Address)
   } catch (err: unknown) {
-    throw new Error(`Could not verify OperatorVault custody for agent #${args.agentId.toString()}: ${err instanceof Error ? err.message : String(err)}`)
+    throw new Error(`Could not verify Vault custody for agent #${args.agentId.toString()}: ${err instanceof Error ? err.message : String(err)}`)
   }
   if (vaultOwner === '0x0000000000000000000000000000000000000000') {
-    throw new Error(`OperatorVault ${vaultAddress} does not currently hold agent token #${args.agentId.toString()}. Connect the owner wallet and run "Fix Records" or return the token to the vault before retrying.`)
+    throw new Error(`Vault ${vaultAddress} does not currently hold agent token #${args.agentId.toString()}. Connect the owner wallet and run "Fix Records" or return the token to the vault before retrying.`)
   }
   if (vaultOwner.toLowerCase() === signer.toLowerCase()) return
 
   const isOperator = await client.readContract({
     address: vaultAddress,
-    abi: OPERATOR_VAULT_ABI,
+    abi: VAULT_ABI,
     functionName: 'metadataOperators',
     args: [registryAddress, args.agentId, signer],
   }) as boolean
   if (isOperator) return
 
   throw new Error(
-    `Operator wallet ${signer} is not yet authorized on the OperatorVault to rotate this agent's URI. Connect the owner wallet and run "Fix Records" or re-add this operator to grant the permission.`,
+    `Operator wallet ${signer} is not yet authorized on the Vault to rotate this agent's URI. Connect the owner wallet and run "Fix Records" or re-add this operator to grant the permission.`,
   )
 }
 

@@ -88,7 +88,7 @@ export const IdentitySummary: React.FC<IdentitySummaryProps> = ({ identity, conf
         if (!vaultAddress) return null
         return (
           <Text>
-            <Text color={theme.dim}>{'OperatorVault'.padEnd(12)}</Text>
+            <Text color={theme.dim}>{'Vault'.padEnd(12)}</Text>
             <Text color={theme.text}>{shortAddress(vaultAddress)}</Text>
           </Text>
         )

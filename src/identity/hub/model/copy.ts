@@ -21,7 +21,7 @@ export function copyableIdentityFields(identity?: EthagentIdentity, config?: Eth
   const custodyMode = readCustodyMode(identity.state)
   if (custodyMode === 'advanced') {
     const vaultAddress = readIdentityStateString(identity.state, 'operatorVaultAddress')
-    if (vaultAddress) fields.push({ label: 'OperatorVault', value: vaultAddress })
+    if (vaultAddress) fields.push({ label: 'Vault', value: vaultAddress })
   }
   const activeOperator = readIdentityStateString(identity.state, 'activeOperatorAddress')
   if (activeOperator) fields.push({ label: 'Operator Wallet', value: activeOperator })

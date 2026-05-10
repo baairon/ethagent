@@ -24,9 +24,9 @@ import {
   withEthagentPointers,
 } from '../../../registry/erc8004.js'
 import {
-  OPERATOR_VAULT_ABI,
+  VAULT_ABI,
   encodeRotateAgentURI,
-} from '../../../registry/operatorVault.js'
+} from '../../../registry/vault.js'
 import {
   requestBrowserWalletSignature,
   requestBrowserWalletSignatureAndTransaction,
@@ -54,7 +54,7 @@ import { markCurrentContinuityFilesPublished } from '../shared/sync.js'
 type BackupMetadata = NonNullable<EthagentIdentity['backup']>
 type PublicSkillsMetadata = NonNullable<EthagentIdentity['publicSkills']>
 
-type OperatorVaultPublishPrepared = {
+type VaultPublishPrepared = {
   nextIdentity: EthagentIdentity
   markdownScaffold?: IdentityMarkdownScaffold
   completionMessage: string
@@ -210,7 +210,7 @@ async function runOperatorWalletVaultPublish(args: {
   const probeClient = createErc8004PublicClient(step.registry)
   const isOperator = await probeClient.readContract({
     address: vaultAddress,
-    abi: OPERATOR_VAULT_ABI,
+    abi: VAULT_ABI,
     functionName: 'metadataOperators',
     args: [
       getAddress(step.registry.identityRegistryAddress),
@@ -220,11 +220,11 @@ async function runOperatorWalletVaultPublish(args: {
   }) as boolean
   if (!isOperator) {
     throw new Error(
-      `Operator wallet ${expectedSigner} is not yet authorized on the OperatorVault to rotate this agent's URI. Connect the owner wallet and run "Fix Records" or re-add this operator to grant the permission.`,
+      `Operator wallet ${expectedSigner} is not yet authorized on the Vault to rotate this agent's URI. Connect the owner wallet and run "Fix Records" or re-add this operator to grant the permission.`,
     )
   }
 
-  const result = await requestBrowserWalletSignatureAndTransaction<OperatorVaultPublishPrepared>({
+  const result = await requestBrowserWalletSignatureAndTransaction<VaultPublishPrepared>({
     chainId: step.registry.chainId,
     messageForAccount: account => createWalletRestoreAccessChallenge({
       token: walletAccess.token,
@@ -344,8 +344,8 @@ async function runOperatorWalletVaultPublish(args: {
       }
 
       const completionMessage = nextEnsName !== undefined && nextEnsName !== ((step.identity.state as Record<string, unknown> | undefined)?.ensName as string | undefined)
-        ? 'Snapshot published onchain through the OperatorVault. ENS records remain owner-signed, switch to the owner wallet to update them.'
-        : 'Snapshot published onchain through the OperatorVault.'
+        ? 'Snapshot published onchain through the Vault. ENS records remain owner-signed, switch to the owner wallet to update them.'
+        : 'Snapshot published onchain through the Vault.'
 
       return {
         to: vaultCall.to,

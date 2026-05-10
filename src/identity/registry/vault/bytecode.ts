@@ -1,7 +1,7 @@
 import { getAddress, keccak256, type Address, type Hex, type PublicClient } from 'viem'
-import { OPERATOR_VAULT_RUNTIME_BYTECODE, OPERATOR_VAULT_RUNTIME_BYTECODE_HASH } from './constants.js'
+import { VAULT_RUNTIME_BYTECODE, VAULT_RUNTIME_BYTECODE_HASH } from './constants.js'
 
-export class OperatorVaultBytecodeMismatchError extends Error {
+export class VaultBytecodeMismatchError extends Error {
   readonly vaultAddress: Address
   readonly observedHash: Hex | null
   readonly observedLength: number
@@ -15,22 +15,22 @@ export class OperatorVaultBytecodeMismatchError extends Error {
     txHash?: Hex,
   ) {
     super(
-      'Deployed contract bytecode does not match the expected OperatorVault. The deploy transaction may have been intercepted.',
+      'Deployed contract bytecode does not match the expected Vault. The deploy transaction may have been intercepted.',
     )
-    this.name = 'OperatorVaultBytecodeMismatchError'
+    this.name = 'VaultBytecodeMismatchError'
     this.vaultAddress = vaultAddress
     this.observedHash = observedHash
     this.observedLength = observedLength
-    this.expectedHash = OPERATOR_VAULT_RUNTIME_BYTECODE_HASH
-    this.expectedLength = (OPERATOR_VAULT_RUNTIME_BYTECODE.length - 2) / 2
+    this.expectedHash = VAULT_RUNTIME_BYTECODE_HASH
+    this.expectedLength = (VAULT_RUNTIME_BYTECODE.length - 2) / 2
     if (txHash) this.txHash = txHash
   }
 }
 
 export type AssertVaultBytecodeClient = Pick<PublicClient, 'getBytecode'>
 
-export const OPERATOR_VAULT_POLL_MAX_ATTEMPTS = 5
-export const OPERATOR_VAULT_POLL_DELAY_MS = 1500
+export const VAULT_POLL_MAX_ATTEMPTS = 5
+export const VAULT_POLL_DELAY_MS = 1500
 export function delayMs(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
@@ -41,8 +41,8 @@ async function readVaultBytecodeWithPoll(
 ): Promise<Hex | undefined> {
   let lastErr: unknown
   let lastCode: Hex | undefined
-  for (let attempt = 0; attempt < OPERATOR_VAULT_POLL_MAX_ATTEMPTS; attempt++) {
-    if (attempt > 0) await delayMs(OPERATOR_VAULT_POLL_DELAY_MS)
+  for (let attempt = 0; attempt < VAULT_POLL_MAX_ATTEMPTS; attempt++) {
+    if (attempt > 0) await delayMs(VAULT_POLL_DELAY_MS)
     try {
       const code = await client.getBytecode({ address })
       lastErr = undefined
@@ -66,13 +66,13 @@ export async function assertVaultBytecode(
   const address = getAddress(vaultAddress)
   const code = await readVaultBytecodeWithPoll(client, address)
   if (!code || code === '0x') {
-    throw new OperatorVaultBytecodeMismatchError(address, null, 0, txHash)
+    throw new VaultBytecodeMismatchError(address, null, 0, txHash)
   }
   const observedLength = (code.length - 2) / 2
   const observed = keccak256(code).toLowerCase() as Hex
-  const expected = OPERATOR_VAULT_RUNTIME_BYTECODE_HASH.toLowerCase() as Hex
+  const expected = VAULT_RUNTIME_BYTECODE_HASH.toLowerCase() as Hex
   if (observed !== expected) {
-    throw new OperatorVaultBytecodeMismatchError(address, observed, observedLength, txHash)
+    throw new VaultBytecodeMismatchError(address, observed, observedLength, txHash)
   }
 }
 
@@ -80,8 +80,8 @@ function shortHash(hash: Hex): string {
   return `${hash.slice(0, 18)}...${hash.slice(-6)}`
 }
 
-export function formatOperatorVaultBytecodeMismatchDetail(
-  err: OperatorVaultBytecodeMismatchError,
+export function formatVaultBytecodeMismatchDetail(
+  err: VaultBytecodeMismatchError,
 ): string {
   const lines = [
     `Vault address:   ${err.vaultAddress}`,

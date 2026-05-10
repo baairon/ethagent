@@ -14,7 +14,7 @@ import {
   type Erc8004RegistryConfig,
 } from '../../../registry/erc8004.js'
 import { requestBrowserWalletSignature } from '../../../wallet/browserWallet.js'
-import { setOperatorVaultAddressField } from '../../../identityCompat.js'
+import { setVaultAddressField } from '../../../identityCompat.js'
 import type { EffectCallbacks } from '../types.js'
 import { isContinuitySnapshotEnvelope, parseRestorableEnvelope } from './envelopes.js'
 import { restoreMessageForWallet } from './auth.js'
@@ -98,7 +98,7 @@ export async function runRecoveryRefetch(
   }
   const tokenOwnerAddress = candidate.tokenOwnerAddress ?? candidate.ownerAddress
   if (tokenOwnerAddress.toLowerCase() !== candidate.ownerAddress.toLowerCase()) {
-    setOperatorVaultAddressField(refreshedState, getAddress(tokenOwnerAddress))
+    setVaultAddressField(refreshedState, getAddress(tokenOwnerAddress))
   }
   const nextIdentity: EthagentIdentity = {
     ...identity,

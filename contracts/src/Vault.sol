@@ -24,7 +24,7 @@ interface IERC721Receiver {
     ) external returns (bytes4);
 }
 
-/// @title OperatorVault
+/// @title Vault
 /// @notice A thin vault that holds one ERC-8004 agent token on behalf of an
 /// owner and exposes a least-authority "metadata operator" lane: an
 /// authorized operator address can rotate the agent's `agentURI` pointer
@@ -40,7 +40,7 @@ interface IERC721Receiver {
 ///   operators or move the token.
 /// - Operator-only privilege: rotate the onchain agentURI via
 ///   `rotateAgentURI`, which proxies to `setAgentURI` on the registry.
-contract OperatorVault is IERC721Receiver {
+contract Vault is IERC721Receiver {
     address private _expectedRegistry;
     uint256 private _expectedAgentId;
     address private _activeRegistry;

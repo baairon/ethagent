@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { createErc8004PublicClient } from '../../../registry/erc8004.js'
-import { confirmAgentInVault } from '../../../registry/operatorVault.js'
+import { confirmAgentInVault } from '../../../registry/vault.js'
 import { invalidateOwnershipCache } from '../../reconciliation/index.js'
 import type { ProfileUpdates } from '../../identityHubReducer.js'
 import type { CustodyFlowDeps } from './custodyFlowTypes.js'
@@ -25,7 +25,7 @@ export function useCustodyTransactionEffects({
     let cancelled = false
     if (!step.identity.agentId) {
       handleStepError(
-        new Error('Cannot deploy OperatorVault: agent token ID is missing'),
+        new Error('Cannot deploy Vault: agent token ID is missing'),
         { kind: 'custody-model', identity: step.identity, registry: step.registry, returnTo: step.returnTo },
       )
       return () => { cancelled = true }

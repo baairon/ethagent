@@ -95,7 +95,7 @@ export const CustodyEditFlow: React.FC<CustodyEditFlowProps> = ({
     const isAdvanced = onChainCustody === 'advanced' || midFlow || custodyMode === 'advanced'
     const vaultHolds = onChainCustody === 'advanced' || midFlow
     const subtitle = midFlow
-      ? 'Advanced setup pending. This OperatorVault holds your token. Finish by publishing the first onchain update.'
+      ? 'Advanced setup pending. This Vault holds your token. Finish by publishing the first onchain update.'
       : isAdvanced
         ? 'Advanced is active. Authorized operator wallets publish updates for this agent without an owner signature each time.'
         : 'Simple is active. One wallet owns the token and signs every update.'
@@ -106,7 +106,7 @@ export const CustodyEditFlow: React.FC<CustodyEditFlowProps> = ({
       options.push({
         value: 'resume-advanced',
         label: 'Resume Advanced Setup',
-        hint: 'Sign once to publish onchain and finish the OperatorVault switch.',
+        hint: 'Sign once to publish onchain and finish the Vault switch.',
       })
       options.push({
         value: 'cancel-advanced',
@@ -119,7 +119,7 @@ export const CustodyEditFlow: React.FC<CustodyEditFlowProps> = ({
       options.push({
         value: 'switch-advanced',
         label: 'Switch to Advanced',
-        hint: 'Deposit this token into its own OperatorVault so operator wallets can publish updates onchain.',
+        hint: 'Deposit this token into its own Vault so operator wallets can publish updates onchain.',
       })
     } else {
       if (!midFlow) {
@@ -139,7 +139,7 @@ export const CustodyEditFlow: React.FC<CustodyEditFlowProps> = ({
         options.push({
           value: 'return-to-vault',
           label: 'Return Token to Vault',
-          hint: 'Redeposit this token to its OperatorVault. No redeploy, no operator re-add.',
+          hint: 'Redeposit this token to its Vault. No redeploy, no operator re-add.',
         })
       }
       options.push({ value: 'manage-operator-wallets', role: 'section', label: 'Operators' })
@@ -184,7 +184,7 @@ export const CustodyEditFlow: React.FC<CustodyEditFlowProps> = ({
           })()}
           <Row label="Custody" value={modeLabel} />
           <Row label="Owner" value={shortAddress(ownerAddress || tokenOwner)} />
-          {isAdvanced && vaultAddress ? <Row label="OperatorVault" value={shortAddress(vaultAddress)} /> : null}
+          {isAdvanced && vaultAddress ? <Row label="Vault" value={shortAddress(vaultAddress)} /> : null}
           {isAdvanced ? (
             <Row
               label="Operators"
@@ -251,14 +251,14 @@ export const CustodyEditFlow: React.FC<CustodyEditFlowProps> = ({
     return (
       <Surface
         title="Switch to Advanced"
-        subtitle="Move this token into its own OperatorVault so authorized operator wallets can update this agent onchain without your signature each time."
+        subtitle="Move this token into its own Vault so authorized operator wallets can update this agent onchain without your signature each time."
         footer={footerHint('enter confirm, esc back')}
       >
         <Box flexDirection="column">
           <Row label="Token" value={tokenLabel} />
           {agentName ? <Row label="Name" value={agentName} /> : null}
           <Row label="Owner Wallet" value={shortAddress(ownerAddress || tokenOwner)} />
-          <Text color={theme.textSubtle}>You sign once now to deposit token #{identity.agentId ?? 'unknown'} into a dedicated OperatorVault.</Text>
+          <Text color={theme.textSubtle}>You sign once now to deposit token #{identity.agentId ?? 'unknown'} into a dedicated Vault.</Text>
           <Text color={theme.textSubtle}>This vault can hold only this ERC-8004 token.</Text>
           <Text color={theme.textSubtle}>Other agent tokens use their own vaults.</Text>
           <Text color={theme.textSubtle}>After that, operator wallets you authorize can publish updates for this agent.</Text>
@@ -271,7 +271,7 @@ export const CustodyEditFlow: React.FC<CustodyEditFlowProps> = ({
           <Select<Action>
             options={[
               { value: 'confirm', role: 'section', label: 'Confirm' },
-              { value: 'confirm', label: 'Yes, Switch to Advanced', hint: `Sign with ${shortAddress(ownerAddress || tokenOwner)} to deposit this token into its OperatorVault` },
+              { value: 'confirm', label: 'Yes, Switch to Advanced', hint: `Sign with ${shortAddress(ownerAddress || tokenOwner)} to deposit this token into its Vault` },
               { value: 'transfer', role: 'section', label: 'Move Token First' },
               { value: 'transfer', label: 'Prepare Token Transfer', hint: 'Move the token to a different wallet first, with snapshot handoff' },
               { value: 'back', role: 'section', label: 'Cancel' },
@@ -300,7 +300,7 @@ export const CustodyEditFlow: React.FC<CustodyEditFlowProps> = ({
   return (
     <Surface
       title="Switch to Simple"
-      subtitle="Unwraps this ERC-8004 token from its OperatorVault and returns it directly to the owner wallet."
+      subtitle="Unwraps this ERC-8004 token from its Vault and returns it directly to the owner wallet."
       footer={footerHint('enter confirm · esc back')}
     >
       <Box flexDirection="column">
@@ -309,13 +309,13 @@ export const CustodyEditFlow: React.FC<CustodyEditFlowProps> = ({
         <Text> </Text>
         <Text color={theme.accentBlue}>Operators lose decrypt access on future snapshots immediately.</Text>
         <Text color={theme.textSubtle}>Operator approvals are cleared from local state for future snapshots. Revoke onchain via Manage Operators first if needed.</Text>
-        <Text color={theme.textSubtle}>This switch calls the OperatorVault unwrap function for this token, so the owner wallet must sign the transaction.</Text>
+        <Text color={theme.textSubtle}>This switch calls the Vault unwrap function for this token, so the owner wallet must sign the transaction.</Text>
       </Box>
       <Box marginTop={1}>
         <Select<Action>
           options={[
             { value: 'confirm', role: 'section', label: 'Confirm' },
-            { value: 'confirm', label: 'Yes, Switch to Simple', hint: `Sign with the owner wallet to unwrap ${tokenLabel} from its OperatorVault` },
+            { value: 'confirm', label: 'Yes, Switch to Simple', hint: `Sign with the owner wallet to unwrap ${tokenLabel} from its Vault` },
             { value: 'back', role: 'section', label: 'Cancel' },
             { value: 'back', label: 'No, Go Back', hint: 'Return without changing custody', role: 'utility' },
           ]}

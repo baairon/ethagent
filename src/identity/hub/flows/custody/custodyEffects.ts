@@ -4,32 +4,32 @@ import {
   encodeDepositAgent,
   encodeUnwrapAgent,
   isAgentInVault,
-  resolveConfiguredOperatorVaultAddress,
-  OPERATOR_VAULT_ABI,
-  OPERATOR_VAULT_DEPLOY_BYTECODE,
+  resolveConfiguredVaultAddress,
+  VAULT_ABI,
+  VAULT_DEPLOY_BYTECODE,
   assertVaultBytecode,
-} from '../../../registry/operatorVault.js'
+} from '../../../registry/vault.js'
 import {
   createErc8004PublicClient,
   type Erc8004RegistryConfig,
 } from '../../../registry/erc8004.js'
 import type { EthagentIdentity } from '../../../../storage/config.js'
-import { readOperatorVaultAddressField, readOwnerAddressField } from '../../../identityCompat.js'
+import { readVaultAddressField, readOwnerAddressField } from '../../../identityCompat.js'
 import { prepareTransactionGasFee, sendBrowserWalletTransaction } from '../../../wallet/browserWallet.js'
 import { acquireTxGuard, releaseTxGuard, type TxGuardKind } from '../../txGuard.js'
 import { awaitConfirmedReceipt } from '../../effects/receipts.js'
 import type { EffectCallbacks } from '../../effects/types.js'
 import { readCustodyMode } from '../../model/custody.js'
 
-export function resolveOperatorVaultAddress(
+export function resolveVaultAddress(
   identity: EthagentIdentity,
   operatorVaults?: Readonly<Record<string, string>>,
 ): Address | undefined {
-  const identityVault = readOperatorVaultAddressField(identity.state as Record<string, unknown> | undefined)
+  const identityVault = readVaultAddressField(identity.state as Record<string, unknown> | undefined)
   if (identityVault) return getAddress(identityVault)
   if (readCustodyMode(identity.state as Record<string, unknown> | undefined) !== 'advanced') return undefined
   if (!identity.chainId) return undefined
-  return resolveConfiguredOperatorVaultAddress(operatorVaults, identity.chainId)
+  return resolveConfiguredVaultAddress(operatorVaults, identity.chainId)
 }
 
 async function withTxGuard<T>(kind: TxGuardKind, fn: () => Promise<T>): Promise<T> {
@@ -63,8 +63,8 @@ async function runVaultDeployTransactionInner(args: {
   const walletAddress = getAddress(args.walletAddress)
   const registryAddress = getAddress(args.registry.identityRegistryAddress)
   const deployData = encodeDeployData({
-    abi: OPERATOR_VAULT_ABI,
-    bytecode: OPERATOR_VAULT_DEPLOY_BYTECODE,
+    abi: VAULT_ABI,
+    bytecode: VAULT_DEPLOY_BYTECODE,
     args: [registryAddress, args.agentId],
   })
   const gasFeeClient = createErc8004PublicClient(args.registry)
@@ -86,9 +86,9 @@ async function runVaultDeployTransactionInner(args: {
   })
   args.callbacks.onWalletReady(null)
   const client = args.publicClient ?? createErc8004PublicClient(args.registry)
-  const receipt = await awaitConfirmedReceipt(client, result.txHash, 'OperatorVault deploy', { kind: 'vault-deploy', chainId: args.registry.chainId })
+  const receipt = await awaitConfirmedReceipt(client, result.txHash, 'Vault deploy', { kind: 'vault-deploy', chainId: args.registry.chainId })
   if (!receipt.contractAddress) {
-    throw new Error('OperatorVault deploy receipt is missing contractAddress; the transaction was not a contract creation')
+    throw new Error('Vault deploy receipt is missing contractAddress; the transaction was not a contract creation')
   }
   const vaultAddress = getAddress(receipt.contractAddress)
   await assertVaultBytecode(client, vaultAddress, result.txHash)
@@ -114,7 +114,7 @@ async function runVaultDepositTransactionInner(args: {
 }): Promise<{ txHash: string }> {
   const { identity, registry, vaultAddress } = args
   if (!identity.agentId) {
-    throw new Error('Cannot deposit token to OperatorVault: agent token ID is missing')
+    throw new Error('Cannot deposit token to Vault: agent token ID is missing')
   }
   const tokenOwner = getAddress(identity.ownerAddress ?? identity.address)
   await assertVaultCanAcceptAgent({
@@ -152,7 +152,7 @@ async function runVaultDepositTransactionInner(args: {
   await awaitConfirmedReceipt(
     depositClient,
     result.txHash as Hex,
-    'OperatorVault deposit',
+    'Vault deposit',
     { kind: 'vault-deposit', chainId: registry.chainId },
   )
   return { txHash: result.txHash }
@@ -168,7 +168,7 @@ async function assertVaultCanAcceptAgent(args: {
   try {
     held = await client.readContract({
       address: getAddress(args.vaultAddress),
-      abi: OPERATOR_VAULT_ABI,
+      abi: VAULT_ABI,
       functionName: 'heldAgent',
     }) as readonly [Address, bigint, Address]
   } catch {
@@ -179,9 +179,9 @@ async function assertVaultCanAcceptAgent(args: {
   const expectedRegistry = getAddress(args.registry.identityRegistryAddress)
   const sameAgent = heldRegistry.toLowerCase() === expectedRegistry.toLowerCase() && heldAgentId === args.agentId
   if (sameAgent) {
-    throw new Error(`OperatorVault ${getAddress(args.vaultAddress)} already holds ERC-8004 token #${args.agentId.toString()}. Publish the pending update instead of depositing again.`)
+    throw new Error(`Vault ${getAddress(args.vaultAddress)} already holds ERC-8004 token #${args.agentId.toString()}. Publish the pending update instead of depositing again.`)
   }
-  throw new Error(`OperatorVault ${getAddress(args.vaultAddress)} already holds ERC-8004 token #${heldAgentId.toString()} for registry ${getAddress(heldRegistry)}. Deploy a fresh vault for this agent.`)
+  throw new Error(`Vault ${getAddress(args.vaultAddress)} already holds ERC-8004 token #${heldAgentId.toString()} for registry ${getAddress(heldRegistry)}. Deploy a fresh vault for this agent.`)
 }
 
 export async function runVaultUnwrapTransaction(args: {
@@ -206,7 +206,7 @@ async function runVaultUnwrapTransactionInner(args: {
   const { identity, registry, vaultAddress } = args
   const targetAgentId = args.agentId ?? (identity.agentId ? BigInt(identity.agentId) : undefined)
   if (targetAgentId === undefined) {
-    throw new Error('Cannot unwrap token from OperatorVault: agent token ID is missing')
+    throw new Error('Cannot unwrap token from Vault: agent token ID is missing')
   }
   const baseState = (identity.state ?? {}) as Record<string, unknown>
   const ownerAddressRaw = readOwnerAddressField(baseState)
@@ -240,7 +240,7 @@ async function runVaultUnwrapTransactionInner(args: {
   await awaitConfirmedReceipt(
     publicClient,
     result.txHash as Hex,
-    'OperatorVault unwrap',
+    'Vault unwrap',
     { kind: 'vault-unwrap', chainId: registry.chainId },
   )
   await confirmAgentWithdrawnFromVault({
@@ -307,7 +307,7 @@ async function runVaultWithdrawTransactionInner(args: {
   await awaitConfirmedReceipt(
     publicClient,
     result.txHash as Hex,
-    'OperatorVault withdraw',
+    'Vault withdraw',
     { kind: 'vault-withdraw', chainId: registry.chainId },
   )
   await confirmAgentWithdrawnFromVault({

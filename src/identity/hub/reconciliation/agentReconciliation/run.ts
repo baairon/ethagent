@@ -5,9 +5,9 @@ import {
   validateErc8004TokenOwner,
   type Erc8004RegistryConfig,
 } from '../../../registry/erc8004.js'
-import { isAgentInVault, resolveConfiguredOperatorVaultAddress } from '../../../registry/operatorVault.js'
+import { isAgentInVault, resolveConfiguredVaultAddress } from '../../../registry/vault.js'
 import type { EthagentConfig, EthagentIdentity } from '../../../../storage/config.js'
-import { readOperatorVaultAddressField } from '../../../identityCompat.js'
+import { readVaultAddressField } from '../../../identityCompat.js'
 import { reconcileWalletSetup, type RecordsFixPlan } from '../walletSetup.js'
 import { readCustodyMode } from '../../model/custody.js'
 import { continuityWorkingTreeStatus, type ContinuityWorkingTreeStatus } from '../../../continuity/storage.js'
@@ -115,11 +115,11 @@ function resolveReconciliationVaultAddress(
   identity: EthagentIdentity,
   operatorVaults?: Readonly<Record<string, string>>,
 ): Address | undefined {
-  const identityVault = readOperatorVaultAddressField(identity.state as Record<string, unknown> | undefined)
+  const identityVault = readVaultAddressField(identity.state as Record<string, unknown> | undefined)
   if (identityVault) return getAddress(identityVault)
   if (readCustodyMode(identity.state as Record<string, unknown> | undefined) !== 'advanced') return undefined
   if (!identity.chainId) return undefined
-  return resolveConfiguredOperatorVaultAddress(operatorVaults, identity.chainId)
+  return resolveConfiguredVaultAddress(operatorVaults, identity.chainId)
 }
 
 type TokenProbe =

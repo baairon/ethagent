@@ -24,8 +24,8 @@ export function renderCustodyStep({
   if (step.kind === 'custody-vault-deploy-tx') {
     return (
       <WalletApprovalScreen
-        title="Deploy OperatorVault"
-        subtitle={`Deploying a dedicated OperatorVault for this ERC-8004 token on ${chainLabel(step.registry.chainId)}.`}
+        title="Deploy Vault"
+        subtitle={`Deploying a dedicated Vault for this ERC-8004 token on ${chainLabel(step.registry.chainId)}.`}
         walletSession={walletSession}
         label="waiting for owner wallet transaction..."
         onCancel={() => setStep({ kind: 'custody-model', identity: step.identity, registry: step.registry, returnTo: step.returnTo })}
@@ -35,8 +35,8 @@ export function renderCustodyStep({
   if (step.kind === 'custody-vault-deposit-tx') {
     return (
       <WalletApprovalScreen
-        title="Deposit Token Into OperatorVault"
-        subtitle={`Sign one ${chainLabel(step.registry.chainId)} transaction. Sends ERC-8004 token #${step.identity.agentId ?? ''} to its OperatorVault.`}
+        title="Deposit Token Into Vault"
+        subtitle={`Sign one ${chainLabel(step.registry.chainId)} transaction. Sends ERC-8004 token #${step.identity.agentId ?? ''} to its Vault.`}
         walletSession={walletSession}
         label="waiting for token-owner wallet transaction..."
         onCancel={() => setStep({ kind: 'custody-model', identity: step.identity, registry: step.registry, returnTo: step.returnTo })}
@@ -49,8 +49,8 @@ export function renderCustodyStep({
       <Surface
         title="Checking Vault"
         subtitle={targetAgentId
-          ? `Confirming the OperatorVault holds ERC-8004 token #${targetAgentId} on ${chainLabel(step.registry.chainId)}.`
-          : `Checking this identity's recorded OperatorVault on ${chainLabel(step.registry.chainId)}.`}
+          ? `Confirming the Vault holds ERC-8004 token #${targetAgentId} on ${chainLabel(step.registry.chainId)}.`
+          : `Checking this identity's recorded Vault on ${chainLabel(step.registry.chainId)}.`}
         footer={<Text color={theme.dim}>esc cancel</Text>}
       >
         <Box marginTop={1}>
@@ -64,7 +64,7 @@ export function renderCustodyStep({
     return (
       <WalletApprovalScreen
         title="Withdraw Token"
-        subtitle={`Unwraps ERC-8004 token #${targetAgentId} from its OperatorVault to your owner wallet on ${chainLabel(step.registry.chainId)}.`}
+        subtitle={`Unwraps ERC-8004 token #${targetAgentId} from its Vault to your owner wallet on ${chainLabel(step.registry.chainId)}.`}
         walletSession={walletSession}
         label="waiting for owner wallet transaction..."
         onCancel={() => setStep({ kind: 'custody-model', identity: step.identity, registry: step.registry, returnTo: step.returnTo })}
@@ -135,7 +135,7 @@ export function renderCustodyStep({
     return (
       <Surface
         title="Token Returned to Owner Wallet"
-        subtitle={`Token returned to ${shortAddress(step.recipient)} on ${chainLabel(step.registry.chainId)}. The OperatorVault can be reused for this token.`}
+        subtitle={`Token returned to ${shortAddress(step.recipient)} on ${chainLabel(step.registry.chainId)}. The Vault can be reused for this token.`}
         footer={<Text color={theme.dim}>enter select · esc back</Text>}
       >
         <Box flexDirection="column">
@@ -149,7 +149,7 @@ export function renderCustodyStep({
           <Select<'return-to-vault' | 'keep-out'>
             options={[
               { value: 'return-to-vault', role: 'section', label: 'Resume Advanced Custody' },
-              { value: 'return-to-vault', label: 'Return Token to Vault', hint: 'Redeposit to this OperatorVault. No redeploy, no operator re-add' },
+              { value: 'return-to-vault', label: 'Return Token to Vault', hint: 'Redeposit to this Vault. No redeploy, no operator re-add' },
               { value: 'keep-out', role: 'section', label: 'Later' },
               { value: 'keep-out', label: 'Keep Out For Now', hint: 'Token stays with the owner wallet; redeposit any time from Custody Mode', role: 'utility' },
             ]}
@@ -167,8 +167,8 @@ export function renderCustodyStep({
   if (step.kind === 'custody-vault-unwrap-tx') {
     return (
       <WalletApprovalScreen
-        title="Unwrap Token From OperatorVault"
-        subtitle={`Sign one ${chainLabel(step.registry.chainId)} transaction. Calls the OperatorVault unwrap function to return ERC-8004 token #${step.identity.agentId ?? ''} to the owner wallet.`}
+        title="Unwrap Token From Vault"
+        subtitle={`Sign one ${chainLabel(step.registry.chainId)} transaction. Calls the Vault unwrap function to return ERC-8004 token #${step.identity.agentId ?? ''} to the owner wallet.`}
         walletSession={walletSession}
         label="waiting for owner wallet transaction..."
         onCancel={() => setStep({ kind: 'custody-model', identity: step.identity, registry: step.registry, returnTo: step.returnTo })}
@@ -182,11 +182,11 @@ export function renderCustodyStep({
     return (
       <Surface
         title="Advanced Custody Active"
-        subtitle="Your token is held in its own OperatorVault. Authorized operator wallets can rotate the agent URI onchain without owner signatures."
+        subtitle="Your token is held in its own Vault. Authorized operator wallets can rotate the agent URI onchain without owner signatures."
         footer={<Text color={theme.dim}>enter continues</Text>}
       >
         <Box flexDirection="column">
-          {step.vaultAddress ? <Row label="OperatorVault" value={shortAddress(step.vaultAddress)} /> : null}
+          {step.vaultAddress ? <Row label="Vault" value={shortAddress(step.vaultAddress)} /> : null}
           <Row label="Owner Wallet" value={shortAddress(ownerWallet)} />
           <Row label="Operator Wallets" value={operatorCount === 1 ? '1 approved' : `${operatorCount} approved`} />
           <Box marginTop={1}>
@@ -235,5 +235,5 @@ export function renderRebackupSubtitle(
   vaultRouted: boolean,
 ): React.ReactNode {
   if (!vaultRouted) return defaultSubtitle
-  return <Text color={theme.textSubtle}>{defaultSubtitle} Routed through this token's OperatorVault.</Text>
+  return <Text color={theme.textSubtle}>{defaultSubtitle} Routed through this token's Vault.</Text>
 }

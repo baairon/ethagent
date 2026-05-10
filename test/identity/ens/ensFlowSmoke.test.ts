@@ -117,7 +117,7 @@ test('vaulted public profile saves do not require Ethereum Mainnet ENS writes', 
   assert.match(vaultFlow, /rotate-agent-uri-vault-operator/)
   assert.doesNotMatch(vaultFlow, /publishOperatorProfileEnsRecord/)
   assert.doesNotMatch(vaultFlow, /runUpdateEnsRecords/)
-  assert.match(vaultFlow, /Profile updated\. ERC-8004 metadata published through the OperatorVault\./)
+  assert.match(vaultFlow, /Profile updated\. ERC-8004 metadata published through the Vault\./)
 })
 
 test('public profile completion feedback starts capitalized', () => {

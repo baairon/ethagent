@@ -24,7 +24,7 @@ import type {
   RestoreProgress,
   TokenTransferProgress,
 } from './effects/types.js'
-import { resolveOperatorVaultAddress } from './flows/custody/custodyEffects.js'
+import { resolveVaultAddress } from './flows/custody/custodyEffects.js'
 import { useCustodyFlow } from './flows/custody/useCustodyFlow.js'
 import { identityHubErrorView } from './model/errors.js'
 import { readCustodyMode } from './model/custody.js'
@@ -242,7 +242,7 @@ export function useIdentityHubController({
     }
     const vaultAddress = options?.useVault === false
       ? undefined
-      : options?.vaultAddress ?? resolveOperatorVaultAddress(identity, config?.erc8004?.operatorVaults)
+      : options?.vaultAddress ?? resolveVaultAddress(identity, config?.erc8004?.operatorVaults)
     ;(async () => {
       const role: 'token-holder' | 'vault-level-owner' = vaultAddress ? 'vault-level-owner' : 'token-holder'
       const allowed = await guardOwnership(identity, registry, role, backStep)
@@ -260,7 +260,7 @@ export function useIdentityHubController({
       return
     }
     ;(async () => {
-      const vaultAddress = resolveOperatorVaultAddress(identity, config?.erc8004?.operatorVaults)
+      const vaultAddress = resolveVaultAddress(identity, config?.erc8004?.operatorVaults)
       const allowed = await guardOwnership(identity, registry, 'vault-level-owner', backStep)
       if (!allowed) return
       runPublicProfilePreflight(identity, registry, callbacks, profileUpdates, backStep, vaultAddress)

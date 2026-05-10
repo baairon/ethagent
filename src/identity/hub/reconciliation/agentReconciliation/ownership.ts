@@ -85,7 +85,7 @@ async function runOwnershipPreflight(args: {
       return {
         ok: false,
         reason: 'not-owned',
-        detail: `Token is held by the OperatorVault (${directOwner.owner}). Withdraw it first.`,
+        detail: `Token is held by the Vault (${directOwner.owner}). Withdraw it first.`,
         onChainOwner: directOwner.owner,
       }
     }

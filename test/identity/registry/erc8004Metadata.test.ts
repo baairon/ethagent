@@ -639,7 +639,7 @@ test('validateErc8004TokenOwner treats a vault owner with an empty slot as settl
   }
 })
 
-test('validateErc8004TokenOwner accepts the actual token owner as an OperatorVault without per-chain config', async () => {
+test('validateErc8004TokenOwner accepts the actual token owner as a Vault without per-chain config', async () => {
   const owner = getAddress('0x000000000000000000000000000000000000dEaD')
   const vault = getAddress('0x00000000000000000000000000000000000077ab')
   const result = await validateErc8004TokenOwner({

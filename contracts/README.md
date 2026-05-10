@@ -1,7 +1,7 @@
 # ethagent contracts
 
 Solidity contracts that the ethagent CLI deploys to. The only contract here
-today is `OperatorVault`: a thin vault that holds ERC-8004 agent tokens and
+today is `Vault`: a thin vault that holds ERC-8004 agent tokens and
 exposes a least-authority "metadata operator" lane, letting an operator
 wallet rotate the agent's `agentURI` without granting it ERC-721 transfer
 rights.
@@ -11,9 +11,9 @@ rights.
 ```
 contracts/
   src/
-    OperatorVault.sol  # the vault
+    Vault.sol  # the vault
   test/
-    OperatorVault.t.sol  # forge tests
+    Vault.t.sol  # forge tests
   script/
     Deploy.s.sol  # deployment script
   foundry.toml
@@ -58,12 +58,11 @@ forge script script/Deploy.s.sol:Deploy \
 ```
 
 Deploy one vault per ERC-8004 token that enters Advanced custody. The
-TypeScript layer stores the deployed address on that identity as
-`operatorVaultAddress`.
+TypeScript layer stores the deployed address in the agent identity.
 
 ## Deployment topology
 
-OperatorVault must live on the same chain as the ERC-8004 registry it
+The Vault must live on the same chain as the ERC-8004 registry it
 serves. The vault calls `IERC8004URI(registry).setAgentURI(agentId,
 newURI)` directly on the registry, and ERC-721 `safeTransferFrom` lands
 at the vault on the same chain. There are no cross-chain calls; deploying
@@ -74,7 +73,7 @@ deployments are dedicated to one ERC-8004 token, and the constructor
 binds each vault to that registry and token ID.
 
 End users deploy during Advanced custody setup, then sign deposit
-(`ERC-8004.safeTransferFrom`) and unwrap (`OperatorVault.unwrap`)
+(`ERC-8004.safeTransferFrom`) and unwrap (`Vault.unwrap`)
 transactions for their own agent token.
 
 ## Properties

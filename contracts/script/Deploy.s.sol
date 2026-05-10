@@ -2,9 +2,9 @@
 pragma solidity 0.8.24;
 
 import {Script, console2} from "forge-std/Script.sol";
-import {OperatorVault} from "../src/OperatorVault.sol";
+import {Vault} from "../src/Vault.sol";
 
-/// @notice Deploys OperatorVault for one ERC-8004 token.
+/// @notice Deploys Vault for one ERC-8004 token.
 ///
 /// Example:
 ///   REGISTRY=0x... AGENT_ID=42 PRIVATE_KEY=0x... \
@@ -14,15 +14,15 @@ import {OperatorVault} from "../src/OperatorVault.sol";
 ///     --verify \
 ///     -vvvv
 contract Deploy is Script {
-    function run() external returns (OperatorVault vault) {
+    function run() external returns (Vault vault) {
         uint256 deployerKey = vm.envUint("PRIVATE_KEY");
         address registry = vm.envAddress("REGISTRY");
         uint256 agentId = vm.envUint("AGENT_ID");
         vm.startBroadcast(deployerKey);
-        vault = new OperatorVault(registry, agentId);
+        vault = new Vault(registry, agentId);
         vm.stopBroadcast();
 
-        console2.log("OperatorVault deployed at:", address(vault));
+        console2.log("Vault deployed at:", address(vault));
         console2.log("Chain ID:", block.chainid);
         console2.log("Registry:", registry);
         console2.log("Agent ID:", agentId);

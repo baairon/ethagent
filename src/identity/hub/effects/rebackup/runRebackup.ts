@@ -38,7 +38,7 @@ import {
 import {
   encodeRotateAgentURI,
   isAgentInVault,
-} from '../../../registry/operatorVault.js'
+} from '../../../registry/vault.js'
 import type { Step, ProfileUpdates } from '../../identityHubReducer.js'
 import { acquireTxGuard, releaseTxGuard } from '../../txGuard.js'
 import type { EffectCallbacks } from '../types.js'
@@ -65,7 +65,7 @@ import {
   resolverSyncWarningMessage,
   syncResolverApprovalsAfterOwnerSave,
 } from '../shared/sync.js'
-import { runOperatorWalletRebackup } from './operatorVault.js'
+import { runOperatorWalletRebackup } from './vault.js'
 
 type BackupMetadata = NonNullable<EthagentIdentity['backup']>
 type PublicSkillsMetadata = NonNullable<EthagentIdentity['publicSkills']>

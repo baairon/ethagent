@@ -1,5 +1,5 @@
 import { encodeFunctionData, getAddress, parseAbi, type Address, type Hex } from 'viem'
-import { OPERATOR_VAULT_ABI } from './constants.js'
+import { VAULT_ABI } from './constants.js'
 
 const ERC721_SAFE_TRANSFER_ABI = parseAbi([
   'function safeTransferFrom(address from, address to, uint256 tokenId)',
@@ -35,7 +35,7 @@ export function encodeSetMetadataOperator(args: SetMetadataOperatorArgs): { to: 
   return {
     to: getAddress(args.vaultAddress),
     data: encodeFunctionData({
-      abi: OPERATOR_VAULT_ABI,
+      abi: VAULT_ABI,
       functionName: 'setMetadataOperator',
       args: [getAddress(args.registry), args.agentId, getAddress(args.operator), args.approved],
     }),
@@ -53,7 +53,7 @@ export function encodeRotateAgentURI(args: RotateAgentURIArgs): { to: Address; d
   return {
     to: getAddress(args.vaultAddress),
     data: encodeFunctionData({
-      abi: OPERATOR_VAULT_ABI,
+      abi: VAULT_ABI,
       functionName: 'rotateAgentURI',
       args: [getAddress(args.registry), args.agentId, args.newURI],
     }),
@@ -73,9 +73,9 @@ export function encodeUnwrapAgent(
   return {
     to: getAddress(args.vaultAddress),
     data: encodeFunctionData({
-      abi: OPERATOR_VAULT_ABI,
+      abi: VAULT_ABI,
       functionName: 'unwrap',
-      args: [getAddress(args.registry), args.agentId, getAddress(args.recipient)],
+      args: [getAddress(args.registry), args.agentId, args.recipient],
     }),
   }
 }

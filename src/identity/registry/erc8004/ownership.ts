@@ -1,5 +1,5 @@
 import { getAddress, type Address, type PublicClient } from 'viem'
-import { OPERATOR_VAULT_ABI } from '../operatorVault.js'
+import { VAULT_ABI } from '../vault.js'
 import { ERC8004_ABI } from './abi.js'
 import { createErc8004PublicClient } from './client.js'
 import type { Erc8004RegistryConfig } from './types.js'
@@ -54,7 +54,7 @@ export async function validateErc8004TokenOwner(args: Erc8004RegistryConfig & {
     return {
       ok: false,
       reason: 'token-owner-lookup-failed',
-      detail: `ERC-8004 token #${args.agentId.toString()} is still reported at the OperatorVault, but that vault record is empty. Ownership is still settling; retry shortly.`,
+      detail: `ERC-8004 token #${args.agentId.toString()} is still reported at the Vault, but that vault record is empty. Ownership is still settling; retry shortly.`,
     }
   }
   if (vaultOwnerResult.kind === 'error') {
@@ -73,7 +73,7 @@ export async function validateErc8004TokenOwner(args: Erc8004RegistryConfig & {
       ok: false,
       reason: 'token-owner-mismatch',
       ownerAddress: vaultOwner,
-      detail: `ERC-8004 token #${args.agentId.toString()} is held by the OperatorVault for ${vaultOwner}`,
+      detail: `ERC-8004 token #${args.agentId.toString()} is held by the Vault for ${vaultOwner}`,
     }
   }
   return {
@@ -98,7 +98,7 @@ async function readVaultLevelOwner(args: Erc8004RegistryConfig & {
     const client = args.publicClient ?? createErc8004PublicClient(args)
     const vaultOwner = await client.readContract({
       address: args.vaultAddress,
-      abi: OPERATOR_VAULT_ABI,
+      abi: VAULT_ABI,
       functionName: 'agentOwner',
       args: [args.identityRegistryAddress, args.agentId],
     }) as Address

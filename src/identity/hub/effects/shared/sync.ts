@@ -5,10 +5,10 @@ import {
   type Erc8004RegistryConfig,
 } from '../../../registry/erc8004.js'
 import {
-  OPERATOR_VAULT_ABI,
+  VAULT_ABI,
   encodeSetMetadataOperator,
   readMetadataOperators,
-} from '../../../registry/operatorVault.js'
+} from '../../../registry/vault.js'
 import {
   sendBrowserWalletTransaction,
   type WalletPurpose,
@@ -117,7 +117,7 @@ export async function syncVaultMetadataOperatorsAfterOwnerSave(args: {
   try {
     depositor = await probeClient.readContract({
       address: vaultAddress,
-      abi: OPERATOR_VAULT_ABI,
+      abi: VAULT_ABI,
       functionName: 'agentOwner',
       args: [registryAddress, agentId],
     }) as Address

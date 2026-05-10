@@ -11,7 +11,7 @@ import {
 import {
   runPublicProfileStorageSubmit,
 } from './effects/publicProfile/runPublicProfileSave.js'
-import { resolveOperatorVaultAddress } from './flows/custody/custodyEffects.js'
+import { resolveVaultAddress } from './flows/custody/custodyEffects.js'
 import { WalletApprovalScreen } from './components/WalletApprovalScreen.js'
 import { RebackupStorageScreen } from './flows/continuity/RebackupStorageScreen.js'
 import { BusyScreen } from './components/BusyScreen.js'
@@ -222,14 +222,14 @@ export const IdentityHubOperationalRoutes: React.FC<IdentityHubOperationalRoutes
       <CustodyEditFlow
         step={step}
         reconciliation={reconciliation}
-        vaultAddress={resolveOperatorVaultAddress(step.identity, config?.erc8004?.operatorVaults)}
+        vaultAddress={resolveVaultAddress(step.identity, config?.erc8004?.operatorVaults)}
         onSetStep={setStep}
         onSwitchToAdvanced={(returnTo, updates) => custodyFlow.beginVaultDeposit(step, returnTo, updates)}
         onSwitchToSimple={(returnTo, updates) => custodyFlow.beginVaultUnwrap(step, returnTo, updates)}
         onWithdrawToken={returnTo => custodyFlow.beginWithdrawToken(step, returnTo)}
         onReturnToVault={(returnTo, vaultAddress) => custodyFlow.beginReturnToVault(step, returnTo, vaultAddress)}
         onResumeAdvanced={returnTo => {
-          const vaultAddress = resolveOperatorVaultAddress(step.identity, config?.erc8004?.operatorVaults)
+          const vaultAddress = resolveVaultAddress(step.identity, config?.erc8004?.operatorVaults)
           const updates: ProfileUpdates = {
             custodyMode: 'advanced',
             ownerAddress: step.identity.ownerAddress ?? step.identity.address,

@@ -1388,9 +1388,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
   }, [compactionUi, overlay, projectedUsageForInput, pullInFlight, pushNote, queuedInputs, runStream, showContextLimitForPrompt, streaming])
 
   const contextLine = `${config.provider} · ${formatModelDisplayName(config.provider, config.model, { maxLength: 24 })} · ${compressHome(cwd)}`
-  const tipLine = streaming
-    ? 'Tip: You can keep typing and press enter to queue the next message · shift+enter for newline'
-    : 'Tip: type /help to get started · shift+enter for newline'
+  const tipLine = 'Tip: type /help to get started · shift+enter for newline'
 
   const placeholderHints = useMemo(() => {
     if (compactionUi) return ['compaction in progress · esc to cancel']

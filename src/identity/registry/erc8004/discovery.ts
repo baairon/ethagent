@@ -1,7 +1,7 @@
 import { getAddress, isAddress, type Address, type PublicClient } from 'viem'
 import { mainnet } from 'viem/chains'
 import { DEFAULT_IPFS_API_URL } from '../../storage/ipfs.js'
-import { isAgentInVault } from '../operatorVault.js'
+import { isAgentInVault } from '../vault.js'
 import { ERC8004_ABI, TRANSFER_EVENT } from './abi.js'
 import {
   SUPPORTED_ERC8004_CHAINS,

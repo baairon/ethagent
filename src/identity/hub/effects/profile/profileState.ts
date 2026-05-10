@@ -2,7 +2,7 @@ import { getAddress, isAddress, type Address } from 'viem'
 import type { EthagentIdentity } from '../../../../storage/config.js'
 import type { Erc8004RegistryConfig } from '../../../registry/erc8004.js'
 import { validateAgentEnsLink, type EnsValidation } from '../../../ens/ensLookup.js'
-import { clearOwnerAddressField, clearOperatorVaultAddressField, readOwnerAddressField, setOperatorVaultAddressField, setOwnerAddressField } from '../../../identityCompat.js'
+import { clearOwnerAddressField, clearVaultAddressField, readOwnerAddressField, setVaultAddressField, setOwnerAddressField } from '../../../identityCompat.js'
 import { validateAdvancedEnsRelationship } from '../../advancedEnsValidation.js'
 import { readCustodyMode } from '../../model/custody.js'
 import { ensValidationReasonText } from '../../model/ens.js'
@@ -114,9 +114,9 @@ export function applyOperatorProfileState(
 
   if (profile.operatorVaultAddress !== undefined) {
     if (typeof profile.operatorVaultAddress === 'string' && profile.operatorVaultAddress.trim()) {
-      setOperatorVaultAddressField(state, getAddress(profile.operatorVaultAddress))
+      setVaultAddressField(state, getAddress(profile.operatorVaultAddress))
     } else {
-      clearOperatorVaultAddressField(state)
+      clearVaultAddressField(state)
     }
   }
 

@@ -8,13 +8,13 @@ import {
   defaultModelFor,
   getConfigDir,
   getConfigPath,
-  getConfiguredOperatorVaultAddress,
+  getConfiguredVaultAddress,
   loadConfig,
   normalizeConfig,
   saveConfig,
   saveConfigGuarded,
   saveConfigWithMerge,
-  setConfiguredOperatorVaultAddress,
+  setConfiguredVaultAddress,
   type EthagentConfig,
 } from '../../src/storage/config.js'
 
@@ -42,44 +42,44 @@ test('legacy Ollama configs load as local GGUF mode', async () => {
   })
 })
 
-test('getConfiguredOperatorVaultAddress returns undefined when no map is set', () => {
+test('getConfiguredVaultAddress returns undefined when no map is set', () => {
   const cfg = baseConfig()
-  assert.equal(getConfiguredOperatorVaultAddress(cfg, 8453), undefined)
-  assert.equal(getConfiguredOperatorVaultAddress(null, 8453), undefined)
-  assert.equal(getConfiguredOperatorVaultAddress(undefined, 8453), undefined)
+  assert.equal(getConfiguredVaultAddress(cfg, 8453), undefined)
+  assert.equal(getConfiguredVaultAddress(null, 8453), undefined)
+  assert.equal(getConfiguredVaultAddress(undefined, 8453), undefined)
 })
 
-test('setConfiguredOperatorVaultAddress + getConfiguredOperatorVaultAddress round-trip per chain', () => {
+test('setConfiguredVaultAddress + getConfiguredVaultAddress round-trip per chain', () => {
   const cfg = baseConfig()
   const vault8453 = '0x1111111111111111111111111111111111111111'
   const vault1 = '0x2222222222222222222222222222222222222222'
-  const cfg1 = setConfiguredOperatorVaultAddress(cfg, 8453, vault8453)
-  const cfg2 = setConfiguredOperatorVaultAddress(cfg1, 1, vault1)
-  assert.equal(getConfiguredOperatorVaultAddress(cfg2, 8453), vault8453)
-  assert.equal(getConfiguredOperatorVaultAddress(cfg2, 1), vault1)
+  const cfg1 = setConfiguredVaultAddress(cfg, 8453, vault8453)
+  const cfg2 = setConfiguredVaultAddress(cfg1, 1, vault1)
+  assert.equal(getConfiguredVaultAddress(cfg2, 8453), vault8453)
+  assert.equal(getConfiguredVaultAddress(cfg2, 1), vault1)
 })
 
-test('setConfiguredOperatorVaultAddress does not mutate the input config', () => {
+test('setConfiguredVaultAddress does not mutate the input config', () => {
   const cfg = baseConfig()
   const vault = '0x1111111111111111111111111111111111111111'
-  const next = setConfiguredOperatorVaultAddress(cfg, 8453, vault)
+  const next = setConfiguredVaultAddress(cfg, 8453, vault)
   assert.notEqual(next, cfg)
   assert.equal(cfg.erc8004?.operatorVaults, undefined, 'original config should be untouched')
 })
 
-test('setConfiguredOperatorVaultAddress throws when the registry config is missing', () => {
+test('setConfiguredVaultAddress throws when the registry config is missing', () => {
   const cfg: EthagentConfig = {
     version: 1,
     provider: 'llamacpp',
     model: 'huggingface-link',
     firstRunAt: new Date(0).toISOString(),
   }
-  assert.throws(() => setConfiguredOperatorVaultAddress(cfg, 8453, '0x1111111111111111111111111111111111111111'))
+  assert.throws(() => setConfiguredVaultAddress(cfg, 8453, '0x1111111111111111111111111111111111111111'))
 })
 
 test('saveConfig + loadConfig round-trip the operatorVaults map', async () => {
   await withTempHome(async () => {
-    const cfg = setConfiguredOperatorVaultAddress(
+    const cfg = setConfiguredVaultAddress(
       baseConfig(),
       8453,
       '0x1111111111111111111111111111111111111111',
@@ -88,7 +88,7 @@ test('saveConfig + loadConfig round-trip the operatorVaults map', async () => {
     const reloaded = await loadConfig()
     assert.ok(reloaded)
     assert.equal(
-      getConfiguredOperatorVaultAddress(reloaded, 8453),
+      getConfiguredVaultAddress(reloaded, 8453),
       '0x1111111111111111111111111111111111111111',
     )
   })
@@ -162,7 +162,7 @@ test('saveConfigGuarded throws ConfigVersionStaleError when on-disk version adva
     const base = await loadConfig()
     assert.ok(base)
     await saveConfig(base)
-    const drifted = setConfiguredOperatorVaultAddress(base, 8453, '0x3333333333333333333333333333333333333333')
+    const drifted = setConfiguredVaultAddress(base, 8453, '0x3333333333333333333333333333333333333333')
     await assert.rejects(() => saveConfigGuarded(base, drifted), (err: unknown) => err instanceof ConfigVersionStaleError)
   })
 })
@@ -177,7 +177,7 @@ test('saveConfigWithMerge re-applies the patch against fresh on-disk state when 
     const persisted = await saveConfigWithMerge(current => {
       patchCalls += 1
       if (patchCalls === 1 && current) {
-        return setConfiguredOperatorVaultAddress(current, 8453, '0xaaa1111111111111111111111111111111111111')
+        return setConfiguredVaultAddress(current, 8453, '0xaaa1111111111111111111111111111111111111')
       }
       throw new Error('unexpected attempt count')
     })
@@ -201,7 +201,7 @@ test('saveConfigWithMerge retries against the new on-disk state after a concurre
         await saveConfig(concurrent)
       }
       assert.ok(current)
-      return setConfiguredOperatorVaultAddress(current, 8453, '0xbbb2222222222222222222222222222222222222')
+      return setConfiguredVaultAddress(current, 8453, '0xbbb2222222222222222222222222222222222222')
     })
     assert.equal(patchCalls, 2)
     assert.equal(persisted.erc8004?.operatorVaults?.['8453'], '0xbbb2222222222222222222222222222222222222')
@@ -220,7 +220,7 @@ test('saveConfigWithMerge surfaces ConfigVersionStaleError after exhausting atte
         assert.ok(concurrent)
         await saveConfig(concurrent)
         assert.ok(current)
-        return setConfiguredOperatorVaultAddress(current, 8453, '0xccc3333333333333333333333333333333333333')
+        return setConfiguredVaultAddress(current, 8453, '0xccc3333333333333333333333333333333333333')
       }, 2),
       (err: unknown) => err instanceof ConfigVersionStaleError,
     )

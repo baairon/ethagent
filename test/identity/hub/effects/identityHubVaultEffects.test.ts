@@ -13,7 +13,7 @@ test('assertTokenNotInVault returns void when identity has no agentId yet', asyn
   })
 })
 
-test('assertTokenNotInVault returns void when no OperatorVault is deployed for the chain', async () => {
+test('assertTokenNotInVault returns void when no Vault is deployed for the chain', async () => {
   const identityWithToken = {
     ...identityFixture,
     chainId: registry.chainId,
@@ -27,7 +27,7 @@ test('assertTokenNotInVault returns void when no OperatorVault is deployed for t
   })
 })
 
-test('assertTokenNotInVault throws TokenInVaultError when the token is held by OperatorVault', async () => {
+test('assertTokenNotInVault throws TokenInVaultError when the token is held by Vault', async () => {
   const VAULT = '0x00000000000000000000000000000000000077AB' as `0x${string}`
   const identityWithToken = {
     ...identityFixture,
@@ -48,7 +48,7 @@ test('assertTokenNotInVault throws TokenInVaultError when the token is held by O
   )
 })
 
-test('assertTokenNotInVault returns void when OperatorVault reports the token is not held', async () => {
+test('assertTokenNotInVault returns void when Vault reports the token is not held', async () => {
   const VAULT = '0x00000000000000000000000000000000000077AB' as `0x${string}`
   const identityWithToken = {
     ...identityFixture,

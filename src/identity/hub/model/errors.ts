@@ -6,9 +6,9 @@ import {
   ContinuityTransferSnapshotTargetMismatchError,
 } from '../../continuity/envelope.js'
 import {
-  OperatorVaultBytecodeMismatchError,
-  formatOperatorVaultBytecodeMismatchDetail,
-} from '../../registry/operatorVault.js'
+  VaultBytecodeMismatchError,
+  formatVaultBytecodeMismatchDetail,
+} from '../../registry/vault.js'
 import { BrowserWalletError } from '../../wallet/browserWallet.js'
 import { TxGuardBusyError } from '../txGuard.js'
 import { shortAddress } from './format.js'
@@ -65,11 +65,11 @@ export function identityHubErrorView(err: unknown): IdentityHubErrorView {
       hint: `Prepare a new transfer snapshot from ${shortAddress(err.snapshotOwner)} to the intended receiver wallet.`,
     }
   }
-  if (err instanceof OperatorVaultBytecodeMismatchError) {
+  if (err instanceof VaultBytecodeMismatchError) {
     return {
       title: 'Vault Bytecode Mismatch',
-      detail: formatOperatorVaultBytecodeMismatchDetail(err),
-      hint: 'Open the deploy tx on the block explorer and confirm the input data matches the OperatorVault deploy bytecode plus constructor args before retrying. A persistent mismatch usually means the wallet or RPC substituted the create.',
+      detail: formatVaultBytecodeMismatchDetail(err),
+      hint: 'Open the deploy tx on the block explorer and confirm the input data matches the Vault deploy bytecode plus constructor args before retrying. A persistent mismatch usually means the wallet or RPC substituted the create.',
     }
   }
   if (err instanceof BrowserWalletError) {

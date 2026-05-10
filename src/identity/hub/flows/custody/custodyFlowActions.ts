@@ -1,9 +1,9 @@
 import type { Address } from 'viem'
 import { createErc8004PublicClient } from '../../../registry/erc8004.js'
-import { discoverPriorVaultFromTokenOwner, isAgentInVault } from '../../../registry/operatorVault.js'
+import { discoverPriorVaultFromTokenOwner, isAgentInVault } from '../../../registry/vault.js'
 import type { ProfileUpdates, Step } from '../../identityHubReducer.js'
 import { isCustodyEditStep } from './CustodyEditFlow.js'
-import { resolveOperatorVaultAddress } from './custodyEffects.js'
+import { resolveVaultAddress } from './custodyEffects.js'
 import type { CustodyFlowDeps } from './custodyFlowTypes.js'
 import { humanOwnerAddress } from './custodyFlowHelpers.js'
 
@@ -21,7 +21,7 @@ export function createCustodyFlowActions({
 } {
   const beginVaultDeposit = (currentStep: Step, returnTo: Step, profileUpdates: ProfileUpdates): void => {
     if (!isCustodyEditStep(currentStep) || currentStep.kind !== 'custody-advanced-confirm') return
-    const vaultAddress = resolveOperatorVaultAddress(currentStep.identity, config?.erc8004?.operatorVaults)
+    const vaultAddress = resolveVaultAddress(currentStep.identity, config?.erc8004?.operatorVaults)
     const expectedOwnerForDiscovery = humanOwnerAddress(currentStep.identity)
     if (!vaultAddress) {
       const registry = currentStep.registry
@@ -49,7 +49,7 @@ export function createCustodyFlowActions({
             }
             if (status.inVault) {
               handleStepError(
-                new Error(`Recovered OperatorVault ${recoveredVault} holds the token, but the vault-level depositor is ${status.ownerAddress ?? 'unknown'}, not your wallet ${expectedOwnerForDiscovery}. Mid-flow recovery requires the original depositor's wallet to call vault.unwrap.`),
+                new Error(`Recovered Vault ${recoveredVault} holds the token, but the vault-level depositor is ${status.ownerAddress ?? 'unknown'}, not your wallet ${expectedOwnerForDiscovery}. Mid-flow recovery requires the original depositor's wallet to call vault.unwrap.`),
                 { kind: 'custody-model', identity: currentStep.identity, registry, returnTo },
               )
               return
@@ -95,7 +95,7 @@ export function createCustodyFlowActions({
         }
         if (status.inVault) {
           handleStepError(
-            new Error(`Token is held by the OperatorVault, but the vault-level owner is ${status.ownerAddress ?? 'unknown'}, not your wallet ${expectedOwner}. Recovery requires that wallet to call vault.unwrap.`),
+            new Error(`Token is held by the Vault, but the vault-level owner is ${status.ownerAddress ?? 'unknown'}, not your wallet ${expectedOwner}. Recovery requires that wallet to call vault.unwrap.`),
             { kind: 'custody-model', identity: currentStep.identity, registry, returnTo },
           )
           return
@@ -124,10 +124,10 @@ export function createCustodyFlowActions({
 
   const beginWithdrawToken = (currentStep: Step, returnTo: Step): void => {
     if (!isCustodyEditStep(currentStep)) return
-    const vaultAddress = resolveOperatorVaultAddress(currentStep.identity, config?.erc8004?.operatorVaults)
+    const vaultAddress = resolveVaultAddress(currentStep.identity, config?.erc8004?.operatorVaults)
     if (!vaultAddress) {
       handleStepError(
-        new Error('No OperatorVault is recorded for this identity. There is nothing to withdraw.'),
+        new Error('No Vault is recorded for this identity. There is nothing to withdraw.'),
         { kind: 'custody-model', identity: currentStep.identity, registry: currentStep.registry, returnTo },
       )
       return
@@ -160,7 +160,7 @@ export function createCustodyFlowActions({
         if (status.inVault) {
           if (status.ownerAddress && status.ownerAddress.toLowerCase() !== depositor.toLowerCase()) {
             handleStepError(
-              new Error(`OperatorVault holds token #${activeAgentId} but recorded the depositor as ${status.ownerAddress}, not your wallet ${depositor}. Only the original depositor can withdraw.`),
+              new Error(`Vault holds token #${activeAgentId} but recorded the depositor as ${status.ownerAddress}, not your wallet ${depositor}. Only the original depositor can withdraw.`),
               { kind: 'custody-model', identity: currentStep.identity, registry: currentStep.registry, returnTo },
             )
             return
@@ -176,7 +176,7 @@ export function createCustodyFlowActions({
           return
         }
         handleStepError(
-          new Error(`Token #${activeAgentId} is not currently in the OperatorVault. There is nothing to withdraw; the token is already with the owner wallet.`),
+          new Error(`Token #${activeAgentId} is not currently in the Vault. There is nothing to withdraw; the token is already with the owner wallet.`),
           { kind: 'custody-model', identity: currentStep.identity, registry: currentStep.registry, returnTo },
         )
       } catch (err: unknown) {
@@ -187,7 +187,7 @@ export function createCustodyFlowActions({
 
   const beginVaultUnwrap = (currentStep: Step, returnTo: Step, profileUpdates: ProfileUpdates): void => {
     if (!isCustodyEditStep(currentStep) || currentStep.kind !== 'custody-simple-confirm') return
-    const vaultAddress = resolveOperatorVaultAddress(currentStep.identity, config?.erc8004?.operatorVaults)
+    const vaultAddress = resolveVaultAddress(currentStep.identity, config?.erc8004?.operatorVaults)
     if (!vaultAddress) {
       triggerRebackup(returnTo, profileUpdates, { useVault: false })
       return

@@ -36,7 +36,7 @@ export {
 } from './restore/restoreEffects.js'
 export {
   assertTokenNotInVault,
-  OperatorVaultUnavailableError,
+  VaultUnavailableError,
   TokenInVaultError,
 } from './vault/preflight.js'
 export {

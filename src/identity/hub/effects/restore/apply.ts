@@ -8,7 +8,7 @@ import {
 import { ensureIdentityMarkdownScaffold, writeContinuityFiles } from '../../../continuity/storage.js'
 import { recordPublishedContinuitySnapshot } from '../../../continuity/snapshots.js'
 import { requestBrowserWalletSignature } from '../../../wallet/browserWallet.js'
-import { setOperatorVaultAddressField } from '../../../identityCompat.js'
+import { setVaultAddressField } from '../../../identityCompat.js'
 import type { Step } from '../../identityHubReducer.js'
 import type { EffectCallbacks } from '../types.js'
 import { isContinuitySnapshotEnvelope } from './envelopes.js'
@@ -76,7 +76,7 @@ export async function runRestoreAuthorize(
     ...operatorStateFromCandidate(step.candidate),
   }
   if (tokenOwnerAddress.toLowerCase() !== step.candidate.ownerAddress.toLowerCase()) {
-    setOperatorVaultAddressField(restoredState, getAddress(tokenOwnerAddress))
+    setVaultAddressField(restoredState, getAddress(tokenOwnerAddress))
   }
   const nextIdentity: EthagentIdentity = {
     source: 'erc8004',

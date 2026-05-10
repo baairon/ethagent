@@ -196,7 +196,7 @@ export async function saveConfigWithMerge(
   throw lastErr ?? new ConfigVersionStaleError(undefined, undefined)
 }
 
-export function getConfiguredOperatorVaultAddress(
+export function getConfiguredVaultAddress(
   config: EthagentConfig | null | undefined,
   chainId: number,
 ): string | undefined {
@@ -223,13 +223,13 @@ export function buildSeedConfigForIdentity(args: {
   }
 }
 
-export function setConfiguredOperatorVaultAddress(
+export function setConfiguredVaultAddress(
   config: EthagentConfig,
   chainId: number,
   vaultAddress: string,
 ): EthagentConfig {
   if (!config.erc8004) {
-    throw new Error('Cannot record OperatorVault address: erc8004 registry config is not set')
+    throw new Error('Cannot record Vault address: erc8004 registry config is not set')
   }
   return {
     ...config,

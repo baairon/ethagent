@@ -2,7 +2,7 @@
 pragma solidity 0.8.24;
 
 import {Test} from "forge-std/Test.sol";
-import {OperatorVault, IERC721Receiver} from "../src/OperatorVault.sol";
+import {Vault, IERC721Receiver} from "../src/Vault.sol";
 
 /// @notice Minimal ERC-721-with-setAgentURI mock that mimics the relevant
 /// surface of the ERC-8004 registry: ownerOf, safeTransferFrom (to a
@@ -41,8 +41,8 @@ contract MockErc8004 {
     }
 }
 
-contract OperatorVaultTest is Test {
-    OperatorVault internal vault;
+contract VaultTest is Test {
+    Vault internal vault;
     MockErc8004 internal registry;
 
     address internal owner = address(0xA11CE);
@@ -68,7 +68,7 @@ contract OperatorVaultTest is Test {
 
     function setUp() public {
         registry = new MockErc8004();
-        vault = new OperatorVault(address(registry), AGENT_ID);
+        vault = new Vault(address(registry), AGENT_ID);
         registry.mint(owner, AGENT_ID);
     }
 
@@ -92,7 +92,7 @@ contract OperatorVaultTest is Test {
         // A direct second onERC721Received call (with msg.sender spoofed to
         // the registry) must revert with AlreadyDeposited.
         vm.prank(address(registry));
-        vm.expectRevert(OperatorVault.AlreadyDeposited.selector);
+        vm.expectRevert(Vault.AlreadyDeposited.selector);
         vault.onERC721Received(address(0), stranger, AGENT_ID, "");
     }
 
@@ -116,11 +116,11 @@ contract OperatorVaultTest is Test {
         _deposit();
 
         vm.prank(stranger);
-        vm.expectRevert(OperatorVault.NotOwner.selector);
+        vm.expectRevert(Vault.NotOwner.selector);
         vault.setMetadataOperator(address(registry), AGENT_ID, operator, true);
 
         vm.prank(operator);
-        vm.expectRevert(OperatorVault.NotOwner.selector);
+        vm.expectRevert(Vault.NotOwner.selector);
         vault.setMetadataOperator(address(registry), AGENT_ID, stranger, true);
     }
 
@@ -153,7 +153,7 @@ contract OperatorVaultTest is Test {
         _deposit();
 
         vm.prank(stranger);
-        vm.expectRevert(OperatorVault.NotAuthorized.selector);
+        vm.expectRevert(Vault.NotAuthorized.selector);
         vault.rotateAgentURI(address(registry), AGENT_ID, "ipfs://forbidden");
     }
 
@@ -166,7 +166,7 @@ contract OperatorVaultTest is Test {
         vm.stopPrank();
 
         vm.prank(operator);
-        vm.expectRevert(OperatorVault.NotAuthorized.selector);
+        vm.expectRevert(Vault.NotAuthorized.selector);
         vault.rotateAgentURI(address(registry), AGENT_ID, "ipfs://forbidden");
     }
 
@@ -177,7 +177,7 @@ contract OperatorVaultTest is Test {
         vault.setMetadataOperator(address(registry), AGENT_ID, operator, true);
 
         vm.prank(operator);
-        vm.expectRevert(OperatorVault.NotOwner.selector);
+        vm.expectRevert(Vault.NotOwner.selector);
         vault.unwrap(address(registry), AGENT_ID, recipient);
     }
 
@@ -190,7 +190,7 @@ contract OperatorVaultTest is Test {
         // Even though `operator` can rotate URI, it cannot grant the same
         // privilege to another address.
         vm.prank(operator);
-        vm.expectRevert(OperatorVault.NotOwner.selector);
+        vm.expectRevert(Vault.NotOwner.selector);
         vault.setMetadataOperator(address(registry), AGENT_ID, stranger, true);
     }
 
@@ -210,7 +210,7 @@ contract OperatorVaultTest is Test {
         _deposit();
 
         vm.prank(stranger);
-        vm.expectRevert(OperatorVault.NotOwner.selector);
+        vm.expectRevert(Vault.NotOwner.selector);
         vault.unwrap(address(registry), AGENT_ID, stranger);
     }
 
@@ -233,7 +233,7 @@ contract OperatorVaultTest is Test {
         assertFalse(vault.metadataOperators(address(registry), AGENT_ID, operator));
 
         vm.prank(operator);
-        vm.expectRevert(OperatorVault.NotAuthorized.selector);
+        vm.expectRevert(Vault.NotAuthorized.selector);
         vault.rotateAgentURI(address(registry), AGENT_ID, "ipfs://under-new-owner");
 
         vm.prank(recipient);
@@ -249,7 +249,7 @@ contract OperatorVaultTest is Test {
         registry.mint(stranger, otherId);
 
         vm.prank(stranger);
-        vm.expectRevert(OperatorVault.UnexpectedToken.selector);
+        vm.expectRevert(Vault.UnexpectedToken.selector);
         registry.safeTransferFrom(stranger, address(vault), otherId);
 
         assertEq(registry.ownerOf(AGENT_ID), owner);
@@ -263,7 +263,7 @@ contract OperatorVaultTest is Test {
 
         _deposit();
         vm.prank(stranger);
-        vm.expectRevert(OperatorVault.UnexpectedToken.selector);
+        vm.expectRevert(Vault.UnexpectedToken.selector);
         registry.safeTransferFrom(stranger, address(vault), otherId);
 
         assertEq(registry.ownerOf(AGENT_ID), address(vault));
@@ -279,7 +279,7 @@ contract OperatorVaultTest is Test {
         vm.prank(owner);
         vault.unwrap(address(registry), AGENT_ID, owner);
         vm.prank(stranger);
-        vm.expectRevert(OperatorVault.UnexpectedToken.selector);
+        vm.expectRevert(Vault.UnexpectedToken.selector);
         registry.safeTransferFrom(stranger, address(vault), otherId);
 
         assertEq(vault.agentOwner(address(registry), AGENT_ID), address(0));
