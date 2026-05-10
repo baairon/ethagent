@@ -8,7 +8,7 @@ import { runRuntimeTurn, type TurnEvent } from '../runtime/turn.js'
 import type { EthagentConfig } from '../storage/config.js'
 import type { SessionMessage } from '../storage/sessions.js'
 import type { SessionPermissionRule, ToolResult } from '../tools/contracts.js'
-import { readContinuityFiles, readPublicSkillsFile } from '../identity/continuity/storage.js'
+import { readContinuityFiles } from '../identity/continuity/storage.js'
 import type { MessageRow } from './MessageList.js'
 import {
   buildBaseMessages,
@@ -60,18 +60,6 @@ export type StreamingTurnResult = {
   cancelled: boolean
 }
 
-/**
- * runStreamingTurn - the UI adapter over runRuntimeTurn.
- *
- * Responsibilities (UI-only; logic lives in runtime/turn.ts):
- *   - translate runtime events into Ink MessageRow updates,
- *   - flush streaming text to rows on a debounce,
- *   - persist SessionMessages on commit boundaries,
- *   - drive the tool batch (permission prompts, row pushes, persistence),
- *   - surface plan-mode output to the caller,
- *   - return a summary of what happened (finishedNormally / cancelled)
- *     for the caller to act on.
- */
 export async function runStreamingTurn(
   context: TurnOrchestratorContext,
 ): Promise<StreamingTurnResult> {
@@ -86,7 +74,6 @@ export async function runStreamingTurn(
     nowIso,
     getConfig,
     getCwd,
-    getSessionMessages,
     setActiveCheckpoint,
     setStreaming,
     updateRows,
@@ -135,8 +122,6 @@ export async function runStreamingTurn(
     ]
   }
 
-  // Per-iteration UI scratch. These are reset each time the runtime loop
-  // re-enters streaming (new provider call = new assistant row, new accumulator).
   let accumulated = ''
   let thinkingContent = ''
   let thinkingRowId: string | null = null
@@ -207,9 +192,6 @@ export async function runStreamingTurn(
     flushStreamRows(true)
     updateRows(prev => {
       let next = finalizeStreamingRowsById(prev, assistantId, thinkingRowId, accumulated, thinkingContent)
-      // If we emitted tool_uses, strip the empty assistant text row - tool_use
-      // rows replace it. If the assistant emitted no text at all (pure tool
-      // turn), drop the empty row.
       if (assistantId && (hasPendingToolUse || accumulated.length === 0)) {
         next = next.filter(r => r.id !== assistantId)
       }
@@ -235,13 +217,6 @@ export async function runStreamingTurn(
     name: string
     input: Record<string, unknown>
   }>) => {
-    // Persist the assistant tool_use blocks into the session before execution
-    // so microcompact / rebuild has them on the next provider call. The actual
-    // Message[] sent to the provider is rebuilt from session messages.
-    // (This mirrors the pre-Wave-2 behavior, just routed from the event loop.)
-    // NOTE: some provider loops keep tool_use blocks inside the assistant
-    // message; ethagent stores them as discrete tool_use SessionMessages via
-    // runPendingToolUses, which keeps the microcompact model simpler.
     const step = await runPendingToolUses({
       pendingToolUses,
       nextRowId,
@@ -351,10 +326,6 @@ export async function runStreamingTurn(
   }
 }
 
-// ---------------------------------------------------------------------------
-// Event handling: per-event UI translation
-// ---------------------------------------------------------------------------
-
 type EventHandlerContext = {
   ensureAssistantRow: () => string
   flushStreamRows: (immediate?: boolean) => void
@@ -391,10 +362,6 @@ function isCancelledEvent(ev: TurnEvent): boolean {
 async function handleEvent(ev: TurnEvent, ctx: EventHandlerContext): Promise<void> {
   switch (ev.type) {
     case 'iteration_start': {
-      // Reset per-iteration scratch so each provider call gets a fresh
-      // assistant row, accumulator, and hasPendingToolUse flag. Iteration 0
-      // is the initial stream - resetting before anything runs is a no-op,
-      // which is fine.
       ctx.resetIteration()
       return
     }
@@ -433,7 +400,6 @@ async function handleEvent(ev: TurnEvent, ctx: EventHandlerContext): Promise<voi
       return
     }
     case 'retry': {
-      ctx.pushNote(formatRetryStatus(ev), 'dim')
       return
     }
     case 'tool_use_stop': {
@@ -442,8 +408,6 @@ async function handleEvent(ev: TurnEvent, ctx: EventHandlerContext): Promise<voi
       return
     }
     case 'assistant_message_committed': {
-      // End of a streaming round with no tool_use - finalize rows, persist
-      // the assistant text, and hand it to the plan hook if in plan mode.
       ctx.finalizeStreamingRows()
       if (ev.text) {
         await ctx.persistTurnMessage({
@@ -458,22 +422,14 @@ async function handleEvent(ev: TurnEvent, ctx: EventHandlerContext): Promise<voi
       return
     }
     case 'tool_executed': {
-      // Row + session persistence happened inside runPendingToolUses; the
-      // event is informational for observers that need it (tests, future
-      // instrumentation). No UI side-effect here.
       return
     }
     case 'local_tool_recovery': {
-      // The runtime recovered tool calls from local model text output.
-      // Discard the streamed assistant rows that contained the JSON blob
-      // so they are not persisted or displayed as prose.
       ctx.discardStreamingRows()
       ctx.markPendingToolUse()
       return
     }
     case 'continuation_nudge': {
-      // Clean break between provider calls. Corrective nudges suppress the
-      // unverified assistant row so it cannot become durable context.
       if (
         ev.reason === 'tool_state_claim' ||
         ev.reason === 'tool_capability' ||
@@ -501,9 +457,6 @@ async function handleEvent(ev: TurnEvent, ctx: EventHandlerContext): Promise<voi
       return
     }
     case 'done': {
-      // If we ended mid-iteration (no assistant_message_committed yet) the
-      // finalize call from error/cancelled already ran. If we ended after a
-      // tool_executed batch, finalize here so the UI settles.
       ctx.finalizeStreamingRows()
       if (ev.finishedNormally) ctx.onFinishedNormally()
       return
@@ -512,21 +465,6 @@ async function handleEvent(ev: TurnEvent, ctx: EventHandlerContext): Promise<voi
     case 'tool_use_delta':
       return
   }
-}
-
-function formatRetryStatus(ev: Extract<TurnEvent, { type: 'retry' }>): string {
-  const totalAttempts = ev.maxRetries + 1
-  const reason = ev.status !== undefined ? `HTTP ${ev.status}` : ev.code ?? ev.reason
-  return `provider retry ${ev.nextAttempt}/${totalAttempts} in ${formatRetryDelay(ev.delayMs)} (${reason})`
-}
-
-function formatRetryDelay(delayMs: number): string {
-  if (delayMs < 1000) return `${Math.max(0, Math.round(delayMs))}ms`
-  const seconds = delayMs / 1000
-  if (seconds < 10) return `${seconds.toFixed(1).replace(/\.0$/, '')}s`
-  if (seconds < 60) return `${Math.round(seconds)}s`
-  const minutes = seconds / 60
-  return `${minutes.toFixed(minutes < 10 ? 1 : 0).replace(/\.0$/, '')}m`
 }
 
 function updateStreamingRows(
@@ -592,10 +530,6 @@ function findRowIndexById(rows: MessageRow[], id: string): number {
   return -1
 }
 
-// ---------------------------------------------------------------------------
-// File-mention context (unchanged from pre-Wave-2 - pure helper)
-// ---------------------------------------------------------------------------
-
 async function buildFileMentionContextMessages(
   userText: string,
   cwd: string,
@@ -641,7 +575,6 @@ export async function buildIdentityContinuityContextMessages(
 
   try {
     const privateFiles = await readContinuityFiles(identity)
-    const publicSkillsContent = await readPublicSkillsFile(identity).catch(() => null)
     const parts: string[] = [
       '<identity_continuity_files>',
       'The active identity continuity files have been loaded automatically for this turn.',
@@ -655,17 +588,8 @@ export async function buildIdentityContinuityContextMessages(
       '<MEMORY.md visibility="private">',
       privateFiles['MEMORY.md'].trimEnd(),
       '</MEMORY.md>',
+      '</identity_continuity_files>',
     ]
-    if (publicSkillsContent) {
-      parts.push(
-        '',
-        'skills.json is the public-facing agent profile; the published copy is referenced from onchain tokenURI metadata.',
-        '<skills.json visibility="public">',
-        publicSkillsContent.trimEnd(),
-        '</skills.json>',
-      )
-    }
-    parts.push('</identity_continuity_files>')
     return [{
       role: 'system',
       content: parts.join('\n'),

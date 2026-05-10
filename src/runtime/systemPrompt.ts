@@ -98,6 +98,7 @@ function buildToolEnabledPrompt(ctx: SystemPromptContext): string {
                   ]
                 : ['No agent identity is linked in this session. Do not attempt private identity continuity edits; ask the user to create or load an agent first.']),
               'Use `run_bash` **only** when true shell execution is necessary.',
+              'Never use `run_bash` to produce conversational text. Do not call `echo`, `printf`, or similar to emit your reply — write it as your assistant text. Bash is for actions that need a real shell, not for generating words.',
               '**CWD CONTINUITY**: The working directory below is authoritative. After `change_directory` succeeds, use the new path as the base for subsequent actions.',
               'Do not lag behind the CWD. Edit/read relative to the *current* working directory.',
               'If asked for a complete application/site/game, **create the files yourself**. Do not hand back copy-paste templates.',
@@ -112,6 +113,7 @@ function buildToolEnabledPrompt(ctx: SystemPromptContext): string {
           'Local Model Tool Discipline',
           [
             '**PROTOCOL**: Emit tool calls in the native tool-call protocol. Do NOT describe the call in prose first, and do NOT print a JSON blob inside markdown as a substitute for an actual tool call.',
+            '**NO ECHO REPLIES**: Never call `run_bash` with `echo`, `printf`, or any command whose only purpose is to print your reply. Reply directly in your assistant text. Bash is for real shell actions only.',
             '**NO FAKE COMPLETIONS**: NEVER claim you have updated or created a file if you have not used the edit tools. Talk is cheap, use the tools.',
             'One tool call per response when a tool is needed. Wait for the tool result before deciding the next step.',
             ...(ctx.hasIdentity

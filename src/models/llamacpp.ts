@@ -278,12 +278,12 @@ export async function installLlamaCppRunner(
 ): Promise<LlamaCppInstallResult> {
   const plans = llamaCppInstallPlans(platform)
   const failures: string[] = []
-  onProgress?.({ phase: 'checking', label: 'checking local runner installers', progress: 0.08 })
+  onProgress?.({ phase: 'checking', label: 'checking local runner installers...', progress: 0.08 })
   for (const plan of plans) {
     onProgress?.({ phase: 'installing', label: installerProgressLabel(plan), progress: 0.34 })
     const result = await runInstallCommand(plan, plan.timeoutMs ?? 10 * 60_000)
     if (result.ok) {
-      onProgress?.({ phase: 'finding', label: 'finding llama-server', progress: 0.78 })
+      onProgress?.({ phase: 'finding', label: 'finding llama-server...', progress: 0.78 })
       const binary = await findAndPersistLlamaCppServer(platform)
       if (binary.path) return { ok: true, serverPath: binary.path }
       const cliPaths = await discoverLlamaCppCliPaths(process.env, platform)
@@ -679,11 +679,11 @@ function cleanInstallLine(line: string): string {
 }
 
 function installerProgressLabel(plan: LlamaCppInstallPlan): string {
-  if (plan.command === 'winget') return 'installing with Windows package manager'
-  if (plan.command === 'brew') return 'installing with Homebrew'
-  if (plan.command === 'nix') return 'installing with Nix'
-  if (plan.command === 'port') return 'installing with MacPorts'
-  return `installing with ${plan.label}`
+  if (plan.command === 'winget') return 'installing with Windows package manager...'
+  if (plan.command === 'brew') return 'installing with Homebrew...'
+  if (plan.command === 'nix') return 'installing with Nix...'
+  if (plan.command === 'port') return 'installing with MacPorts...'
+  return `installing with ${plan.label}...`
 }
 
 function formatInstallFailure(label: string, result: RunInstallResult): string {
@@ -735,7 +735,7 @@ async function installLlamaCppFromSource(
   await ensureConfigDir()
   await fs.mkdir(root, { recursive: true })
 
-  onProgress?.({ phase: 'checking', label: 'checking build tools', progress: 0.08 })
+  onProgress?.({ phase: 'checking', label: 'checking build tools...', progress: 0.08 })
   const hasGit = await runCommand('git', ['--version'])
   if (!hasGit || hasGit.code !== 0) {
     return {
@@ -757,14 +757,14 @@ async function installLlamaCppFromSource(
 
   try {
     await fs.access(path.join(repoDir, '.git'))
-    onProgress?.({ phase: 'building', label: 'updating local runner source', progress: 0.22 })
+    onProgress?.({ phase: 'building', label: 'updating local runner source...', progress: 0.22 })
     const update = await runInstallCommand(
       { label: 'update llama.cpp source', command: 'git', args: ['-C', repoDir, 'pull', '--ff-only'], timeoutMs: 5 * 60_000 },
       5 * 60_000,
     )
     if (!update.ok) return buildFailure(update)
   } catch {
-    onProgress?.({ phase: 'building', label: 'downloading local runner source', progress: 0.22 })
+    onProgress?.({ phase: 'building', label: 'downloading local runner source...', progress: 0.22 })
     const clone = await runInstallCommand(
       { label: 'clone llama.cpp source', command: 'git', args: ['clone', '--depth', '1', 'https://github.com/ggml-org/llama.cpp.git', repoDir], timeoutMs: 10 * 60_000 },
       10 * 60_000,
@@ -772,14 +772,14 @@ async function installLlamaCppFromSource(
     if (!clone.ok) return buildFailure(clone)
   }
 
-  onProgress?.({ phase: 'building', label: 'configuring local runner', progress: 0.48 })
+  onProgress?.({ phase: 'building', label: 'configuring local runner...', progress: 0.48 })
   const configure = await runInstallCommand(
     { label: 'configure llama.cpp', command: 'cmake', args: ['-S', repoDir, '-B', buildDir, '-DCMAKE_BUILD_TYPE=Release'], timeoutMs: 5 * 60_000 },
     5 * 60_000,
   )
   if (!configure.ok) return buildFailure(configure)
 
-  onProgress?.({ phase: 'building', label: 'building local runner', progress: 0.68 })
+  onProgress?.({ phase: 'building', label: 'building local runner...', progress: 0.68 })
   const build = await runInstallCommand(
     {
       label: 'build llama-server',
@@ -795,7 +795,7 @@ async function installLlamaCppFromSource(
     ?? (await discoverLlamaCppServerPaths(process.env, platform))[0]
   if (builtServerPath) {
     await setLlamaCppServerPath(builtServerPath)
-    onProgress?.({ phase: 'finding', label: 'local runner ready', progress: 1 })
+    onProgress?.({ phase: 'finding', label: 'local runner ready...', progress: 1 })
     return { ok: true, serverPath: builtServerPath }
   }
 

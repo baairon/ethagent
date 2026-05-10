@@ -1,5 +1,4 @@
 import type { MessageRow } from './MessageList.js'
-import { hidesSuccessfulToolResultContent } from './toolResultDisplay.js'
 
 export type TranscriptAnchor = {
   rowId: string
@@ -219,12 +218,8 @@ export function estimateMessageRowHeight(row: MessageRow, columns = 80): number 
       return row.expanded
         ? 3 + wrappedLineCount([row.content, row.liveTail ?? ''].filter(Boolean).join('\n'), contentWidth)
         : 3 + wrappedLineCount(reasoningPreview(row), contentWidth)
-    case 'tool_use':
-      return 3 + (row.input ? wrappedLineCount(row.input, contentWidth) : 0)
-    case 'tool_result':
-      return hidesSuccessfulToolResultContent(row.name, row.isError)
-        ? 3
-        : 3 + wrappedLineCount(row.content, contentWidth)
+    case 'tool_call':
+      return 1
     case 'note':
       return 1 + wrappedLineCount(row.content, contentWidth)
     case 'progress':

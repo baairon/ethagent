@@ -82,7 +82,7 @@ export const privateContinuityEditTool: Tool<typeof schema> = {
     'For persona or standing behavior call exactly: {"file":"SOUL.md","appendToSection":"Persona","appendText":"- Persona or standing behavior note."}.',
     'Prefer appendToSection+appendText to build on an existing scaffold section; use oldText+newText only for targeted replacement after exact text is known.',
     'Whole-file replacement is disabled for private continuity.',
-    'Approved private continuity edits are not managed by /rewind; the previous version is saved to private identity history before writing.',
+    'Approved private continuity edits are not managed by /rewind.',
   ].join(' '),
   inputSchema: schema,
   inputSchemaJson: {
@@ -108,7 +108,7 @@ export const privateContinuityEditTool: Tool<typeof schema> = {
       path: prepared.fullPath,
       relativePath: prepared.relativePath,
       directoryPath: prepared.directoryPath,
-      title: 'approve private continuity edit?',
+      title: 'Approve Private Continuity Edit?',
       subtitle: prepared.fullPath,
       file: prepared.file,
       before: prepared.previewBefore,
@@ -132,7 +132,6 @@ export const privateContinuityEditTool: Tool<typeof schema> = {
       previousFiles,
       previousPublicSkills,
       changeSummary: prepared.changeSummary,
-      createdAt: new Date().toISOString(),
       sessionId: context.checkpoint?.sessionId,
       turnId: context.checkpoint?.turnId,
       promptSnippet: context.checkpoint?.promptSnippet,
@@ -153,9 +152,9 @@ function formatPrivateContinuityEditResult(file: 'SOUL.md' | 'MEMORY.md', fullPa
     '',
     `- File: \`identity-vault/${file}\``,
     `- Review file: \`${fullPath}\``,
-    '- Open: Identity Hub > Memory and Persona',
-    '- Save: Identity Hub > Recovery > Save Snapshot Now',
     '- History: previous version saved to private identity history; `/rewind` does not restore identity continuity',
+    '- Open: Identity Hub > Soul, Memory, and Skills',
+    '- Save: Identity Hub > Recovery > Save Snapshot Now',
   ].join('\n')
 }
 

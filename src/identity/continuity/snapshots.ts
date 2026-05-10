@@ -9,7 +9,7 @@ import {
   type ContinuitySnapshotContentHashes,
 } from './storage.js'
 
-export type PublishedContinuitySnapshot = {
+type PublishedContinuitySnapshot = {
   version: 1
   id: string
   createdAt: string
@@ -30,12 +30,12 @@ export type PublishedContinuitySnapshot = {
   }
 }
 
-export type RecordPublishedContinuitySnapshotInput = {
+type RecordPublishedContinuitySnapshotInput = {
   identity: EthagentIdentity
   label?: string
 }
 
-export function publishedContinuitySnapshotsPath(identity: EthagentIdentity): string {
+function publishedContinuitySnapshotsPath(identity: EthagentIdentity): string {
   return path.join(continuityVaultRef(identity).dir, '.published-snapshots.jsonl')
 }
 
@@ -88,10 +88,10 @@ export async function updatePublishedContinuitySnapshotContentHashes(
   const index = snapshots.findIndex(item => item.cid === cid)
   if (index === -1) {
     const base = current.find(item => item.cid === cid)
-    if (!base) throw new Error('published snapshot was not found')
-    snapshots.push({ ...base, contentHashes })
+    if (!base) throw new Error('Published snapshot was not found')
+    snapshots.push(refreshPublishedSnapshotSidecars({ ...base, contentHashes }, identity))
   } else {
-    snapshots[index] = { ...snapshots[index]!, contentHashes }
+    snapshots[index] = refreshPublishedSnapshotSidecars({ ...snapshots[index]!, contentHashes }, identity)
   }
   await atomicWriteText(
     publishedContinuitySnapshotsPath(identity),
@@ -132,6 +132,17 @@ function enrichPublishedSnapshot(
     ...(snapshot.publicSkillsCid ? {} : current.publicSkillsCid ? { publicSkillsCid: current.publicSkillsCid } : {}),
     ...(snapshot.agentCardCid ? {} : current.agentCardCid ? { agentCardCid: current.agentCardCid } : {}),
     ...(snapshot.contentHashes ? {} : current.contentHashes ? { contentHashes: current.contentHashes } : {}),
+  }
+}
+
+function refreshPublishedSnapshotSidecars(
+  snapshot: PublishedContinuitySnapshot,
+  identity: EthagentIdentity,
+): PublishedContinuitySnapshot {
+  return {
+    ...snapshot,
+    ...(identity.publicSkills?.cid ? { publicSkillsCid: identity.publicSkills.cid } : {}),
+    ...(identity.publicSkills?.agentCardCid ? { agentCardCid: identity.publicSkills.agentCardCid } : {}),
   }
 }
 

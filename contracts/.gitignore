@@ -1,0 +1,14 @@
+# Foundry build artifacts
+out/
+cache/
+
+# Foundry dependencies installed via `forge install`
+lib/
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# Broadcast logs
+broadcast/

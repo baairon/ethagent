@@ -14,6 +14,14 @@ export const MODEL_PICKER_CLOUD_PROVIDERS: CloudProviderId[] = ['openai', 'anthr
 export const LOCAL_MODEL_LINK_HINT = 'Paste a GGUF link'
 export const LOCAL_MODEL_LINK_EXAMPLE = 'e.g. https://huggingface.co/Qwen/Qwen3-8B-GGUF'
 
+export function cloudProviderDisplayName(provider: CloudProviderId): string {
+  switch (provider) {
+    case 'openai': return 'OpenAI'
+    case 'anthropic': return 'Anthropic'
+    case 'gemini': return 'Gemini'
+  }
+}
+
 export type LocalHfPickerModel = {
   id: string
   displayName: string
@@ -67,10 +75,10 @@ export function buildModelPickerOptions(
 
   options.push(sectionOption('hdr:cloud', 'Cloud'))
   for (const provider of MODEL_PICKER_CLOUD_PROVIDERS) {
-    options.push(groupOption(`hdr:cloud:${provider}`, provider))
+    options.push(groupOption(`hdr:cloud:${provider}`, cloudProviderDisplayName(provider)))
     const keySet = data.cloudKeys[provider] === true
     if (!keySet) {
-      options.push(utilityOption(`key:set:${provider}`, 'API Key · Add'))
+      options.push(utilityOption(`key:set:${provider}`, 'Add API Key'))
       continue
     }
 
@@ -97,8 +105,11 @@ export function buildModelPickerOptions(
       ))
     }
     options.push(utilityOption(`catalog:${provider}`, 'Full Catalog'))
-    options.push(utilityOption(`key:manage:${provider}`, 'API Key · Manage'))
+    options.push(utilityOption(`key:manage:${provider}`, 'Manage API Key'))
   }
+
+  options.push(sectionOption('hdr:exit', 'Exit'))
+  options.push(utilityOption('cancel', 'Close Model Picker', 'Return to chat without changing model'))
 
   return options
 }
@@ -139,6 +150,8 @@ export function buildLocalModelCatalogOptions(
   if (data.hfModels.length > 0) {
     options.push(utilityOption('local:uninstall', 'Uninstall Downloaded GGUF'))
   }
+  options.push(sectionOption('hdr:navigation', 'Navigation'))
+  options.push(utilityOption('back', 'Back To Picker', 'Return to model picker'))
   return options
 }
 

@@ -8,7 +8,6 @@ import {
   getVisualLines,
 } from '../chat/textCursor.js'
 
-// ConversationStack padding=1 (2) + Surface border (2) + Surface paddingX=2 (4) + '> ' prefix (2) = 10
 const DEFAULT_CHROME_WIDTH = 10
 
 type TextInputProps = {
@@ -23,6 +22,8 @@ type TextInputProps = {
   validate?: (value: string) => string | null
   onSubmit: (value: string) => void
   onCancel?: () => void
+  onNavigateLeft?: () => void
+  onNavigateRight?: (value: string) => void
 }
 
 type RenderedTextInputLine = {
@@ -42,6 +43,8 @@ export function TextInput({
   validate,
   onSubmit,
   onCancel,
+  onNavigateLeft,
+  onNavigateRight,
 }: TextInputProps) {
   const { stdout } = useStdout()
   const [value, setValue] = useState(initialValue)
@@ -49,7 +52,6 @@ export function TextInput({
   const [preferredColumn, setPreferredColumn] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  // Keep a columns state updated via resize, matching ChatInput's pattern exactly
   const [columns, setColumns] = useState<number>(() => Math.floor(stdout?.columns ?? 80))
   useEffect(() => {
     if (!stdout) return
@@ -60,26 +62,37 @@ export function TextInput({
 
   const wrapWidth = textInputWrapWidth(columns, chromeWidth)
 
-  // Sync refs during render so the input handler always reads fresh values,
-  // even if AppInputProvider fires before the next useEffect cycle updates handlerRef.
   const stateRef = useRef({ value, cursor, preferredColumn, wrapWidth })
   stateRef.current = { value, cursor, preferredColumn, wrapWidth }
 
   useAppInput((input, key) => {
     const { value: val, cursor: cur, preferredColumn: prefCol, wrapWidth: ww } = stateRef.current
 
-    if (key.return) {
+    const submitValue = (submit: (value: string) => void) => {
       if (!allowEmpty && val.trim().length === 0) {
         setError('value cannot be empty')
-        return
+        return false
       }
       const validationError = validate?.(val) ?? null
       if (validationError) {
         setError(validationError)
-        return
+        return false
       }
       setError(null)
-      onSubmit(val)
+      submit(val)
+      return true
+    }
+
+    if (multiline && isTextInputSoftBreak(key)) {
+      const next = insertTextInputText(val, cur, '\n', maxLength)
+      setValue(next.value)
+      setCursor(next.cursor)
+      setPreferredColumn(null)
+      if (error) setError(null)
+      return
+    }
+    if (key.return) {
+      submitValue(onSubmit)
       return
     }
     if (key.escape || (key.ctrl && input === 'c')) {
@@ -87,11 +100,19 @@ export function TextInput({
       return
     }
     if (key.leftArrow) {
+      if (onNavigateLeft && cur === 0) {
+        onNavigateLeft()
+        return
+      }
       setCursor(Math.max(0, cur - 1))
       setPreferredColumn(null)
       return
     }
     if (key.rightArrow) {
+      if (onNavigateRight && cur === val.length) {
+        submitValue(onNavigateRight)
+        return
+      }
       setCursor(Math.min(val.length, cur + 1))
       setPreferredColumn(null)
       return
@@ -111,8 +132,15 @@ export function TextInput({
       return
     }
     if (key.ctrl && input === 'u') {
-      setValue('')
-      setCursor(0)
+      const lineStart = val.lastIndexOf('\n', cur - 1) + 1
+      if (lineStart === cur) {
+        if (!multiline || cur === 0) return
+        setValue(val.slice(0, cur - 1) + val.slice(cur))
+        setCursor(cur - 1)
+      } else {
+        setValue(val.slice(0, lineStart) + val.slice(cur))
+        setCursor(lineStart)
+      }
       setPreferredColumn(null)
       if (error) setError(null)
       return
@@ -121,11 +149,13 @@ export function TextInput({
       return
     }
     if (input) {
-      const clean = input.replace(/[\r\n]/g, '')
+      const clean = multiline
+        ? input.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+        : input.replace(/[\r\n]/g, '')
       if (clean) {
-        const next = (val.slice(0, cur) + clean + val.slice(cur)).slice(0, maxLength)
-        setValue(next)
-        setCursor(Math.min(cur + clean.length, maxLength))
+        const next = insertTextInputText(val, cur, clean, maxLength)
+        setValue(next.value)
+        setCursor(next.cursor)
         setPreferredColumn(null)
         if (error) setError(null)
       }
@@ -145,7 +175,7 @@ export function TextInput({
         <Box flexDirection="column">
           {renderedLines.map(line => (
             <Box key={line.visualLineIndex} flexDirection="row">
-              <Text color={line.visualLineIndex === 0 ? theme.accentPrimary : theme.dim}>
+              <Text color={line.visualLineIndex === 0 ? theme.accentPeriwinkle : theme.dim}>
                 {line.visualLineIndex === 0 ? '> ' : '  '}
               </Text>
               <Box width={wrapWidth}>{line.node}</Box>
@@ -154,30 +184,43 @@ export function TextInput({
         </Box>
       ) : (
         <Box flexDirection="row">
-          <Text color={theme.accentPrimary}>{'> '}</Text>
+          <Text color={theme.accentPeriwinkle}>{'> '}</Text>
           <Box width={wrapWidth}>
             {showPlaceholder ? (
               <Text wrap={multiline ? 'wrap' : 'truncate-end'}>
-                <Text backgroundColor={theme.accentMint} color="#08110c">{' '}</Text>
+                <Text backgroundColor={theme.accentPeriwinkle} color="#0c0c1f">{' '}</Text>
                 <Text color={theme.dim}>{placeholder}</Text>
               </Text>
             ) : (
               <Text color={theme.text} wrap="truncate-end">
                 {display.slice(0, cursor)}
-                <Text backgroundColor={theme.accentMint} color="#08110c">{display[cursor] ?? ' '}</Text>
+                <Text backgroundColor={theme.accentPeriwinkle} color="#0c0c1f">{display[cursor] ?? ' '}</Text>
                 {display.slice(cursor + 1)}
               </Text>
             )}
           </Box>
         </Box>
       )}
-      {error ? <Text color="#e87070">{error}</Text> : null}
+      {error ? <Text color={theme.accentError}>{error}</Text> : null}
     </Box>
   )
 }
 
 export function textInputWrapWidth(columns: number, chromeWidth = DEFAULT_CHROME_WIDTH): number {
   return Math.max(1, Math.floor(columns) - Math.max(0, Math.floor(chromeWidth)))
+}
+
+export function insertTextInputText(value: string, cursor: number, input: string, maxLength = 4096): { value: string; cursor: number } {
+  const cleanCursor = Math.max(0, Math.min(cursor, value.length))
+  const next = (value.slice(0, cleanCursor) + input + value.slice(cleanCursor)).slice(0, maxLength)
+  return {
+    value: next,
+    cursor: Math.min(cleanCursor + input.length, next.length),
+  }
+}
+
+export function isTextInputSoftBreak(key: { return: boolean; shift?: boolean; meta?: boolean }): boolean {
+  return key.return && Boolean(key.shift || key.meta)
 }
 
 export function renderTextInputLines(
@@ -207,7 +250,7 @@ export function renderTextInputLines(
       node: (
         <Text color={theme.text} wrap="wrap">
           {before}
-          <Text backgroundColor={theme.accentMint} color="#08110c">{atChar}</Text>
+          <Text backgroundColor={theme.accentPeriwinkle} color="#0c0c1f">{atChar}</Text>
           {after}
         </Text>
       ),

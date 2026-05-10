@@ -16,11 +16,11 @@ function stripHex(input: string): string {
 
 function hexToBytes(hex: string): Uint8Array {
   const stripped = stripHex(hex)
-  if (stripped.length % 2 !== 0) throw new Error('hex string has odd length')
+  if (stripped.length % 2 !== 0) throw new Error('Hex string has odd length')
   const out = new Uint8Array(stripped.length / 2)
   for (let i = 0; i < out.length; i += 1) {
     const byte = Number.parseInt(stripped.slice(i * 2, i * 2 + 2), 16)
-    if (Number.isNaN(byte)) throw new Error('invalid hex')
+    if (Number.isNaN(byte)) throw new Error('Invalid hex')
     out[i] = byte
   }
   return out
@@ -82,14 +82,14 @@ export function validatePrivateKey(input: string): boolean {
 }
 
 export function addressFromPrivateKey(input: string): string {
-  if (!validatePrivateKey(input)) throw new Error('invalid private key')
+  if (!validatePrivateKey(input)) throw new Error('Invalid private key')
   const bytes = hexToBytes(stripHex(input.trim()))
   const pub = secp256k1.getPublicKey(bytes, false)
   return addressFromPublicKey(pub)
 }
 
 export function toChecksumAddress(address: string): string {
-  if (!ADDR_RE.test(address)) throw new Error('invalid address')
+  if (!ADDR_RE.test(address)) throw new Error('Invalid address')
   const lower = address.slice(2).toLowerCase()
   const hashHex = bytesToHex(keccak_256(new TextEncoder().encode(lower)))
   let out = '0x'
@@ -105,7 +105,7 @@ export function toChecksumAddress(address: string): string {
 }
 
 export function signMessage(privateKey: string, message: string | Uint8Array): string {
-  if (!validatePrivateKey(privateKey)) throw new Error('invalid private key')
+  if (!validatePrivateKey(privateKey)) throw new Error('Invalid private key')
   const sk = hexToBytes(stripHex(privateKey.trim()))
   const digest = ethereumMessageDigest(message)
   const sig = secp256k1.sign(digest, sk, { prehash: false })
@@ -121,11 +121,11 @@ export function signMessage(privateKey: string, message: string | Uint8Array): s
 }
 
 export function recoverAddressFromSignature(message: string | Uint8Array, signature: string): string {
-  if (!SIG_RE.test(signature)) throw new Error('invalid signature')
+  if (!SIG_RE.test(signature)) throw new Error('Invalid signature')
   const bytes = hexToBytes(stripHex(signature))
   const v = bytes[64]!
   const recovery = v >= 27 ? v - 27 : v
-  if (recovery < 0 || recovery > 3) throw new Error('invalid recovery id')
+  if (recovery < 0 || recovery > 3) throw new Error('Invalid recovery id')
   const recovered = new Uint8Array(65)
   recovered[0] = recovery
   recovered.set(bytes.subarray(0, 64), 1)

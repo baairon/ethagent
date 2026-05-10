@@ -18,7 +18,7 @@ import { SessionStatus, formatTokens } from './SessionStatus.js'
 import { formatModelDisplayName } from '../models/modelDisplay.js'
 import { toggleReasoningRow, type MessageRow } from './MessageList.js'
 import { ConversationStack } from './ConversationStack.js'
-import { ModelPicker, type ModelPickerSelection } from '../models/ModelPicker.js'
+import type { ModelPickerSelection } from '../models/ModelPicker.js'
 import type { ModelPickerContextFit } from '../models/modelPickerOptions.js'
 import type { CopyResult } from '../utils/clipboard.js'
 import { useKeybinding, useRegisterKeybindingContext } from '../app/keybindings/KeybindingProvider.js'
@@ -55,13 +55,15 @@ import type {
 } from '../tools/contracts.js'
 import {
   buildBaseMessages,
-  formatBytes,
   sessionMessagesToRows,
   type TurnCheckpoint,
 } from './chatScreenUtils.js'
 import { ChatBottomPane, type ContextLimitState, type CopyPickerState, type IdentityOverlayState, type Overlay } from './ChatBottomPane.js'
 import { setTokenIdentity, getIdentityStatus } from '../storage/identity.js'
 import type { IdentityHubResult } from '../identity/hub/IdentityHub.js'
+import { continuityWorkingTreeStatus } from '../identity/continuity/storage.js'
+import { listPublishedContinuitySnapshots } from '../identity/continuity/snapshots.js'
+import { localChangeStatusView } from '../identity/hub/model/continuity.js'
 import {
   buildResumedSessionState,
   promptHistoryFromSessionMessages,
@@ -181,6 +183,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
   const pendingContinuityEditReviewRef = useRef<ContinuityEditReviewState | null>(null)
   const contextModelSwitchPromptRef = useRef<string | null>(null)
   const mcpManagerRef = useRef<McpManager | null>(null)
+  const savePromptShownRef = useRef<boolean>(false)
 
   useEffect(() => { rowsRef.current = rows }, [rows])
   useEffect(() => { overlayRef.current = overlay }, [overlay])
@@ -203,6 +206,29 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
       const loaded = await readHistory()
       globalHistoryRef.current = loaded
       if (historyScopeRef.current === 'global') setHistory(loaded)
+    })()
+  }, [])
+
+  useEffect(() => {
+    if (savePromptShownRef.current) return
+    savePromptShownRef.current = true
+    void (async () => {
+      try {
+        const identity = configRef.current.identity
+        if (!identity) return
+        const [latest] = await listPublishedContinuitySnapshots(identity, 1)
+        const status = await continuityWorkingTreeStatus(identity, latest)
+        if (!localChangeStatusView(status).hasLocalChanges) return
+        if (overlayRef.current !== 'none') return
+        setIdentityOverlay({
+          initialAction: 'save-prompt',
+          existing: { address: identity.address },
+        })
+        overlayRef.current = 'identity'
+        setOverlay('identity')
+      } catch {
+        // best-effort; skip prompt on any error
+      }
     })()
   }, [])
 
@@ -1107,7 +1133,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
         })
         overlayRef.current = 'identity'
         setOverlay('identity')
-        pushNote('opening snapshot approval.', 'dim')
+        pushNote('opening snapshot signature.', 'dim')
         return
       }
       overlayRef.current = 'none'
@@ -1363,8 +1389,8 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
 
   const contextLine = `${config.provider} · ${formatModelDisplayName(config.provider, config.model, { maxLength: 24 })} · ${compressHome(cwd)}`
   const tipLine = streaming
-    ? 'tip: you can keep typing and press enter to queue the next message · shift+enter for newline'
-    : 'tip: type /help to get started · shift+enter for newline'
+    ? 'Tip: You can keep typing and press enter to queue the next message · shift+enter for newline'
+    : 'Tip: type /help to get started · shift+enter for newline'
 
   const placeholderHints = useMemo(() => {
     if (compactionUi) return ['compaction in progress · esc to cancel']
@@ -1373,30 +1399,24 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
 
   const exitHint = exitState.pending ? 'ctrl+c again to quit' : null
   const runtimeModeLabel = sessionModeLabel(mode)
-  const modeColor =
-    mode === 'plan'
-      ? theme.accentLavender
-      : mode === 'accept-edits'
-        ? theme.accentPeach
-        : theme.accentMint
   const footerRight = (
     <Box flexDirection="row">
       {exitHint ? (
         <>
-          <Text color={theme.accentPrimary}>{exitHint}</Text>
+          <Text color={theme.text}>{exitHint}</Text>
           <Text color={theme.dim}> · </Text>
         </>
       ) : null}
       {runtimeModeLabel ? (
         <>
-          <Text color={modeColor}>{runtimeModeLabel}</Text>
+          <Text bold>{runtimeModeLabel}</Text>
           <Text color={theme.dim}> (</Text>
-          <Text color={theme.accentMint}>shift+tab to cycle</Text>
+          <Text color={theme.accentPeriwinkle}>shift+tab to cycle</Text>
           <Text color={theme.dim}>) · </Text>
         </>
       ) : (
         <>
-          <Text color={theme.accentMint}>shift+tab to cycle</Text>
+          <Text color={theme.accentPeriwinkle}>shift+tab to cycle</Text>
           <Text color={theme.dim}> · </Text>
         </>
       )}

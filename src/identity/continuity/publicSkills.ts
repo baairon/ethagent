@@ -1,6 +1,6 @@
 import type { EthagentIdentity } from '../../storage/config.js'
 
-export type PublicSkill = {
+type PublicSkill = {
   id: string
   name: string
   description: string
@@ -8,7 +8,7 @@ export type PublicSkill = {
   outputModes: string[]
 }
 
-export type PublicSkillsProfile = {
+type PublicSkillsProfile = {
   name: string
   description: string
   version: string
@@ -16,14 +16,13 @@ export type PublicSkillsProfile = {
   skills: PublicSkill[]
 }
 
-export type AgentCard = {
+type AgentCard = {
   name: string
   description: string
   version: string
   protocolVersion: string
-  url: string
+  url?: string
   image?: string
-  iconUrl?: string
   defaultInputModes: string[]
   defaultOutputModes: string[]
   capabilities: {
@@ -93,7 +92,7 @@ export function renderPublicSkillsJson(profile: PublicSkillsProfile): string {
     ...(profile.imageUrl ? { imageUrl: profile.imageUrl } : {}),
     inputModes,
     outputModes,
-    boundary: 'Public discovery metadata only. This is not executable code, private memory, or a skill installation manifest.',
+    boundary: 'Public discovery only. This is not executable code, private memory, or a skill installation manifest.',
     capabilities: {
       softwareEngineering: true,
       workspaceTools: 'permissioned',
@@ -134,7 +133,7 @@ export function renderPublicSkillsJson(profile: PublicSkillsProfile): string {
   return `${JSON.stringify(summary, null, 2)}\n`
 }
 
-export function createAgentCard(profile: PublicSkillsProfile, url = 'ipfs://pending-agent-endpoint'): AgentCard {
+export function createAgentCard(profile: PublicSkillsProfile, url?: string): AgentCard {
   const inputModes = unique(profile.skills.flatMap(skill => skill.inputModes))
   const outputModes = unique(profile.skills.flatMap(skill => skill.outputModes))
   return {
@@ -142,8 +141,8 @@ export function createAgentCard(profile: PublicSkillsProfile, url = 'ipfs://pend
     description: profile.description,
     version: profile.version,
     protocolVersion: '0.2.6',
-    url,
-    ...(profile.imageUrl ? { image: profile.imageUrl, iconUrl: profile.imageUrl } : {}),
+    ...(url ? { url } : {}),
+    ...(profile.imageUrl ? { image: profile.imageUrl } : {}),
     defaultInputModes: inputModes.length ? inputModes : ['text/markdown'],
     defaultOutputModes: outputModes.length ? outputModes : ['text/markdown'],
     capabilities: {

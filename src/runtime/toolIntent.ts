@@ -8,18 +8,6 @@ export type ToolIntent = {
   reason: string
 }
 
-/**
- * detectDirectToolIntent — typed detection for high-confidence direct
- * filesystem requests. Returns the first matching intent, or null for
- * ambiguous or multi-step engineering requests so the model handles those.
- *
- * Covers:
- *   - change_directory: "cd into identity", "go to src/identity"
- *   - list_directory: "list files", "show what's here", "ls"
- *   - read_file: "read package.json", "open/show/cat <file>"
- *
- * Returns null for anything else.
- */
 export function detectDirectToolIntent(userText: string): ToolIntent | null {
   const uses = directToolUsesForUserText(userText)
   if (uses.length === 0) return null
@@ -28,14 +16,6 @@ export function detectDirectToolIntent(userText: string): ToolIntent | null {
   return { name: first.name, input: first.input, reason }
 }
 
-/**
- * validateAssistantTextAgainstTurnEvidence — checks whether assistant prose
- * claims workspace state that isn't backed by a tool result from the active
- * turn.
- *
- * Returns 'ok' if the text is safe (no unsupported claims), or 'needs-tool'
- * if the text claims state that has no matching tool evidence.
- */
 export function validateAssistantTextAgainstTurnEvidence(
   text: string,
   evidence: ToolEvidence[],

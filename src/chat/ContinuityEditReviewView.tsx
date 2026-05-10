@@ -19,32 +19,16 @@ export const ContinuityEditReviewView: React.FC<{
   onCancel: () => void
 }> = ({ review, onSelect, onCancel }) => (
   <Surface
-    title="Private Continuity Updated"
-    subtitle="Review the file, then save an encrypted snapshot."
-    footer="enter select · esc later"
+    title={`${review.file} Updated`}
+    footer="enter select · esc dismiss"
   >
-    <Box flexDirection="column">
-      <Text color={theme.accentMint}>{review.summary}</Text>
-      <Box marginTop={1} flexDirection="column">
-        <Text color={theme.textSubtle}>review file</Text>
-        <Text color={theme.text}>{review.filePath}</Text>
-      </Box>
-      {review.editorOpened && (
-        <Box marginTop={1}>
-          <Text color={theme.accentPeach}>Save with ctrl+s in your editor</Text>
-        </Box>
-      )}
-      <Box marginTop={1} flexDirection="column">
-        <Text color={theme.textSubtle}>saved locally</Text>
-        <Text color={theme.dim}>Previous version saved in identity history. /rewind does not restore identity continuity.</Text>
-      </Box>
-    </Box>
+    <Text color={theme.accentPeriwinkle}>{displayContinuityReviewText(review.summary)}</Text>
     <Box marginTop={1}>
       <Select<ContinuityEditReviewAction>
         options={[
-          { value: 'open', label: `open ${review.file}`, hint: 'review the edited private file now' },
-          { value: 'save-publish', label: 'save snapshot now', hint: 'go directly to wallet approval' },
-          { value: 'later', label: 'later', hint: 'keep the local draft unsaved' },
+          { value: 'open', label: `Open ${review.file}`, hint: 'Review in editor' },
+          { value: 'save-publish', label: 'Save Snapshot', hint: 'Wallet signature' },
+          { value: 'later', label: 'Dismiss', hint: 'Save later from Identity Hub' },
         ]}
         onSubmit={onSelect}
         onCancel={onCancel}
@@ -52,3 +36,7 @@ export const ContinuityEditReviewView: React.FC<{
     </Box>
   </Surface>
 )
+
+function displayContinuityReviewText(value: string): string {
+  return value ? value[0]!.toUpperCase() + value.slice(1) : value
+}

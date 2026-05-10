@@ -1,4 +1,5 @@
 import type { AnthropicToolDefinition } from '../providers/anthropic.js'
+import type { GeminiToolDefinition } from '../providers/gemini.js'
 import type { OpenAIToolDefinition } from '../providers/openai-chat.js'
 import type { Tool } from './contracts.js'
 import { modePolicy, type SessionMode } from '../runtime/sessionMode.js'
@@ -63,5 +64,34 @@ export function openAITools(mode: SessionMode = 'chat', context: ToolAvailabilit
       description: tool.description,
       parameters: tool.inputSchemaJson,
     },
+  }))
+}
+
+const GEMINI_DROP_KEYS = new Set([
+  'additionalProperties',
+  '$schema',
+  '$ref',
+  '$defs',
+  'definitions',
+])
+
+function sanitizeForGemini(schema: unknown): unknown {
+  if (Array.isArray(schema)) return schema.map(sanitizeForGemini)
+  if (schema && typeof schema === 'object') {
+    const out: Record<string, unknown> = {}
+    for (const [k, v] of Object.entries(schema as Record<string, unknown>)) {
+      if (GEMINI_DROP_KEYS.has(k)) continue
+      out[k] = sanitizeForGemini(v)
+    }
+    return out
+  }
+  return schema
+}
+
+export function geminiTools(mode: SessionMode = 'chat', context: ToolAvailabilityContext = {}): GeminiToolDefinition[] {
+  return toolsForMode(mode, context).map(tool => ({
+    name: tool.name,
+    description: tool.description,
+    parameters: sanitizeForGemini(tool.inputSchemaJson) as GeminiToolDefinition['parameters'],
   }))
 }

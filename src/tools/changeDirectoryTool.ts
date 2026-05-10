@@ -56,7 +56,7 @@ function resolveTargetDirectory(workspaceRoot: string, requestedPath: string): s
 function resolveDirectoryIntent(input: string, workspaceRoot: string): string {
   const normalized = normalizeIntentInput(input)
   if (!normalized) {
-    throw new Error('missing directory path')
+    throw new Error('Missing directory path')
   }
 
   if (looksLikeConcretePath(normalized)) {

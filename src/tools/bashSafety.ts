@@ -132,6 +132,14 @@ export function validateBashCommandInput(command: string): string | undefined {
     return `command must be an actual shell command, not an ethagent tool name. ${nativeToolMessage}`
   }
 
+  if (normalizedFirstToken === 'echo' || normalizedFirstToken === 'printf') {
+    const rest = trimmed.slice(firstToken.length)
+    const hasShellMeta = /[|&;<>`$]/.test(rest)
+    if (!hasShellMeta) {
+      return `do not use ${normalizedFirstToken} to emit conversational text; reply directly in your assistant message instead.`
+    }
+  }
+
   if (
     /\b(you can|you should|you need|run the following command|written in|under the|to run(?: the game)?|copy and paste|save (?:it|this))/i.test(trimmed)
   ) {

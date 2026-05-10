@@ -6,6 +6,12 @@ export type RetryClassification = {
   code?: string
 }
 
+export type RetryBodyHint = {
+  retryAfterMs?: number
+  fatal?: boolean
+  reason?: string
+}
+
 export type RetryPolicy = {
   maxRetries: number
   baseDelayMs: number
@@ -179,6 +185,7 @@ export type FetchWithRetryOptions = {
   retryAfterCapMs?: number
   jitterRatio?: number
   rateLimitResetProvider?: RateLimitResetProvider
+  parseRetryHintFromBody?: (body: string) => RetryBodyHint | undefined
   signal?: AbortSignal
   fetchImpl?: typeof fetch
   sleep?: (ms: number, signal?: AbortSignal) => Promise<void>
@@ -205,10 +212,36 @@ export async function fetchWithRetry(
       const response = await fetchImpl(input, { ...init, signal: options.signal })
       if (response.ok) return response
 
-      const classification = classifyRetryableProviderResponse(response, now(), options.rateLimitResetProvider)
-      if (!classification.retryable || attempt > policy.maxRetries) return response
+      let classification = classifyRetryableProviderResponse(response, now(), options.rateLimitResetProvider)
+      let bufferedResponse: Response | undefined
+      if (
+        classification.retryable
+        && response.status === 429
+        && options.parseRetryHintFromBody
+      ) {
+        let bodyText = ''
+        try { bodyText = await response.text() } catch { /* ignore */ }
+        bufferedResponse = new Response(bodyText, {
+          status: response.status,
+          statusText: response.statusText,
+          headers: response.headers,
+        })
+        const hint = bodyText ? safeParseRetryHint(bodyText, options.parseRetryHintFromBody) : undefined
+        if (hint?.fatal) {
+          return bufferedResponse
+        }
+        if (hint?.retryAfterMs !== undefined) {
+          classification = { ...classification, retryAfterMs: hint.retryAfterMs }
+        }
+        if (hint?.reason) {
+          classification = { ...classification, reason: `${classification.reason} ${hint.reason}` }
+        }
+      }
+      if (!classification.retryable || attempt > policy.maxRetries) return bufferedResponse ?? response
 
-      try { await response.body?.cancel() } catch { /* ignore */ }
+      if (!bufferedResponse) {
+        try { await response.body?.cancel() } catch { /* ignore */ }
+      }
       const delayMs = computeBackoffMs(
         attempt,
         classification.retryAfterMs,
@@ -241,6 +274,17 @@ export async function fetchWithRetry(
     }
   }
   throw lastError ?? new Error('fetchWithRetry exhausted')
+}
+
+function safeParseRetryHint(
+  body: string,
+  parser: (body: string) => RetryBodyHint | undefined,
+): RetryBodyHint | undefined {
+  try {
+    return parser(body)
+  } catch {
+    return undefined
+  }
 }
 
 function retryEvent(

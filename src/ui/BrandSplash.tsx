@@ -1,56 +1,14 @@
 import React, { useEffect, useState } from 'react'
 import { Text, Box } from 'ink'
-import { eyeGradientColor, theme } from './theme.js'
+import { theme } from './theme.js'
 
 const glyphs = {
-  ethagent: {
-    eth: `░░░░░░░╗░░░░░░░░╗░░╗  ░░╗
-░░╔════╝╚══░░╔══╝░░║  ░░║
-░░░░░╗     ░░║   ░░░░░░░║
-░░╔══╝     ░░║   ░░╔══░░║
-░░░░░░░╗   ░░║   ░░║  ░░║
-╚══════╝   ╚═╝   ╚═╝  ╚═╝`,
-    a: [
-      ` █████╗ `,
-      `██╔══██╗`,
-      `███████║`,
-      `██╔══██║`,
-      `██║  ██║`,
-      `╚═╝  ╚═╝`,
-    ].join('\n'),
-    g: [
-      ` ██████╗ `,
-      `██╔════╝ `,
-      `██║  ███╗`,
-      `██║   ██║`,
-      `╚██████╔╝`,
-      ` ╚═════╝ `,
-    ].join('\n'),
-    e: [
-      `███████╗`,
-      `██╔════╝`,
-      `█████╗  `,
-      `██╔══╝  `,
-      `███████╗`,
-      `╚══════╝`,
-    ].join('\n'),
-    n: [
-      `███╗   ██╗`,
-      `████╗  ██║`,
-      `██╔██╗ ██║`,
-      `██║╚██╗██║`,
-      `██║ ╚████║`,
-      `╚═╝  ╚═══╝`,
-    ].join('\n'),
-    t: [
-      `████████╗`,
-      `╚══██╔══╝`,
-      `   ██║   `,
-      `   ██║   `,
-      `   ██║   `,
-      `   ╚═╝   `,
-    ].join('\n'),
-  },
+  ethagent: `░░░░░░░╗░░░░░░░░╗░░╗  ░░╗ █████╗  ██████╗ ███████╗███╗   ██╗████████╗
+░░╔════╝╚══░░╔══╝░░║  ░░║██╔══██╗██╔════╝ ██╔════╝████╗  ██║╚══██╔══╝
+░░░░░╗     ░░║   ░░░░░░░║███████║██║  ███╗█████╗  ██╔██╗ ██║   ██║
+░░╔══╝     ░░║   ░░╔══░░║██╔══██║██║   ██║██╔══╝  ██║╚██╗██║   ██║
+░░░░░░░╗   ░░║   ░░║  ░░║██║  ██║╚██████╔╝███████╗██║ ╚████║   ██║
+╚══════╝   ╚═╝   ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝ ╚══════╝╚═╝  ╚═══╝   ╚═╝   `,
   eyes: `
                                          -+:
                    :=-                    -%@@@%.
@@ -79,33 +37,13 @@ const glyphs = {
   },
 } as const
 
-const ethagentGlyphOrder = ['eth', 'a', 'g', 'e', 'n', 't'] as const
-
 const Eyes = () => {
   const lines = glyphs.eyes.split('\n')
   return (
     <Box flexDirection="column">
-      {lines.map((line, li) => {
-        const glyphPositions = [...line]
-          .map((char, index) => ({ char, index }))
-          .filter(entry => entry.char.trim().length > 0)
-          .map(entry => entry.index)
-        const firstGlyph = glyphPositions[0] ?? 0
-        const lastGlyph = glyphPositions[glyphPositions.length - 1] ?? firstGlyph
-        const span = Math.max(lastGlyph - firstGlyph, 1)
-
-        return (
-          <Text key={li}>
-            {[...line].map((char, ci) => {
-              if (!char.trim()) {
-                return <Text key={ci}>{char}</Text>
-              }
-              const t = (ci - firstGlyph) / span
-              return <Text key={ci} color={eyeGradientColor(t)}>{char}</Text>
-            })}
-          </Text>
-        )
-      })}
+      {lines.map((line, li) => (
+        <Text key={li} color={theme.text}>{line}</Text>
+      ))}
     </Box>
   )
 }
@@ -135,19 +73,18 @@ export const BrandSplash: React.FC<SplashProps> = ({ contextLine, tipLine, updat
     return (
       <Box flexDirection="column" alignSelf="flex-start" padding={1}>
         <Eyes />
-        <Text bold color={theme.accentPrimary}>ethagent</Text>
-        <Text color={theme.dim}>{glyphs.tagline.trim()}</Text>
+        <Text bold color={theme.accentWhite}>ethagent</Text>
+        <Text color={theme.dim}>privacy-first AI agent with a portable <Text color={theme.accentPeriwinkle}>Ethereum</Text> identity</Text>
         {contextLine ? <Text color={theme.dim}>{contextLine}</Text> : null}
         {tipLine ? <Text color={theme.dim}>{tipLine}</Text> : null}
-        {updateNotice ? <Text color={theme.accentPeach}>{updateNotice}</Text> : null}
+        {updateNotice ? <Text color={theme.accentPeriwinkle}>{updateNotice}</Text> : null}
       </Box>
     )
   }
 
-  const logoLines = ethagentGlyphOrder.map(key => glyphs.ethagent[key].split('\n'))
-  const rowCount = Math.max(...logoLines.map(lines => lines.length))
-
   const w = 69
+  const logoLines = glyphs.ethagent.split('\n').map(line => line.padEnd(w, ' '))
+
   const topPad = Math.max(0, w - glyphs.tagline.length - 1)
 
   const bottomInline = contextLine ? ` ${truncateToFit(contextLine, w - 4)} ` : ''
@@ -158,22 +95,20 @@ export const BrandSplash: React.FC<SplashProps> = ({ contextLine, tipLine, updat
       <Eyes />
       <Text>
         <Text color={theme.border}>{glyphs.frame.topLeft}</Text>
-        <Text color={theme.dim}>{glyphs.tagline}</Text>
+        <Text color={theme.dim}>{' privacy-first AI agent with a portable '}<Text color={theme.accentPeriwinkle}>Ethereum</Text>{' identity '}</Text>
         <Text color={theme.border}>{glyphs.frame.horizontal.repeat(topPad)}{glyphs.frame.topRight}</Text>
       </Text>
-      {Array.from({ length: rowCount }, (_, i) => (
+      {logoLines.map((line, i) => (
         <Box key={i}>
           <Text color={theme.border}>{glyphs.frame.side}</Text>
-          {logoLines.map((lines, index) => (
-            <Text key={ethagentGlyphOrder[index]} color={theme.border}>{lines[i] ?? ''}</Text>
-          ))}
+          <Text color={theme.border}>{line}</Text>
           <Text color={theme.border}>{glyphs.frame.side}</Text>
         </Box>
       ))}
       {bottomInline ? (
         <Text>
           <Text color={theme.border}>{glyphs.frame.bottomLeft}</Text>
-          <Text color={theme.accentMint}>{bottomInline}</Text>
+          <Text color={theme.accentPeriwinkle}>{bottomInline}</Text>
           <Text color={theme.border}>{glyphs.frame.horizontal.repeat(bottomPad)}{glyphs.frame.bottomRight}</Text>
         </Text>
       ) : (
@@ -182,7 +117,7 @@ export const BrandSplash: React.FC<SplashProps> = ({ contextLine, tipLine, updat
       {tipLine || updateNotice ? (
         <Box marginTop={1} flexDirection="column">
           {tipLine ? <Text color={theme.dim}>{tipLine}</Text> : null}
-          {updateNotice ? <Text color={theme.accentPeach}>{updateNotice}</Text> : null}
+          {updateNotice ? <Text color={theme.accentPeriwinkle}>{updateNotice}</Text> : null}
         </Box>
       ) : null}
     </Box>

@@ -105,7 +105,7 @@ export function useAppInput(
   options: { isActive?: boolean } = {},
 ): void {
   const ctx = useContext(AppInputContext)
-  if (!ctx) throw new Error('useAppInput must be used inside AppInputProvider')
+  if (!ctx) throw new Error('Hook useAppInput must be used inside AppInputProvider')
 
   const handlerRef = useRef(handler)
   const isActiveRef = useRef(options.isActive !== false)

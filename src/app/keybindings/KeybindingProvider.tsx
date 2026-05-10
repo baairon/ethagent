@@ -90,7 +90,7 @@ export const KeybindingProvider: React.FC<ProviderProps> = ({ bindings = DEFAULT
 
 export function useKeybindingContext(): KeybindingContextValue {
   const ctx = useContext(Ctx)
-  if (!ctx) throw new Error('useKeybindingContext requires KeybindingProvider')
+  if (!ctx) throw new Error('Hook useKeybindingContext requires KeybindingProvider')
   return ctx
 }
 

@@ -51,6 +51,7 @@ import {
   buildLocalModelCatalogOptions,
   buildModelPickerOptions,
   catalogOptionValue,
+  cloudProviderDisplayName,
   LOCAL_MODEL_LINK_EXAMPLE,
   LOCAL_MODEL_LINK_HINT,
   MODEL_PICKER_CLOUD_PROVIDERS,
@@ -153,7 +154,6 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
         }
       }
       setState({ kind: 'list', data })
-      // If a featured repo was provided (first-run local flow), auto-inspect it
       if (featuredHfRepo) {
         await inspectHfInput({ kind: 'hfInput', data }, featuredHfRepo, setState)
       }
@@ -168,7 +168,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
   if (state.kind === 'loading') {
     return (
       <Surface title={contextFit ? 'Switch to Larger-Context Model' : 'Switch Provider · Model'} subtitle="Loading providers and models.">
-        <Spinner label="Loading providers..." />
+        <Spinner label="loading providers..." />
       </Surface>
     )
   }
@@ -186,7 +186,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
           onSubmit={value => void inspectHfInput(state, value, setState)}
           onCancel={() => setState({ kind: 'list', data: state.data })}
         />
-        {state.error ? <Text color="#e87070">{state.error}</Text> : null}
+        {state.error ? <Text color={theme.accentError}>{state.error}</Text> : null}
       </Surface>
     )
   }
@@ -194,7 +194,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
   if (state.kind === 'hfLoading') {
     return (
       <Surface title="Checking Model Link" subtitle={state.input}>
-        <Spinner label="Reading model page..." />
+        <Spinner label="reading model page..." />
       </Surface>
     )
   }
@@ -266,7 +266,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
     return (
       <Surface title="Downloading Model" subtitle={state.plan.displayName}>
         <Text color={theme.dim}>{state.progress.status}</Text>
-        <ProgressBar progress={progress} suffix={suffix} variant="rainbow" />
+        <ProgressBar progress={progress} suffix={suffix} />
       </Surface>
     )
   }
@@ -441,7 +441,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
     return (
       <Surface title="Installing Local Runner" subtitle="This may take a few minutes.">
         <ElapsedSpinner startedAt={state.startedAt} label={state.progress.label} />
-        <ProgressBar progress={state.progress.progress} variant="rainbow" />
+        <ProgressBar progress={state.progress.progress} />
       </Surface>
     )
   }
@@ -481,7 +481,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
             onCancel={() => setState({ kind: 'localRunnerSetup', data: state.data, model: state.model })}
           />
         )}
-        {state.error ? <Text color="#e87070">{state.error}</Text> : null}
+        {state.error ? <Text color={theme.accentError}>{state.error}</Text> : null}
       </Surface>
     )
   }
@@ -489,7 +489,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
   if (state.kind === 'localRunnerStarting') {
     return (
       <Surface title="Starting Local Model" subtitle={state.model.displayName}>
-        <ElapsedSpinner startedAt={state.startedAt} label="Starting local runner" />
+        <ElapsedSpinner startedAt={state.startedAt} label="starting local runner..." />
       </Surface>
     )
   }
@@ -518,38 +518,41 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
 
   if (state.kind === 'keyEntry') {
     const { provider, action, submitting, error } = state
+    const providerName = cloudProviderDisplayName(provider)
+    const actionLabel = action === 'set' ? 'Add' : 'Replace'
     return (
       <Surface
-        title={`${capitalize(action)} ${provider} API Key`}
+        title={`${actionLabel} ${providerName} API Key`}
         subtitle="Stored in your OS keyring when available; never written to config in plaintext."
         footer="enter save · esc back"
       >
         {submitting ? (
-          <Spinner label={`saving ${provider} key...`} />
+          <Spinner label={`saving ${providerName} key...`} />
         ) : (
           <TextInput
-            label={`${provider} key`}
+            label={`${providerName} key`}
             placeholder={providerKeyPlaceholder(provider)}
             isSecret
             onSubmit={(value) => void submitKey(state, value, currentConfig, setState)}
             onCancel={() => setState({ kind: 'list', data: state.data })}
           />
         )}
-        {error ? <Text color="#e87070">{error}</Text> : null}
+        {error ? <Text color={theme.accentError}>{error}</Text> : null}
       </Surface>
     )
   }
 
   if (state.kind === 'keyManage') {
     const { provider, submitting, error } = state
+    const providerName = cloudProviderDisplayName(provider)
     return (
       <Surface
-        title={`${capitalize(provider)} API Key`}
+        title={`${providerName} API Key`}
         subtitle="Manage the stored key for this provider."
         footer="enter select · esc back"
       >
         {submitting ? (
-          <Spinner label={`removing ${provider} key...`} />
+          <Spinner label={`removing ${providerName} key...`} />
         ) : (
           <Select
             options={[
@@ -571,12 +574,10 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
             onCancel={() => setState({ kind: 'list', data: state.data })}
           />
         )}
-        {error ? <Text color="#e87070">{error}</Text> : null}
+        {error ? <Text color={theme.accentError}>{error}</Text> : null}
       </Surface>
     )
   }
-
-
 
   if (state.kind === 'catalog') {
     const catalog = state.data.cloudCatalogs[state.provider]
@@ -588,7 +589,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
     })
     return (
       <Surface
-        title={`${capitalize(state.provider)} Full Catalog`}
+        title={`${cloudProviderDisplayName(state.provider)} Full Catalog`}
         subtitle={contextFit ? contextFitSubtitle(contextFit) : 'All discovered models for this provider'}
         footer="enter select · esc back"
       >
@@ -609,7 +610,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
   if (state.kind === 'localCatalogLoading') {
     return (
       <Surface title="View Full Catalog" subtitle="Loading curated local GGUF files.">
-        <Spinner label="Reading Hugging Face files..." />
+        <Spinner label="reading hugging face files..." />
       </Surface>
     )
   }
@@ -647,7 +648,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
           options={options}
           initialIndex={initialIndex === -1 ? 0 : initialIndex}
           maxVisible={12}
-          onSubmit={(value) => handleSubmit(value, state, setState, onPick)}
+          onSubmit={(value) => handleSubmit(value, state, setState, onPick, onCancel)}
           onCancel={() => setState({ kind: 'list', data: state.data })}
         />
       </Surface>
@@ -668,7 +669,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
         options={options}
         initialIndex={initialIndex === -1 ? 0 : initialIndex}
         maxVisible={10}
-        onSubmit={(value) => handleSubmit(value, state, setState, onPick)}
+        onSubmit={(value) => handleSubmit(value, state, setState, onPick, onCancel)}
         onCancel={onCancel}
       />
     </Surface>
@@ -680,8 +681,17 @@ function handleSubmit(
   state: Extract<State, { kind: 'list' | 'localCatalog' }>,
   setState: (s: State) => void,
   onPick: (sel: ModelPickerSelection) => void,
+  onCancel: () => void,
 ): void {
   if (value.startsWith('hdr:')) return
+  if (value === 'cancel') {
+    onCancel()
+    return
+  }
+  if (value === 'back' && state.kind === 'localCatalog') {
+    setState({ kind: 'list', data: state.data })
+    return
+  }
   if (value.startsWith('hf:')) {
     const id = value.slice(3)
     if (id === 'download') {
@@ -1256,7 +1266,7 @@ async function runRunnerSetup(
   const startedAt = Date.now()
   const initialProgress: LlamaCppInstallProgress = {
     phase: 'checking',
-    label: 'Preparing local runner',
+    label: 'preparing local runner...',
     progress: 0.04,
   }
   const updateProgress = (progress: LlamaCppInstallProgress): void => {
@@ -1361,14 +1371,14 @@ function modelMetadataSubtext(size: string, indicators: string[]): string | unde
 }
 
 function riskColor(risk: string): string {
-  if (risk === 'high') return '#e87070'
+  if (risk === 'high') return theme.accentError
   if (risk === 'medium') return theme.dim
-  return theme.accentSecondary
+  return theme.accentPeriwinkle
 }
 
 function fitColor(fit: GgufMachineFit): string {
-  if (fit === 'too-large') return '#e87070'
-  if (fit === 'tight') return theme.accentWarm
+  if (fit === 'too-large') return theme.accentError
+  if (fit === 'tight') return theme.accentPeriwinkle
   return theme.dim
 }
 
@@ -1431,10 +1441,6 @@ function providerKeyPlaceholder(provider: ProviderId): string {
 function runnerPathPlaceholder(): string {
   if (process.platform === 'win32') return 'C:\\path\\to\\llama-server.exe'
   return '/path/to/llama-server'
-}
-
-function capitalize(value: string): string {
-  return value.charAt(0).toUpperCase() + value.slice(1)
 }
 
 function isCloudProvider(value: string | undefined): value is CloudProviderId {

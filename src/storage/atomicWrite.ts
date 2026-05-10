@@ -1,7 +1,10 @@
+import crypto from 'node:crypto'
 import fs from 'node:fs/promises'
 
 const RETRYABLE_RENAME_CODES = new Set(['EPERM', 'EBUSY', 'EACCES'])
 const RETRY_DELAYS_MS = [20, 60, 120]
+
+let tempCounter = 0
 
 type WriteOptions = {
   mode?: number
@@ -12,7 +15,7 @@ export async function atomicWriteText(
   data: string,
   options: WriteOptions = {},
 ): Promise<void> {
-  const tmp = `${file}.${process.pid}.${Date.now()}.tmp`
+  const tmp = `${file}.${process.pid}.${Date.now()}.${(tempCounter = (tempCounter + 1) >>> 0)}.${crypto.randomBytes(4).toString('hex')}.tmp`
   const mode = options.mode ?? 0o600
 
   await fs.writeFile(tmp, data, { encoding: 'utf8', mode })

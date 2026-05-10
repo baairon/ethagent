@@ -24,7 +24,7 @@ async function loadKeytar(): Promise<Keytar | null> {
     if (typeof api.getPassword !== 'function'
       || typeof api.setPassword !== 'function'
       || typeof api.deletePassword !== 'function') {
-      throw new Error('keytar module shape unexpected')
+      throw new Error('Keytar module shape unexpected')
     }
     await api.getPassword(KEYTAR_SERVICE, '__ethagent_probe__')
     keytarCache = api
@@ -130,7 +130,7 @@ export async function getSecret(account: string): Promise<string | null> {
 
 export async function setSecret(account: string, value: string): Promise<KeyBackend> {
   const trimmed = value.trim()
-  if (!trimmed) throw new Error('secret value is empty')
+  if (!trimmed) throw new Error('Secret value is empty')
   const keytar = await loadKeytar()
   if (keytar) {
     await keytar.setPassword(KEYTAR_SERVICE, account, trimmed)

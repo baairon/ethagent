@@ -1,5 +1,6 @@
 import type { ProviderId } from '../storage/config.js'
 import { ProviderError } from './contracts.js'
+import { formatGeminiRateLimitMessage } from './gemini.js'
 
 type ErrorBody =
   | string
@@ -16,7 +17,22 @@ export async function providerErrorFromResponse(
   provider: ProviderId,
   response: Response,
 ): Promise<ProviderError> {
+  if (provider === 'gemini' && response.status === 429) {
+    const short = await formatGeminiRateLimitMessage(response.clone())
+    if (short) return new ProviderError(short, { transient: true })
+  }
+
   const detail = await readErrorDetail(response)
+
+  if (
+    provider === 'gemini'
+    && response.status === 400
+    && /API[_ ]?key( not valid| not found|_invalid)|invalid api key/i.test(detail)
+  ) {
+    return new ProviderError(
+      'gemini: API key rejected — verify your key at https://aistudio.google.com/app/apikey, then run /key gemini to set it again',
+    )
+  }
 
   if (provider !== 'llamacpp') {
     if (response.status === 401 || response.status === 403) {

@@ -54,5 +54,5 @@ export async function* fetchWithRetryStreamEvents(
   await fetchPromise
   if (settled?.state === 'resolved') return settled.response
   if (settled?.state === 'rejected') throw settled.error
-  throw new Error('fetch retry completed without a response')
+  throw new Error('Fetch retry completed without a response')
 }

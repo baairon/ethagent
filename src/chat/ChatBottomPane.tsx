@@ -203,7 +203,6 @@ export function ChatBottomPane({
       <IdentityHub
         mode="manage"
         config={config}
-        cwd={cwd}
         initialAction={identityOverlay.initialAction}
         onComplete={handleIdentityResult}
         onConfigChange={onConfigChange}

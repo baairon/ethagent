@@ -74,6 +74,18 @@ function formatRepoAndFile(repoId: string, filename: string, maxLength: number):
   const full = `${repoId}${HF_SEPARATOR}${file}`
   if (full.length <= maxLength) return full
 
+  const compactFile = compactModelFilename(file, maxLength)
+  if (maxLength <= 32 || compactFile.length >= maxLength - HF_SEPARATOR.length - 6) {
+    return truncateEndClean(compactFile, maxLength)
+  }
+
+  const repoBudget = maxLength - HF_SEPARATOR.length - compactFile.length
+  const compactRepo = compactRepoId(repoId, repoBudget)
+  if (compactRepo) {
+    const compact = `${compactRepo}${HF_SEPARATOR}${compactFile}`
+    if (compact.length <= maxLength) return compact
+  }
+
   const separatorBudget = HF_SEPARATOR.length
   const partBudget = maxLength - separatorBudget
   if (partBudget <= 8) return truncateMiddle(full, maxLength)
@@ -102,4 +114,67 @@ function formatRepoAndFile(repoId: string, filename: string, maxLength: number):
 
 function friendlyFilename(filename: string): string {
   return filename.split('/').pop() ?? filename
+}
+
+function compactRepoId(repoId: string, maxLength: number): string {
+  if (maxLength <= 0) return ''
+  if (repoId.length <= maxLength) return repoId
+  const parts = repoId.split('/').filter(Boolean)
+  const owner = parts.length > 1 ? parts[0] ?? '' : ''
+  const repoName = parts.at(-1) ?? repoId
+  if (owner.length > 0) {
+    const nameBudget = maxLength - owner.length - 1
+    if (nameBudget >= 6) {
+      const compactName = compactModelCore(repoName, nameBudget)
+      const withOwner = `${owner}/${compactName}`
+      if (withOwner.length <= maxLength) return withOwner
+    }
+  }
+  return compactModelCore(repoName, maxLength)
+}
+
+function compactModelFilename(filename: string, maxLength: number): string {
+  const withoutExtension = filename.replace(/\.gguf$/i, '')
+  const compact = compactModelCore(withoutExtension, maxLength)
+  if (compact.length <= maxLength) return compact
+  return truncateEndClean(compact, maxLength)
+}
+
+function compactModelCore(value: string, maxLength: number): string {
+  if (maxLength <= 0) return ''
+  const cleaned = value
+    .replace(/\.gguf$/i, '')
+    .replace(/[_-]+/g, ' ')
+    .replace(/(^|[^0-9])\./g, '$1 ')
+    .replace(/\.(?=[^0-9]|$)/g, ' ')
+    .replace(/\bgguf\b/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+  if (!cleaned) return truncateEndClean(value, maxLength)
+
+  const tokens = cleaned.split(' ')
+  const sizeIndex = tokens.findIndex(token => /^\d+(?:\.\d+)?[bm]$/i.test(token))
+  const familyTokens = sizeIndex > 0 ? tokens.slice(0, Math.min(sizeIndex, 3)) : tokens.slice(0, Math.min(tokens.length, 3))
+  const size = sizeIndex >= 0 ? tokens[sizeIndex] : undefined
+  const context = tokens.find(token => /^\d+k$/i.test(token))
+  const quant = quantizationLabel(value)
+  const parts = [familyTokens.join(' '), size, context, quant]
+    .filter((part): part is string => Boolean(part))
+    .filter((part, index, all) => all.findIndex(other => other.toLowerCase() === part.toLowerCase()) === index)
+  const compact = parts.join(' ').trim() || cleaned
+  if (compact.length <= maxLength) return compact
+  return truncateEndClean(compact, maxLength)
+}
+
+function quantizationLabel(value: string): string | undefined {
+  const match = value.match(/(?:^|[-_.\s])((?:Q\d(?:_[A-Za-z0-9]+)*)|BF16|F16|FP16)(?:$|[-_.\s])/i)
+  return match?.[1]?.toUpperCase()
+}
+
+function truncateEndClean(value: string, maxLength: number): string {
+  if (maxLength <= 0) return ''
+  if (value.length <= maxLength) return value
+  if (maxLength <= 3) return value.slice(0, maxLength)
+  const sliced = value.slice(0, maxLength - 3).replace(/[\s._/-]+$/g, '')
+  return `${sliced || value.slice(0, maxLength - 3)}...`
 }

@@ -182,7 +182,7 @@ export async function uninstallLocalHfModel(
   const modelPath = path.resolve(model.localPath)
   const partialPath = path.resolve(`${model.localPath}.partial`)
   if (!isPathInside(cacheRoot, modelPath) || !isPathInside(cacheRoot, partialPath)) {
-    throw new Error('refusing to uninstall a local model outside EthAgent model cache')
+    throw new Error('Refusing to uninstall a local model outside EthAgent model cache')
   }
 
   const unlink = deps.unlink ?? ((target: string) => fs.unlink(target))
@@ -203,10 +203,10 @@ export function parseHuggingFaceRef(input: string): HuggingFaceRef {
     const url = new URL(trimmed)
     const host = url.hostname.toLowerCase()
     if (host !== 'huggingface.co' && host !== 'www.huggingface.co') {
-      throw new Error('expected a huggingface.co model link')
+      throw new Error('Expected a huggingface.co model link')
     }
     const parts = url.pathname.split('/').filter(Boolean)
-    if (parts.length < 2) throw new Error('expected a Hugging Face repo link')
+    if (parts.length < 2) throw new Error('Expected a Hugging Face repo link')
     const repoId = `${decodeURIComponent(parts[0]!)}/${decodeURIComponent(parts[1]!)}`
     const mode = parts[2]
     if (mode === 'blob' || mode === 'resolve' || mode === 'tree') {
@@ -221,7 +221,7 @@ export function parseHuggingFaceRef(input: string): HuggingFaceRef {
 
   const withoutPrefix = trimmed.replace(/^hf:\/\//i, '')
   const parts = withoutPrefix.split('/').filter(Boolean)
-  if (parts.length < 2) throw new Error('expected repo id like org/model or a huggingface.co link')
+  if (parts.length < 2) throw new Error('Expected repo id like org/model or a huggingface.co link')
   const repoId = `${parts[0]!}/${parts[1]!}`
   let fileParts = parts.slice(2)
   const mode = fileParts[0]
@@ -242,7 +242,7 @@ export async function fetchHuggingFaceRepoInfo(
   const response = await fetchImpl(url, { headers: { Accept: 'application/json' } })
   if (!response.ok) {
     if (response.status === 401 || response.status === 403) {
-      throw new Error('repo is gated or private')
+      throw new Error('Repo is gated or private')
     }
     if (response.status === 404) throw new Error('Hugging Face repo not found')
     throw new Error(`Hugging Face API HTTP ${response.status}`)
@@ -301,7 +301,7 @@ export async function createHfDownloadPlan(
   const repo = await fetchHuggingFaceRepoInfo(ref, deps.fetchImpl)
   const files = ggufFiles(repo)
   if (files.length === 0) {
-    throw new Error('no compatible local model files found for this link')
+    throw new Error('No compatible local model files found for this link')
   }
   const selected = selectedFilename
     ? files.find(file => file.filename === selectedFilename)
@@ -388,7 +388,7 @@ export async function* downloadHfModel(
   fetchImpl: FetchImpl = fetch,
 ): AsyncIterable<HfDownloadProgress> {
   if (plan.review.runtime !== 'llama.cpp runnable') {
-    throw new Error('selected file is not compatible with local chat')
+    throw new Error('Selected file is not compatible with local chat')
   }
 
   await fs.mkdir(path.dirname(plan.localPath), { recursive: true })
@@ -411,7 +411,7 @@ export async function* downloadHfModel(
     while (true) {
       const { done, value } = await reader.read()
       if (done) break
-      if (signal?.aborted) throw new Error('cancelled')
+      if (signal?.aborted) throw new Error('Cancelled')
       const buffer = Buffer.from(value)
       hash.update(buffer)
       await handle.write(buffer)
@@ -513,7 +513,7 @@ async function unlinkIfPresent(
     const code = (err as NodeJS.ErrnoException).code
     if (code === 'ENOENT') return
     if (code === 'EBUSY' || code === 'EPERM' || code === 'EACCES') {
-      throw new Error('that model file is currently in use. stop the local runner and try uninstall again.')
+      throw new Error('That model file is currently in use. Stop the local runner and try uninstall again.')
     }
     throw err
   }

@@ -495,14 +495,14 @@ export const ChatInput: React.FC<PromptInputProps> = ({
 
   const showPlaceholder = value.length === 0 && !disabled && placeholderHints && placeholderHints.length > 0
   const placeholder = showPlaceholder ? (placeholderHints[placeholderIdx] ?? placeholderHints[0] ?? '') : ''
-  const promptColor = mode === 'bash' ? theme.accentWarm : (disabled ? theme.dim : theme.accentMint)
+  const promptColor = mode === 'bash' ? theme.accentPeriwinkle : (disabled ? theme.dim : theme.accentPeriwinkle)
   const promptChar = mode === 'bash' ? '!' : prefix
 
   const display = useMemo(
     () => renderWithCursor(value, cursor, !disabled, wrapWidth, maxVisibleInputLines),
     [value, cursor, disabled, wrapWidth, maxVisibleInputLines],
   )
-  const borderColor = disabled ? theme.border : theme.accentMint
+  const borderColor = disabled ? theme.border : theme.accentPeriwinkle
 
   return (
     <Box flexDirection="column" width="100%">
@@ -544,7 +544,7 @@ export const ChatInput: React.FC<PromptInputProps> = ({
       {showingSlash && filteredSuggestions.length > 0 ? (
         <Box marginLeft={2} flexDirection="column">
           {filteredSuggestions.map((s, i) => (
-            <Text key={s.name} color={i === suggestionIdx ? theme.accentPrimary : theme.dim}>
+            <Text key={s.name} color={i === suggestionIdx ? theme.accentPeriwinkle : theme.dim}>
               {i === suggestionIdx ? '\u203a ' : '  '}/{s.name}
               <Text color={theme.dim}>  {s.summary}{i === suggestionIdx ? (s.executeOnEnter ? ' · enter runs' : ' · enter fills') : ''}</Text>
             </Text>
@@ -554,7 +554,7 @@ export const ChatInput: React.FC<PromptInputProps> = ({
       {showingFiles ? (
         <Box marginLeft={2} flexDirection="column">
           {fileSuggestions.slice(0, 8).map((s, i) => (
-            <Text key={s.path} color={i === fileSuggestionIdx ? theme.accentPrimary : theme.dim}>
+            <Text key={s.path} color={i === fileSuggestionIdx ? theme.accentPeriwinkle : theme.dim}>
               {i === fileSuggestionIdx ? '\u203a ' : '  '}@{s.path}
               <Text color={theme.dim}>  {i === fileSuggestionIdx ? 'tab/enter completes' : s.hint}</Text>
             </Text>
@@ -571,7 +571,7 @@ export const ChatInput: React.FC<PromptInputProps> = ({
           </Text>
           {queuedMessages.slice(0, 3).map((message, i) => (
             <Text key={`${i}-${message.slice(0, 24)}`}>
-              <Text color={theme.accentMint}>{i === 0 ? '» ' : '  '}</Text>
+              <Text color={theme.accentPeriwinkle}>{i === 0 ? '» ' : '  '}</Text>
               <Text color={theme.textSubtle}>{summarizeQueuedMessage(message)}</Text>
             </Text>
           ))}
@@ -652,7 +652,7 @@ export function renderWithCursor(
         node: (
           <Text color={theme.text} wrap="wrap">
             {before}
-            <Text backgroundColor={theme.accentMint} color="#08110c">{atChar}</Text>
+            <Text backgroundColor={theme.accentPeriwinkle} color="#0c0c1f">{atChar}</Text>
             {after}
           </Text>
         ),

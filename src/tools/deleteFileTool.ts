@@ -70,7 +70,7 @@ async function prepareDelete(input: z.infer<typeof schema>, context: { workspace
   const fullPath = resolveWorkspacePath(context.workspaceRoot, input.path)
   const stats = await fs.stat(fullPath)
   if (stats.isDirectory()) {
-    throw new Error('delete_file path points to a directory; provide a file path')
+    throw new Error('Tool delete_file path points to a directory; provide a file path')
   }
   const before = await fs.readFile(fullPath, 'utf8')
   return {
@@ -83,13 +83,13 @@ async function prepareDelete(input: z.infer<typeof schema>, context: { workspace
 function assertSafeDeletePath(requestedPath: string): void {
   const trimmed = requestedPath.trim()
   if (trimmed !== requestedPath || trimmed.length === 0) {
-    throw new Error('delete_file path must be a clean workspace-relative file path')
+    throw new Error('Tool delete_file path must be a clean workspace-relative file path')
   }
   if (/[|;&<>`]/.test(trimmed)) {
-    throw new Error('delete_file path must not contain shell operators')
+    throw new Error('Tool delete_file path must not contain shell operators')
   }
   if (/^(?:rm|del|erase|rmdir|remove-item|mkdir|type|cat|echo|copy|move|mv|cp)\b/i.test(trimmed)) {
-    throw new Error('delete_file path looks like a shell command; pass only the file path')
+    throw new Error('Tool delete_file path looks like a shell command; pass only the file path')
   }
 }
 

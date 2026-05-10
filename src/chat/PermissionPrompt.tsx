@@ -23,23 +23,23 @@ export const PermissionPrompt: React.FC<PermissionPromptProps> = ({ request, onD
     >
       {request.kind === 'private-continuity-edit' ? (
         <Box flexDirection="column" marginBottom={1}>
-          <Text color={theme.accentPeach}>{request.changeSummary}</Text>
+          <Text color={theme.accentPeriwinkle}>{displayPermissionText(request.changeSummary)}</Text>
           <Text color={theme.textSubtle}>
-            Not reversible by /rewind. A private identity-history snapshot is saved before the edit is applied.
+            Not reversible by /rewind. A private identity-history snapshot is saved before writing.
           </Text>
           <Box marginTop={1}>
             <Text color={theme.textSubtle}>target</Text>
           </Box>
           <Text color={theme.text}>{request.file}</Text>
           <Box marginTop={1}>
-            <Text color={theme.accentPrimary}>diff</Text>
+            <Text color={theme.accentPeriwinkle}>diff</Text>
           </Box>
           <Text color={theme.text}>{request.diff}</Text>
         </Box>
       ) : null}
       {request.kind === 'private-continuity-read' ? (
         <Box flexDirection="column" marginBottom={1}>
-          <Text color={theme.accentPeach}>read private {request.file}</Text>
+          <Text color={theme.accentPeriwinkle}>read private {request.file}</Text>
           <Text color={theme.textSubtle}>This reveals private identity continuity to the model for this turn.</Text>
           <Box marginTop={1}>
             <Text color={theme.textSubtle}>range</Text>
@@ -49,20 +49,20 @@ export const PermissionPrompt: React.FC<PermissionPromptProps> = ({ request, onD
       ) : null}
       {request.kind === 'edit' || request.kind === 'write' || request.kind === 'delete' ? (
         <Box flexDirection="column" marginBottom={1}>
-          <Text color={theme.accentPeach}>{request.changeSummary}</Text>
+          <Text color={theme.accentPeriwinkle}>{displayPermissionText(request.changeSummary)}</Text>
           <Box marginTop={1}>
             <Text color={theme.textSubtle}>before</Text>
           </Box>
           <Text color={theme.textSubtle}>{request.before || '(empty)'}</Text>
           <Box marginTop={1}>
-            <Text color={theme.accentPrimary}>after</Text>
+            <Text color={theme.accentPeriwinkle}>after</Text>
           </Box>
           <Text color={theme.text}>{request.after || '(empty)'}</Text>
         </Box>
       ) : null}
       {request.kind === 'bash' && request.warning ? (
         <Box marginBottom={1}>
-          <Text color="#e87070">{request.warning}</Text>
+          <Text color={theme.accentError}>{request.warning}</Text>
         </Box>
       ) : null}
       <Select options={options} onSubmit={onDecision} onCancel={onCancel} />
@@ -127,8 +127,8 @@ export function permissionOptionsForRequest(request: PermissionRequest): Array<{
 
   if (request.kind === 'private-continuity-edit') {
     return [
-      { value: 'allow-once', label: 'approve once', hint: `apply this edit to ${request.file}` },
-      { value: 'deny', label: 'deny', hint: 'keep private continuity unchanged' },
+      { value: 'allow-once', label: 'Approve Once', hint: `Apply this edit to ${request.file}` },
+      { value: 'deny', label: 'Deny', hint: 'Keep private continuity unchanged' },
     ]
   }
 
@@ -150,4 +150,8 @@ export function permissionOptionsForRequest(request: PermissionRequest): Array<{
     },
     { value: 'deny', label: 'deny', hint: 'return a denial back to the model' },
   ]
+}
+
+function displayPermissionText(value: string): string {
+  return value ? value[0]!.toUpperCase() + value.slice(1) : value
 }

@@ -49,7 +49,7 @@ export function resolveModelSelection(
         model: selection.model,
         baseUrl,
       },
-      notice: `local Hugging Face model ready. now using ${formatModelDisplayName('llamacpp', selection.model, { maxLength: 64 })}.`,
+      notice: `Local Hugging Face model ready. Now using ${formatModelDisplayName('llamacpp', selection.model, { maxLength: 64 })}.`,
       tone: 'info',
     }
   }
@@ -69,7 +69,7 @@ export function resolveModelSelection(
   return {
     kind: 'switch',
     config: nextConfig,
-    notice: `${selection.keyJustSet ? `${selection.provider} key saved.` : `${selection.provider} ready.`} now using ${nextConfig.provider} · ${formatModelDisplayName(nextConfig.provider, nextConfig.model, { maxLength: 64 })}.`,
+    notice: `${selection.keyJustSet ? `${selection.provider} key saved.` : `${selection.provider} ready.`} Now using ${nextConfig.provider} · ${formatModelDisplayName(nextConfig.provider, nextConfig.model, { maxLength: 64 })}.`,
     tone: 'dim',
   }
 }

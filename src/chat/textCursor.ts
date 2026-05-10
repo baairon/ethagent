@@ -119,7 +119,7 @@ export function moveVerticalVisualCursor(
   }
 }
 
-export function cursorOnLastLine(value: string, offset: number): TextCursor {
+export function cursorOnLastLine(value: string, _offset: number): TextCursor {
   const lines = getLogicalLines(value)
   const lastLine = Math.max(0, lines.length - 1)
   return normalizeCursor(value, offsetFromPosition(lines, lastLine, 0))

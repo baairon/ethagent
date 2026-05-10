@@ -3,7 +3,6 @@ import { z } from 'zod'
 import {
   continuityVaultRef,
   ensureContinuityFiles,
-  type PrivateContinuityFile,
 } from '../identity/continuity/storage.js'
 import type { Tool } from './contracts.js'
 
@@ -71,7 +70,7 @@ function preparePrivateContinuityRead(
 ) {
   const identity = config?.identity
   if (!identity) {
-    throw new Error('no active identity; create or load an identity before reading private continuity files')
+    throw new Error('No active identity; create or load an identity before reading private continuity files')
   }
   const ref = continuityVaultRef(identity)
   const fullPath = input.file === 'SOUL.md' ? ref.soulPath : ref.memoryPath

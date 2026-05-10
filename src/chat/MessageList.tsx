@@ -3,14 +3,25 @@ import { Box, Text } from 'ink'
 import { theme } from '../ui/theme.js'
 import { ProgressBar } from '../ui/ProgressBar.js'
 import { Spinner } from '../ui/Spinner.js'
-import { hidesSuccessfulToolResultContent } from './toolResultDisplay.js'
+
+export type ToolCallResult = {
+  content: string
+  summary: string
+  isError: boolean
+}
 
 export type MessageRow =
   | { role: 'user'; id: string; content: string }
   | { role: 'assistant'; id: string; content: string; liveTail?: string; streaming?: boolean }
   | { role: 'thinking'; id: string; content: string; liveTail?: string; streaming?: boolean; expanded?: boolean; showCursor?: boolean }
-  | { role: 'tool_use'; id: string; name: string; summary: string; input?: string }
-  | { role: 'tool_result'; id: string; name: string; summary: string; content: string; isError?: boolean }
+  | {
+      role: 'tool_call'
+      id: string
+      name: string
+      summary: string
+      input?: string
+      result?: ToolCallResult
+    }
   | { role: 'note'; id: string; kind: 'info' | 'error' | 'dim'; content: string }
   | {
       role: 'progress'
@@ -43,7 +54,7 @@ type InlineToken =
 
 const MAX_RENDERED_MESSAGE_CHARS = 12_000
 const MAX_RENDERED_REASONING_CHARS = 10_000
-const ASSISTANT_ACCENT = theme.accentMint
+const ASSISTANT_ACCENT = theme.accentPeriwinkle
 const UNREADABLE_REASONING_TEXT = 'reasoning output was not readable text'
 
 const MessageListInner: React.FC<MessageListProps> = ({ rows }) => (
@@ -54,18 +65,27 @@ const MessageListInner: React.FC<MessageListProps> = ({ rows }) => (
 
 export const MessageList = React.memo(MessageListInner)
 
+function isInspectableRole(role: MessageRow['role']): boolean {
+  return role === 'thinking'
+}
+
 export function toggleLatestReasoningRow(rows: MessageRow[]): MessageRow[] {
-  return toggleReasoningRow(rows)
+  return toggleInspectableRow(rows)
 }
 
 export function toggleReasoningRow(rows: MessageRow[], rowId?: string): MessageRow[] {
+  return toggleInspectableRow(rows, rowId)
+}
+
+export function toggleInspectableRow(rows: MessageRow[], rowId?: string): MessageRow[] {
   let index = -1
   if (rowId) {
-    index = rows.findIndex(row => row.id === rowId && row.role === 'thinking')
+    index = rows.findIndex(row => row.id === rowId && isInspectableRole(row.role))
   }
   if (index === -1) {
     for (let cursor = rows.length - 1; cursor >= 0; cursor -= 1) {
-      if (rows[cursor]?.role === 'thinking') {
+      const role = rows[cursor]?.role
+      if (role && isInspectableRole(role)) {
         index = cursor
         break
       }
@@ -73,10 +93,13 @@ export function toggleReasoningRow(rows: MessageRow[], rowId?: string): MessageR
   }
   if (index === -1) return rows
   const row = rows[index]
-  if (!row || row.role !== 'thinking') return rows
-  const next = rows.slice()
-  next[index] = { ...row, expanded: !row.expanded }
-  return next
+  if (!row) return rows
+  if (row.role === 'thinking') {
+    const next = rows.slice()
+    next[index] = { ...row, expanded: !row.expanded }
+    return next
+  }
+  return rows
 }
 
 const RowViewInner: React.FC<{ row: MessageRow }> = ({ row }) => {
@@ -90,7 +113,7 @@ const RowViewInner: React.FC<{ row: MessageRow }> = ({ row }) => {
         ) : null}
         {lines.map((line, i) => (
           <Text key={i}>
-            <Text color={i === 0 ? theme.accentMint : theme.dim}>{i === 0 ? '> ' : '  '}</Text>
+            <Text color={i === 0 ? theme.accentPeriwinkle : theme.dim}>{i === 0 ? '> ' : '  '}</Text>
             <Text color={theme.textSubtle}>{line}</Text>
           </Text>
         ))}
@@ -115,7 +138,7 @@ const RowViewInner: React.FC<{ row: MessageRow }> = ({ row }) => {
       return (
         <Box flexDirection="column" marginTop={1} borderStyle="round" borderColor={borderColor} paddingX={1}>
           <Text>
-            <Text color={theme.accentPeach} bold>reasoning</Text>
+            <Text color={theme.accentPeriwinkle} bold>reasoning</Text>
             <Text color={theme.dim}> · expanded · alt+t collapse</Text>
           </Text>
           <ReasoningBody content={text} showCursor={showCursor} />
@@ -125,7 +148,7 @@ const RowViewInner: React.FC<{ row: MessageRow }> = ({ row }) => {
     return (
       <Box flexDirection="column" marginTop={1} borderStyle="round" borderColor={borderColor} paddingX={1}>
         <Text>
-          <Text color={theme.accentPeach} bold>reasoning</Text>
+          <Text color={theme.accentPeriwinkle} bold>reasoning</Text>
           <Text color={theme.dim}> · collapsed · alt+t inspect</Text>
         </Text>
         <Text color={theme.textSubtle}>
@@ -136,39 +159,27 @@ const RowViewInner: React.FC<{ row: MessageRow }> = ({ row }) => {
     )
   }
 
-  if (row.role === 'tool_use') {
+  if (row.role === 'tool_call') {
+    const result = row.result
+    const inputPreview = row.input ? truncateToolInputForLine(row.input, 60) : ''
     return (
-      <Box flexDirection="column" marginTop={1} borderStyle="round" borderColor={theme.border} paddingX={1}>
-        <Text color={theme.accentNeutral} bold>{`tool · ${row.name}`}</Text>
-        <Text color={theme.dim}>{row.summary}</Text>
-        {row.input ? <Text color={theme.textSubtle}>{row.input}</Text> : null}
-      </Box>
-    )
-  }
-
-  if (row.role === 'tool_result') {
-    const hideContent = hidesSuccessfulToolResultContent(row.name, row.isError)
-    return (
-      <Box
-        flexDirection="column"
-        marginTop={1}
-        borderStyle="round"
-        borderColor={row.isError ? '#a84c4c' : theme.border}
-        paddingX={1}
-      >
-        <Text color={row.isError ? '#e87070' : theme.accentSecondary} bold>{`result · ${row.name}`}</Text>
-        <Text color={theme.dim}>{row.summary}</Text>
-        {row.isError ? (
-          <Text color="#f1b0b0">{row.content}</Text>
-        ) : hideContent || !row.content ? null : (
-          <AssistantBody content={row.content} />
-        )}
+      <Box marginTop={1}>
+        <Text>
+          <Text color={theme.dim}>{'· '}</Text>
+          <Text color={theme.accentPeriwinkle} bold>{row.name}</Text>
+          {inputPreview ? <Text color={theme.textSubtle}>{`  ${inputPreview}`}</Text> : null}
+          {result ? (
+            <Text color={result.isError ? theme.accentError : theme.dim}>{`  ${result.summary}`}</Text>
+          ) : (
+            <Text color={theme.dim}>{'  running…'}</Text>
+          )}
+        </Text>
       </Box>
     )
   }
 
   if (row.role === 'note') {
-    const color = row.kind === 'error' ? '#e87070' : row.kind === 'dim' ? theme.dim : theme.accentInfo
+    const color = row.kind === 'error' ? theme.accentError : row.kind === 'dim' ? theme.dim : theme.accentPeriwinkle
     return (
       <Box marginTop={1}>
         <Text color={color}>{row.content}</Text>
@@ -178,7 +189,7 @@ const RowViewInner: React.FC<{ row: MessageRow }> = ({ row }) => {
 
   return (
     <Box flexDirection="column" marginTop={1}>
-      <Text color={theme.accentMint} bold>{row.title}</Text>
+      <Text color={theme.accentPeriwinkle} bold>{row.title}</Text>
       {row.indeterminate ? (
         <ProgressSpinner row={row} />
       ) : (
@@ -198,7 +209,13 @@ const ProgressSpinner: React.FC<{ row: Extract<MessageRow, { role: 'progress' }>
 }
 
 export function reasoningBorderColor(row: Extract<MessageRow, { role: 'thinking' }>): string {
-  return row.streaming ? theme.accentPeach : theme.border
+  return row.streaming ? theme.accentPeriwinkle : theme.border
+}
+
+function truncateToolInputForLine(input: string, max: number): string {
+  const flat = input.replace(/\s+/g, ' ').trim()
+  if (flat.length <= max) return flat
+  return `${flat.slice(0, Math.max(1, max - 1))}…`
 }
 
 export function reasoningCursorVisible(row: Extract<MessageRow, { role: 'thinking' }>): boolean {
@@ -370,7 +387,7 @@ const InlineText: React.FC<{ text: string; color: string; bold?: boolean }> = ({
 const ThinkingCursor: React.FC<{ active: boolean; hasPreview: boolean }> = ({ active, hasPreview }) => {
   if (!active) return null
   return (
-    <Text color={theme.accentPeach}>
+    <Text color={theme.accentPeriwinkle}>
       {hasPreview ? ' ' : ''}
       <StreamCursor active />
     </Text>
@@ -488,7 +505,7 @@ function parseMarkdownBlocks(markdown: string): MarkdownBlock[] {
   return blocks
 }
 
-function codeAccent(lang: string | null): string {
+function codeAccent(_lang: string | null): string {
   return ASSISTANT_ACCENT
 }
 

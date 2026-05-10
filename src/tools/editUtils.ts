@@ -21,7 +21,7 @@ export function applyRequestedEdit(
 ): AppliedEdit {
   if (!oldText) {
     if (newText.length === 0) {
-      throw new Error('edit_file newText is empty; empty whole-file writes are not valid unless replacing a specific oldText range')
+      throw new Error('Field newText is empty; empty whole-file writes are not valid unless replacing a specific oldText range')
     }
     return {
       before,
@@ -34,7 +34,7 @@ export function applyRequestedEdit(
 
   if (replaceAll) {
     const matchCount = countOccurrences(before, oldText)
-    if (matchCount === 0) throw new Error('oldText was not found in the file')
+    if (matchCount === 0) throw new Error('Field oldText was not found in the file')
     return {
       before,
       after: before.replaceAll(oldText, () => newText),
@@ -45,9 +45,9 @@ export function applyRequestedEdit(
   }
 
   const actualOldText = findUniqueEditableMatch(before, oldText)
-  if (!actualOldText) throw new Error('oldText was not found in the file')
+  if (!actualOldText) throw new Error('Field oldText was not found in the file')
   if (countOccurrences(before, actualOldText) > 1) {
-    throw new Error('oldText matched multiple locations; provide more context or use replaceAll')
+    throw new Error('Field oldText matched multiple locations; provide more context or use replaceAll')
   }
 
   const adjustedNewText = preserveQuoteStyle(oldText, actualOldText, newText)
@@ -62,7 +62,7 @@ export function applyRequestedEdit(
 
 function replaceSingleOccurrence(content: string, search: string, replace: string): string {
   const index = content.indexOf(search)
-  if (index === -1) throw new Error('oldText was not found in the file')
+  if (index === -1) throw new Error('Field oldText was not found in the file')
   return `${content.slice(0, index)}${replace}${content.slice(index + search.length)}`
 }
 

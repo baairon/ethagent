@@ -114,7 +114,7 @@ async function assertEditableFileTarget(fullPath: string): Promise<void> {
   try {
     const stats = await fs.stat(fullPath)
     if (stats.isDirectory()) {
-      throw new Error('edit_file path points to a directory; provide a file path')
+      throw new Error('Tool edit_file path points to a directory; provide a file path')
     }
   } catch (error: unknown) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return
@@ -125,15 +125,15 @@ async function assertEditableFileTarget(fullPath: string): Promise<void> {
 function assertSafeEditPath(requestedPath: string): void {
   const trimmed = requestedPath.trim()
   if (trimmed !== requestedPath || trimmed.length === 0) {
-    throw new Error('edit_file path must be a clean workspace-relative file path')
+    throw new Error('Tool edit_file path must be a clean workspace-relative file path')
   }
 
   if (/[|;&<>`]/.test(trimmed)) {
-    throw new Error('edit_file path must not contain shell operators')
+    throw new Error('Tool edit_file path must not contain shell operators')
   }
 
   if (/^(?:rm|del|erase|rmdir|remove-item|mkdir|type|cat|echo|copy|move|mv|cp)\b/i.test(trimmed)) {
-    throw new Error('edit_file path looks like a shell command; pass only the file path')
+    throw new Error('Tool edit_file path looks like a shell command; pass only the file path')
   }
 }
 

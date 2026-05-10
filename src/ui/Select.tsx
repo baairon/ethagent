@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { Box, Text } from 'ink'
 import { theme } from './theme.js'
 import { useAppInput } from '../app/input/AppInputProvider.js'
@@ -39,9 +39,18 @@ export function Select<T>({
   onCancel,
   onHighlight,
 }: SelectProps<T>) {
+  const optionsSignature = useMemo(
+    () => options.map(option => `${String(option.value)}:${option.disabled ? 'disabled' : 'enabled'}:${option.role ?? 'option'}`).join('|'),
+    [options],
+  )
   const firstEnabled = Math.max(0, options.findIndex(isSelectableOption))
   const start = isSelectableOption(options[initialIndex]) ? initialIndex : firstEnabled
   const [index, setIndex] = useState(start === -1 ? 0 : start)
+
+  useEffect(() => {
+    setIndex(start === -1 ? 0 : start)
+  }, [optionsSignature, start])
+
   const visibleCount = Math.max(1, maxVisible ?? options.length)
   const windowStart = Math.max(0, Math.min(
     index - Math.floor(visibleCount / 2),
@@ -88,24 +97,27 @@ export function Select<T>({
         const absoluteIndex = windowStart + visibleIndex
         const isActive = absoluteIndex === index
         const selectable = isSelectableOption(option)
+        const disabled = !!option.disabled
         const cursor = !selectable ? ' ' : isActive ? '>' : ' '
         const isSection = option.role === 'section' || option.role === 'group'
         const prefix = option.prefix && !isSection ? `${option.prefix} ` : ''
         const rowIndent = option.indent ?? (usesInlineSections ? isSection ? 1 : 3 : 0)
-        const prefixColor = option.disabled
+        const prefixColor = disabled
           ? option.labelColor ?? theme.border
           : isActive && selectable
-            ? theme.accentPrimary
+            ? theme.accentPeriwinkle
             : option.labelColor ?? theme.dim
         const labelColor = isSection
-          ? option.labelColor ?? theme.dim
+          ? option.labelColor ?? theme.textSubtle
           : isActive && selectable
-            ? theme.accentPrimary
-            : option.labelColor ?? (option.disabled ? theme.dim : theme.text)
+            ? theme.accentPeriwinkle
+            : option.labelColor ?? (disabled ? theme.dim : theme.text)
         const hintColor = isActive && selectable
           ? theme.textSubtle
-          : option.hintColor ?? theme.dim
-        const subtextColor = option.subtextColor ?? theme.dim
+          : disabled
+            ? theme.border
+            : option.hintColor ?? theme.dim
+        const subtextColor = disabled ? theme.border : option.subtextColor ?? theme.dim
         const bold = option.bold ?? (isSection || (isActive && selectable))
         const inlineHint = Boolean(option.hint && hintLayout === 'inline' && !isSection)
         const belowHint = Boolean(option.hint && (!inlineHint || isSection))

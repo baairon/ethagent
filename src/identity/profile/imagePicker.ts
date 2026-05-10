@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 
-export type ImageFilePickerResult =
+type ImageFilePickerResult =
   | { ok: true; file: string; method: string }
   | { ok: false; cancelled: boolean; error: string }
 
@@ -28,14 +28,14 @@ export async function openImageFilePicker(
       ok: false,
       cancelled: false,
       error: platform === 'linux'
-        ? 'install zenity or kdialog, or enter the image path manually'
-        : 'no native image picker is available; enter the image path manually',
+        ? 'install zenity or kdialog, or enter the icon path manually'
+        : 'no native icon picker is available; enter the icon path manually',
     }
   }
   const result = await runPickerCommand(command, options.spawnImpl ?? spawn, options.timeoutMs ?? 120_000)
   if (!result.ok) return result
   const file = result.file.trim()
-  if (!file) return { ok: false, cancelled: true, error: 'image selection cancelled' }
+  if (!file) return { ok: false, cancelled: true, error: 'icon selection cancelled' }
   return { ok: true, file, method: command.method }
 }
 
@@ -55,8 +55,8 @@ function resolveImagePickerCommand(platform: NodeJS.Platform, env: NodeJS.Proces
           '[Console]::OutputEncoding = [System.Text.Encoding]::UTF8',
           'Add-Type -AssemblyName System.Windows.Forms',
           '$dialog = New-Object System.Windows.Forms.OpenFileDialog',
-          '$dialog.Title = "Choose agent image"',
-          '$dialog.Filter = "Images (*.png;*.jpg;*.jpeg;*.gif;*.webp;*.svg)|*.png;*.jpg;*.jpeg;*.gif;*.webp;*.svg|All files (*.*)|*.*"',
+          '$dialog.Title = "Choose Agent Icon"',
+          '$dialog.Filter = "Agent Icon (*.png;*.jpg;*.jpeg;*.gif;*.webp;*.svg;*.mp4;*.webm;*.mov)|*.png;*.jpg;*.jpeg;*.gif;*.webp;*.svg;*.mp4;*.webm;*.mov|All files (*.*)|*.*"',
           '$dialog.CheckFileExists = $true',
           'if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { Write-Output $dialog.FileName }',
         ].join('; '),
@@ -69,7 +69,7 @@ function resolveImagePickerCommand(platform: NodeJS.Platform, env: NodeJS.Proces
       cmd: 'osascript',
       args: [
         '-e',
-        'set selectedFile to choose file with prompt "Choose agent image"',
+        'set selectedFile to choose file with prompt "Choose Agent Icon"',
         '-e',
         'POSIX path of selectedFile',
       ],
@@ -82,8 +82,8 @@ function resolveImagePickerCommand(platform: NodeJS.Platform, env: NodeJS.Proces
       cmd: zenity,
       args: [
         '--file-selection',
-        '--title=Choose agent image',
-        '--file-filter=Images | *.png *.jpg *.jpeg *.gif *.webp *.svg',
+        '--title=Choose Agent Icon',
+        '--file-filter=Agent Icon | *.png *.jpg *.jpeg *.gif *.webp *.svg *.mp4 *.webm *.mov',
       ],
       method: 'zenity',
     }
@@ -92,7 +92,7 @@ function resolveImagePickerCommand(platform: NodeJS.Platform, env: NodeJS.Proces
   if (kdialog) {
     return {
       cmd: kdialog,
-      args: ['--getopenfilename', '.', 'Images (*.png *.jpg *.jpeg *.gif *.webp *.svg)'],
+      args: ['--getopenfilename', '.', 'Agent Icon (*.png *.jpg *.jpeg *.gif *.webp *.svg *.mp4 *.webm *.mov)'],
       method: 'kdialog',
     }
   }
@@ -122,7 +122,7 @@ function runPickerCommand(
       if (settled) return
       settled = true
       child.kill()
-      resolve({ ok: false, cancelled: false, error: 'image picker timed out' })
+      resolve({ ok: false, cancelled: false, error: 'icon picker timed out' })
     }, timeoutMs)
     child.stdout?.setEncoding('utf8')
     child.stderr?.setEncoding('utf8')
@@ -145,7 +145,7 @@ function runPickerCommand(
       }
       const detail = stderr.trim()
       const cancelled = code === 0 || /cancel/i.test(detail)
-      resolve({ ok: false, cancelled, error: cancelled ? 'image selection cancelled' : detail || `${command.method} exited ${code}` })
+      resolve({ ok: false, cancelled, error: cancelled ? 'icon selection cancelled' : detail || `${command.method} exited ${code}` })
     })
   })
 }

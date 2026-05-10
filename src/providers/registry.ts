@@ -6,7 +6,7 @@ import type { SessionMode } from '../runtime/sessionMode.js'
 import { AnthropicProvider } from './anthropic.js'
 import { GeminiProvider } from './gemini.js'
 import { OpenAIChatProvider } from './openai-chat.js'
-import { anthropicTools, openAITools } from '../tools/registry.js'
+import { anthropicTools, geminiTools, openAITools } from '../tools/registry.js'
 import { openAIBaseUrlFor } from '../models/catalog.js'
 import type { Tool } from '../tools/contracts.js'
 
@@ -37,6 +37,6 @@ export function createProvider(config: EthagentConfig, options: { mode?: Session
     case 'anthropic':
       return new AnthropicProvider({ model: config.model, tools: anthropicTools(mode, toolContext) })
     case 'gemini':
-      return new GeminiProvider({ model: config.model })
+      return new GeminiProvider({ model: config.model, tools: geminiTools(mode, toolContext) })
   }
 }

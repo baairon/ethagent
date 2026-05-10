@@ -47,7 +47,7 @@ export const ResetConfirmView: React.FC<{
 
 const Section: React.FC<{ title: string; lines: string[] }> = ({ title, lines }) => (
   <Box flexDirection="column" marginBottom={1}>
-    <Text color={theme.accentMint}>{title}</Text>
+    <Text color={theme.accentPeriwinkle}>{title}</Text>
     {lines.map(line => (
       <Text key={line} color={theme.textSubtle}>- {line}</Text>
     ))}

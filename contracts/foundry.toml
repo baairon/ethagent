@@ -1,0 +1,29 @@
+[profile.default]
+src = "src"
+test = "test"
+script = "script"
+out = "out"
+libs = ["lib"]
+optimizer = true
+optimizer_runs = 200
+solc = "0.8.24"
+evm_version = "paris"
+
+[fmt]
+line_length = 100
+tab_width = 4
+bracket_spacing = false
+
+# Networks for deployment scripts. Populate RPC URLs and verifier API
+# keys via environment variables, never commit them here.
+[rpc_endpoints]
+mainnet = "${MAINNET_RPC_URL}"
+base = "${BASE_RPC_URL}"
+sepolia = "${SEPOLIA_RPC_URL}"
+base_sepolia = "${BASE_SEPOLIA_RPC_URL}"
+
+[etherscan]
+mainnet = { key = "${ETHERSCAN_API_KEY}" }
+base = { key = "${BASESCAN_API_KEY}" }
+sepolia = { key = "${ETHERSCAN_API_KEY}" }
+base_sepolia = { key = "${BASESCAN_API_KEY}" }

@@ -73,7 +73,7 @@ export function moveThroughHistory(
   historyIndex: number,
   direction: 1 | -1,
   draftBuffer: ChatBuffer,
-  preferredColumn: number | null,
+  _preferredColumn: number | null,
 ): { preview: HistoryPreviewState; buffer: ChatBuffer } {
   const next = historyIndex + direction
   if (next < 0) {

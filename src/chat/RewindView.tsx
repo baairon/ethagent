@@ -312,7 +312,7 @@ function buildActionOptions(canRestoreConversation: boolean): Array<SelectOption
 
 const CompactPreview: React.FC<{ entry: RewindEntry }> = ({ entry }) => (
   <Box flexDirection="column" marginTop={1}>
-    <Text color={theme.accentPrimary}>{entry.relativePath}</Text>
+    <Text color={theme.accentPeriwinkle}>{entry.relativePath}</Text>
     <Text color={theme.dim}>{entry.promptSnippet || '(prompt snippet unavailable for older checkpoints)'}</Text>
   </Box>
 )
@@ -323,7 +323,7 @@ const ActionPreview: React.FC<{
   canRestoreConversation: boolean
 }> = ({ entry, selectedAction, canRestoreConversation }) => (
   <Box flexDirection="column" marginTop={1}>
-    <Text color={theme.accentPrimary}>{entry.relativePath}</Text>
+    <Text color={theme.accentPeriwinkle}>{entry.relativePath}</Text>
     <Text color={theme.dim}>{formatTimestamp(entry.createdAt)} · {entry.changeSummary}</Text>
     <Text color={theme.textSubtle}>
       {selectedAction === 'both'

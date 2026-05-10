@@ -13,9 +13,9 @@ type SurfaceProps = {
 }
 
 const toneColor: Record<SurfaceTone, string> = {
-  primary: theme.accentPrimary,
+  primary: theme.accentPeriwinkle,
   muted: theme.border,
-  error: '#e87070',
+  error: theme.accentError,
 }
 
 export const Surface: React.FC<SurfaceProps> = ({

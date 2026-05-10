@@ -78,7 +78,7 @@ async function prepareWrite(
   assertSafeWritePath(input.path)
   assertNotPrivateContinuityWorkspacePath(input.path, context.config, 'write_file')
   if (input.content.length === 0) {
-    throw new Error('write_file content is empty; provide non-empty file contents')
+    throw new Error('Tool write_file content is empty; provide non-empty file contents')
   }
 
   const fullPath = resolveWorkspacePath(context.workspaceRoot, input.path)
@@ -91,7 +91,7 @@ async function prepareWrite(
 async function readExistingFile(fullPath: string): Promise<{ before: string; existedBefore: boolean }> {
   try {
     const stats = await fs.stat(fullPath)
-    if (stats.isDirectory()) throw new Error('write_file path points to a directory; provide a file path')
+    if (stats.isDirectory()) throw new Error('Tool write_file path points to a directory; provide a file path')
     return { before: await fs.readFile(fullPath, 'utf8'), existedBefore: true }
   } catch (error: unknown) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return { before: '', existedBefore: false }
@@ -113,13 +113,13 @@ async function tryRecordRewindSnapshot(
 function assertSafeWritePath(requestedPath: string): void {
   const trimmed = requestedPath.trim()
   if (trimmed !== requestedPath || trimmed.length === 0) {
-    throw new Error('write_file path must be a clean workspace-relative file path')
+    throw new Error('Tool write_file path must be a clean workspace-relative file path')
   }
   if (/[|;&<>`]/.test(trimmed)) {
-    throw new Error('write_file path must not contain shell operators')
+    throw new Error('Tool write_file path must not contain shell operators')
   }
   if (/^(?:rm|del|erase|rmdir|remove-item|mkdir|type|cat|echo|copy|move|mv|cp)\b/i.test(trimmed)) {
-    throw new Error('write_file path looks like a shell command; pass only the file path')
+    throw new Error('Tool write_file path looks like a shell command; pass only the file path')
   }
 }
 

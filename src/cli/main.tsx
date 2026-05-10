@@ -103,13 +103,19 @@ const AppRoot: React.FC<{ setExitCode: (code: number) => void; currentVersion: s
 
   useAppInput((input, key) => {
     if (phase.kind === 'ready') return
-    if (key.ctrl && (input === 'c' || input === 'd')) exit()
+    if (key.ctrl && (input === 'c' || input === 'd')) {
+      if (phase.kind === 'setup') {
+        setPhase({ kind: 'cancelled' })
+      } else {
+        exit()
+      }
+    }
   })
 
   if (phase.kind === 'loading') {
     return (
       <Box padding={1}>
-        <Spinner label="Starting ethagent..." showElapsed={false} />
+        <Spinner label="starting ethagent..." showElapsed={false} />
       </Box>
     )
   }
@@ -131,7 +137,7 @@ const AppRoot: React.FC<{ setExitCode: (code: number) => void; currentVersion: s
   if (phase.kind === 'error') {
     return (
       <Box padding={1}>
-        <Text color="#e87070">Error: {phase.message}</Text>
+        <Text color={theme.accentError}>Error: {phase.message}</Text>
       </Box>
     )
   }

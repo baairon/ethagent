@@ -52,26 +52,37 @@ export function buildBaseMessages(
 
 export function sessionMessagesToRows(messages: SessionMessage[], nextRowId: () => string): MessageRow[] {
   const restored: MessageRow[] = []
+  const toolCallByUseId = new Map<string, Extract<MessageRow, { role: 'tool_call' }>>()
   for (const msg of messages) {
     if (msg.role === 'user') restored.push({ role: 'user', id: nextRowId(), content: msg.content })
     else if (msg.role === 'assistant') restored.push({ role: 'assistant', id: nextRowId(), content: msg.content })
     else if (msg.role === 'tool_use') {
-      restored.push({
-        role: 'tool_use',
+      const row: Extract<MessageRow, { role: 'tool_call' }> = {
+        role: 'tool_call',
         id: nextRowId(),
         name: msg.name,
         summary: msg.name,
         input: summarizeToolInput(msg.input),
-      })
+      }
+      restored.push(row)
+      toolCallByUseId.set(msg.toolUseId, row)
     } else if (msg.role === 'tool_result') {
-      restored.push({
-        role: 'tool_result',
-        id: nextRowId(),
-        name: msg.name,
-        summary: msg.isError ? `${msg.name} failed` : `${msg.name} completed`,
-        content: toolResultContentForRow(msg.name, msg.content, msg.isError),
-        isError: msg.isError,
-      })
+      const isError = Boolean(msg.isError)
+      const summary = isError ? `${msg.name} failed` : `${msg.name} completed`
+      const content = toolResultContentForRow(msg.name, msg.content, msg.isError)
+      const existing = toolCallByUseId.get(msg.toolUseId)
+      if (existing) {
+        existing.result = { content, summary, isError }
+        existing.name = msg.name
+      } else {
+        restored.push({
+          role: 'tool_call',
+          id: nextRowId(),
+          name: msg.name,
+          summary: msg.name,
+          result: { content, summary, isError },
+        })
+      }
     }
   }
   return restored

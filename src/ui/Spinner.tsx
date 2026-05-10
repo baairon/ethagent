@@ -193,6 +193,15 @@ export function pickVerb(): string {
   return SPINNER_VERBS[idx] ?? 'thinking'
 }
 
+export function spinnerText(value: string): string {
+  const text = restoreSpinnerTerms(value.toLowerCase())
+  return text.replace(/^(\s*)([a-z])/, (_match, prefix: string, letter: string) => `${prefix}${letter.toUpperCase()}`)
+}
+
+export function spinnerHintText(value: string): string {
+  return restoreSpinnerTerms(value.toLowerCase())
+}
+
 type SpinnerProps = {
   active?: boolean
   hint?: string
@@ -210,7 +219,7 @@ export const Spinner: React.FC<SpinnerProps> = ({
   hint: rawHint,
   label,
   verb,
-  color = theme.accentSecondary,
+  color = theme.accentPeriwinkle,
   startedAt,
   showElapsed = true,
 }) => {
@@ -246,11 +255,11 @@ export const Spinner: React.FC<SpinnerProps> = ({
   if (!active) return null
 
   const autoLabel = stickyVerbRef.current ?? verb ?? 'thinking'
-  const text = label ?? `${autoLabel}…`
+  const text = spinnerText(label ?? `${autoLabel}…`)
   const glyph = FRAMES[frame] ?? 'o'
   const elapsed = showElapsed ? formatElapsedSeconds(Date.now() - (startedAt ?? internalStartedAtRef.current)) : null
   const renderedHint = [rawHint, elapsed].filter(Boolean).join(' · ')
-  const hint = renderedHint
+  const hint = renderedHint ? spinnerHintText(renderedHint) : ''
 
   return (
     <Text>
@@ -266,4 +275,30 @@ function formatElapsedSeconds(milliseconds: number): string {
   if (seconds < 60) return `${seconds}s`
   const minutes = Math.floor(seconds / 60)
   return `${minutes}:${(seconds % 60).toString().padStart(2, '0')}`
+}
+
+function restoreSpinnerTerms(value: string): string {
+  return value
+    .replace(/\bapi\b/g, 'API')
+    .replace(/\bens\b/g, 'ENS')
+    .replace(/\berc-8004\b/g, 'ERC-8004')
+    .replace(/\bgguf\b/g, 'GGUF')
+    .replace(/\bhugging face\b/g, 'Hugging Face')
+    .replace(/\bipfs\b/g, 'IPFS')
+    .replace(/\bjson\b/g, 'JSON')
+    .replace(/\bjwt\b/g, 'JWT')
+    .replace(/\bmemory\.md\b/g, 'MEMORY.md')
+    .replace(/\bopenai\b/g, 'OpenAI')
+    .replace(/\banthropic\b/g, 'Anthropic')
+    .replace(/\bgemini\b/g, 'Gemini')
+    .replace(/\bos\b/g, 'OS')
+    .replace(/\brpc\b/g, 'RPC')
+    .replace(/\bsoul\.md\b/g, 'SOUL.md')
+    .replace(/\buri\b/g, 'URI')
+    .replace(/\burl\b/g, 'URL')
+    .replace(/\bbase\b/g, 'Base')
+    .replace(/\bethereum mainnet\b/g, 'Ethereum Mainnet')
+    .replace(/\bethereum\b/g, 'Ethereum')
+    .replace(/\bsepolia\b/g, 'Sepolia')
+    .replace(/\bbase sepolia\b/g, 'Base Sepolia')
 }

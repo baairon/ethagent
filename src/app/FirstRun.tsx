@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { Box, Text } from 'ink'
 import { BrandSplash as Splash } from '../ui/BrandSplash.js'
 import { Select } from '../ui/Select.js'
+import { Surface } from '../ui/Surface.js'
 import { TextInput } from '../ui/TextInput.js'
 import { theme } from '../ui/theme.js'
 import { ModelPicker, type ModelPickerSelection } from '../models/ModelPicker.js'
@@ -9,7 +10,8 @@ import { formatModelDisplayName } from '../models/modelDisplay.js'
 import { detectSpec, type SpecSnapshot } from '../models/runtimeDetection.js'
 import { FEATURED_HF_REPO_URL } from '../models/modelRecommendation.js'
 import {
-  saveConfig,
+  loadConfig,
+  saveConfigWithMerge,
   normalizeConfig,
   defaultModelFor,
   defaultBaseUrlFor,
@@ -18,6 +20,7 @@ import {
 } from '../storage/config.js'
 import { setKey } from '../storage/secrets.js'
 import { IdentityHub, type IdentityHubResult } from '../identity/hub/IdentityHub.js'
+import { FirstRunTimeline, firstRunStageNumber, type FirstRunStepKind } from './FirstRunTimeline.js'
 
 type Step =
   | { kind: 'detecting' }
@@ -39,18 +42,18 @@ type FirstRunProps = {
   onCancel: () => void
 }
 
-const STATUS: Record<string, string> = {
-  'detecting':         'first-run setup · inspecting machine',
-  'detect-error':      'first-run setup · detection failed',
-  'choose-path':       'first-run setup · choose how to run',
-  'hf-setup':          'first-run setup · local model',
-  'cloud-provider':    'first-run setup · pick a cloud provider',
-  'cloud-key':         'first-run setup · paste API key',
-  'cloud-key-saving':  'first-run setup · storing key',
-  'cloud-model':       'first-run setup · pick a model',
-  'saving':            'first-run setup · saving config',
-  'save-error':        'first-run setup · save failed',
-  'done':              'ready',
+const TITLE: Record<string, string> = {
+  'detecting':         'Inspecting Machine',
+  'detect-error':      'Detection Failed',
+  'choose-path':       'Choose How To Run',
+  'hf-setup':          'Local Model',
+  'cloud-provider':    'Pick A Cloud Provider',
+  'cloud-key':         'Paste API Key',
+  'cloud-key-saving':  'Storing Key',
+  'cloud-model':       'Pick A Model',
+  'saving':            'Saving Config',
+  'save-error':        'Save Failed',
+  'done':              'Ready',
 }
 
 const NAV_BACK = '↑↓ navigate · enter select · esc back'
@@ -60,6 +63,19 @@ export const FirstRun: React.FC<FirstRunProps> = ({ onComplete, onCancel }) => {
   const [step, setStep] = useState<Step>({ kind: 'detecting' })
   const [history, setHistory] = useState<Step[]>([])
   const [firstRunIdentity, setFirstRunIdentity] = useState<EthagentConfig['identity']>(undefined)
+  const [firstRunConfig, setFirstRunConfig] = useState<EthagentConfig | undefined>(undefined)
+
+  useEffect(() => {
+    let cancelled = false
+    loadConfig()
+      .then(loaded => {
+        if (cancelled || !loaded) return
+        setFirstRunConfig(loaded)
+        if (loaded.identity) setFirstRunIdentity(loaded.identity)
+      })
+      .catch(() => null)
+    return () => { cancelled = true }
+  }, [])
 
   const goTo = (next: Step): void => {
     setHistory(h => [...h, step])
@@ -93,17 +109,36 @@ export const FirstRun: React.FC<FirstRunProps> = ({ onComplete, onCancel }) => {
   useEffect(() => {
     if (step.kind !== 'saving') return
     let cancelled = false
-    const config = normalizeConfig(step.config)
-    saveConfig(config)
-      .then(() => {
+    const incoming = normalizeConfig(step.config)
+    ;(async () => {
+      try {
+        const merged = await saveConfigWithMerge(current => {
+          if (!current) return incoming
+          const baseErc = current.erc8004
+          const incErc = incoming.erc8004
+          const next: EthagentConfig = { ...current, ...incoming }
+          if (baseErc || incErc) {
+            const mergedVaults = {
+              ...(baseErc?.operatorVaults ?? {}),
+              ...(incErc?.operatorVaults ?? {}),
+            }
+            const erc = {
+              ...(baseErc ?? {}),
+              ...(incErc ?? {}),
+              ...(Object.keys(mergedVaults).length > 0 ? { operatorVaults: mergedVaults } : {}),
+            } as NonNullable<EthagentConfig['erc8004']>
+            next.erc8004 = erc
+          }
+          return next
+        })
         if (cancelled) return
-        setStep({ kind: 'done', config })
-        onComplete(config)
-      })
-      .catch((err: unknown) => {
+        setStep({ kind: 'done', config: merged })
+        onComplete(merged)
+      } catch (err: unknown) {
         if (cancelled) return
-        setStep({ kind: 'save-error', config, message: (err as Error).message })
-      })
+        setStep({ kind: 'save-error', config: incoming, message: (err as Error).message })
+      }
+    })()
     return () => { cancelled = true }
   }, [step, onComplete])
 
@@ -114,6 +149,9 @@ export const FirstRun: React.FC<FirstRunProps> = ({ onComplete, onCancel }) => {
       if (step.result.kind === 'token') {
         setFirstRunIdentity(step.result.identity)
       }
+      const reloaded = await loadConfig().catch(() => null)
+      if (cancelled || !reloaded) return
+      setFirstRunConfig(reloaded)
     }
     persist()
       .then(() => {
@@ -124,35 +162,65 @@ export const FirstRun: React.FC<FirstRunProps> = ({ onComplete, onCancel }) => {
         if (cancelled) return
         setStep({
           kind: 'detect-error',
-          message: `could not store identity: ${(err as Error).message}`,
+          message: `Could not store identity: ${(err as Error).message}`,
         })
       })
     return () => { cancelled = true }
   }, [step])
 
-  const hint = (canBack: boolean): React.ReactElement => (
-    <Box marginTop={1}>
-      <Text color={theme.dim}>{canBack ? NAV_BACK : NAV_CANCEL}</Text>
+  const navHint = (canBack: boolean): string => canBack ? NAV_BACK : NAV_CANCEL
+
+  const withFirstRunIdentity = (config: EthagentConfig): EthagentConfig => {
+    const merged: EthagentConfig = firstRunConfig
+      ? {
+          ...firstRunConfig,
+          ...config,
+          ...(firstRunConfig.erc8004 ? { erc8004: { ...firstRunConfig.erc8004, ...(config.erc8004 ?? {}) } } : config.erc8004 ? { erc8004: config.erc8004 } : {}),
+        }
+      : config
+    return firstRunIdentity ? { ...merged, identity: firstRunIdentity } : merged
+  }
+
+  const renderShell = (
+    currentKind: FirstRunStepKind,
+    title: string,
+    body: React.ReactNode,
+    footer?: string,
+  ): React.ReactElement => (
+    <Box flexDirection="column" padding={1}>
+      <Splash />
+      <Box marginTop={1}>
+        <Surface
+          title={title}
+          subtitle={<FirstRunTimeline current={firstRunStageNumber(currentKind)} />}
+          footer={footer}
+        >
+          {body}
+        </Surface>
+      </Box>
     </Box>
   )
 
-  const withFirstRunIdentity = (config: EthagentConfig): EthagentConfig =>
-    firstRunIdentity ? { ...config, identity: firstRunIdentity } : config
+  const renderRaw = (currentKind: FirstRunStepKind, body: React.ReactNode): React.ReactElement => (
+    <Box flexDirection="column" padding={1}>
+      <Splash />
+      <Box marginTop={1} marginBottom={1}>
+        <FirstRunTimeline current={firstRunStageNumber(currentKind)} />
+      </Box>
+      {body}
+    </Box>
+  )
 
   if (step.kind === 'detecting') {
-    return (
-      <Box flexDirection="column" padding={1}>
-        <Splash tipLine={STATUS['detecting']} />
-        <Text color={theme.dim}>inspecting machine…</Text>
-      </Box>
-    )
+    return renderShell(step.kind, TITLE['detecting']!, (
+      <Text color={theme.dim}>Inspecting machine…</Text>
+    ))
   }
 
   if (step.kind === 'detect-error') {
-    return (
-      <Box flexDirection="column" padding={1}>
-        <Splash tipLine={STATUS['detect-error']} />
-        <Text color="#e87070">could not inspect machine: {step.message}</Text>
+    return renderShell(step.kind, TITLE['detect-error']!, (
+      <>
+        <Text color={theme.accentError}>Could not inspect machine: {step.message}</Text>
         <Box marginTop={1}>
           <Select<'quit'>
             options={[{ value: 'quit', label: 'quit' }]}
@@ -160,46 +228,41 @@ export const FirstRun: React.FC<FirstRunProps> = ({ onComplete, onCancel }) => {
             onCancel={onCancel}
           />
         </Box>
-      </Box>
-    )
+      </>
+    ))
   }
 
   if (step.kind === 'identity-start') {
-    return (
-      <Box flexDirection="column" padding={1}>
-        <Splash tipLine="first-run setup · agent identity" />
-        <IdentityHub
-          mode="first-run"
-          onComplete={result => {
-            if (result.kind === 'cancel') {
-              onCancel()
-              return
-            }
-            if (result.kind === 'skip') {
-              setStep({ kind: 'choose-path', spec: step.spec })
-              return
-            }
-            setStep({ kind: 'identity-start-saving', spec: step.spec, result })
-          }}
-        />
-      </Box>
-    )
+    return renderRaw(step.kind, (
+      <IdentityHub
+        mode="first-run"
+        config={firstRunConfig}
+        onConfigChange={setFirstRunConfig}
+        onComplete={result => {
+          if (result.kind === 'cancel') {
+            onCancel()
+            return
+          }
+          if (result.kind === 'skip') {
+            setStep({ kind: 'choose-path', spec: step.spec })
+            return
+          }
+          setStep({ kind: 'identity-start-saving', spec: step.spec, result })
+        }}
+      />
+    ))
   }
 
   if (step.kind === 'identity-start-saving') {
-    return (
-      <Box flexDirection="column" padding={1}>
-        <Splash tipLine="first-run setup · storing identity" />
-        <Text color={theme.dim}>storing identity...</Text>
-      </Box>
-    )
+    return renderShell(step.kind, 'Storing Identity', (
+      <Text color={theme.dim}>Storing identity...</Text>
+    ))
   }
 
   if (step.kind === 'choose-path') {
     const { spec } = step
-    return (
-      <Box flexDirection="column" padding={1}>
-        <Splash tipLine={STATUS['choose-path']} />
+    return renderShell(step.kind, TITLE['choose-path']!, (
+      <>
         <Box flexDirection="column" marginBottom={1}>
           <Text color={theme.dim}>
             detected {formatGB(spec.effectiveRamBytes)} RAM
@@ -208,10 +271,9 @@ export const FirstRun: React.FC<FirstRunProps> = ({ onComplete, onCancel }) => {
           </Text>
         </Box>
         <Select<'cloud' | 'hf'>
-          label="how do you want to run?"
           options={[
-            { value: 'cloud',  label: 'cloud API', hint: 'anthropic, openai, or gemini' },
-            { value: 'hf',     label: 'local model', hint: 'download and run locally' },
+            { value: 'cloud', label: 'Cloud API', hint: 'OpenAI, Anthropic, or Gemini' },
+            { value: 'hf', label: 'Local Model', hint: 'Download and run locally' },
           ]}
           onSubmit={choice => {
             if (choice === 'cloud') goTo({ kind: 'cloud-provider' })
@@ -219,12 +281,9 @@ export const FirstRun: React.FC<FirstRunProps> = ({ onComplete, onCancel }) => {
           }}
           onCancel={onCancel}
         />
-        {hint(false)}
-      </Box>
-    )
+      </>
+    ), navHint(false))
   }
-
-
 
   if (step.kind === 'hf-setup') {
     const modelPickerConfig: EthagentConfig = withFirstRunIdentity({
@@ -234,57 +293,43 @@ export const FirstRun: React.FC<FirstRunProps> = ({ onComplete, onCancel }) => {
       baseUrl: defaultBaseUrlFor('llamacpp'),
       firstRunAt: new Date().toISOString(),
     })
-    return (
-      <Box flexDirection="column" padding={1}>
-        <Splash tipLine={STATUS['hf-setup']} />
-        <Box flexDirection="column" marginBottom={1}>
-          <Text color={theme.dim}>featured: {FEATURED_HF_REPO_URL}</Text>
-        </Box>
-        <ModelPicker
-          currentConfig={modelPickerConfig}
-          currentProvider="llamacpp"
-          currentModel={modelPickerConfig.model}
-          featuredHfRepo={FEATURED_HF_REPO_URL}
-          onPick={(selection: ModelPickerSelection) => {
-            goTo({ kind: 'saving', config: configFromModelPickerSelection(selection, modelPickerConfig) })
-          }}
-          onCancel={goBack}
-        />
-      </Box>
-    )
+    return renderRaw(step.kind, (
+      <ModelPicker
+        currentConfig={modelPickerConfig}
+        currentProvider="llamacpp"
+        currentModel={modelPickerConfig.model}
+        featuredHfRepo={FEATURED_HF_REPO_URL}
+        onPick={(selection: ModelPickerSelection) => {
+          goTo({ kind: 'saving', config: configFromModelPickerSelection(selection, modelPickerConfig) })
+        }}
+        onCancel={goBack}
+      />
+    ))
   }
 
   if (step.kind === 'cloud-provider') {
-    return (
-      <Box flexDirection="column" padding={1}>
-        <Splash tipLine={STATUS['cloud-provider']} />
-        <Text color={theme.accentSecondary} bold>pick a cloud provider</Text>
-        <Box marginTop={1}>
-          <Select<ProviderId>
-            options={[
-              { value: 'openai',    label: 'openai' },
-              { value: 'anthropic', label: 'anthropic' },
-              { value: 'gemini',    label: 'gemini' },
-            ]}
-            onSubmit={provider => goTo({ kind: 'cloud-key', provider })}
-            onCancel={goBack}
-          />
-        </Box>
-        {hint(true)}
-      </Box>
-    )
+    return renderShell(step.kind, TITLE['cloud-provider']!, (
+      <Select<ProviderId>
+        options={[
+          { value: 'openai', label: 'OpenAI' },
+          { value: 'anthropic', label: 'Anthropic' },
+          { value: 'gemini', label: 'Gemini' },
+        ]}
+        onSubmit={provider => goTo({ kind: 'cloud-key', provider })}
+        onCancel={goBack}
+      />
+    ), navHint(true))
   }
 
   if (step.kind === 'cloud-key' || step.kind === 'cloud-key-saving') {
     const provider = step.provider
     const saving = step.kind === 'cloud-key-saving'
     const error = step.kind === 'cloud-key' ? step.error : undefined
-    return (
-      <Box flexDirection="column" padding={1}>
-        <Splash tipLine={saving ? STATUS['cloud-key-saving'] : STATUS['cloud-key']} />
-        <Text color={theme.accentSecondary} bold>paste your {provider} API key</Text>
+    const keyTitle = `${TITLE[saving ? 'cloud-key-saving' : 'cloud-key']!} · ${providerDisplayName(provider)}`
+    return renderShell(step.kind, keyTitle, (
+      <>
         <Text color={theme.dim}>stored in your OS keyring when available; never written to config.json</Text>
-        {error ? <Text color="#e87070">{error}</Text> : null}
+        {error ? <Text color={theme.accentError}>{error}</Text> : null}
         <Box marginTop={1}>
           <TextInput
             isSecret
@@ -310,18 +355,16 @@ export const FirstRun: React.FC<FirstRunProps> = ({ onComplete, onCancel }) => {
             onCancel={goBack}
           />
         </Box>
-        {saving ? <Text color={theme.dim}>storing key…</Text> : hint(true)}
-      </Box>
-    )
+        {saving ? <Text color={theme.dim}>storing key…</Text> : null}
+      </>
+    ), saving ? undefined : navHint(true))
   }
 
   if (step.kind === 'cloud-model') {
     const { provider } = step
     const defaultModel = defaultModelFor(provider)
-    return (
-      <Box flexDirection="column" padding={1}>
-        <Splash tipLine={STATUS['cloud-model']} />
-        <Text color={theme.accentSecondary} bold>which model?</Text>
+    return renderShell(step.kind, TITLE['cloud-model']!, (
+      <>
         <Text color={theme.dim}>press enter to accept default: {defaultModel}</Text>
         <Box marginTop={1}>
           <TextInput
@@ -340,25 +383,20 @@ export const FirstRun: React.FC<FirstRunProps> = ({ onComplete, onCancel }) => {
             onCancel={goBack}
           />
         </Box>
-        {hint(true)}
-      </Box>
-    )
+      </>
+    ), navHint(true))
   }
 
   if (step.kind === 'saving') {
-    return (
-      <Box flexDirection="column" padding={1}>
-        <Splash tipLine={STATUS['saving']} />
-        <Text color={theme.dim}>saving config…</Text>
-      </Box>
-    )
+    return renderShell(step.kind, TITLE['saving']!, (
+      <Text color={theme.dim}>saving config…</Text>
+    ))
   }
 
   if (step.kind === 'save-error') {
-    return (
-      <Box flexDirection="column" padding={1}>
-        <Splash tipLine={STATUS['save-error']} />
-        <Text color="#e87070">{step.message}</Text>
+    return renderShell(step.kind, TITLE['save-error']!, (
+      <>
+        <Text color={theme.accentError}>{step.message}</Text>
         <Box marginTop={1}>
           <Select<'retry' | 'back' | 'quit'>
             options={[
@@ -374,18 +412,16 @@ export const FirstRun: React.FC<FirstRunProps> = ({ onComplete, onCancel }) => {
             onCancel={goBack}
           />
         </Box>
-        {hint(history.length > 0)}
-      </Box>
-    )
+      </>
+    ), navHint(history.length > 0))
   }
 
   if (step.kind === 'done') {
-    return (
-      <Box flexDirection="column" padding={1}>
-        <Splash tipLine={`ready · ${step.config.provider} · ${formatModelDisplayName(step.config.provider, step.config.model, { maxLength: 48 })}`} />
-        <Text color={theme.accentSecondary}>all set.</Text>
-      </Box>
-    )
+    return renderShell(step.kind, TITLE['done']!, (
+      <Text color={theme.accentPeriwinkle}>
+        Ready · {providerDisplayName(step.config.provider)} · {formatModelDisplayName(step.config.provider, step.config.model, { maxLength: 48 })}
+      </Text>
+    ))
   }
 
   return null
@@ -411,4 +447,12 @@ function configFromModelPickerSelection(selection: ModelPickerSelection, base: E
 function formatGB(bytes: number): string {
   const gb = bytes / (1024 * 1024 * 1024)
   return gb < 10 ? `${gb.toFixed(1)}GB` : `${Math.round(gb)}GB`
+}
+
+function providerDisplayName(provider: ProviderId): string {
+  if (provider === 'openai') return 'OpenAI'
+  if (provider === 'anthropic') return 'Anthropic'
+  if (provider === 'gemini') return 'Gemini'
+  if (provider === 'llamacpp') return 'llama.cpp'
+  return provider
 }

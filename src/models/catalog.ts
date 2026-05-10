@@ -236,10 +236,13 @@ async function discoverGeminiModels(
   apiKey: string,
 ): Promise<ModelCatalogEntry[]> {
   const response = await fetchImpl(
-    `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`,
+    'https://generativelanguage.googleapis.com/v1beta/models',
     {
       method: 'GET',
-      headers: { Accept: 'application/json' },
+      headers: {
+        Accept: 'application/json',
+        'x-goog-api-key': apiKey.trim(),
+      },
     },
   )
   if (!response.ok) throw new Error(`HTTP ${response.status}`)

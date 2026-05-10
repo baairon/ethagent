@@ -11,7 +11,7 @@ import {
   type PrivateContinuityFile,
 } from './storage.js'
 
-export type PrivateContinuityHistorySnapshot = {
+type PrivateContinuityHistorySnapshot = {
   version: 1
   id: string
   createdAt: string
@@ -35,7 +35,7 @@ export type PrivateContinuityHistorySnapshot = {
   checkpointLabel?: string
 }
 
-export type RecordPrivateContinuityHistoryInput = {
+type RecordPrivateContinuityHistoryInput = {
   identity: EthagentIdentity
   file: PrivateContinuityFile
   filePath: string
@@ -51,7 +51,7 @@ export type RecordPrivateContinuityHistoryInput = {
   checkpointLabel?: string
 }
 
-export function privateContinuityHistoryPath(identity: EthagentIdentity): string {
+function privateContinuityHistoryPath(identity: EthagentIdentity): string {
   return path.join(continuityVaultRef(identity).dir, '.history.jsonl')
 }
 
@@ -121,7 +121,7 @@ export async function restorePrivateContinuityHistorySnapshot(
 ): Promise<PrivateContinuityHistorySnapshot> {
   const snapshot = (await listPrivateContinuityHistory(identity, 500))
     .find(item => item.id === snapshotId)
-  if (!snapshot) throw new Error('private continuity checkpoint was not found')
+  if (!snapshot) throw new Error('Private continuity checkpoint was not found')
 
   if (snapshot.previousFiles) {
     await writeContinuityFiles(identity, snapshot.previousFiles)

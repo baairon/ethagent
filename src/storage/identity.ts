@@ -5,7 +5,6 @@ import {
   type EthagentIdentity,
 } from './config.js'
 import {
-  getSecret,
   rmSecret,
   hasSecret,
   whichBackend,
@@ -59,7 +58,7 @@ export async function setTokenIdentity(
   identity: EthagentIdentity,
 ): Promise<EthagentConfig> {
   if (!identity.address || !identity.agentId || !identity.agentUri || !identity.ownerAddress) {
-    throw new Error('token identity is missing ERC-8004 metadata')
+    throw new Error('Token identity is missing ERC-8004 metadata')
   }
   const next: EthagentConfig = {
     ...config,
@@ -67,6 +66,13 @@ export async function setTokenIdentity(
       ...identity,
       source: 'erc8004',
     },
+  }
+  if (!next.erc8004 && identity.chainId && identity.rpcUrl && identity.identityRegistryAddress) {
+    next.erc8004 = {
+      chainId: identity.chainId,
+      rpcUrl: identity.rpcUrl,
+      identityRegistryAddress: identity.identityRegistryAddress,
+    }
   }
   await saveConfig(next)
   return next
@@ -76,7 +82,7 @@ export async function updateIdentityBackup(
   config: EthagentConfig,
   backup: NonNullable<EthagentIdentity['backup']>,
 ): Promise<EthagentConfig> {
-  if (!config.identity) throw new Error('no identity set')
+  if (!config.identity) throw new Error('No identity set')
   const next: EthagentConfig = {
     ...config,
     identity: {

@@ -27,7 +27,6 @@ import {
   formatMcpCallResult,
   formatMcpResourceResult,
   promptMessagesToText,
-  truncateMcpOutput,
 } from './output.js'
 
 const MCP_CONNECT_TIMEOUT_MS = 10_000

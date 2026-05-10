@@ -26,8 +26,6 @@ export const CLEAR_ALL_SESSIONS_VALUE = '__clear_all_sessions__'
 export const ResumeView: React.FC<ResumeViewProps> = ({ currentSessionId, onResume, onClearAll, onCancel }) => {
   const [state, setState] = useState<State>({ kind: 'loading' })
 
-  // Allow ESC to close the view during loading / error states
-  // (Select handles ESC only when it's rendered in the 'ready' state)
   const escActive = state.kind === 'loading' || state.kind === 'error' || (state.kind === 'ready' && state.sessions.length === 0)
   useAppInput((_input, key) => {
     if (key.escape) onCancel()
@@ -75,7 +73,7 @@ export const ResumeView: React.FC<ResumeViewProps> = ({ currentSessionId, onResu
         <Box flexDirection="column" marginBottom={1}>
           <Text color={theme.dim}>Removes saved chats and resume context from this machine.</Text>
           <Text color={theme.dim}>Config, identities, keys, and local models stay.</Text>
-          {state.error ? <Text color="#e87070">{state.error}</Text> : null}
+          {state.error ? <Text color={theme.accentError}>{state.error}</Text> : null}
         </Box>
         <Select<'back' | 'clear'>
           options={[
@@ -212,7 +210,6 @@ export function buildResumeOptions(
     }
   }
 
-  // Utility section sits below all session groups with a visual gap
   options.push(manageSpacer)
   options.push(clearOption)
 

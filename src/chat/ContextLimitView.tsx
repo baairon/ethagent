@@ -64,20 +64,20 @@ export const ContextLimitView: React.FC<ContextLimitViewProps> = ({
   })
 
   return (
-    <Box flexDirection="column" borderStyle="round" borderColor={theme.accentPeach} paddingX={1}>
-      <Text color={theme.accentPeach} bold>context limit</Text>
+    <Box flexDirection="column" borderStyle="round" borderColor={theme.accentPeriwinkle} paddingX={1}>
+      <Text color={theme.accentPeriwinkle} bold>context limit</Text>
       <Text color={theme.dim}>
         {`Context ${usage.percent}% · ~${formatTokens(usage.usedTokens)} / ${formatTokens(usage.windowTokens)} tokens (${usage.source}).`}
       </Text>
       {usage.percent >= 100 ? (
-        <Text color={theme.accentPeach}>
+        <Text color={theme.accentPeriwinkle}>
           This transcript is over the selected model's estimated window. You can still send, but summarizing first is safer.
         </Text>
       ) : null}
       <Text color={theme.textSubtle}>{`Pending: ${promptPreview || '(empty)'}`}</Text>
       <Box flexDirection="column" marginTop={1}>
         {CONTEXT_LIMIT_OPTIONS.map((option, index) => (
-          <Text key={option.action} color={index === selected ? theme.accentPrimary : theme.text}>
+          <Text key={option.action} color={index === selected ? theme.accentPeriwinkle : theme.text}>
             {index === selected ? '> ' : '  '}
             {option.label}
             <Text color={theme.dim}>{` · ${option.detail}`}</Text>

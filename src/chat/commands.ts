@@ -210,7 +210,7 @@ const COMMANDS: CommandSpec[] = [
       }
       await saveConfig(next)
       ctx.onReplaceConfig(next)
-      return { kind: 'note', text: `now using ${next.provider} · ${formatModelDisplayName(next.provider, name, { maxLength: 64 })}.` }
+      return { kind: 'note', text: `Now using ${next.provider} · ${formatModelDisplayName(next.provider, name, { maxLength: 64 })}.` }
     },
   },
   {

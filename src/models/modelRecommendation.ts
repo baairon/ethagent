@@ -8,7 +8,6 @@ import type { SpecSnapshot } from './runtimeDetection.js'
 
 const GB = 1024 * 1024 * 1024
 
-/** Featured local model repo for first-run setup and the model picker catalog. */
 export const FEATURED_HF_REPO = 'HauhauCS/Qwen3.5-9B-Uncensored-HauhauCS-Aggressive'
 export const FEATURED_HF_REPO_URL = `https://huggingface.co/${FEATURED_HF_REPO}`
 

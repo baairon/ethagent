@@ -70,11 +70,11 @@ export const PlanApprovalView: React.FC<PlanApprovalViewProps> = ({
             const active = optionIndex === index
             return (
               <Box key={option.value} flexDirection="row">
-                <Text color={active ? theme.accentMint : theme.dim}>
+                <Text color={active ? theme.accentPeriwinkle : theme.dim}>
                   {active ? '> ' : '  '}
                   {optionIndex + 1}.{' '}
                 </Text>
-                <Text color={active ? theme.accentMint : theme.text} bold={active}>
+                <Text color={active ? theme.accentPeriwinkle : theme.text} bold={active}>
                   {option.label}
                 </Text>
               </Box>
@@ -82,7 +82,7 @@ export const PlanApprovalView: React.FC<PlanApprovalViewProps> = ({
           })}
         </Box>
         <Box flexDirection="column" marginLeft={4} flexShrink={1}>
-          <Text color={theme.accentMint} bold>{selected.title}</Text>
+          <Text color={theme.accentPeriwinkle} bold>{selected.title}</Text>
           <Text color={theme.dim}>{selected.detail(contextLabel)}</Text>
         </Box>
       </Box>
