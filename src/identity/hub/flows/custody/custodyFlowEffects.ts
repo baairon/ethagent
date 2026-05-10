@@ -25,7 +25,7 @@ export function useCustodyTransactionEffects({
     let cancelled = false
     if (!step.identity.agentId) {
       handleStepError(
-        new Error('Cannot deploy agent vault: agent token ID is missing'),
+        new Error('Cannot deploy OperatorVault: agent token ID is missing'),
         { kind: 'custody-model', identity: step.identity, registry: step.registry, returnTo: step.returnTo },
       )
       return () => { cancelled = true }

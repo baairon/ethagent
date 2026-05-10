@@ -91,7 +91,7 @@ export const MenuScreen: React.FC<MenuScreenProps> = ({
       : null)
 
   const walletSetupBaseHint = custodyMode === 'advanced'
-    ? 'Advanced. Owner wallet, agent vault, authorized operator wallets'
+    ? 'Advanced. Owner wallet, OperatorVault, authorized operator wallets'
     : 'Simple. Switch to Advanced to delegate URI rotation through a dedicated OperatorVault'
 
   const walletSetupLabel = flags?.custodyAsterisk ? 'Custody Mode *' : 'Custody Mode'

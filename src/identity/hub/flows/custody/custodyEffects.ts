@@ -86,9 +86,9 @@ async function runVaultDeployTransactionInner(args: {
   })
   args.callbacks.onWalletReady(null)
   const client = args.publicClient ?? createErc8004PublicClient(args.registry)
-  const receipt = await awaitConfirmedReceipt(client, result.txHash, 'Operator delegation vault deploy', { kind: 'vault-deploy', chainId: args.registry.chainId })
+  const receipt = await awaitConfirmedReceipt(client, result.txHash, 'OperatorVault deploy', { kind: 'vault-deploy', chainId: args.registry.chainId })
   if (!receipt.contractAddress) {
-    throw new Error('Operator delegation vault deploy receipt is missing contractAddress; the transaction was not a contract creation')
+    throw new Error('OperatorVault deploy receipt is missing contractAddress; the transaction was not a contract creation')
   }
   const vaultAddress = getAddress(receipt.contractAddress)
   await assertVaultBytecode(client, vaultAddress, result.txHash)
@@ -114,7 +114,7 @@ async function runVaultDepositTransactionInner(args: {
 }): Promise<{ txHash: string }> {
   const { identity, registry, vaultAddress } = args
   if (!identity.agentId) {
-    throw new Error('Cannot deposit token to operator delegation vault: agent token ID is missing')
+    throw new Error('Cannot deposit token to OperatorVault: agent token ID is missing')
   }
   const tokenOwner = getAddress(identity.ownerAddress ?? identity.address)
   await assertVaultCanAcceptAgent({
@@ -152,7 +152,7 @@ async function runVaultDepositTransactionInner(args: {
   await awaitConfirmedReceipt(
     depositClient,
     result.txHash as Hex,
-    'Operator delegation vault deposit',
+    'OperatorVault deposit',
     { kind: 'vault-deposit', chainId: registry.chainId },
   )
   return { txHash: result.txHash }
@@ -179,9 +179,9 @@ async function assertVaultCanAcceptAgent(args: {
   const expectedRegistry = getAddress(args.registry.identityRegistryAddress)
   const sameAgent = heldRegistry.toLowerCase() === expectedRegistry.toLowerCase() && heldAgentId === args.agentId
   if (sameAgent) {
-    throw new Error(`Agent vault ${getAddress(args.vaultAddress)} already holds ERC-8004 token #${args.agentId.toString()}. Publish the pending update instead of depositing again.`)
+    throw new Error(`OperatorVault ${getAddress(args.vaultAddress)} already holds ERC-8004 token #${args.agentId.toString()}. Publish the pending update instead of depositing again.`)
   }
-  throw new Error(`Agent vault ${getAddress(args.vaultAddress)} already holds ERC-8004 token #${heldAgentId.toString()} for registry ${getAddress(heldRegistry)}. Deploy a fresh vault for this agent.`)
+  throw new Error(`OperatorVault ${getAddress(args.vaultAddress)} already holds ERC-8004 token #${heldAgentId.toString()} for registry ${getAddress(heldRegistry)}. Deploy a fresh vault for this agent.`)
 }
 
 export async function runVaultUnwrapTransaction(args: {
@@ -206,7 +206,7 @@ async function runVaultUnwrapTransactionInner(args: {
   const { identity, registry, vaultAddress } = args
   const targetAgentId = args.agentId ?? (identity.agentId ? BigInt(identity.agentId) : undefined)
   if (targetAgentId === undefined) {
-    throw new Error('Cannot unwrap token from operator delegation vault: agent token ID is missing')
+    throw new Error('Cannot unwrap token from OperatorVault: agent token ID is missing')
   }
   const baseState = (identity.state ?? {}) as Record<string, unknown>
   const ownerAddressRaw = readOwnerAddressField(baseState)
@@ -240,7 +240,7 @@ async function runVaultUnwrapTransactionInner(args: {
   await awaitConfirmedReceipt(
     publicClient,
     result.txHash as Hex,
-    'Operator delegation vault unwrap',
+    'OperatorVault unwrap',
     { kind: 'vault-unwrap', chainId: registry.chainId },
   )
   await confirmAgentWithdrawnFromVault({
@@ -307,7 +307,7 @@ async function runVaultWithdrawTransactionInner(args: {
   await awaitConfirmedReceipt(
     publicClient,
     result.txHash as Hex,
-    'Operator delegation vault withdraw',
+    'OperatorVault withdraw',
     { kind: 'vault-withdraw', chainId: registry.chainId },
   )
   await confirmAgentWithdrawnFromVault({

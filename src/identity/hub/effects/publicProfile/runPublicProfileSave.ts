@@ -435,7 +435,7 @@ async function runOperatorWalletVaultPublicProfileSave(args: {
 
     await callbacks.onIdentityComplete(
       nextIdentity,
-      'Profile updated. ERC-8004 metadata published through the operator delegation vault.',
+      'Profile updated. ERC-8004 metadata published through the OperatorVault.',
       'update',
     )
   } finally {
@@ -616,10 +616,10 @@ async function assertVaultSignerCanRotateAgentUri(args: {
       args: [registryAddress, args.agentId],
     }) as Address)
   } catch (err: unknown) {
-    throw new Error(`Could not verify operator delegation vault custody for agent #${args.agentId.toString()}: ${err instanceof Error ? err.message : String(err)}`)
+    throw new Error(`Could not verify OperatorVault custody for agent #${args.agentId.toString()}: ${err instanceof Error ? err.message : String(err)}`)
   }
   if (vaultOwner === '0x0000000000000000000000000000000000000000') {
-    throw new Error(`Operator delegation vault ${vaultAddress} does not currently hold agent token #${args.agentId.toString()}. Connect the owner wallet and run "Fix Records" or return the token to the vault before retrying.`)
+    throw new Error(`OperatorVault ${vaultAddress} does not currently hold agent token #${args.agentId.toString()}. Connect the owner wallet and run "Fix Records" or return the token to the vault before retrying.`)
   }
   if (vaultOwner.toLowerCase() === signer.toLowerCase()) return
 
@@ -632,7 +632,7 @@ async function assertVaultSignerCanRotateAgentUri(args: {
   if (isOperator) return
 
   throw new Error(
-    `Operator wallet ${signer} is not yet authorized on the operator delegation vault to rotate this agent's URI. Connect the owner wallet and run "Fix Records" or re-add this operator to grant the permission.`,
+    `Operator wallet ${signer} is not yet authorized on the OperatorVault to rotate this agent's URI. Connect the owner wallet and run "Fix Records" or re-add this operator to grant the permission.`,
   )
 }
 

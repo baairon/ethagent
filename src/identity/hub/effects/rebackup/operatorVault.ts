@@ -220,7 +220,7 @@ async function runOperatorWalletVaultPublish(args: {
   }) as boolean
   if (!isOperator) {
     throw new Error(
-      `Operator wallet ${expectedSigner} is not yet authorized on the operator delegation vault to rotate this agent's URI. Connect the owner wallet and run "Fix Records" or re-add this operator to grant the permission.`,
+      `Operator wallet ${expectedSigner} is not yet authorized on the OperatorVault to rotate this agent's URI. Connect the owner wallet and run "Fix Records" or re-add this operator to grant the permission.`,
     )
   }
 
@@ -344,8 +344,8 @@ async function runOperatorWalletVaultPublish(args: {
       }
 
       const completionMessage = nextEnsName !== undefined && nextEnsName !== ((step.identity.state as Record<string, unknown> | undefined)?.ensName as string | undefined)
-        ? 'Snapshot published onchain through the operator delegation vault. ENS records remain owner-signed, switch to the owner wallet to update them.'
-        : 'Snapshot published onchain through the operator delegation vault.'
+        ? 'Snapshot published onchain through the OperatorVault. ENS records remain owner-signed, switch to the owner wallet to update them.'
+        : 'Snapshot published onchain through the OperatorVault.'
 
       return {
         to: vaultCall.to,

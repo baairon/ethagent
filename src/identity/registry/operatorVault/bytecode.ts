@@ -15,7 +15,7 @@ export class OperatorVaultBytecodeMismatchError extends Error {
     txHash?: Hex,
   ) {
     super(
-      'Deployed contract bytecode does not match the expected operator delegation vault. The deploy transaction may have been intercepted.',
+      'Deployed contract bytecode does not match the expected OperatorVault. The deploy transaction may have been intercepted.',
     )
     this.name = 'OperatorVaultBytecodeMismatchError'
     this.vaultAddress = vaultAddress

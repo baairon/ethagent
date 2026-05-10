@@ -218,9 +218,9 @@ export const EnsSetupBlockedScreen: React.FC<EnsSetupBlockedScreenProps> = ({
             ? (
               <>
                 <Box marginTop={1} flexDirection="column">
-                  <Text color={theme.text}>To proceed: the owner wallet signs ENS records and must hold this token at setup time. Once setup is done you can deposit the token into the operator delegation vault while the ENS subdomain stays with the owner wallet.</Text>
+                  <Text color={theme.text}>To proceed: the owner wallet signs ENS records and must hold this token at setup time. Once setup is done you can deposit the token into the OperatorVault while the ENS subdomain stays with the owner wallet.</Text>
                 </Box>
-                <Text color={theme.dim}>Operator wallets have no authority on this name; they only rotate the onchain ERC-8004 URI via the operator delegation vault.</Text>
+                <Text color={theme.dim}>Operator wallets have no authority on this name; they only rotate the onchain ERC-8004 URI via the OperatorVault.</Text>
               </>
               )
             : null}

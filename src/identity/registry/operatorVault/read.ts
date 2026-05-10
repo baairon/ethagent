@@ -97,7 +97,7 @@ export async function confirmAgentInVault(
   }
   if (lastErr) throw lastErr
   throw new Error(
-    `Operator delegation vault ${getAddress(args.vaultAddress)} does not hold agent token #${args.agentId.toString()} for registry ${getAddress(args.registry)} after the deposit-confirmation budget was exhausted. The deposit transaction may have been re-orged or applied to the wrong vault. Re-run the switch.`,
+    `OperatorVault ${getAddress(args.vaultAddress)} does not hold agent token #${args.agentId.toString()} for registry ${getAddress(args.registry)} after the deposit-confirmation budget was exhausted. The deposit transaction may have been re-orged or applied to the wrong vault. Re-run the switch.`,
   )
 }
 
@@ -135,7 +135,7 @@ export async function confirmAgentWithdrawnFromVault(
   }
   if (lastErr) throw lastErr
   throw new Error(
-    `Operator delegation vault ${getAddress(args.vaultAddress)} did not release agent token #${args.agentId.toString()} to ${recipient} after the withdraw-confirmation budget was exhausted. Last observed: ${lastObserved ?? 'unknown'}.`,
+    `OperatorVault ${getAddress(args.vaultAddress)} did not release agent token #${args.agentId.toString()} to ${recipient} after the withdraw-confirmation budget was exhausted. Last observed: ${lastObserved ?? 'unknown'}.`,
   )
 }
 

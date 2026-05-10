@@ -128,7 +128,7 @@ export const CreateFlow: React.FC<CreateFlowProps> = ({
             { value: 'simple', role: 'section', label: 'Simple (Recommended)' },
             { value: 'simple', label: 'Simple', hint: 'One wallet owns the token, signs every save, and rotates the URI directly' },
             { value: 'advanced', role: 'section', label: 'Advanced' },
-            { value: 'advanced', label: 'Advanced', hint: 'Operator delegation vault holds the token; owner wallet controls vault, operator wallets get URI-rotation permission' },
+            { value: 'advanced', label: 'Advanced', hint: 'OperatorVault holds the token; owner wallet controls vault, operator wallets get URI-rotation permission' },
           ]}
           hintLayout="inline"
           onSubmit={onCustodySubmit}
@@ -182,7 +182,7 @@ export const CreateFlow: React.FC<CreateFlowProps> = ({
         title={isAdvanced ? 'Connect Owner Wallet' : 'Sign in Wallet'}
         subtitle={
           isAdvanced
-            ? 'This wallet will own the agent token and control the delegation vault. Operator wallets are configured after minting.'
+            ? 'This wallet will own the agent token and control the OperatorVault. Operator wallets are configured after minting.'
             : 'One browser flow signs, saves the IPFS backup, and submits the token transaction.'
         }
         walletSession={walletSession}

@@ -7,14 +7,14 @@ import { readCustodyMode } from '../../model/custody.js'
 
 export class OperatorVaultUnavailableError extends Error {
   constructor(chainId: number) {
-    super(`Operator delegation vault is not deployed for chainId ${chainId}. Switching custody mode is unavailable until a deployment is recorded.`)
+    super(`OperatorVault is not deployed for chainId ${chainId}. Switching custody mode is unavailable until a deployment is recorded.`)
     this.name = 'OperatorVaultUnavailableError'
   }
 }
 
 export class TokenInVaultError extends Error {
   constructor(public vaultAddress: Address) {
-    super('Token is in the operator delegation vault. Withdraw it first to prepare a transfer.')
+    super('Token is in the OperatorVault. Withdraw it first to prepare a transfer.')
     this.name = 'TokenInVaultError'
   }
 }

@@ -89,7 +89,7 @@ export function renderAdvancedEnsPhase({
           <Box marginTop={1} flexDirection="column">
             <EnsSetupRow label="Owner wallet" value={`Holds ERC-8004 token #${agentId ?? 'unknown'} and signs ENS records.`} />
             <EnsSetupRow label="Operator wallet" value="Restores snapshots; never controls the token." />
-            <EnsSetupRow label="Token moves" value="If the token is in the operator delegation vault, withdraw it first from Custody Mode." />
+            <EnsSetupRow label="Token moves" value="If the token is in the OperatorVault, withdraw it first from Custody Mode." />
           </Box>
         </Box>
         <Box marginTop={1}>
@@ -217,7 +217,7 @@ export function renderAdvancedEnsPhase({
         <Box flexDirection="column">
           <Text color={theme.dim}>Agent ENS: <Text color={theme.text}>{label}.{rootName}</Text></Text>
           {phase.registryAction ? <Text color={theme.dim}>{advancedSubdomainStatusText(phase.registryAction)}</Text> : null}
-          <Text color={theme.dim}>Choose the operator wallet for snapshot restore access and onchain ERC-8004 URI rotation via the operator delegation vault.</Text>
+          <Text color={theme.dim}>Choose the operator wallet for snapshot restore access and onchain ERC-8004 URI rotation via the OperatorVault.</Text>
           <Text color={theme.dim}>The operator wallet has no authority over this ENS subdomain or any token transfer; the owner wallet is the sole signer for both.</Text>
           <Text color={theme.dim}>We only read the operator's address here so it can be added to the snapshot envelope and vault operator list later.</Text>
           {savedOperator ? <Text color={theme.dim}>Saved operator wallet: <Text color={theme.text}>{shortAddress(savedOperator)}</Text></Text> : null}

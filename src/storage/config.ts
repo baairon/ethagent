@@ -229,7 +229,7 @@ export function setConfiguredOperatorVaultAddress(
   vaultAddress: string,
 ): EthagentConfig {
   if (!config.erc8004) {
-    throw new Error('Cannot record operator delegation vault address: erc8004 registry config is not set')
+    throw new Error('Cannot record OperatorVault address: erc8004 registry config is not set')
   }
   return {
     ...config,

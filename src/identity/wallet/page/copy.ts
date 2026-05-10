@@ -93,7 +93,7 @@ export const PURPOSE_COPY: Record<string, PurposeCopyEntry> = {
     flowTitle: "Operator Wallet Save",
     sign: { text: "Sign With Operator Wallet", hint: "Signs the encrypted snapshot for restore access." },
     prepare: { text: "Saving Snapshot...", hint: "Keep this page open." },
-    transaction: { text: "Use Operator Wallet", hint: "Rotates the ERC-8004 token URI through the operator delegation vault." },
+    transaction: { text: "Use Operator Wallet", hint: "Rotates the ERC-8004 token URI through the OperatorVault." },
   },
   "update-snapshot-connected": {
     flowTitle: "Save Snapshot",
@@ -196,7 +196,7 @@ export const PURPOSE_COPY: Record<string, PurposeCopyEntry> = {
   "sync-operator-vault": {
     flowTitle: "Owner Wallet Required",
     prepare: { text: "Preparing Vault Operator Update...", hint: "Keep this page open." },
-    transaction: { text: "Use Owner Wallet", hint: "Updates the operator delegation vault's metadata-operator list so authorized operator wallets can rotate the agent URI." },
+    transaction: { text: "Use Owner Wallet", hint: "Updates the OperatorVault metadata-operator list so authorized operator wallets can rotate the agent URI." },
   },
   "refetch-snapshot": {
     flowTitle: "Refetch Latest Snapshot",
@@ -219,39 +219,39 @@ export const PURPOSE_COPY: Record<string, PurposeCopyEntry> = {
     transaction: { text: "Use Sender Wallet", hint: "Submits one transaction to publish the transfer snapshot to the ERC-8004 token URI." },
   },
   "deploy-agent-vault": {
-    flowTitle: "Deploy Operator Delegation Vault",
+    flowTitle: "Deploy OperatorVault",
     prepare: { text: "Preparing Vault Deploy...", hint: "Keep this page open." },
-    transaction: { text: "Use Owner Wallet", hint: "Deploys the operator delegation vault contract onchain. One-time setup per agent." },
-    errorContext: "While submitting the operator delegation vault deploy",
+    transaction: { text: "Use Owner Wallet", hint: "Deploys the OperatorVault contract onchain. One-time setup per agent." },
+    errorContext: "While submitting the OperatorVault deploy",
   },
   "deposit-agent-vault": {
     flowTitle: "Deposit Token Into Vault",
     prepare: { text: "Preparing Vault Deposit...", hint: "Keep this page open." },
-    transaction: { text: "Use Owner Wallet", hint: "Sends the agent token to the operator delegation vault so the vault can save updates on your behalf." },
-    errorContext: "While submitting the operator delegation vault deposit",
+    transaction: { text: "Use Owner Wallet", hint: "Sends the agent token to the OperatorVault so the vault can save updates on your behalf." },
+    errorContext: "While submitting the OperatorVault deposit",
   },
   "unwrap-agent-vault": {
     flowTitle: "Unwrap Token From Vault",
     prepare: { text: "Preparing Vault Unwrap...", hint: "Keep this page open." },
-    transaction: { text: "Use Owner Wallet", hint: "Returns the agent token from the operator delegation vault to your owner wallet." },
+    transaction: { text: "Use Owner Wallet", hint: "Returns the agent token from the OperatorVault to your owner wallet." },
   },
   "rotate-agent-uri-vault-owner": {
     flowTitle: "Save Update Through Vault",
     sign: { text: "Sign With Owner Wallet", hint: "Approves the new snapshot before saving onchain. No token approval." },
     prepare: { text: "Preparing Update...", hint: "Keep this page open." },
-    transaction: { text: "Use Owner Wallet", hint: "Saves your update onchain through the operator delegation vault. The vault holds your token, so updates go through it." },
+    transaction: { text: "Use Owner Wallet", hint: "Saves your update onchain through the OperatorVault. The vault holds your token, so updates go through it." },
   },
   "rotate-agent-uri-vault-operator": {
     flowTitle: "Save Update Through Vault",
     sign: { text: "Sign With Operator Wallet", hint: "Approves the new snapshot before saving onchain. No token approval." },
     prepare: { text: "Preparing Update...", hint: "Keep this page open." },
-    transaction: { text: "Use Operator Wallet", hint: "Rotates the ERC-8004 token URI through the operator delegation vault. The vault holds your token, so the operator wallet calls the vault to publish." },
+    transaction: { text: "Use Operator Wallet", hint: "Rotates the ERC-8004 token URI through the OperatorVault. The vault holds your token, so the operator wallet calls the vault to publish." },
   },
   "withdraw-vault": {
     flowTitle: "Withdraw Token From Vault",
     prepare: { text: "Preparing Token Withdrawal...", hint: "Keep this page open." },
     transaction: { text: "Use Owner Wallet", hint: "Temporarily returns the agent token from the vault to your owner wallet. Vault stays configured so you can redeposit later." },
-    errorContext: "While submitting the operator delegation vault withdraw",
+    errorContext: "While submitting the OperatorVault withdraw",
   },
   "register-root-commit": {
     flowTitle: "Commit ENS Name",

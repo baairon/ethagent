@@ -329,9 +329,9 @@ test('copyableIdentityFields exposes advanced ENS operator wallet state', () => 
   } as const
   const fields = copyableIdentityFields(identity)
 
-  assert.deepEqual(fields.map(field => field.label), ['Token ID', 'ENS Name', 'Agent URI', 'Owner Wallet', 'Agent Vault', 'Operator Wallet'])
+  assert.deepEqual(fields.map(field => field.label), ['Token ID', 'ENS Name', 'Agent URI', 'Owner Wallet', 'OperatorVault', 'Operator Wallet'])
   assert.equal(fields.find(field => field.label === 'Owner Wallet')?.value, '0x000000000000000000000000000000000000c01d')
-  assert.equal(fields.find(field => field.label === 'Agent Vault')?.value, '0x00000000000000000000000000000000000077AB')
+  assert.equal(fields.find(field => field.label === 'OperatorVault')?.value, '0x00000000000000000000000000000000000077AB')
   assert.equal(fields.find(field => field.label === 'Operator Wallet')?.value, '0x0000000000000000000000000000000000000A11')
   assert.equal(fields.find(field => field.label === 'Approved Operator Wallets'), undefined)
 })

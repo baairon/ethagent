@@ -220,7 +220,7 @@ test('readMetadataOperators with empty candidates list returns an empty map', as
 test('OperatorVault gating error message names the chain so the user sees why advanced is disabled', async () => {
   const { OperatorVaultUnavailableError } = await import('../../../src/identity/hub/effects/vault/preflight.js')
   const err = new OperatorVaultUnavailableError(8453)
-  assert.match(err.message, /Operator delegation vault is not deployed for chainId 8453/)
+  assert.match(err.message, /OperatorVault is not deployed for chainId 8453/)
   assert.equal(err.name, 'OperatorVaultUnavailableError')
 })
 

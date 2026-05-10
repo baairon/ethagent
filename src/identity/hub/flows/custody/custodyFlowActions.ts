@@ -49,7 +49,7 @@ export function createCustodyFlowActions({
             }
             if (status.inVault) {
               handleStepError(
-                new Error(`Recovered operator delegation vault ${recoveredVault} holds the token, but the vault-level depositor is ${status.ownerAddress ?? 'unknown'}, not your wallet ${expectedOwnerForDiscovery}. Mid-flow recovery requires the original depositor's wallet to call vault.unwrap.`),
+                new Error(`Recovered OperatorVault ${recoveredVault} holds the token, but the vault-level depositor is ${status.ownerAddress ?? 'unknown'}, not your wallet ${expectedOwnerForDiscovery}. Mid-flow recovery requires the original depositor's wallet to call vault.unwrap.`),
                 { kind: 'custody-model', identity: currentStep.identity, registry, returnTo },
               )
               return
@@ -95,7 +95,7 @@ export function createCustodyFlowActions({
         }
         if (status.inVault) {
           handleStepError(
-            new Error(`Token is held by the operator delegation vault, but the vault-level owner is ${status.ownerAddress ?? 'unknown'}, not your wallet ${expectedOwner}. Recovery requires that wallet to call vault.unwrap.`),
+            new Error(`Token is held by the OperatorVault, but the vault-level owner is ${status.ownerAddress ?? 'unknown'}, not your wallet ${expectedOwner}. Recovery requires that wallet to call vault.unwrap.`),
             { kind: 'custody-model', identity: currentStep.identity, registry, returnTo },
           )
           return
@@ -127,7 +127,7 @@ export function createCustodyFlowActions({
     const vaultAddress = resolveOperatorVaultAddress(currentStep.identity, config?.erc8004?.operatorVaults)
     if (!vaultAddress) {
       handleStepError(
-        new Error('No agent vault is recorded for this identity. There is nothing to withdraw.'),
+        new Error('No OperatorVault is recorded for this identity. There is nothing to withdraw.'),
         { kind: 'custody-model', identity: currentStep.identity, registry: currentStep.registry, returnTo },
       )
       return
@@ -160,7 +160,7 @@ export function createCustodyFlowActions({
         if (status.inVault) {
           if (status.ownerAddress && status.ownerAddress.toLowerCase() !== depositor.toLowerCase()) {
             handleStepError(
-              new Error(`Agent vault holds token #${activeAgentId} but recorded the depositor as ${status.ownerAddress}, not your wallet ${depositor}. Only the original depositor can withdraw.`),
+              new Error(`OperatorVault holds token #${activeAgentId} but recorded the depositor as ${status.ownerAddress}, not your wallet ${depositor}. Only the original depositor can withdraw.`),
               { kind: 'custody-model', identity: currentStep.identity, registry: currentStep.registry, returnTo },
             )
             return
@@ -176,7 +176,7 @@ export function createCustodyFlowActions({
           return
         }
         handleStepError(
-          new Error(`Token #${activeAgentId} is not currently in the agent vault. There is nothing to withdraw; the token is already with the owner wallet.`),
+          new Error(`Token #${activeAgentId} is not currently in the OperatorVault. There is nothing to withdraw; the token is already with the owner wallet.`),
           { kind: 'custody-model', identity: currentStep.identity, registry: currentStep.registry, returnTo },
         )
       } catch (err: unknown) {

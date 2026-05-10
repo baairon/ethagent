@@ -15,7 +15,7 @@ ethagent binds an AI agent to a wallet-owned ERC-8004 token. Soul and memory sta
 | --- | --- |
 | Owner Wallet | Holds and controls the ERC-8004 agent token. Signs custody changes and, in Simple custody, every URI rotation. |
 | Operator Wallet | Additional wallet authorized to rotate the onchain URI on behalf of the owner. Used in Advanced custody. Never receives token approval. |
-| Operator Delegation Vault | Immutable contract deployed per agent token in Advanced custody. Each new vault holds at most one ERC-8004 token. |
+| OperatorVault | Immutable per-agent custody contract used in Advanced custody. Holds at most one ERC-8004 token. |
 | Snapshot | Encrypted bundle of SOUL.md, MEMORY.md, and session state. Pinned to IPFS; decrypts only against the owner wallet's signature. |
 | Agent URI | IPFS URI stored in the ERC-8004 `tokenURI`. Resolves to the agent's published metadata. |
 | Agent Card | Public JSON describing the agent: name, description, capabilities, and skills. Other agents fetch it for discovery. |
@@ -50,7 +50,7 @@ The Identity Hub manages everything portable about the agent:
 
 - **Public Profile** edits name, description, icon, and the Agent Card.
 - **ENS Name** links the agent to a subdomain and authorizes operator wallets to write the subdomain's records.
-- **Custody Mode** switches between Simple and Advanced by depositing the token into its agent vault or unwrapping it back out.
+- **Custody Mode** switches between Simple and Advanced by depositing the token into its OperatorVault or unwrapping it back out.
 - **Prepare Transfer** stages a dual-wallet snapshot before sending the token externally.
 - **Refetch Latest** pulls the most recent published snapshot back to local files.
 - **Load Agent** accepts either an ENS name or a bare token ID, and loads any agent owned by or linked to the connected wallet.
@@ -81,7 +81,7 @@ Custody comes in two modes. Switch between them anytime from **Custody Mode**.
 
 **Advanced** splits an owner wallet from one or more operator wallets. The **owner wallet** owns this agent's dedicated OperatorVault; one or more **operator wallets** handle routine URI rotations through that vault. Use Advanced when routine saves should not require an owner signature.
 
-Granting an operator wallet ERC-721 approval would let it rotate the URI, but that same approval also lets it transfer the token away. The agent vault holds the token instead and exposes only a URI-rotation lane for that agent. Operators never receive token approval or transfer rights, cannot touch ENS, and cannot grant rights to other operators. The owner still signs to authorize or revoke operators for the agent, withdraw the token, or transfer the agent.
+Granting an operator wallet ERC-721 approval would let it rotate the URI, but that same approval also lets it transfer the token away. The OperatorVault holds the token instead and exposes only a URI-rotation lane for that agent. Operators never receive token approval or transfer rights, cannot touch ENS, and cannot grant rights to other operators. The owner still signs to authorize or revoke operators for the agent, withdraw the token, or transfer the agent.
 
 The vault is an immutable Foundry contract at `contracts/src/OperatorVault.sol`. New vault deployments are dedicated per agent token and reject any other token.
 
@@ -95,7 +95,7 @@ Save the token ID + network somewhere safe. ENS records can be cleared and rebui
 
 ## Token Transfers
 
-**Prepare Token Transfer** runs before any ERC-8004 token transfer, and only when the token sits directly in your wallet. An agent in Advanced custody has to switch to Simple first from Custody Mode, which unwraps the token from its agent vault back to the owner wallet.
+**Prepare Token Transfer** runs before any ERC-8004 token transfer, and only when the token sits directly in your wallet. An agent in Advanced custody has to switch to Simple first from Custody Mode, which unwraps the token from its OperatorVault back to the owner wallet.
 
 - sender signs snapshot access, receiver signs restore access.
 - Sender publishes the snapshot pointer to the agent URI.
