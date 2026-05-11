@@ -166,6 +166,12 @@ function normalizePrivateContinuityInput(input: Record<string, unknown>): Record
   if (normalized.appendText === undefined) {
     normalized.appendText = normalized.note ?? normalized.text ?? normalized.content
   }
+  for (const key of ['oldText', 'newText', 'appendToSection', 'appendText'] as const) {
+    const value = normalized[key]
+    if (typeof value === 'string' && value.trim() === '') {
+      normalized[key] = undefined
+    }
+  }
   return normalized
 }
 

@@ -461,7 +461,6 @@ function nextToolResultRepairNudge(
   completedTools: ExecutedToolUse[],
 ): string | null {
   if (!provider.supportsTools) return null
-  if (provider.id !== 'llamacpp') return null
   const failedPrivateEdit = completedTools.some(completed =>
     completed.name === 'propose_private_continuity_edit'
     && !completed.result.ok

@@ -40,6 +40,21 @@ test('identity-linked prompt routes private continuity through scaffold edits', 
   assert.match(prompt, /do NOT create, overwrite, or patch SOUL\.md\/MEMORY\.md with `write_file` or `edit_file`/)
 })
 
+test('cloud-provider identity prompt includes the empty/file-only private continuity guidance', () => {
+  for (const provider of ['openai', 'anthropic', 'gemini']) {
+    const prompt = buildSystemPrompt({
+      cwd: process.cwd(),
+      model: 'test-model',
+      provider,
+      hasTools: true,
+      hasIdentity: true,
+    })
+
+    assert.match(prompt, /Never call `propose_private_continuity_edit` with `\{\}` or only `file`/, `${provider} prompt missing empty/file-only guard`)
+    assert.match(prompt, /do not pass empty strings for `oldText`\/`newText` alongside an append/, `${provider} prompt missing empty-string guidance`)
+  }
+})
+
 test('base messages do not include continuity config or public skills metadata automatically', () => {
   const config: EthagentConfig = {
     version: 1,

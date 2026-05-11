@@ -135,7 +135,7 @@ export function renderSimpleEnsPhase({
           ]
         : []),
       { value: 'open-ens-domains' as DomainAction, role: 'section' as const, label: 'No Parent Name?' },
-      { value: 'open-ens-domains' as DomainAction, label: 'Register at app.ens.domains', hint: 'Open the ENS app in your browser; come back when this wallet owns one' },
+      { value: 'open-ens-domains' as DomainAction, label: 'Register .eth Name', hint: 'Open the ENS app in your browser; come back when this wallet owns one' },
       ...(noOwnedNames || discovery.status === 'ok'
         ? [{ value: 'retry' as DomainAction, label: 'Scan Again', hint: 'Re-run root .eth name discovery for this wallet' }]
         : []),

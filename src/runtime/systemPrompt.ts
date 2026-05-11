@@ -93,6 +93,7 @@ function buildToolEnabledPrompt(ctx: SystemPromptContext): string {
                     'When exact private continuity text is needed for surgical removal or targeted replacement, call `read_private_continuity_file` with `file: "MEMORY.md"` or `file: "SOUL.md"` first.',
                     'When the user wants memory, persona, preferences, or private identity continuity changed, call `propose_private_continuity_edit`; do NOT create, overwrite, or patch SOUL.md/MEMORY.md with `write_file` or `edit_file`.',
                     'For private continuity, edit the existing scaffold and build on top of it: prefer `appendToSection`+`appendText` for new notes or use `oldText`+`newText` for targeted replacement. Never omit the edit anchor, never create a new file, and never replace the whole file.',
+                    'Never call `propose_private_continuity_edit` with `{}` or only `file`. Send exactly one edit mode: either `appendToSection` + non-empty `appendText`, or `oldText` + `newText`. Omit the fields you are not using — do not pass empty strings for `oldText`/`newText` alongside an append, or empty `appendToSection`/`appendText` alongside a targeted edit.',
                     'If the user asks to remember preferences or facts, call exactly one private continuity append such as `{"file":"MEMORY.md","appendToSection":"Durable User Preferences","appendText":"- User preference or durable memory."}`.',
                     'If the user asks to change persona or standing behavior, call exactly one private continuity append such as `{"file":"SOUL.md","appendToSection":"Persona","appendText":"- Persona or standing behavior."}`.',
                   ]
@@ -120,7 +121,6 @@ function buildToolEnabledPrompt(ctx: SystemPromptContext): string {
               ? [
                   'For private SOUL.md or MEMORY.md inspection, do not search project folders. Call `read_private_continuity_file` with `file: "SOUL.md"` or `file: "MEMORY.md"`.',
                   'For private SOUL.md or MEMORY.md changes, call `propose_private_continuity_edit` with `file: "SOUL.md"` or `file: "MEMORY.md"` and an in-place append/replacement payload.',
-                  'Never call `propose_private_continuity_edit` with `{}` or only `file`. For memory/preferences include `appendToSection: "Durable User Preferences"` and a non-empty `appendText`; for persona include `appendToSection: "Persona"` and a non-empty `appendText`.',
                 ]
               : []),
             'For targeted private continuity edits with `oldText`, copy the text verbatim from the most recent `read_private_continuity_file` output. For workspace targeted edits, copy from the most recent `read_file` output.',

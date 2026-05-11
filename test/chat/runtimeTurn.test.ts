@@ -408,6 +408,89 @@ test('runRuntimeTurn repairs empty local private continuity tool input with a ta
   assert.deepEqual(events.at(-1), { type: 'done', finishedNormally: true })
 })
 
+test('runRuntimeTurn fires the private continuity repair nudge for cloud providers too', async () => {
+  const responses: StreamEvent[][] = [
+    [
+      {
+        type: 'tool_use_stop',
+        id: 'tool-empty',
+        name: 'propose_private_continuity_edit',
+        input: {},
+      },
+      { type: 'done', stopReason: 'tool_use' },
+    ],
+    [
+      {
+        type: 'tool_use_stop',
+        id: 'tool-valid',
+        name: 'propose_private_continuity_edit',
+        input: {
+          file: 'MEMORY.md',
+          appendToSection: 'Durable User Preferences',
+          appendText: '- Cloud-side memory note.',
+        },
+      },
+      { type: 'done', stopReason: 'tool_use' },
+    ],
+    [
+      { type: 'text', delta: 'Memory updated.' },
+      { type: 'done', stopReason: 'end_turn' },
+    ],
+  ]
+  let callIndex = 0
+  const seenMessages: Message[][] = []
+  const provider: Provider = {
+    id: 'openai',
+    model: 'gpt-test',
+    supportsTools: true,
+    async *complete(messages): AsyncIterable<StreamEvent> {
+      seenMessages.push(messages)
+      const events = responses[callIndex] ?? []
+      callIndex += 1
+      for (const ev of events) yield ev
+    },
+  }
+
+  const events = await collect(
+    runRuntimeTurn({
+      provider,
+      signal: new AbortController().signal,
+      initialMessages: [{ role: 'user', content: 'remember something' }],
+      rebuildMessages: () => [{ role: 'user', content: 'remember something' }],
+      runToolBatch: async pending => ({
+        cancelled: false,
+        completedTools: pending.map(t => ({
+          ...t,
+          cwd: '/tmp',
+          result: Object.keys(t.input).length === 0
+            ? {
+                ok: false,
+                summary: 'propose_private_continuity_edit rejected input',
+                content: 'missing required fields: file',
+              }
+            : {
+                ok: true,
+                summary: 'append to Durable User Preferences in MEMORY.md',
+                content: 'updated private continuity file',
+              },
+        })),
+      }),
+    }),
+  )
+
+  assert.equal(callIndex, 3)
+  assert.deepEqual(
+    events.find(e => e.type === 'continuation_nudge'),
+    { type: 'continuation_nudge', attempt: 1, reason: 'private_continuity_tool_repair' },
+  )
+  assert.ok(seenMessages[1]!.some(message =>
+    message.role === 'user'
+    && typeof message.content === 'string'
+    && /previous propose_private_continuity_edit call had invalid or missing input/.test(message.content),
+  ))
+  assert.deepEqual(events.at(-1), { type: 'done', finishedNormally: true })
+})
+
 test('runRuntimeTurn retries when the provider emits reasoning with no visible answer', async () => {
   const seenMessages: Message[][] = []
   let calls = 0

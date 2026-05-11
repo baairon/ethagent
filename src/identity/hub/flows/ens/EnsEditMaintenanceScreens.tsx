@@ -86,7 +86,6 @@ export function renderEnsMaintenancePhase({
         ? 'Walks you through Root, Name, Review, and Apply'
         : 'Walks you through Root, Name, Review, and Apply'
     const options: Array<{ value: EnsAction; role?: 'section' | 'utility'; label: string; hint?: string; disabled?: boolean }> = []
-    options.push({ value: 'link', role: 'section', label: 'Name' })
     if (currentEnsName) {
       options.push({ value: 'unlink', label: 'Unlink Name', hint: 'Removes this name from the token. Set up a different name afterward by linking again.' })
     } else {

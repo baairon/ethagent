@@ -513,6 +513,90 @@ test('private continuity edit rejects file-only input with explicit edit-mode gu
   assert.match(outcome.result.content, /oldText\+newText/)
 })
 
+test('private continuity append accepts empty oldText/newText alongside append fields (cloud-model shape)', async () => {
+  await withHome(async () => {
+    await writeContinuityFiles(identity, {
+      'SOUL.md': '# Soul\n\n## Persona\n\n- Existing persona\n',
+      'MEMORY.md': '# Memory\n\n## Durable User Preferences\n\n- Existing preference\n',
+    })
+
+    const outcome = await executeToolWithPermissions({
+      name: 'propose_private_continuity_edit',
+      input: {
+        file: 'MEMORY.md',
+        oldText: '',
+        newText: '',
+        appendToSection: 'Durable User Preferences',
+        appendText: '- User asked me to edit my memory when requested.',
+      },
+      permissionMode: 'default',
+      cwd: process.cwd(),
+      config,
+      getPermissionRules: () => [],
+      requestPermission: async () => 'allow-once',
+      onDirectoryChange: () => {},
+    })
+
+    assert.equal(outcome.result.ok, true)
+    const files = await readContinuityFiles(identity)
+    assert.match(files['MEMORY.md'], /User asked me to edit my memory when requested/)
+  })
+})
+
+test('private continuity append strips whitespace-only edit fields before validating', async () => {
+  await withHome(async () => {
+    await writeContinuityFiles(identity, {
+      'SOUL.md': '# Soul\n\n## Persona\n\n- Existing persona\n',
+      'MEMORY.md': '# Memory\n\n## Durable User Preferences\n\n- Existing preference\n',
+    })
+
+    const outcome = await executeToolWithPermissions({
+      name: 'propose_private_continuity_edit',
+      input: {
+        file: 'MEMORY.md',
+        oldText: '   ',
+        newText: '\n',
+        appendToSection: 'Durable User Preferences',
+        appendText: '- Whitespace-only edit fields are stripped.',
+      },
+      permissionMode: 'default',
+      cwd: process.cwd(),
+      config,
+      getPermissionRules: () => [],
+      requestPermission: async () => 'allow-once',
+      onDirectoryChange: () => {},
+    })
+
+    assert.equal(outcome.result.ok, true)
+    const files = await readContinuityFiles(identity)
+    assert.match(files['MEMORY.md'], /Whitespace-only edit fields are stripped/)
+  })
+})
+
+test('private continuity edit with all four edit-mode fields empty rejects as file-only, not mixed-mode', async () => {
+  const outcome = await executeToolWithPermissions({
+    name: 'propose_private_continuity_edit',
+    input: {
+      file: 'MEMORY.md',
+      oldText: '',
+      newText: '',
+      appendToSection: '',
+      appendText: '',
+    },
+    permissionMode: 'default',
+    cwd: process.cwd(),
+    config,
+    getPermissionRules: () => [],
+    requestPermission: async () => 'allow-once',
+    onDirectoryChange: () => {},
+  })
+
+  assert.equal(outcome.result.ok, false)
+  assert.equal(outcome.result.summary, 'propose_private_continuity_edit rejected input')
+  assert.match(outcome.result.content, /file alone is not enough/)
+  assert.doesNotMatch(outcome.result.content, /provide only one edit mode/)
+})
+
 test('private continuity edit refuses when no active identity exists', async () => {
   let prompts = 0
   const outcome = await executeToolWithPermissions({
