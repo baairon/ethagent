@@ -27,9 +27,6 @@ export type WalletPurpose =
   | 'set-agent-ens-records'
   | 'update-operators'
   | 'operator-proof'
-  | 'authorize-operator-wallet-resolver'
-  | 'revoke-operator-wallet-resolver'
-  | 'reconcile-resolver-approvals'
   | 'sync-operator-vault'
   | 'refetch-snapshot'
   | 'prepare-transfer-sender'
@@ -41,8 +38,6 @@ export type WalletPurpose =
   | 'rotate-agent-uri-vault-owner'
   | 'rotate-agent-uri-vault-operator'
   | 'withdraw-vault'
-  | 'register-root-commit'
-  | 'register-root-tx'
   | 'delete-ens-subdomain'
 
 export type SignatureRequest = {

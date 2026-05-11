@@ -9,8 +9,6 @@ export const LEGACY_WALLET_PURPOSE_ALIASES: Record<string, string> = {
   [legacyWalletPurpose('connect', legacyOperatorRole)]: 'connect-operator-wallet',
   [legacyWalletPurpose('restore', legacyOwnerRole)]: 'restore-owner-wallet',
   [legacyWalletPurpose('restore', legacyOperatorRole)]: 'restore-operator-wallet',
-  [legacyWalletPurpose('authorize', legacyOperatorRole, 'wallet-resolver')]: 'authorize-operator-wallet-resolver',
-  [legacyWalletPurpose('revoke', legacyOperatorRole, 'wallet-resolver')]: 'revoke-operator-wallet-resolver',
 }
 
 export function normalizeWalletPurposeValue(value: unknown): string | undefined {

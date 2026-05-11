@@ -26,10 +26,6 @@ import {
   upsertApprovedOperatorWallet,
   type ApprovedOperatorWalletRecord,
 } from '../../operatorWallets.js'
-import {
-  reconcileWalletSetup,
-  type RecordsFixPlan,
-} from '../../reconciliation/index.js'
 
 type OperatorPhase =
   | { kind: 'main'; notice?: string; error?: string }
@@ -71,27 +67,10 @@ export const OperatorWalletsScreen: React.FC<OperatorWalletsScreenProps> = ({
   const restoreAccessEpoch = readStateNumber(state, 'restoreAccessEpoch') ?? 0
   const records = normalizeApprovedOperatorWallets(state.approvedOperatorWallets)
   const [phase, setPhase] = React.useState<OperatorPhase>({ kind: 'main', notice, error })
-  const [fixPlan, setFixPlan] = React.useState<RecordsFixPlan | null>(null)
 
   React.useEffect(() => {
     setPhase(current => current.kind === 'main' ? { kind: 'main', notice, error } : current)
   }, [notice, error])
-
-  React.useEffect(() => {
-    if (custodyMode !== 'advanced' || records.length === 0) {
-      setFixPlan(null)
-      return
-    }
-    let cancelled = false
-    reconcileWalletSetup({ identity, registry })
-      .then(plan => { if (!cancelled) setFixPlan(plan) })
-      .catch(() => { if (!cancelled) setFixPlan(null) })
-    return () => { cancelled = true }
-  }, [identity, registry, custodyMode, records.length])
-
-  const driftItems = fixPlan?.items.filter(item =>
-    item.kind === 'missing-approval' || item.kind === 'stale-approval',
-  ) ?? []
 
   const saveOperators = React.useCallback((
     approvedOperatorWallets: ApprovedOperatorWalletRecord[],
@@ -253,16 +232,6 @@ export const OperatorWalletsScreen: React.FC<OperatorWalletsScreenProps> = ({
           <Text color={theme.dim}>Add as many operator wallets as needed; unlink any saved wallet here.</Text>
           <Text color={theme.dim}>No approve(), setApprovalForAll(), transferFrom(), or token approval is requested.</Text>
         </Box>
-        {driftItems.length > 0
-          ? (
-              <Box marginTop={1} flexDirection="column">
-                <Text color="#e8a070">
-                  {`! ENS resolver drift: ${driftItems.length} operator wallet${driftItems.length === 1 ? '' : 's'} missing onchain approval.`}
-                </Text>
-                <Text color={theme.dim}>Run "Fix Records" from Custody Mode to re-sync; onchain ENS writes will fail until then.</Text>
-              </Box>
-            )
-          : null}
         {phaseNotice ? <Text color={theme.accentPeriwinkle}>{phaseNotice}</Text> : null}
         {phaseError ? <Text color={theme.accentError}>{phaseError}</Text> : null}
       </Box>

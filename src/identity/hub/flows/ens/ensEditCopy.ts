@@ -18,7 +18,7 @@ export function recordsHaveCurrentValues(recordsDiff: AgentRecordDiff[]): boolea
 }
 
 export function emptyAgentEnsRecords(): AgentEnsRecords {
-  return { token: '', profile: '' }
+  return { token: '' }
 }
 
 export function unlinkEnsLinkOptions(savedCustodyMode: CustodyMode | undefined, savedOwnerAddress: string): EnsLinkOptions {

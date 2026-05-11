@@ -71,11 +71,19 @@ export function applyEnsValidationState(
       throw new Error('Advanced custody requires owner wallet and operator wallet addresses')
     }
     const ownerAddress = getAddress(ownerAddressValue)
-    const existingOperators = mergeApprovedOperatorWallets(baseState.approvedOperatorWallets, profile.approvedOperatorWallets ?? [], { walletAddress: ownerAddress })
-    const approvedOperatorWallets = upsertApprovedOperatorWallet(existingOperators, getAddress(operatorWallet), { walletAddress: ownerAddress })
     setOwnerAddressField(state, getAddress(ownerAddress))
-    state.approvedOperatorWallets = approvedOperatorWallets
-    state.activeOperatorAddress = getAddress(operatorWallet)
+    const operatorTouched =
+      profile.approvedOperatorWallets !== undefined
+      || profile.activeOperatorAddress !== undefined
+    if (operatorTouched) {
+      const existingOperators = mergeApprovedOperatorWallets(baseState.approvedOperatorWallets, profile.approvedOperatorWallets ?? [], { walletAddress: ownerAddress })
+      const approvedOperatorWallets = upsertApprovedOperatorWallet(existingOperators, getAddress(operatorWallet), { walletAddress: ownerAddress })
+      state.approvedOperatorWallets = approvedOperatorWallets
+      state.activeOperatorAddress = getAddress(operatorWallet)
+    } else {
+      state.approvedOperatorWallets = normalizeApprovedOperatorWallets(baseState.approvedOperatorWallets)
+      state.activeOperatorAddress = getAddress(operatorWallet)
+    }
     return
   }
   clearOwnerAddressField(state)

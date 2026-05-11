@@ -84,9 +84,9 @@ export function ensRecordWritesForUpdate(args: {
   clearRecords?: boolean
 }): Record<string, string> {
   if (args.clearRecords) {
-    return changedRecords(args.currentRecords ?? {}, { token: '', profile: '' })
+    return changedRecords(args.currentRecords ?? {}, { token: '' })
   }
-  return changedRecords(args.currentRecords ?? { token: '', profile: '' }, args.records)
+  return changedRecords(args.currentRecords ?? { token: '' }, args.records)
 }
 
 export async function runEnsSetupRegistryTransaction(args: {

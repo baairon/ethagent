@@ -1,4 +1,4 @@
-import { getAddress, type Address, type Hex } from 'viem'
+import { getAddress, type Address } from 'viem'
 import type { EthagentIdentity } from '../../../../storage/config.js'
 import {
   createWalletRestoreAccessChallenge,
@@ -32,19 +32,13 @@ import { resolveValidatedPinataJwt, savePinataJwt } from '../../../storage/pinat
 import {
   openBrowserWalletSession,
   requestBrowserWalletSignatureAndTransaction,
-  type BrowserWalletSession,
   type BrowserWalletSignature,
   type WalletPurpose,
 } from '../../../wallet/browserWallet.js'
 import type { ProfileUpdates, Step } from '../../identityHubReducer.js'
-import { reconcileWalletSetup } from '../../reconciliation/index.js'
 import { acquireTxGuard, releaseTxGuard } from '../../txGuard.js'
 import type { EffectCallbacks } from '../types.js'
 import { awaitConfirmedReceipt } from '../receipts.js'
-import {
-  createMainnetEnsPublicClient,
-  runUpdateEnsRecords,
-} from '../ens/transactions.js'
 import {
   assertVerifiedPin,
   deriveAgentName,
@@ -55,7 +49,7 @@ import {
   appendResolverSyncWarning,
   markCurrentContinuityFilesPublished,
   resolverSyncWarningMessage,
-  syncResolverApprovalsAfterOwnerSave,
+  syncVaultOperatorsAfterOwnerSave,
 } from '../shared/sync.js'
 import {
   assertSnapshotSaveSignerAuthorized,
@@ -241,7 +235,7 @@ async function runPublicProfileSigningInner(
   }
   await writePublicSkillsFile(nextIdentity, result.prepared.publicSkillsJson)
   await markCurrentContinuityFilesPublished(nextIdentity)
-  const resolverSyncWarning = await syncResolverApprovalsAfterOwnerSave({
+  const resolverSyncWarning = await syncVaultOperatorsAfterOwnerSave({
     beforeIdentity: step.identity,
     afterIdentity: nextIdentity,
     registry: step.registry,
@@ -263,92 +257,21 @@ async function runOperatorWalletPublicProfileSave(
   callbacks: EffectCallbacks,
 ): Promise<void> {
   if (!step.identity.agentId) throw new Error('Cannot update public profile: identity is missing an agent token ID')
-  const baseState = (step.identity.state ?? {}) as Record<string, unknown>
-  const ensName = typeof baseState.ensName === 'string' ? baseState.ensName.trim() : ''
-  if (!ensName) {
-    throw new Error('Operator wallet profile updates require an ENS subdomain, connect the owner wallet to set one up first')
+  if (!step.vaultAddress) {
+    throw new Error('Operator-wallet profile updates require a Vault. Set one up via Advanced Mode, or connect the owner wallet to update the profile.')
   }
   const snapshotOwner = ownerAddressForSnapshotSave(step.identity, step.profileUpdates)
   const walletAccess = walletRestoreAccessContext(step.identity, step.registry, step.profileUpdates, snapshotOwner)
   if (!walletAccess) throw new Error('Operator-wallet profile updates require wallet restore access context')
   const challengePurpose: WalletChallengePurpose = 'restore-operator'
-  if (step.vaultAddress) {
-    await runOperatorWalletVaultPublicProfileSave({
-      step,
-      callbacks,
-      snapshotOwner,
-      walletAccess,
-      challengePurpose,
-      vaultAddress: step.vaultAddress,
-    })
-    return
-  }
-
-  const reconcileBaseState = (step.identity.state ?? {}) as Record<string, unknown>
-  const activeOperator = typeof reconcileBaseState.activeOperatorAddress === 'string'
-    ? reconcileBaseState.activeOperatorAddress.trim()
-    : ''
-  if (activeOperator) {
-    const fixPlan = await reconcileWalletSetup({ identity: step.identity, registry: step.registry })
-    const stale = fixPlan.items.find(
-      (item): item is Extract<typeof item, { kind: 'missing-approval' }> =>
-        item.kind === 'missing-approval'
-        && item.address.toLowerCase() === activeOperator.toLowerCase(),
-    )
-    if (stale) {
-      throw new Error(
-        `Operator wallet ${stale.address} is no longer approved as a resolver delegate for this agent's ENS subdomain. Connect the owner wallet and run "Fix Records" to restore the approval before retrying.`,
-      )
-    }
-  }
-
-  const session = await openBrowserWalletSession({ onReady: callbacks.onWalletReady })
-  try {
-    const wallet = await session.requestSignature({
-      chainId: step.registry.chainId,
-      messageForAccount: account => createWalletRestoreAccessChallenge({
-        token: walletAccess.token,
-        ownerAddress: snapshotOwner,
-        walletAddress: account,
-        accessEpoch: walletAccess.accessEpoch,
-        purpose: challengePurpose,
-      }),
-      purpose: 'update-profile-operator',
-    })
-    assertSnapshotSaveSignerAuthorized(step.identity, step.profileUpdates, wallet.account, snapshotOwner, walletAccess)
-    const prepared = await prepareOperatorProfileArtifacts({
-      step,
-      wallet,
-      snapshotOwner,
-      walletAccess,
-      challengePurpose,
-      includeMetadata: false,
-    })
-    await publishOperatorProfileEnsRecord({
-      ensName,
-      signer: wallet.account,
-      registry: step.registry,
-      agentCardUri: prepared.agentCardUri,
-      callbacks,
-      session,
-    })
-
-    await writePublicSkillsFile(prepared.nextIdentity, prepared.publicSkillsJson)
-    await markCurrentContinuityFilesPublished(prepared.nextIdentity).catch(() => null)
-    await recordPublishedContinuitySnapshot({
-      identity: prepared.nextIdentity,
-      label: 'operator-wallet ENS profile update',
-    }).catch(() => null)
-
-    await callbacks.onIdentityComplete(
-      prepared.nextIdentity,
-      'Profile pointer published to ENS records (org.ethagent.profile). ERC-8004 metadata stays put until owner wallet next signs.',
-      'update',
-    )
-  } finally {
-    await session.close().catch(() => null)
-    callbacks.onWalletReady(null)
-  }
+  await runOperatorWalletVaultPublicProfileSave({
+    step,
+    callbacks,
+    snapshotOwner,
+    walletAccess,
+    challengePurpose,
+    vaultAddress: step.vaultAddress,
+  })
 }
 
 type WalletAccessContext = NonNullable<ReturnType<typeof walletRestoreAccessContext>>
@@ -391,11 +314,7 @@ async function runOperatorWalletVaultPublicProfileSave(args: {
       snapshotOwner,
       walletAccess,
       challengePurpose,
-      includeMetadata: true,
     })
-    if (!prepared.agentUri || !prepared.metadataCid) {
-      throw new Error('Vault profile update did not prepare ERC-8004 metadata')
-    }
 
     const vaultCall = encodeRotateAgentURI({
       registry: getAddress(step.registry.identityRegistryAddress),
@@ -447,9 +366,8 @@ async function runOperatorWalletVaultPublicProfileSave(args: {
 type OperatorProfileArtifacts = {
   nextIdentity: EthagentIdentity
   publicSkillsJson: string
-  agentCardUri: string
-  agentUri?: string
-  metadataCid?: string
+  agentUri: string
+  metadataCid: string
 }
 
 async function prepareOperatorProfileArtifacts(args: {
@@ -458,7 +376,6 @@ async function prepareOperatorProfileArtifacts(args: {
   snapshotOwner: Address
   walletAccess: WalletAccessContext
   challengePurpose: WalletChallengePurpose
-  includeMetadata: boolean
 }): Promise<OperatorProfileArtifacts> {
   const { step, wallet, snapshotOwner, walletAccess, challengePurpose } = args
   const {
@@ -523,78 +440,39 @@ async function prepareOperatorProfileArtifacts(args: {
     agentId: step.identity.agentId!,
   }
 
-  let metadataCid: string | undefined
-  let agentUri: string | undefined
-  if (args.includeMetadata) {
-    const registration = withEthagentPointers({
-      type: 'https://eips.ethereum.org/EIPS/eip-8004#registration-v1',
-      name: nextName ?? deriveAgentName(step.identity),
-      ...(nextDescription ? { description: nextDescription } : {}),
-      ...(uploadedImageUri ? { image: uploadedImageUri } : {}),
-    }, {
-      backup: { cid: statePin.cid, envelopeVersion: envelope.envelopeVersion, createdAt: envelope.createdAt },
-      publicDiscovery: { skillsCid: publicSkills.cid, agentCardCid: publicSkills.agentCardCid, updatedAt: publicSkills.updatedAt },
-      registration: { chainId: step.registry.chainId, identityRegistryAddress: step.registry.identityRegistryAddress, agentId: step.identity.agentId },
-      ensName: nextEnsName,
-      operators: operatorsPointerFromState(state, nextEnsName),
-      ownerAddress: snapshotOwner,
-    })
-    const metadataPin = await addToIpfs(DEFAULT_IPFS_API_URL, JSON.stringify(registration, null, 2), fetch, { pinataJwt: step.pinataJwt })
-    assertVerifiedPin(metadataPin)
-    metadataCid = metadataPin.cid
-    agentUri = `ipfs://${metadataCid}`
-  }
+  const registration = withEthagentPointers({
+    type: 'https://eips.ethereum.org/EIPS/eip-8004#registration-v1',
+    name: nextName ?? deriveAgentName(step.identity),
+    ...(nextDescription ? { description: nextDescription } : {}),
+    ...(uploadedImageUri ? { image: uploadedImageUri } : {}),
+  }, {
+    backup: { cid: statePin.cid, envelopeVersion: envelope.envelopeVersion, createdAt: envelope.createdAt },
+    publicDiscovery: { skillsCid: publicSkills.cid, agentCardCid: publicSkills.agentCardCid, updatedAt: publicSkills.updatedAt },
+    registration: { chainId: step.registry.chainId, identityRegistryAddress: step.registry.identityRegistryAddress, agentId: step.identity.agentId },
+    ensName: nextEnsName,
+    operators: operatorsPointerFromState(state, nextEnsName),
+    ownerAddress: snapshotOwner,
+  })
+  const metadataPin = await addToIpfs(DEFAULT_IPFS_API_URL, JSON.stringify(registration, null, 2), fetch, { pinataJwt: step.pinataJwt })
+  assertVerifiedPin(metadataPin)
+  const metadataCid = metadataPin.cid
+  const agentUri = `ipfs://${metadataCid}`
 
-  const nextBackup = agentUri && metadataCid
-    ? { ...backup, metadataCid, agentUri }
-    : backup
   const nextIdentity: EthagentIdentity = {
     ...step.identity,
     state,
-    backup: nextBackup,
+    backup: { ...backup, metadataCid, agentUri },
     publicSkills,
-    ...(agentUri ? { agentUri } : {}),
-    ...(metadataCid ? { metadataCid } : {}),
+    agentUri,
+    metadataCid,
   }
 
   return {
     nextIdentity,
     publicSkillsJson,
-    agentCardUri: `ipfs://${agentCardPin.cid}`,
-    ...(agentUri ? { agentUri } : {}),
-    ...(metadataCid ? { metadataCid } : {}),
+    agentUri,
+    metadataCid,
   }
-}
-
-async function publishOperatorProfileEnsRecord(args: {
-  ensName: string
-  signer: Address
-  registry: Erc8004RegistryConfig
-  agentCardUri: string
-  callbacks: EffectCallbacks
-  session: BrowserWalletSession
-  flowId?: string
-  flowStep?: number
-}): Promise<void> {
-  const ensClient = createMainnetEnsPublicClient()
-  const tx = await runUpdateEnsRecords({
-    fullName: args.ensName,
-    ownerAddress: args.signer,
-    records: { profile: args.agentCardUri },
-    callbacks: args.callbacks,
-    purpose: 'update-profile-operator',
-    tokenChainId: args.registry.chainId,
-    session: args.session,
-    publicClient: ensClient,
-    ...(args.flowId ? { flowId: args.flowId } : {}),
-    ...(typeof args.flowStep === 'number' ? { flowStep: args.flowStep } : {}),
-  })
-  await awaitConfirmedReceipt(
-    ensClient,
-    tx.txHash as Hex,
-    'Public profile ENS record update',
-    { kind: 'public-profile', chainId: 1 },
-  )
 }
 
 async function assertVaultSignerCanRotateAgentUri(args: {

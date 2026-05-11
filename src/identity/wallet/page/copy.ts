@@ -123,7 +123,7 @@ export const PURPOSE_COPY: Record<string, PurposeCopyEntry> = {
     flowTitle: "Operator Wallet Profile Update",
     sign: { text: "Sign With Operator Wallet", hint: "Signs the encrypted snapshot for restore access." },
     prepare: { text: "Preparing Profile Update...", hint: "Keep this page open." },
-    transaction: { text: "Use Operator Wallet", hint: "Publishes the updated agent-card pointer to the ENS profile record on Ethereum Mainnet." },
+    transaction: { text: "Use Operator Wallet", hint: "Rotates the agent URI through the Vault. No ENS write." },
   },
   "update-profile-connected": {
     flowTitle: "Update Public Profile",
@@ -177,21 +177,6 @@ export const PURPOSE_COPY: Record<string, PurposeCopyEntry> = {
     flowTitle: "Operator Wallet Required",
     sign: { text: "Sign With Operator Wallet", hint: "Creates restore access. No token approval." },
     prepare: { text: "Verifying Operator Wallet...", hint: "Return to the terminal." },
-  },
-  "authorize-operator-wallet-resolver": {
-    flowTitle: "Owner Wallet Required",
-    prepare: { text: "Preparing Resolver Approval...", hint: "Keep this page open." },
-    transaction: { text: "Use Owner Wallet", hint: "Approves the operator wallet to write ENS records for this name. No token approval." },
-  },
-  "revoke-operator-wallet-resolver": {
-    flowTitle: "Owner Wallet Required",
-    prepare: { text: "Preparing Resolver Revocation...", hint: "Keep this page open." },
-    transaction: { text: "Use Owner Wallet", hint: "Revokes the operator wallet's ENS record write access for this name." },
-  },
-  "reconcile-resolver-approvals": {
-    flowTitle: "Owner Wallet Required",
-    prepare: { text: "Preparing Records Fix...", hint: "Keep this page open." },
-    transaction: { text: "Use Owner Wallet", hint: "Brings ENS resolver approvals in sync with the authorized operator wallet list." },
   },
   "sync-operator-vault": {
     flowTitle: "Owner Wallet Required",
@@ -253,18 +238,6 @@ export const PURPOSE_COPY: Record<string, PurposeCopyEntry> = {
     transaction: { text: "Use Owner Wallet", hint: "Temporarily returns the agent token from the vault to your owner wallet. Vault stays configured so you can redeposit later." },
     errorContext: "While submitting the Vault withdraw",
   },
-  "register-root-commit": {
-    flowTitle: "Commit ENS Name",
-    prepare: { text: "Preparing ENS Commit...", hint: "Keep this page open." },
-    transaction: { text: "Use Connected Wallet", hint: "Submits an ENS commitment, the first of two transactions. The actual registration runs about 60 seconds later." },
-    errorContext: "While committing the ENS name registration",
-  },
-  "register-root-tx": {
-    flowTitle: "Register ENS Name",
-    prepare: { text: "Preparing ENS Registration...", hint: "Keep this page open." },
-    transaction: { text: "Use Connected Wallet", hint: "Pays the 1-year rent and registers the name. The connected wallet becomes the owner." },
-    errorContext: "While registering the ENS name",
-  },
   "delete-ens-subdomain": {
     flowTitle: "Delete ENS Subdomain",
     prepare: { text: "Preparing Subdomain Deletion...", hint: "Keep this page open." },
@@ -301,9 +274,6 @@ export const ENS_PURPOSES: ReadonlySet<string> = new Set([
   "set-agent-ens-records",
   "update-ens-records",
   "clear-ens-records",
-  "authorize-operator-wallet-resolver",
-  "revoke-operator-wallet-resolver",
-  "reconcile-resolver-approvals",
 ]);
 export function isEnsPurpose(purpose: string | undefined): boolean {
   return !!purpose && ENS_PURPOSES.has(purpose);

@@ -8,6 +8,7 @@ import { OperatorWalletsScreen } from './OperatorWalletsScreen.js'
 import { EDIT_PROFILE_STEPS, EditProfileFlow } from '../profile/EditProfileFlow.js'
 import { FlowTimeline } from '../../components/FlowTimeline.js'
 import { WalletApprovalScreen } from '../../components/WalletApprovalScreen.js'
+import type { AgentReconciliation } from '../../reconciliation/index.js'
 
 type StepOf<K extends Step['kind']> = Extract<Step, { kind: K }>
 
@@ -27,11 +28,13 @@ type IdentityHubEnsStep = StepOf<
 type IdentityHubEnsFlowProps = {
   step: IdentityHubEnsStep
   walletSession: BrowserWalletReady | null
+  reconciliation: AgentReconciliation
   onSetStep: (step: Step) => void
   onBack: () => void
   onWalletReady: (session: BrowserWalletReady | null) => void
   onTriggerRebackup: (backStep: Step, profileUpdates?: ProfileUpdates) => void
   onTriggerPublicProfileSave: (backStep: Step, profileUpdates: ProfileUpdates) => void
+  onWithdrawTokenForEns: (step: Step) => void
 }
 
 export function isIdentityHubEnsStep(step: Step): step is IdentityHubEnsStep {
@@ -50,11 +53,13 @@ export function isIdentityHubEnsStep(step: Step): step is IdentityHubEnsStep {
 export const IdentityHubEnsFlow: React.FC<IdentityHubEnsFlowProps> = ({
   step,
   walletSession,
+  reconciliation,
   onSetStep,
   onBack,
   onWalletReady,
   onTriggerRebackup,
   onTriggerPublicProfileSave,
+  onWithdrawTokenForEns,
 }) => {
   if (step.kind === 'manage-ens-operators') {
     return (
@@ -75,6 +80,8 @@ export const IdentityHubEnsFlow: React.FC<IdentityHubEnsFlowProps> = ({
     return (
       <EditProfileFlow
         step={step}
+        reconciliation={reconciliation}
+        onWithdrawToken={() => onWithdrawTokenForEns(step)}
         onNameSubmit={name => {
           if (step.kind !== 'edit-profile-name') return
           onSetStep({

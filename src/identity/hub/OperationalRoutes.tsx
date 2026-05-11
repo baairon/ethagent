@@ -3,9 +3,6 @@ import { hasPendingPublish } from './model/continuity.js'
 import type { ProfileUpdates } from './identityHubReducer.js'
 import { clearPinataJwt, savePinataJwt } from '../storage/pinataJwt.js'
 import {
-  runFixRecordsSubmit,
-} from './effects/restoreAdmin.js'
-import {
   runRebackupStorageSubmit,
 } from './effects/rebackup/runRebackup.js'
 import {
@@ -203,11 +200,13 @@ export const IdentityHubOperationalRoutes: React.FC<IdentityHubOperationalRoutes
       <IdentityHubEnsFlow
         step={step}
         walletSession={walletSession}
+        reconciliation={reconciliation}
         onSetStep={setStep}
         onBack={back}
         onWalletReady={setWalletSession}
         onTriggerRebackup={triggerRebackup}
         onTriggerPublicProfileSave={triggerPublicProfileSave}
+        onWithdrawTokenForEns={currentStep => custodyFlow.beginWithdrawToken(currentStep, currentStep, 'ens')}
       />
     )
   }
@@ -239,14 +238,6 @@ export const IdentityHubOperationalRoutes: React.FC<IdentityHubOperationalRoutes
         }}
         onManageOperatorWallets={() => {
           setStep({ kind: 'manage-ens-operators', identity: step.identity, registry: step.registry, returnTo: step })
-        }}
-        onFixRecords={async plan => {
-          try {
-            await runFixRecordsSubmit({ identity: step.identity, registry: step.registry, plan, callbacks })
-            setStep({ ...step })
-          } catch (err: unknown) {
-            handleStepError(err, step)
-          }
         }}
         onPrepareTransfer={openTokenTransferFlow}
         onBack={back}

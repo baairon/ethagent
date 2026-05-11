@@ -11,9 +11,11 @@ import { readIdentityStateString } from '../../model/custody.js'
 import { FlowTimeline } from '../../components/FlowTimeline.js'
 import { validateAgentIconReference } from '../../../profile/agentIcon.js'
 import { EnsEditFlow, type EnsLinkOptions } from '../ens/EnsEditFlow.js'
+import type { AgentReconciliation } from '../../reconciliation/index.js'
 
 type EditProfileFlowProps = {
   step: Extract<Step, { kind: 'edit-profile-name' | 'edit-profile-description' | 'edit-profile-image' | 'edit-profile-review' | 'edit-profile-ens' }>
+  reconciliation: AgentReconciliation
   onNameSubmit: (name: string) => void
   onDescriptionSubmit: (description: string) => void
   onIconSubmit: (iconPath?: string) => void
@@ -24,6 +26,7 @@ type EditProfileFlowProps = {
   onEnsRecordsUpdate: (fullName: string, records: AgentEnsRecords, options: EnsLinkOptions, clearRecords?: boolean, currentRecords?: AgentEnsRecordState) => void
   onEnsSetup: (setup: EnsSetupPlan) => void
   onManageOperatorWalletAccess: () => void
+  onWithdrawToken: () => void
   onBack: () => void
   onMenu: () => void
 }
@@ -35,6 +38,7 @@ const EDIT_DESCRIPTION_FOOTER = 'enter next · shift+enter newline · esc back'
 
 export const EditProfileFlow: React.FC<EditProfileFlowProps> = ({
   step,
+  reconciliation,
   onNameSubmit,
   onDescriptionSubmit,
   onIconSubmit,
@@ -45,6 +49,7 @@ export const EditProfileFlow: React.FC<EditProfileFlowProps> = ({
   onEnsRecordsUpdate,
   onEnsSetup,
   onManageOperatorWalletAccess,
+  onWithdrawToken,
   onBack,
   onMenu,
 }) => {
@@ -90,11 +95,13 @@ export const EditProfileFlow: React.FC<EditProfileFlowProps> = ({
       <EnsEditFlow
         identity={step.identity}
         registry={step.registry}
+        reconciliation={reconciliation}
         onEnsLink={onEnsLink}
         onEnsUnlink={onEnsUnlink}
         onEnsRecordsUpdate={onEnsRecordsUpdate}
         onEnsSetup={onEnsSetup}
         onManageOperatorWalletAccess={onManageOperatorWalletAccess}
+        onWithdrawToken={onWithdrawToken}
         initialView={step.initialView}
         onBack={onBack}
       />

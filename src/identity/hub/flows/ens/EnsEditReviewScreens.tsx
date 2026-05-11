@@ -113,19 +113,6 @@ export const EnsSetupReviewScreen: React.FC<EnsSetupReviewScreenProps> = ({
 }) => {
   type Action = 'begin' | 'back'
   const isSimple = setup.mode === 'simple'
-  const [ownerIsSmartAccount, setOwnerIsSmartAccount] = React.useState(false)
-  React.useEffect(() => {
-    if (isSimple) return
-    let cancelled = false
-    const client = createErc8004PublicClient(registry)
-    client.getBytecode({ address: getAddress(setup.ownerAddress) })
-      .then(code => {
-        if (cancelled) return
-        if (code && code !== '0x') setOwnerIsSmartAccount(true)
-      })
-      .catch(() => {})
-    return () => { cancelled = true }
-  }, [isSimple, registry, setup.ownerAddress])
   const signerLabel = isSimple ? 'Connected wallet' : 'Owner wallet'
   const switchNotice = setupSwitchNotice(currentEnsName, currentMode, setup.fullName, setup.mode)
   const createLabel = setup.registryAction === 'create-subdomain'
@@ -160,11 +147,6 @@ export const EnsSetupReviewScreen: React.FC<EnsSetupReviewScreenProps> = ({
         <EnsSetupRow label="ENS network" value="Ethereum Mainnet" />
         <EnsSetupRow label="Signer wallet" value={`${shortAddress(setup.ownerAddress)} (${signerLabel.toLowerCase()})`} />
         <EnsSetupRow label="Registry action" value={createLabel} />
-        {ownerIsSmartAccount ? (
-          <Box marginTop={1}>
-            <Text color={theme.accentError}>Owner wallet appears to be a smart account. Resolver delegation may require special handling depending on your wallet provider; if the operator wallet later cannot write ENS records, run "Fix Records" to retry.</Text>
-          </Box>
-        ) : null}
       </Box>
       <Box marginTop={1}>
         <Select<Action>

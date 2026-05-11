@@ -129,8 +129,11 @@ export async function getSecret(account: string): Promise<string | null> {
 }
 
 export async function setSecret(account: string, value: string): Promise<KeyBackend> {
+  if (typeof value !== 'string') {
+    throw new Error(`setSecret(${account}): value is ${typeof value}, expected string`)
+  }
   const trimmed = value.trim()
-  if (!trimmed) throw new Error('Secret value is empty')
+  if (!trimmed) throw new Error(`setSecret(${account}): value is empty`)
   const keytar = await loadKeytar()
   if (keytar) {
     await keytar.setPassword(KEYTAR_SERVICE, account, trimmed)

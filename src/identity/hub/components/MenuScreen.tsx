@@ -85,7 +85,7 @@ export const MenuScreen: React.FC<MenuScreenProps> = ({
     ? menuFlagsFromReconciliation(reconciliation, perspective)
     : (perspective === 'operator'
       ? menuFlagsFromReconciliation({
-          token: 'unknown', custody: 'unknown', agentUri: 'unknown', ensRecords: 'unknown',
+          token: 'unknown', custody: 'unknown', agentUri: 'unknown',
           vault: 'unknown', workingTree: 'unknown', rpc: 'reachable', driftCount: 0, lastCheckedAt: '',
         }, perspective)
       : null)
@@ -223,7 +223,6 @@ function renderReconciliationBanner(r: AgentReconciliation, identity: EthagentId
   if (r.custody === 'mid-flow-uri-pending') lines.push('Advanced setup pending. Open Custody Mode to finish.')
   if (r.agentUri === 'local-newer') lines.push('Local state newer than chain. Save Snapshot Now to publish.')
   if (r.agentUri === 'chain-newer') lines.push('Onchain agentURI is newer than local. Refetch Latest.')
-  if (r.ensRecords === 'drift') lines.push('ENS records out of sync. Open Custody Mode to Fix Records.')
   if (r.vault === 'missing') lines.push('Recorded vault address has no contract at it. Open Custody Mode to redeploy.')
   if (r.workingTree === 'dirty') lines.push('Local edits pending. Save Snapshot Now to publish.')
   return (

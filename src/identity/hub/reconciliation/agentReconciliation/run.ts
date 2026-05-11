@@ -8,7 +8,6 @@ import {
 import { isAgentInVault, resolveConfiguredVaultAddress } from '../../../registry/vault.js'
 import type { EthagentConfig, EthagentIdentity } from '../../../../storage/config.js'
 import { readVaultAddressField } from '../../../identityCompat.js'
-import { reconcileWalletSetup, type RecordsFixPlan } from '../walletSetup.js'
 import { readCustodyMode } from '../../model/custody.js'
 import { continuityWorkingTreeStatus, type ContinuityWorkingTreeStatus } from '../../../continuity/storage.js'
 import type { AgentReconciliation } from './types.js'
@@ -18,7 +17,6 @@ export function emptyReconciliation(): AgentReconciliation {
     token: 'no-agent',
     custody: 'unknown',
     agentUri: 'unknown',
-    ensRecords: 'unset',
     vault: 'unset',
     workingTree: 'unknown',
     rpc: 'reachable',
@@ -52,7 +50,6 @@ export async function runReconciliation(
       tokenDetail: `no rpcUrl configured for chain ${identity.chainId}`,
       custody: 'unknown',
       agentUri: 'unknown',
-      ensRecords: 'unknown',
       vault: vaultAddress ? 'unknown' : 'unset',
       workingTree: 'unknown',
       rpc: 'failing',
@@ -67,14 +64,12 @@ export async function runReconciliation(
     tokenResult,
     custodyResult,
     agentUriResult,
-    ensReconcileResult,
     vaultResult,
     workingTreeResult,
   ] = await Promise.allSettled([
     probeToken({ registry, agentId, expectedOwner, operatorVaults }),
     probeCustody({ client, registry, agentId, expectedOwner, vaultAddress, identity }),
     probeAgentUri({ client, registry, agentId, identity }),
-    probeEnsRecords({ identity, registry, client }),
     probeVault({ client, vaultAddress }),
     probeWorkingTree(identity),
   ])
@@ -82,11 +77,10 @@ export async function runReconciliation(
   const token = unwrap(tokenResult, fallbackToken)
   const custody = unwrap(custodyResult, () => ({ kind: 'unknown' as const }))
   const agentUri = unwrap(agentUriResult, () => ({ kind: 'unknown' as const }))
-  const ensRecords = unwrap(ensReconcileResult, () => ({ kind: 'unknown' as const }))
   const vault = unwrap(vaultResult, () => ({ kind: vaultAddress ? 'unknown' as const : 'unset' as const }))
   const workingTree = unwrap(workingTreeResult, () => ({ kind: 'unknown' as const }))
 
-  const allFailed = [tokenResult, custodyResult, agentUriResult, ensReconcileResult, vaultResult]
+  const allFailed = [tokenResult, custodyResult, agentUriResult, vaultResult]
     .every(r => r.status === 'rejected')
   const rpc: 'reachable' | 'failing' = allFailed ? 'failing' : 'reachable'
 
@@ -99,8 +93,6 @@ export async function runReconciliation(
     ...(token.kind === 'unknown' && token.detail ? { tokenDetail: token.detail } : {}),
     custody: custody.kind,
     agentUri: agentUri.kind,
-    ensRecords: ensRecords.kind,
-    ...(ensRecords.kind === 'drift' || ensRecords.kind === 'aligned' ? { ensRecordsPlan: ensRecords.plan } : {}),
     vault: vault.kind,
     workingTree: workingTree.kind,
     rpc,
@@ -232,30 +224,6 @@ async function probeAgentUri(args: {
   }
 }
 
-type EnsRecordsProbe =
-  | { kind: 'aligned'; plan: RecordsFixPlan }
-  | { kind: 'drift'; plan: RecordsFixPlan }
-  | { kind: 'unset' }
-  | { kind: 'unknown' }
-
-async function probeEnsRecords(args: {
-  identity: EthagentIdentity
-  registry: Erc8004RegistryConfig
-  client: PublicClient
-}): Promise<EnsRecordsProbe> {
-  const baseState = (args.identity.state ?? {}) as Record<string, unknown>
-  const ensName = typeof baseState.ensName === 'string' ? baseState.ensName.trim() : ''
-  const custody = readCustodyMode(baseState)
-  if (!ensName || custody !== 'advanced') return { kind: 'unset' }
-  try {
-    const plan = await reconcileWalletSetup({ identity: args.identity, registry: args.registry })
-    if (plan.items.length === 0) return { kind: 'aligned', plan }
-    const actionable = plan.items.some(item => item.kind === 'missing-approval' || item.kind === 'stale-approval')
-    return actionable ? { kind: 'drift', plan } : { kind: 'aligned', plan }
-  } catch {
-    return { kind: 'unknown' }
-  }
-}
 
 type VaultProbe = { kind: 'confirmed' | 'missing' | 'unset' | 'unknown' }
 
@@ -295,7 +263,6 @@ function computeDriftCount(r: AgentReconciliation): number {
   if (r.token === 'unlinked') n++
   if (r.custody === 'mid-flow-uri-pending') n++
   if (r.agentUri === 'local-newer' || r.agentUri === 'chain-newer') n++
-  if (r.ensRecords === 'drift') n++
   if (r.vault === 'missing') n++
   if (r.workingTree === 'dirty') n++
   return n

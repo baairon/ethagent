@@ -5,6 +5,7 @@ import type { MessageRow } from './MessageList.js'
 import type { ModelPickerSelection } from '../models/ModelPicker.js'
 import { sessionMessagesToRows } from './chatScreenUtils.js'
 import { formatModelDisplayName } from '../models/modelDisplay.js'
+import { providerDisplayName } from '../models/modelPickerOptions.js'
 
 export type ModelSelectionResolution =
   | { kind: 'noop' }
@@ -69,7 +70,7 @@ export function resolveModelSelection(
   return {
     kind: 'switch',
     config: nextConfig,
-    notice: `${selection.keyJustSet ? `${selection.provider} key saved.` : `${selection.provider} ready.`} Now using ${nextConfig.provider} · ${formatModelDisplayName(nextConfig.provider, nextConfig.model, { maxLength: 64 })}.`,
+    notice: `${selection.keyJustSet ? `${providerDisplayName(selection.provider)} key saved.` : `${providerDisplayName(selection.provider)} ready.`} Now using ${providerDisplayName(nextConfig.provider)} · ${formatModelDisplayName(nextConfig.provider, nextConfig.model, { maxLength: 64 })}.`,
     tone: 'dim',
   }
 }

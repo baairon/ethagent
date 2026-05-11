@@ -16,10 +16,10 @@ import {
   unlinkEnsLinkOptions,
 } from './ensEditCopy.js'
 import {
-  AssignEnsCurrentSetup,
   EnsSetupRow,
   footerHint,
 } from './EnsEditShared.js'
+import { IdentitySummary } from '../../components/IdentitySummary.js'
 import { UnlinkEnsReviewScreen } from './EnsEditReviewScreens.js'
 import {
   DeleteSubdomainTxRunner,
@@ -32,6 +32,7 @@ import type {
 
 type MaintenanceScreenProps = {
   phase: EnsPhase
+  identity: EnsEditProps['identity']
   currentEnsName: string
   currentEnsCanDelete: boolean
   savedCustodyMode: CustodyMode | undefined
@@ -49,11 +50,11 @@ type MaintenanceScreenProps = {
   onBack: () => void
   onEnsUnlink: EnsEditProps['onEnsUnlink']
   onEnsRecordsUpdate: EnsEditProps['onEnsRecordsUpdate']
-  onManageOperatorWalletAccess: EnsEditProps['onManageOperatorWalletAccess']
 }
 
 export function renderEnsMaintenancePhase({
   phase,
+  identity,
   currentEnsName,
   currentEnsCanDelete,
   savedCustodyMode,
@@ -71,10 +72,9 @@ export function renderEnsMaintenancePhase({
   onBack,
   onEnsUnlink,
   onEnsRecordsUpdate,
-  onManageOperatorWalletAccess,
 }: MaintenanceScreenProps): React.ReactNode | null {
   if (phase.kind === 'mode-select') {
-    type EnsAction = 'link' | 'unlink' | 'delete-subdomain' | 'manage-operator-wallets' | 'back'
+    type EnsAction = 'link' | 'unlink' | 'back'
     const isAdvanced = savedCustodyMode === 'advanced'
     const multiNeedsCustodySetup = isAdvanced && !savedOwnerAddress
     const subtitle = currentEnsName
@@ -83,19 +83,12 @@ export function renderEnsMaintenancePhase({
     const linkHint = multiNeedsCustodySetup
       ? 'Set Advanced custody first via Custody Mode'
       : isAdvanced
-        ? 'Walks you through Root, Name, Operator Wallet, Review, and Apply'
+        ? 'Walks you through Root, Name, Review, and Apply'
         : 'Walks you through Root, Name, Review, and Apply'
     const options: Array<{ value: EnsAction; role?: 'section' | 'utility'; label: string; hint?: string; disabled?: boolean }> = []
     options.push({ value: 'link', role: 'section', label: 'Name' })
     if (currentEnsName) {
       options.push({ value: 'unlink', label: 'Unlink Name', hint: 'Removes this name from the token. Set up a different name afterward by linking again.' })
-      if (currentEnsCanDelete) {
-        options.push({
-          value: 'delete-subdomain',
-          label: 'Delete Subdomain',
-          hint: 'Clear the onchain subdomain entry at the parent name. The label is freed for reuse, and this token unlinks from it.',
-        })
-      }
     } else {
       options.push({
         value: 'link',
@@ -104,36 +97,16 @@ export function renderEnsMaintenancePhase({
         disabled: multiNeedsCustodySetup,
       })
     }
-    if (isAdvanced && savedOwnerAddress) {
-      options.push({ value: 'manage-operator-wallets', role: 'section', label: 'Operator Wallets' })
-      options.push({
-        value: 'manage-operator-wallets',
-        label: 'Manage Operator Wallets',
-        hint: "Authorize or revoke wallets that can update this name's token and profile text records on your behalf",
-      })
-    }
     options.push({ value: 'back', role: 'section', label: 'Navigation' })
     options.push({ value: 'back', label: 'Back', hint: 'Return to Identity Hub', role: 'utility' })
     return (
       <Surface
         title="ENS Name"
         subtitle={subtitle}
-        footer={footerHint('picking an action starts a stepped flow · enter select · esc back')}
+        footer={footerHint('enter select · esc back')}
       >
-        <AssignEnsCurrentSetup
-          currentEnsName={currentEnsName}
-          currentMode={savedCustodyMode}
-          ownerAddress={savedOwnerAddress}
-          operatorAddress={savedOperator}
-          tokenNetworkLabel={registryNetworkLabel}
-        />
-        {!currentEnsName ? (
-          <Box marginTop={1}>
-            <Text color={theme.dim}>No subdomain linked yet. Discovery falls back to the token ID + network pair until one is set.</Text>
-          </Box>
-        ) : null}
-        {validationError ? <Text color={theme.accentError}>{validationError}</Text> : null}
-        <Box marginTop={1}>
+        {validationError ? <Box marginBottom={1}><Text color={theme.accentError}>{validationError}</Text></Box> : null}
+        <Box>
           <Select<EnsAction>
             options={options}
             hintLayout="inline"
@@ -141,14 +114,6 @@ export function renderEnsMaintenancePhase({
               if (choice === 'back') return onBack()
               if (choice === 'unlink' && currentEnsName) {
                 runUnlinkEnsLoading(currentEnsName)
-                return
-              }
-              if (choice === 'delete-subdomain' && currentEnsName && currentEnsCanDelete) {
-                runDeleteSubdomainPreflight(currentEnsName)
-                return
-              }
-              if (choice === 'manage-operator-wallets') {
-                onManageOperatorWalletAccess()
                 return
               }
               if (choice === 'link') {
@@ -175,9 +140,7 @@ export function renderEnsMaintenancePhase({
         subtitle={`Reading ethagent records from ${phase.fullName}`}
         footer={footerHint('esc back')}
       >
-        <Box marginTop={1}>
-          <Spinner label="reading current ENS record values..." />
-        </Box>
+        <Spinner label="reading current ENS record values..." />
         <EscCancel onCancel={() => setPhase({ kind: 'mode-select' })} />
       </Surface>
     )
@@ -210,9 +173,7 @@ export function renderEnsMaintenancePhase({
         subtitle={`Verifying the parent of ${phase.fullName} on Ethereum mainnet.`}
         footer={footerHint('esc back')}
       >
-        <Box marginTop={1}>
-          <Spinner label="reading parent owner from ENS..." />
-        </Box>
+        <Spinner label="reading parent owner from ENS..." />
         <EscCancel onCancel={() => setPhase({ kind: 'mode-select' })} />
       </Surface>
     )
@@ -225,10 +186,10 @@ export function renderEnsMaintenancePhase({
         subtitle={`Onchain check for ${phase.fullName} did not pass.`}
         footer={footerHint('enter select · esc back')}
       >
-        <Box flexDirection="column" marginTop={1}>
+        <Box flexDirection="column" marginBottom={1}>
           <Text color={theme.accentError}>{phase.reason}</Text>
         </Box>
-        <Box marginTop={1}>
+        <Box>
           <Select<'back'>
             options={[
               { value: 'back', role: 'section', label: 'Navigation' },
@@ -251,7 +212,7 @@ export function renderEnsMaintenancePhase({
         subtitle={`Clear the onchain entry for ${plan.fullName} at ${plan.parentName}.`}
         footer={footerHint('enter select · esc back')}
       >
-        <Box flexDirection="column" marginTop={1}>
+        <Box flexDirection="column" marginBottom={1}>
           <EnsSetupRow label="Subdomain" value={plan.fullName} />
           <EnsSetupRow label="Parent" value={plan.parentName} />
           <EnsSetupRow label="Owner wallet" value={shortAddress(plan.parentOwnerAddress)} />
@@ -264,7 +225,7 @@ export function renderEnsMaintenancePhase({
             value="Onchain: subdomain owner and resolver set to 0. Locally: this token unlinks from the name."
           />
         </Box>
-        <Box marginTop={1}>
+        <Box>
           <Select<'delete' | 'back'>
             options={[
               { value: 'delete', role: 'section', label: 'Action' },
@@ -310,10 +271,10 @@ export function renderEnsMaintenancePhase({
         subtitle={`${phase.fullName} is cleared onchain and unlinked from this token.`}
         footer={footerHint('enter select · esc back')}
       >
-        <Box flexDirection="column" marginTop={1}>
+        <Box flexDirection="column" marginBottom={1}>
           <Text color={theme.text}>The label is freed for reuse on the parent name.</Text>
         </Box>
-        <Box marginTop={1}>
+        <Box>
           <Select<'back'>
             options={[
               { value: 'back', role: 'section', label: 'Navigation' },

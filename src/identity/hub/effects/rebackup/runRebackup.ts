@@ -63,7 +63,7 @@ import {
   appendResolverSyncWarning,
   markCurrentContinuityFilesPublished,
   resolverSyncWarningMessage,
-  syncResolverApprovalsAfterOwnerSave,
+  syncVaultOperatorsAfterOwnerSave,
 } from '../shared/sync.js'
 import { runOperatorWalletRebackup } from './vault.js'
 
@@ -360,7 +360,7 @@ async function runRebackupSigningInner(
   }
   await recordPublishedContinuitySnapshot({ identity: nextIdentity, label: 'published encrypted snapshot' }).catch(() => null)
   await markCurrentContinuityFilesPublished(nextIdentity).catch(() => null)
-  const resolverSyncWarning = await syncResolverApprovalsAfterOwnerSave({
+  const resolverSyncWarning = await syncVaultOperatorsAfterOwnerSave({
     beforeIdentity: step.identity,
     afterIdentity: nextIdentity,
     registry: step.registry,

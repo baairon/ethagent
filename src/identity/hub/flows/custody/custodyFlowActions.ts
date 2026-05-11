@@ -16,7 +16,7 @@ export function createCustodyFlowActions({
 }: CustodyFlowDeps): {
   beginVaultDeposit: (currentStep: Step, returnTo: Step, profileUpdates: ProfileUpdates) => void
   beginVaultUnwrap: (currentStep: Step, returnTo: Step, profileUpdates: ProfileUpdates) => void
-  beginWithdrawToken: (currentStep: Step, returnTo: Step) => void
+  beginWithdrawToken: (currentStep: Step, returnTo: Step, returnContext?: 'ens' | 'simple-exit') => void
   beginReturnToVault: (currentStep: Step, returnTo: Step, vaultAddress: Address) => void
 } {
   const beginVaultDeposit = (currentStep: Step, returnTo: Step, profileUpdates: ProfileUpdates): void => {
@@ -122,8 +122,8 @@ export function createCustodyFlowActions({
     })()
   }
 
-  const beginWithdrawToken = (currentStep: Step, returnTo: Step): void => {
-    if (!isCustodyEditStep(currentStep)) return
+  const beginWithdrawToken = (currentStep: Step, returnTo: Step, returnContext?: 'ens' | 'simple-exit'): void => {
+    if (!isCustodyEditStep(currentStep) && currentStep.kind !== 'edit-profile-ens') return
     const vaultAddress = resolveVaultAddress(currentStep.identity, config?.erc8004?.operatorVaults)
     if (!vaultAddress) {
       handleStepError(
@@ -147,6 +147,7 @@ export function createCustodyFlowActions({
       registry: currentStep.registry,
       vaultAddress,
       returnTo,
+      ...(returnContext ? { returnContext } : {}),
     })
     ;(async () => {
       const client = createErc8004PublicClient(currentStep.registry)
@@ -172,6 +173,7 @@ export function createCustodyFlowActions({
             vaultAddress,
             agentId: activeAgentId,
             returnTo,
+            ...(returnContext ? { returnContext } : {}),
           })
           return
         }

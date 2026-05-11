@@ -71,7 +71,7 @@ test('agent ENS validation rejects root .eth names before lookup', async () => {
 
 test('agent ENS record writes reject root .eth names before lookup', async () => {
   await assert.rejects(
-    encodeSetEthagentTextRecords('example.eth', { 'org.ethagent.profile': 'ipfs://bafy' }),
+    encodeSetEthagentTextRecords('example.eth', { 'org.ethagent.token': 'eip155:1:0x1:42' }),
     /subdomain, not a root \.eth name/,
   )
 })

@@ -30,7 +30,7 @@ export function menuFlagsFromReconciliation(r: AgentReconciliation, perspective:
     prepareTransferReason = 'Token is in the vault. Withdraw it first in Custody Mode.'
   }
 
-  const custodyAsterisk = r.custody === 'mid-flow-uri-pending' || r.ensRecords === 'drift' || r.vault === 'missing'
+  const custodyAsterisk = r.custody === 'mid-flow-uri-pending' || r.vault === 'missing'
   let custodyHint: string | undefined
   if (isOperator) {
     custodyHint = undefined
@@ -38,8 +38,6 @@ export function menuFlagsFromReconciliation(r: AgentReconciliation, perspective:
     custodyHint = 'Advanced setup pending. Open to finish.'
   } else if (r.vault === 'missing') {
     custodyHint = 'Vault contract not found. Open to redeploy.'
-  } else if (r.ensRecords === 'drift') {
-    custodyHint = 'ENS records out of sync. Open to fix.'
   }
 
   const custodyModeReason = isOperator

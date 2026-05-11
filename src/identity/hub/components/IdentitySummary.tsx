@@ -25,11 +25,12 @@ interface IdentitySummaryProps {
   config?: EthagentConfig
   workingStatus?: ContinuityWorkingTreeStatus | null
   hideLocalChanges?: boolean
+  hideHeader?: boolean
   tokenLinked?: boolean
   onchainOwner?: string
 }
 
-export const IdentitySummary: React.FC<IdentitySummaryProps> = ({ identity, config, workingStatus, hideLocalChanges = false, tokenLinked = true, onchainOwner }) => {
+export const IdentitySummary: React.FC<IdentitySummaryProps> = ({ identity, config, workingStatus, hideLocalChanges = false, hideHeader = false, tokenLinked = true, onchainOwner }) => {
   if (!identity) {
     return (
       <Text color={theme.dim}>No agent yet. Create or load one.</Text>
@@ -60,8 +61,12 @@ export const IdentitySummary: React.FC<IdentitySummaryProps> = ({ identity, conf
 
   return (
     <Box flexDirection="column">
-      <Text color={theme.accentPeriwinkle} bold>{stateName || 'Active Agent'}</Text>
-      <Text color={identity.agentId ? theme.text : theme.dim} bold={Boolean(identity.agentId)}>{tokenLine}</Text>
+      {hideHeader ? null : (
+        <>
+          <Text color={theme.accentPeriwinkle} bold>{stateName || 'Active Agent'}</Text>
+          <Text color={identity.agentId ? theme.text : theme.dim} bold={Boolean(identity.agentId)}>{tokenLine}</Text>
+        </>
+      )}
       <Text>
         <Text color={theme.dim}>{'ENS'.padEnd(12)}</Text>
         {ensStatus.kind === 'linked'

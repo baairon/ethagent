@@ -19,6 +19,7 @@ import { setCwd } from '../runtime/cwd.js'
 import type { SessionMode } from '../runtime/sessionMode.js'
 import type { ContextUsage } from '../runtime/compaction.js'
 import { formatModelDisplayName } from '../models/modelDisplay.js'
+import { providerDisplayName } from '../models/modelPickerOptions.js'
 import type { McpManager } from '../mcp/manager.js'
 
 export type IdentityRequestAction =
@@ -210,7 +211,7 @@ const COMMANDS: CommandSpec[] = [
       }
       await saveConfig(next)
       ctx.onReplaceConfig(next)
-      return { kind: 'note', text: `Now using ${next.provider} · ${formatModelDisplayName(next.provider, name, { maxLength: 64 })}.` }
+      return { kind: 'note', text: `Now using ${providerDisplayName(next.provider)} · ${formatModelDisplayName(next.provider, name, { maxLength: 64 })}.` }
     },
   },
   {

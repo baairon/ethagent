@@ -108,8 +108,8 @@ export const RestoreFlow: React.FC<RestoreFlowProps> = ({
         <Select<'ens' | 'token-id' | 'back'>
           options={[
             { value: 'ens', role: 'section', label: 'Recovery Key' },
-            { value: 'ens', label: 'Enter ENS Name', hint: 'Resolve the agent via its ENS subdomain (e.g. agent.example.eth)' },
-            { value: 'token-id', label: 'Enter Token ID', hint: 'Look up the agent directly by ERC-8004 token ID (e.g. 45744)' },
+            { value: 'ens', label: 'Enter ENS Name', hint: 'Resolve the agent via its ENS subdomain' },
+            { value: 'token-id', label: 'Enter Token ID', hint: 'Look up the agent directly by ERC-8004 token ID' },
             { value: 'back', role: 'section', label: 'Navigation' },
             { value: 'back', label: 'Back', hint: 'Pick a different network', role: 'utility' },
           ]}
@@ -146,7 +146,7 @@ export const RestoreFlow: React.FC<RestoreFlowProps> = ({
         subtitle={`Enter the ERC-8004 token ID on ${networkLabelForRegistry(step.registry)}.`}
         footer={footerHint(step.busy ? 'Looking up...' : 'enter continue · esc back')}
       >
-        <Text color={theme.dim}>The integer token ID assigned at mint (for example, 45744). Store it alongside your wallet seed so the agent stays recoverable even if its ENS record is cleared.</Text>
+        <Text color={theme.dim}>The integer token ID assigned at mint.</Text>
         <TextInput
           placeholder="45744"
           onSubmit={value => onTokenIdSubmit(value.trim())}
@@ -202,8 +202,8 @@ export const RestoreFlow: React.FC<RestoreFlowProps> = ({
               }
             }),
             { value: '__ens__', role: 'section', label: 'Recovery Key' },
-            { value: '__ens__', label: 'Enter ENS Name', hint: 'Resolve the agent via its ENS subdomain (e.g. agent.example.eth)' },
-            { value: '__token-id__', label: 'Enter Token ID', hint: 'Look up the agent directly by ERC-8004 token ID (e.g. 45744)' },
+            { value: '__ens__', label: 'Enter ENS Name', hint: 'Resolve the agent via its ENS subdomain' },
+            { value: '__token-id__', label: 'Enter Token ID', hint: 'Look up the agent directly by ERC-8004 token ID' },
             { value: '__back__', role: 'section', label: 'Navigation' },
             { value: '__back__', label: 'Back', hint: 'Return to the previous step', role: 'utility' },
           ]}

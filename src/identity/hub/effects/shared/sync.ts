@@ -9,14 +9,9 @@ import {
   encodeSetMetadataOperator,
   readMetadataOperators,
 } from '../../../registry/vault.js'
-import {
-  sendBrowserWalletTransaction,
-  type WalletPurpose,
-} from '../../../wallet/browserWallet.js'
+import { sendBrowserWalletTransaction } from '../../../wallet/browserWallet.js'
 import {
   computeApprovalDiff,
-  encodeResolverApprovalChanges,
-  verifyResolverApprovalsLanded,
   type ApprovalDiff,
 } from '../../reconciliation/index.js'
 import { normalizeApprovedOperatorWallets } from '../../operatorWallets.js'
@@ -24,8 +19,7 @@ import { readOwnerAddressField } from '../../../identityCompat.js'
 import { localContinuitySnapshotContentHashes } from '../../../continuity/storage.js'
 import { updatePublishedContinuitySnapshotContentHashes } from '../../../continuity/snapshots.js'
 import type { EffectCallbacks } from '../types.js'
-import { awaitConfirmedReceipt, awaitOptionalReceipt } from '../receipts.js'
-import { createMainnetEnsPublicClient } from '../ens/transactions.js'
+import { awaitConfirmedReceipt } from '../receipts.js'
 
 export function resolverSyncWarningMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err)
@@ -36,7 +30,7 @@ export function appendResolverSyncWarning(message: string, warning: string | nul
   return `${message}\n\nWarning: ${warning}`
 }
 
-export async function syncResolverApprovalsAfterOwnerSave(args: {
+export async function syncVaultOperatorsAfterOwnerSave(args: {
   beforeIdentity: EthagentIdentity
   afterIdentity: EthagentIdentity
   registry: Erc8004RegistryConfig
@@ -45,7 +39,6 @@ export async function syncResolverApprovalsAfterOwnerSave(args: {
 }): Promise<void> {
   const beforeState = (args.beforeIdentity.state ?? {}) as Record<string, unknown>
   const afterState = (args.afterIdentity.state ?? {}) as Record<string, unknown>
-  const ensName = typeof afterState.ensName === 'string' ? afterState.ensName.trim() : ''
   const before = normalizeApprovedOperatorWallets(beforeState.approvedOperatorWallets)
   const after = normalizeApprovedOperatorWallets(afterState.approvedOperatorWallets)
   const diff = computeApprovalDiff(before, after)
@@ -53,40 +46,6 @@ export async function syncResolverApprovalsAfterOwnerSave(args: {
 
   const ownerAddressRaw = readOwnerAddressField(afterState) ?? args.afterIdentity.ownerAddress ?? args.afterIdentity.address
   const ownerAddress = getAddress(ownerAddressRaw)
-
-  if (ensName) {
-    let encoded
-    try {
-      encoded = await encodeResolverApprovalChanges({ ensName, diff })
-    } catch {
-      encoded = null
-    }
-    if (encoded) {
-      const purpose: WalletPurpose = diff.removed.length > 0 && diff.added.length === 0
-        ? 'revoke-operator-wallet-resolver'
-        : 'authorize-operator-wallet-resolver'
-
-      const tx = await sendBrowserWalletTransaction({
-        chainId: 1,
-        expectedAccount: ownerAddress,
-        to: encoded.resolverAddress,
-        data: encoded.data,
-        onReady: args.callbacks.onWalletReady,
-        purpose,
-      })
-      args.callbacks.onWalletReady(null)
-      const client = createMainnetEnsPublicClient()
-      await awaitOptionalReceipt(client, tx.txHash, 'Resolver delegation sync')
-      await verifyResolverApprovalsLanded({
-        ensName,
-        ownerAddress: ownerAddress,
-        resolverAddress: encoded.resolverAddress,
-        added: encoded.added,
-        removed: encoded.removed,
-        client,
-      })
-    }
-  }
 
   await syncVaultMetadataOperatorsAfterOwnerSave({
     afterIdentity: args.afterIdentity,

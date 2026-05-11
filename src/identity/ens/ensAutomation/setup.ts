@@ -230,7 +230,6 @@ export async function preflightEnsSetup(args: EnsSetupPreflightArgs): Promise<En
     chainId: args.registry.chainId,
     identityRegistryAddress: args.registry.identityRegistryAddress,
     agentId: String(args.agentId),
-    agentCardCid: args.agentCardCid,
   })
   if (currentRecords.token && nextRecords.token && currentRecords.token !== nextRecords.token) {
     return manual(args, {

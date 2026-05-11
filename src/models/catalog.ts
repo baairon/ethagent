@@ -1,6 +1,15 @@
 import { defaultModelFor, type EthagentConfig, type ProviderId } from '../storage/config.js'
 import { getKey } from '../storage/secrets.js'
 import { loadLocalHfModels } from './huggingface.js'
+import { hasOpenAIOAuthCredentials } from '../auth/openaiOAuth/credentials.js'
+
+const OPENAI_OAUTH_MODEL_IDS = ['gpt-5.5', 'gpt-5.4', 'gpt-5.4-mini', 'gpt-5.3-codex', 'gpt-5.2'] as const
+
+export const OPENAI_OAUTH_DEFAULT_MODEL = 'gpt-5.4'
+
+export function isOpenAIOAuthAllowedModel(model: string): boolean {
+  return (OPENAI_OAUTH_MODEL_IDS as readonly string[]).includes(model)
+}
 
 export type ModelCatalogSource = 'installed' | 'discovered' | 'fallback'
 
@@ -72,7 +81,12 @@ export async function discoverProviderModels(
 
   const loadKey = deps.loadKey ?? getKey
   const apiKey = await loadKey(provider)
-  if (!apiKey) return fallbackResult(config, `missing ${provider} API key`)
+  if (!apiKey) {
+    if (provider === 'openai' && await hasOpenAIOAuthCredentials()) {
+      return openAIOAuthCatalog()
+    }
+    return fallbackResult(config, `missing ${provider} API key`)
+  }
 
   const baseUrl = provider === 'openai' ? openAIBaseUrlFor(config) : ''
   const key = cacheKey(provider, baseUrl, true)
@@ -95,6 +109,19 @@ export async function discoverProviderModels(
     return { provider, status: 'ok', entries: deduped }
   } catch (err: unknown) {
     return fallbackResult(config, (err as Error).message)
+  }
+}
+
+function openAIOAuthCatalog(): ModelCatalogResult {
+  return {
+    provider: 'openai',
+    status: 'ok',
+    entries: OPENAI_OAUTH_MODEL_IDS.map(id => ({
+      provider: 'openai' as ProviderId,
+      id,
+      label: id,
+      source: 'discovered' as const,
+    })),
   }
 }
 

@@ -1,7 +1,6 @@
 import React from 'react'
 import { getAddress, type Address } from 'viem'
 import type { BrowserWalletReady } from '../../../wallet/browserWallet.js'
-import { requestBrowserWalletAccount } from '../../../wallet/browserWallet.js'
 import {
   AGENT_RECORD_READ_KEY_LIST,
   buildAgentEnsRecords,
@@ -45,11 +44,13 @@ export type { EnsLinkOptions }
 export const EnsEditFlow: React.FC<EnsEditProps> = ({
   identity,
   registry,
+  reconciliation,
   onEnsLink,
   onEnsUnlink,
   onEnsRecordsUpdate,
   onEnsSetup,
   onManageOperatorWalletAccess,
+  onWithdrawToken,
   initialView,
   onBack,
 }) => {
@@ -59,7 +60,6 @@ export const EnsEditFlow: React.FC<EnsEditProps> = ({
   const savedRootName = currentEnsParts?.parent ?? ''
   const savedSubdomainLabel = currentEnsParts?.label ?? ''
   const agentNameSuggestion = sanitizeSubdomainPrefix(readIdentityStateString(identity.state, 'name'))
-  const agentCardCid = identity.publicSkills?.agentCardCid
   const savedCustodyMode = readCustodyMode(identity.state)
   const savedOwnerAddress = readIdentityStateString(identity.state, 'ownerAddress')
   const savedOperator = readIdentityStateString(identity.state, 'activeOperatorAddress')
@@ -76,13 +76,13 @@ export const EnsEditFlow: React.FC<EnsEditProps> = ({
   const [operatorWalletSession, setOperatorWalletSession] = React.useState<BrowserWalletReady | null>(null)
   const discoveryControllerRef = React.useRef<AbortController | null>(null)
 
-  const runDiscovery = React.useCallback(() => {
+  const runDiscovery = React.useCallback((targetMode: 'simple' | 'advanced' = 'simple') => {
     discoveryControllerRef.current?.abort()
     const controller = new AbortController()
     discoveryControllerRef.current = controller
     setDiscovery({ status: 'loading' })
     setDiscoveryStartedAt(Date.now())
-    setPhase({ kind: 'discovering' })
+    setPhase({ kind: 'discovering', mode: targetMode })
     discoverOwnedEnsNameDetails(ownerAddress, {
       signal: controller.signal,
       budgetMs: 30_000,
@@ -93,7 +93,7 @@ export const EnsEditFlow: React.FC<EnsEditProps> = ({
         if (discoveryControllerRef.current === controller) discoveryControllerRef.current = null
         if (result.status === 'error') {
           setDiscovery({ status: 'error', message: discoveryErrorMessage(result.errors), names: [] })
-          setPhase({ kind: 'pick-parent' })
+          setPhase({ kind: 'pick-parent', mode: targetMode })
           return
         }
         setDiscovery({
@@ -101,13 +101,13 @@ export const EnsEditFlow: React.FC<EnsEditProps> = ({
           names: result.names,
           ...(result.status === 'partial' ? { warning: 'Some ENS lookup sources failed; showing root names found so far.' } : {}),
         })
-        setPhase({ kind: 'pick-parent' })
+        setPhase({ kind: 'pick-parent', mode: targetMode })
       })
       .catch((err: unknown) => {
         if (controller.signal.aborted) return
         if (discoveryControllerRef.current === controller) discoveryControllerRef.current = null
         setDiscovery({ status: 'error', message: err instanceof Error ? err.message : String(err), names: [] })
-        setPhase({ kind: 'pick-parent' })
+        setPhase({ kind: 'pick-parent', mode: targetMode })
       })
   }, [ownerAddress])
 
@@ -145,7 +145,6 @@ export const EnsEditFlow: React.FC<EnsEditProps> = ({
         chainId: registry.chainId,
         identityRegistryAddress: registry.identityRegistryAddress,
         agentId: identity.agentId,
-        agentCardCid,
       })
       const recordsDiff = diffRecords(current, next)
       if (mode === 'simple' && !validation.ok && validation.reason === 'no-owner') {
@@ -157,36 +156,7 @@ export const EnsEditFlow: React.FC<EnsEditProps> = ({
       setValidationError(err instanceof Error ? err.message : String(err))
       setPhase({ kind: 'pick-parent' })
     }
-  }, [ownerAddress, registry, identity.agentId, agentCardCid])
-
-  const runAdvancedPreflight = React.useCallback((
-    rootName: string,
-    label: string,
-    operatorWallet: Address,
-  ): void => {
-    setPhase({ kind: 'advanced-preflight', rootName, label, operatorWallet })
-    preflightEnsSetup({
-      rootName,
-      label,
-      operatorAddress: operatorWallet,
-      registry,
-      agentId: identity.agentId,
-      agentCardCid,
-    }).then(result => {
-      if (result.ok) {
-        setPhase({ kind: 'advanced-review', setup: result.setup })
-        return
-      }
-      setPhase({ kind: 'advanced-manual', fallback: result.fallback })
-    }).catch((err: unknown) => {
-      setPhase({
-        kind: 'advanced-operator-wallet',
-        rootName,
-        label,
-        error: err instanceof Error ? err.message : String(err),
-      })
-    })
-  }, [agentCardCid, identity.agentId, registry])
+  }, [ownerAddress, registry, identity.agentId])
 
   const runAdvancedRootCheck = React.useCallback((rootName: string): void => {
     setPhase({ kind: 'advanced-root-check', rootName })
@@ -197,12 +167,12 @@ export const EnsEditFlow: React.FC<EnsEditProps> = ({
       agentId: identity.agentId,
     }).then(result => {
       if (result.ok) {
-        setPhase({ kind: 'advanced-subdomain', rootName, label: savedSubdomainLabel || agentNameSuggestion })
+        setPhase({ kind: 'advanced-subdomain', rootName, label: savedSubdomainLabel })
         return
       }
-      setPhase({ kind: 'advanced-root', rootName, error: rootErrorMessage(result.reason, result.detail, rootName) })
+      setPhase({ kind: 'pick-parent', mode: 'advanced', error: rootErrorMessage(result.reason, result.detail, rootName) })
     }).catch((err: unknown) => {
-      setPhase({ kind: 'advanced-root', rootName, error: err instanceof Error ? err.message : String(err) })
+      setPhase({ kind: 'pick-parent', mode: 'advanced', error: err instanceof Error ? err.message : String(err) })
     })
   }, [agentNameSuggestion, identity.agentId, ownerAddress, registry, savedSubdomainLabel])
 
@@ -215,15 +185,9 @@ export const EnsEditFlow: React.FC<EnsEditProps> = ({
       allowSameOwnerOperator: true,
       registry,
       agentId: identity.agentId,
-      agentCardCid,
     }).then(result => {
       if (result.ok) {
-        setPhase({
-          kind: 'advanced-operator-wallet',
-          rootName: result.setup.rootName,
-          label: result.setup.label,
-          registryAction: result.setup.registryAction,
-        })
+        setPhase({ kind: 'advanced-review', setup: result.setup })
         return
       }
       setPhase({ kind: 'advanced-manual', fallback: result.fallback })
@@ -235,7 +199,7 @@ export const EnsEditFlow: React.FC<EnsEditProps> = ({
         error: err instanceof Error ? err.message : String(err),
       })
     })
-  }, [agentCardCid, identity.agentId, ownerAddress, registry])
+  }, [identity.agentId, ownerAddress, registry])
 
   const runSimpleCreatePreflight = React.useCallback((fullName: string): void => {
     const parts = splitSubdomainName(fullName)
@@ -253,7 +217,6 @@ export const EnsEditFlow: React.FC<EnsEditProps> = ({
       allowSameOwnerOperator: true,
       registry,
       agentId: identity.agentId,
-      agentCardCid,
     }).then(result => {
       if (result.ok) {
         setPhase({ kind: 'simple-create-review', setup: result.setup })
@@ -268,23 +231,7 @@ export const EnsEditFlow: React.FC<EnsEditProps> = ({
         error: err instanceof Error ? err.message : String(err),
       })
     })
-  }, [agentCardCid, identity.agentId, ownerAddress, registry])
-
-  const connectOperatorWallet = React.useCallback((rootName: string, label: string): void => {
-    setOperatorWalletSession(null)
-    setPhase({ kind: 'advanced-operator-wallet-connecting', rootName, label })
-    requestBrowserWalletAccount({
-      purpose: 'connect-operator-wallet',
-      onReady: ready => setOperatorWalletSession(ready),
-    }).then(wallet => {
-      const operatorWallet = getAddress(wallet.account)
-      setOperatorWalletSession(null)
-      runAdvancedPreflight(rootName, label, operatorWallet)
-    }).catch((err: unknown) => {
-      setOperatorWalletSession(null)
-      setPhase({ kind: 'advanced-operator-wallet', rootName, label, error: err instanceof Error ? err.message : String(err) })
-    })
-  }, [runAdvancedPreflight])
+  }, [identity.agentId, ownerAddress, registry])
 
   const runDeleteSubdomainPreflight = React.useCallback((fullName: string): void => {
     setValidationError(null)
@@ -323,6 +270,7 @@ export const EnsEditFlow: React.FC<EnsEditProps> = ({
 
   const maintenanceScreen = renderEnsMaintenancePhase({
     phase,
+    identity,
     currentEnsName,
     currentEnsCanDelete: Boolean(currentEnsParts),
     savedCustodyMode,
@@ -340,30 +288,26 @@ export const EnsEditFlow: React.FC<EnsEditProps> = ({
     onBack,
     onEnsUnlink,
     onEnsRecordsUpdate,
-    onManageOperatorWalletAccess,
   })
   if (maintenanceScreen) return maintenanceScreen
 
   const advancedScreen = renderAdvancedEnsPhase({
     phase,
+    identity,
     ownerAddress,
     agentId: identity.agentId,
-    savedOwnerAddress,
-    savedOperator,
-    savedRootName,
+    reconciliation,
     savedSubdomainLabel,
     agentNameSuggestion,
     currentEnsName,
     savedCustodyMode,
     registry,
-    operatorWalletSession,
     setPhase,
-    connectOperatorWallet,
-    runAdvancedRootCheck,
+    runDiscovery,
     runAdvancedSubdomainCheck,
-    runAdvancedPreflight,
     onEnsSetup,
     onEnsLink,
+    onWithdrawToken,
   })
   if (advancedScreen) return advancedScreen
 
@@ -384,6 +328,7 @@ export const EnsEditFlow: React.FC<EnsEditProps> = ({
     cancelDiscoveryToModeSelect,
     runDiscovery,
     runValidation,
+    runAdvancedRootCheck,
     backToSimpleSubdomain,
     runSimpleCreatePreflight,
     onEnsSetup,

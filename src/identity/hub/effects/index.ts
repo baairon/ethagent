@@ -52,7 +52,6 @@ export {
   runStorageSubmit,
 } from './create.js'
 export {
-  runFixRecordsSubmit,
   runRestoreRegistrySubmit,
 } from './restoreAdmin.js'
 export {

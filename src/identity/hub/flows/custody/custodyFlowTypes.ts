@@ -35,7 +35,7 @@ export interface CustodyFlowDeps {
 export interface CustodyFlow {
   beginVaultDeposit: (currentStep: Step, returnTo: Step, profileUpdates: ProfileUpdates) => void
   beginVaultUnwrap: (currentStep: Step, returnTo: Step, profileUpdates: ProfileUpdates) => void
-  beginWithdrawToken: (currentStep: Step, returnTo: Step) => void
+  beginWithdrawToken: (currentStep: Step, returnTo: Step, returnContext?: 'ens' | 'simple-exit') => void
   beginReturnToVault: (currentStep: Step, returnTo: Step, vaultAddress: Address) => void
   renderCustodyStep: () => React.ReactElement | null
   renderRebackupSubtitle: (

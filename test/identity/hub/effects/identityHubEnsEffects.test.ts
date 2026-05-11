@@ -113,16 +113,14 @@ test('ENS record update writes only changed text records', () => {
   const writes = ensRecordWritesForUpdate({
     currentRecords: {
       token: 'eip155:1:0x0000000000000000000000000000000000000001:1',
-      profile: 'ipfs://old',
     },
     records: {
-      token: 'eip155:1:0x0000000000000000000000000000000000000001:1',
-      profile: 'ipfs://new',
+      token: 'eip155:1:0x0000000000000000000000000000000000000001:2',
     },
   })
 
   assert.deepEqual(writes, {
-    'org.ethagent.profile': 'ipfs://new',
+    'org.ethagent.token': 'eip155:1:0x0000000000000000000000000000000000000001:2',
   })
 })
 
@@ -131,9 +129,8 @@ test('ENS record clearing writes empty strings only for populated records', () =
     clearRecords: true,
     currentRecords: {
       token: 'eip155:1:0x0000000000000000000000000000000000000001:1',
-      profile: '',
     },
-    records: { token: '', profile: '' },
+    records: { token: '' },
   })
 
   assert.deepEqual(writes, {
@@ -144,7 +141,7 @@ test('ENS record clearing writes empty strings only for populated records', () =
 test('ENS record clearing does not blindly write records when current values are unknown', () => {
   const writes = ensRecordWritesForUpdate({
     clearRecords: true,
-    records: { token: '', profile: '' },
+    records: { token: '' },
   })
 
   assert.deepEqual(writes, {})
@@ -157,8 +154,8 @@ test('ENS record update preflights resolver transaction before opening wallet', 
     runUpdateEnsRecords({
       fullName: 'agent.example.eth',
       ownerAddress: owner,
-      records: { profile: 'ipfs://new' },
-      currentRecords: { profile: 'ipfs://old' },
+      records: { token: 'eip155:1:0x0000000000000000000000000000000000000001:2' },
+      currentRecords: { token: 'eip155:1:0x0000000000000000000000000000000000000001:1' },
       purpose: 'update-ens-records',
       callbacks: {
         onStep: () => {},

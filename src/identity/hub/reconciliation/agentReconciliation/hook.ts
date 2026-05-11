@@ -10,7 +10,6 @@ export function useAgentReconciliation(
     token: 'no-agent',
     custody: 'unknown',
     agentUri: 'unknown',
-    ensRecords: 'unset',
     vault: 'unset',
     workingTree: 'unknown',
     rpc: 'reachable',

@@ -123,10 +123,23 @@ test('vaulted public profile saves do not require Ethereum Mainnet ENS writes', 
 test('public profile completion feedback starts capitalized', () => {
   const publicProfile = readFileSync('src/identity/hub/effects/publicProfile/runPublicProfileSave.ts', 'utf8')
 
-  assert.doesNotMatch(publicProfile, /'profile pointer published/)
   assert.doesNotMatch(publicProfile, /'profile updated/)
-  assert.match(publicProfile, /'Profile pointer published/)
   assert.match(publicProfile, /'Profile updated/)
+})
+
+test('operator profile updates never write to ENS', () => {
+  const publicProfile = readFileSync('src/identity/hub/effects/publicProfile/runPublicProfileSave.ts', 'utf8')
+  const walletCopy = readFileSync('src/identity/wallet/page/copy.ts', 'utf8')
+
+  assert.doesNotMatch(publicProfile, /publishOperatorProfileEnsRecord/)
+  assert.doesNotMatch(publicProfile, /runUpdateEnsRecords/)
+  assert.doesNotMatch(publicProfile, /org\.ethagent\.profile/)
+
+  const operatorCopy = walletCopy.slice(
+    walletCopy.indexOf('"update-profile-operator"'),
+    walletCopy.indexOf('"update-profile-connected"'),
+  )
+  assert.doesNotMatch(operatorCopy, /ENS/)
 })
 
 test('README documents custody modes, ENS, and token transfer flow', () => {

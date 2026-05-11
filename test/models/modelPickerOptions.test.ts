@@ -254,6 +254,9 @@ test('picker options expose grouped catalog and key management for keyed and unk
   assert.equal(optionByValue(options, 'key:set:anthropic').label, 'Add API Key')
   assert.equal(optionByValue(options, 'key:set:anthropic').role, 'utility')
   assert.equal(optionByValue(options, 'key:set:anthropic').indent, 4)
+  assert.equal(options.some(option => option.value === 'oauth:openai'), false)
+  assert.equal(options.some(option => option.value === 'oauth:anthropic'), false)
+  assert.equal(options.some(option => option.value === 'oauth:gemini'), false)
   assert.equal(options.some(option => option.value === 'key:set:openai'), false)
   assert.equal(options.some(option => option.value === 'key:edit:openai'), false)
   assert.equal(options.some(option => option.value === 'key:delete:openai'), false)
@@ -263,6 +266,34 @@ test('picker options expose grouped catalog and key management for keyed and unk
     options.findIndex(option => option.value === 'catalog:openai')
       < options.findIndex(option => option.value === 'key:manage:openai'),
   )
+})
+
+test('OpenAI without a stored key offers Sign in with ChatGPT before Add API Key', () => {
+  const options = buildModelPickerOptions(baseData({
+    cloudKeys: {
+      openai: false,
+      anthropic: false,
+      gemini: false,
+    },
+    cloudCatalogs: {},
+  }), {
+    currentProvider: 'openai',
+    currentModel: 'gpt-5.2',
+  })
+
+  const oauth = optionByValue(options, 'oauth:openai')
+  const apiKey = optionByValue(options, 'key:set:openai')
+  assert.equal(oauth.label, 'Sign in with ChatGPT')
+  assert.equal(oauth.hint, 'Use your ChatGPT subscription')
+  assert.equal(oauth.role, 'utility')
+  assert.equal(oauth.indent, 4)
+  assert.equal(apiKey.label, 'Add API Key')
+  assert.ok(
+    options.findIndex(option => option.value === 'oauth:openai')
+      < options.findIndex(option => option.value === 'key:set:openai'),
+  )
+  assert.equal(options.some(option => option.value === 'oauth:anthropic'), false)
+  assert.equal(options.some(option => option.value === 'oauth:gemini'), false)
 })
 
 test('picker hierarchy uses provider group labels without repeated provider prefixes', () => {

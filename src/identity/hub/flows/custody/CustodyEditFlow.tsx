@@ -15,11 +15,7 @@ import { ensValidationReasonText, selectEnsStatus } from '../../model/ens.js'
 import { shortAddress } from '../../model/format.js'
 import { lastBackupLabel } from '../../model/identity.js'
 import {
-  describeFixPlanItem,
-  fixPlanRequiresOwnerWallet,
-  reconcileWalletSetup,
   type AgentReconciliation,
-  type RecordsFixPlan,
 } from '../../reconciliation/index.js'
 
 const footerHint = (hint: string) => <Text color={theme.dim}>{hint}</Text>
@@ -37,7 +33,6 @@ interface CustodyEditFlowProps {
   onReturnToVault: (returnTo: Step, vaultAddress: Address) => void
   onResumeAdvanced: (returnTo: Step) => void
   onManageOperatorWallets: () => void
-  onFixRecords: (plan: RecordsFixPlan) => void
   onPrepareTransfer: () => void
   onBack: () => void
 }
@@ -59,7 +54,6 @@ export const CustodyEditFlow: React.FC<CustodyEditFlowProps> = ({
   onReturnToVault,
   onResumeAdvanced,
   onManageOperatorWallets,
-  onFixRecords,
   onPrepareTransfer,
   onBack,
 }) => {
@@ -77,19 +71,8 @@ export const CustodyEditFlow: React.FC<CustodyEditFlowProps> = ({
   const tokenLabel = identity.agentId ? `Token #${identity.agentId}` : 'Token #unknown'
   const tokenOwner = identity.ownerAddress ?? identity.address
 
-  const [fixPlan, setFixPlan] = React.useState<RecordsFixPlan | null>(null)
-  React.useEffect(() => {
-    if (step.kind !== 'custody-model') return
-    if (custodyMode !== 'advanced') return
-    let cancelled = false
-    reconcileWalletSetup({ identity, registry })
-      .then(plan => { if (!cancelled) setFixPlan(plan) })
-      .catch(() => { if (!cancelled) setFixPlan(null) })
-    return () => { cancelled = true }
-  }, [identity, registry, step.kind, custodyMode])
-
   if (step.kind === 'custody-model') {
-    type Action = 'switch-advanced' | 'switch-simple' | 'resume-advanced' | 'cancel-advanced' | 'withdraw-token' | 'return-to-vault' | 'manage-operator-wallets' | 'fix-records' | 'back'
+    type Action = 'switch-advanced' | 'switch-simple' | 'resume-advanced' | 'cancel-advanced' | 'withdraw-token' | 'return-to-vault' | 'manage-operator-wallets' | 'back'
     const onChainCustody = reconciliation?.custody
     const midFlow = onChainCustody === 'mid-flow-uri-pending'
     const isAdvanced = onChainCustody === 'advanced' || midFlow || custodyMode === 'advanced'
@@ -149,15 +132,6 @@ export const CustodyEditFlow: React.FC<CustodyEditFlowProps> = ({
         hint: 'Add or revoke wallets that can publish updates onchain.',
       })
     }
-    const hasFixablePlan = fixPlan !== null && fixPlanRequiresOwnerWallet(fixPlan)
-    if (hasFixablePlan) {
-      options.push({ value: 'fix-records', role: 'section', label: 'Records Out Of Sync' })
-      options.push({
-        value: 'fix-records',
-        label: 'Fix Records (Owner Wallet)',
-        hint: 'Sync ENS resolver approvals with the operator wallet list.',
-      })
-    }
     options.push({ value: 'back', role: 'section', label: 'Navigation' })
     options.push({ value: 'back', label: 'Back', hint: 'Return to Identity Hub', role: 'utility' })
     const notice = step.kind === 'custody-model' ? step.notice : undefined
@@ -201,14 +175,6 @@ export const CustodyEditFlow: React.FC<CustodyEditFlowProps> = ({
             return <Row label="Last Saved" value={lastBackup} muted={lastBackup === 'never'} />
           })()}
         </Box>
-        {fixPlan && fixPlan.items.length > 0 ? (
-          <Box marginTop={1} flexDirection="column">
-            <Text color={theme.accentPeriwinkle} bold>Records out of sync:</Text>
-            {fixPlan.items.map((item, idx) => (
-              <Text key={idx} color={theme.dim}>· {describeFixPlanItem(item)}</Text>
-            ))}
-          </Box>
-        ) : null}
         <Box marginTop={1}>
           <Select<Action>
             options={options}
@@ -224,10 +190,6 @@ export const CustodyEditFlow: React.FC<CustodyEditFlowProps> = ({
               if (choice === 'resume-advanced') return onResumeAdvanced(returnTo ?? { kind: 'menu' })
               if (choice === 'cancel-advanced') {
                 onSetStep({ kind: 'custody-simple-confirm', identity, registry, returnTo })
-                return
-              }
-              if (choice === 'fix-records') {
-                if (fixPlan) onFixRecords(fixPlan)
                 return
               }
               if (choice === 'switch-advanced') {

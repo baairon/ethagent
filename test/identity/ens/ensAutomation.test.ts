@@ -68,7 +68,6 @@ test('advanced ENS preflight creates direct registry setup and resolver records'
     operatorAddress: operator,
     registry,
     agentId: '42',
-    agentCardCid: 'bafyprofile',
     ensClient: ensClient({}),
     tokenPublicClient: tokenClient(),
   })
@@ -117,14 +116,12 @@ test('advanced ENS preflight skips transactions when existing public records alr
     operatorAddress: operator,
     registry,
     agentId: '42',
-    agentCardCid: 'bafyprofile',
     ensClient: ensClient({
       childOwner: owner,
       childResolver: resolver,
       addressRecord: owner,
       texts: {
         'org.ethagent.token': tokenRef,
-        'org.ethagent.profile': 'ipfs://bafyprofile',
       },
     }),
     tokenPublicClient: tokenClient(),

@@ -82,7 +82,6 @@ export type EnsSetupPreflightArgs = {
   allowSameOwnerOperator?: boolean
   registry: Erc8004RegistryConfig
   agentId: string | bigint | undefined
-  agentCardCid?: string
   ensClient?: EnsAutomationReadClient
   tokenPublicClient?: TokenOwnerReadClient
 }

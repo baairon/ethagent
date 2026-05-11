@@ -25,8 +25,11 @@ import {
   type GgufMachineFit,
 } from './modelRecommendation.js'
 import { hasKey, rmKey, setKey } from '../storage/secrets.js'
+import { OpenAIOAuthService } from '../auth/openaiOAuth/index.js'
+import { hasOpenAIOAuthCredentials, rmOpenAIOAuthCredentials } from '../auth/openaiOAuth/credentials.js'
+import { openExternalUrl } from '../utils/openExternal.js'
 import { defaultModelFor, type EthagentConfig, type ProviderId } from '../storage/config.js'
-import { clearModelCatalogCache, discoverProviderModels, type ModelCatalogResult } from './catalog.js'
+import { clearModelCatalogCache, discoverProviderModels, isOpenAIOAuthAllowedModel, OPENAI_OAUTH_DEFAULT_MODEL, type ModelCatalogResult } from './catalog.js'
 import { contextWindowInfo } from '../runtime/compaction.js'
 import {
   createHfDownloadPlan,
@@ -56,6 +59,7 @@ import {
   LOCAL_MODEL_LINK_HINT,
   MODEL_PICKER_CLOUD_PROVIDERS,
   orderModelsForContextFit,
+  type CloudCredentialKind,
   type CloudProviderId,
   type ModelPickerContextFit,
   type ModelPickerOptionsData,
@@ -89,6 +93,8 @@ type State =
   | { kind: 'catalog'; provider: CloudProviderId; data: LoadedData }
   | { kind: 'keyEntry'; provider: CloudProviderId; action: 'set' | 'edit'; data: LoadedData; submitting: boolean; error?: string }
   | { kind: 'keyManage'; provider: CloudProviderId; data: LoadedData; submitting: boolean; error?: string }
+  | { kind: 'oauthManage'; data: LoadedData; submitting: boolean; error?: string }
+  | { kind: 'oauthLogin'; data: LoadedData; phase: 'waiting' | 'exchanging' | 'error'; url?: string; message?: string }
   | { kind: 'hfInput'; data: LoadedData; error?: string }
   | { kind: 'hfLoading'; data: LoadedData; input: string }
   | { kind: 'hfFilePick'; data: LoadedData; input: string; repo: HuggingFaceRepoInfo; files: HuggingFaceSibling[] }
@@ -119,18 +125,29 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
 }) => {
   const [state, setState] = useState<State>({ kind: 'loading' })
   const hfAbortRef = useRef<AbortController | null>(null)
+  const oauthServiceRef = useRef<OpenAIOAuthService | null>(null)
 
   useEffect(() => {
     let cancelled = false
     void (async () => {
-      const [llamaCpp, hfModels, machineSpec, keyEntries] = await Promise.all([
+      const [llamaCpp, hfModels, machineSpec, keyEntries, openaiOauth] = await Promise.all([
         probeLlamaCpp(),
         loadHfPickerModels(),
         detectSpec(),
         Promise.all(MODEL_PICKER_CLOUD_PROVIDERS.map(async p => [p, await hasKey(p)] as const)),
+        hasOpenAIOAuthCredentials(),
       ])
       if (cancelled) return
-      const cloudKeys = Object.fromEntries(keyEntries) as Partial<Record<ProviderId, boolean>>
+      const rawCloudKeys = Object.fromEntries(keyEntries) as Partial<Record<ProviderId, boolean>>
+      const cloudKeys: Partial<Record<ProviderId, boolean>> = {
+        ...rawCloudKeys,
+        openai: rawCloudKeys.openai === true || openaiOauth,
+      }
+      const cloudCredentialKinds: Partial<Record<ProviderId, CloudCredentialKind>> = {}
+      if (openaiOauth) cloudCredentialKinds.openai = 'oauth'
+      else if (rawCloudKeys.openai === true) cloudCredentialKinds.openai = 'apikey'
+      if (rawCloudKeys.anthropic === true) cloudCredentialKinds.anthropic = 'apikey'
+      if (rawCloudKeys.gemini === true) cloudCredentialKinds.gemini = 'apikey'
       const catalogEntries = await Promise.all(
         MODEL_PICKER_CLOUD_PROVIDERS
           .filter(provider => cloudKeys[provider])
@@ -144,6 +161,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
         machineSpec,
         cloudKeys,
         cloudCatalogs,
+        cloudCredentialKinds,
       }
       if (featuredHfRepo) {
         const installedFeatured = await findInstalledHfModelForInput(featuredHfRepo)
@@ -163,6 +181,8 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
 
   useEffect(() => () => {
     hfAbortRef.current?.abort()
+    oauthServiceRef.current?.cleanup()
+    oauthServiceRef.current = null
   }, [])
 
   if (state.kind === 'loading') {
@@ -569,12 +589,112 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
                 setState({ kind: 'list', data: state.data })
                 return
               }
-              void deleteKey(state, currentConfig, setState)
+              void deleteKey(state, currentConfig, setState, onPick, currentProvider)
             }}
             onCancel={() => setState({ kind: 'list', data: state.data })}
           />
         )}
         {error ? <Text color={theme.accentError}>{error}</Text> : null}
+      </Surface>
+    )
+  }
+
+  if (state.kind === 'oauthManage') {
+    const { submitting, error } = state
+    return (
+      <Surface
+        title="ChatGPT Sign-in"
+        subtitle="Manage your ChatGPT sign-in."
+        footer="enter select · esc back"
+      >
+        {submitting ? (
+          <Spinner label="signing out..." />
+        ) : (
+          <Select
+            options={[
+              { value: 'signin', label: 'Sign in Again' },
+              { value: 'signout', label: 'Sign Out' },
+              { value: 'cancel', label: 'Back' },
+            ]}
+            onSubmit={(value) => {
+              if (value === 'signin') {
+                void startOpenAIOAuthFlow(state.data, currentConfig, setState, oauthServiceRef, onPick)
+                return
+              }
+              if (value === 'cancel') {
+                setState({ kind: 'list', data: state.data })
+                return
+              }
+              void signOutOAuth(state, currentConfig, setState, onPick, currentProvider)
+            }}
+            onCancel={() => setState({ kind: 'list', data: state.data })}
+          />
+        )}
+        {error ? <Text color={theme.accentError}>{error}</Text> : null}
+      </Surface>
+    )
+  }
+
+  if (state.kind === 'oauthLogin') {
+    if (state.phase === 'error') {
+      return (
+        <Surface
+          title="OpenAI Sign-in Failed"
+          subtitle={state.message ?? 'Sign-in did not complete.'}
+          tone="error"
+          footer="enter select · esc back"
+        >
+          <Select<'retry' | 'apikey' | 'back'>
+            options={[
+              { value: 'retry', label: 'Try Again' },
+              { value: 'apikey', label: 'Add API Key Instead' },
+              { value: 'back', label: 'Back To Picker' },
+            ]}
+            onSubmit={choice => {
+              if (choice === 'retry') void startOpenAIOAuthFlow(state.data, currentConfig, setState, oauthServiceRef, onPick)
+              else if (choice === 'apikey') setState({ kind: 'keyEntry', provider: 'openai', action: 'set', data: state.data, submitting: false })
+              else setState({ kind: 'list', data: state.data })
+            }}
+            onCancel={() => setState({ kind: 'list', data: state.data })}
+          />
+        </Surface>
+      )
+    }
+    if (state.phase === 'exchanging') {
+      return (
+        <Surface title="Finishing OpenAI Sign-in" subtitle="Exchanging credentials with auth.openai.com.">
+          <Spinner label="completing sign-in..." />
+        </Surface>
+      )
+    }
+    return (
+      <Surface
+        title="Sign in with ChatGPT"
+        subtitle="Opened your browser to auth.openai.com. Approve to continue."
+        footer="esc cancel"
+      >
+        <Spinner label="waiting for browser sign-in..." />
+        {state.url ? (
+          <Box flexDirection="column" marginTop={1}>
+            <Text color={theme.dim}>If the browser did not open, visit:</Text>
+            <Text color={theme.dim}>{state.url}</Text>
+          </Box>
+        ) : null}
+        <Box marginTop={1}>
+          <Select<'cancel'>
+            options={[{ value: 'cancel', label: 'Cancel Sign-in' }]}
+            onSubmit={() => {
+              oauthServiceRef.current?.cleanup()
+              oauthServiceRef.current = null
+              setState({ kind: 'list', data: state.data })
+            }}
+            onCancel={() => {
+              oauthServiceRef.current?.cleanup()
+              oauthServiceRef.current = null
+              setState({ kind: 'list', data: state.data })
+            }}
+          />
+        </Box>
       </Surface>
     )
   }
@@ -648,7 +768,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
           options={options}
           initialIndex={initialIndex === -1 ? 0 : initialIndex}
           maxVisible={12}
-          onSubmit={(value) => handleSubmit(value, state, setState, onPick, onCancel)}
+          onSubmit={(value) => handleSubmit(value, state, setState, onPick, onCancel, currentConfig, oauthServiceRef)}
           onCancel={() => setState({ kind: 'list', data: state.data })}
         />
       </Surface>
@@ -669,7 +789,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
         options={options}
         initialIndex={initialIndex === -1 ? 0 : initialIndex}
         maxVisible={10}
-        onSubmit={(value) => handleSubmit(value, state, setState, onPick, onCancel)}
+        onSubmit={(value) => handleSubmit(value, state, setState, onPick, onCancel, currentConfig, oauthServiceRef)}
         onCancel={onCancel}
       />
     </Surface>
@@ -682,6 +802,8 @@ function handleSubmit(
   setState: (s: State) => void,
   onPick: (sel: ModelPickerSelection) => void,
   onCancel: () => void,
+  currentConfig: EthagentConfig,
+  oauthServiceRef: React.MutableRefObject<OpenAIOAuthService | null>,
 ): void {
   if (value.startsWith('hdr:')) return
   if (value === 'cancel') {
@@ -727,10 +849,18 @@ function handleSubmit(
     const parsed = parseKeyValue(value)
     if (!parsed) return
     if (parsed.action === 'manage') {
+      if (parsed.provider === 'openai' && state.data.cloudCredentialKinds?.openai === 'oauth') {
+        setState({ kind: 'oauthManage', data: state.data, submitting: false })
+        return
+      }
       setState({ kind: 'keyManage', provider: parsed.provider, data: state.data, submitting: false })
       return
     }
     setState({ kind: 'keyEntry', provider: parsed.provider, action: parsed.action, data: state.data, submitting: false })
+    return
+  }
+  if (value === 'oauth:openai') {
+    void startOpenAIOAuthFlow(state.data, currentConfig, setState, oauthServiceRef, onPick)
     return
   }
   if (value.startsWith('catalog:')) {
@@ -908,19 +1038,121 @@ async function submitKey(
   }
 }
 
+async function startOpenAIOAuthFlow(
+  data: LoadedData,
+  currentConfig: EthagentConfig,
+  setState: (s: State) => void,
+  serviceRef: React.MutableRefObject<OpenAIOAuthService | null>,
+  onPick: (sel: ModelPickerSelection) => void,
+): Promise<void> {
+  serviceRef.current?.cleanup()
+  const service = new OpenAIOAuthService()
+  serviceRef.current = service
+  setState({ kind: 'oauthLogin', data, phase: 'waiting' })
+  try {
+    const result = await service.start(authUrl => {
+      openExternalUrl(authUrl)
+      setState({ kind: 'oauthLogin', data, phase: 'waiting', url: authUrl })
+    })
+    if (serviceRef.current !== service) return
+    setState({ kind: 'oauthLogin', data, phase: 'exchanging' })
+    if (result.kind === 'apikey') {
+      if (typeof result.apiKey !== 'string' || result.apiKey.length === 0) {
+        throw new Error(`OAuth result was apikey kind but apiKey is ${typeof result.apiKey}; refusing to store.`)
+      }
+      try {
+        await setKey('openai', result.apiKey)
+      } catch (err) {
+        throw new Error(`Storing the OpenAI API key failed: ${err instanceof Error ? err.message : String(err)}`)
+      }
+    }
+    let refreshed: LoadedData
+    try {
+      refreshed = await refreshProviderKeyState(data, currentConfig, 'openai')
+    } catch (err) {
+      throw new Error(`Refreshing the OpenAI provider state failed: ${err instanceof Error ? err.message : String(err)}`)
+    }
+    if (serviceRef.current !== service) return
+    serviceRef.current = null
+    if (result.kind === 'oauth-only' && !isOpenAIOAuthAllowedModel(currentConfig.model)) {
+      onPick({ kind: 'cloud', provider: 'openai', model: OPENAI_OAUTH_DEFAULT_MODEL, keyJustSet: true })
+      return
+    }
+    setState({ kind: 'list', data: refreshed })
+  } catch (err: unknown) {
+    if (serviceRef.current !== service) return
+    serviceRef.current = null
+    const message = err instanceof Error ? err.message : String(err)
+    if (message === 'OpenAI sign-in was cancelled.') {
+      setState({ kind: 'list', data })
+      return
+    }
+    setState({ kind: 'oauthLogin', data, phase: 'error', message })
+  }
+}
+
 async function deleteKey(
   state: Extract<State, { kind: 'keyManage' }>,
   currentConfig: EthagentConfig,
   setState: (s: State) => void,
+  onPick: (sel: ModelPickerSelection) => void,
+  currentProvider: ProviderId,
 ): Promise<void> {
   setState({ ...state, submitting: true, error: undefined })
   try {
     await rmKey(state.provider)
+    if (state.provider === 'openai') await rmOpenAIOAuthCredentials()
     const data = await refreshProviderKeyState(state.data, currentConfig, state.provider)
+    if (currentProvider === state.provider) {
+      const fallback = pickFallbackSelection(data, state.provider)
+      if (fallback) {
+        onPick(fallback)
+        return
+      }
+    }
     setState({ kind: 'list', data })
   } catch (err: unknown) {
     setState({ ...state, submitting: false, error: (err as Error).message })
   }
+}
+
+async function signOutOAuth(
+  state: Extract<State, { kind: 'oauthManage' }>,
+  currentConfig: EthagentConfig,
+  setState: (s: State) => void,
+  onPick: (sel: ModelPickerSelection) => void,
+  currentProvider: ProviderId,
+): Promise<void> {
+  setState({ ...state, submitting: true, error: undefined })
+  try {
+    await rmKey('openai')
+    await rmOpenAIOAuthCredentials()
+    const data = await refreshProviderKeyState(state.data, currentConfig, 'openai')
+    if (currentProvider === 'openai') {
+      const fallback = pickFallbackSelection(data, 'openai')
+      if (fallback) {
+        onPick(fallback)
+        return
+      }
+    }
+    setState({ kind: 'list', data })
+  } catch (err: unknown) {
+    setState({ ...state, submitting: false, error: (err as Error).message })
+  }
+}
+
+function pickFallbackSelection(data: LoadedData, removed: ProviderId): ModelPickerSelection | null {
+  for (const provider of MODEL_PICKER_CLOUD_PROVIDERS) {
+    if (provider === removed) continue
+    if (data.cloudKeys[provider] !== true) continue
+    const catalogModel = data.cloudCatalogs[provider]?.entries[0]?.id
+    const model = catalogModel ?? defaultModelFor(provider)
+    return { kind: 'cloud', provider, model, keyJustSet: false }
+  }
+  if (data.hfModels.length > 0) {
+    return { kind: 'llamacpp', model: data.hfModels[0]!.id }
+  }
+  return null
 }
 
 async function refreshProviderKeyState(
@@ -929,15 +1161,21 @@ async function refreshProviderKeyState(
   provider: CloudProviderId,
 ): Promise<LoadedData> {
   clearModelCatalogCache()
-  const keySet = await hasKey(provider)
+  const apiKeySet = await hasKey(provider)
+  const oauthSet = provider === 'openai' ? await hasOpenAIOAuthCredentials() : false
+  const keySet = apiKeySet || oauthSet
   const cloudKeys = { ...data.cloudKeys, [provider]: keySet }
+  const cloudCredentialKinds: Partial<Record<ProviderId, CloudCredentialKind>> = { ...(data.cloudCredentialKinds ?? {}) }
+  if (oauthSet) cloudCredentialKinds[provider] = 'oauth'
+  else if (apiKeySet) cloudCredentialKinds[provider] = 'apikey'
+  else delete cloudCredentialKinds[provider]
   const cloudCatalogs = { ...data.cloudCatalogs }
   if (keySet) {
     cloudCatalogs[provider] = await discoverProviderModels(configForProvider(currentConfig, provider))
   } else {
     delete cloudCatalogs[provider]
   }
-  return { ...data, cloudKeys, cloudCatalogs }
+  return { ...data, cloudKeys, cloudCatalogs, cloudCredentialKinds }
 }
 
 function configForProvider(config: EthagentConfig, provider: CloudProviderId): EthagentConfig {

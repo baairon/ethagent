@@ -123,13 +123,14 @@ export const AssignEnsCurrentSetup: React.FC<AssignEnsCurrentSetupProps> = ({
 type SubdomainEntryProps = {
   parent: string
   ownerAddress: Address
-  suggestion: string
+  initialValue?: string
+  placeholder?: string
   error?: string
   onConfirm: (fullName: string) => void
   onBack: () => void
 }
 
-export const SubdomainEntry: React.FC<SubdomainEntryProps> = ({ parent, ownerAddress, suggestion, error, onConfirm, onBack }) => (
+export const SubdomainEntry: React.FC<SubdomainEntryProps> = ({ parent, ownerAddress, initialValue, placeholder, error, onConfirm, onBack }) => (
   <Surface
     title={`Subdomain of ${parent}`}
     footer={footerHint('enter continues · esc back')}
@@ -139,8 +140,8 @@ export const SubdomainEntry: React.FC<SubdomainEntryProps> = ({ parent, ownerAdd
     {error ? <Text color={theme.accentError}>{error}</Text> : null}
     <TextInput
       key={`edit-ens-subdomain-${parent}`}
-      initialValue={suggestion}
-      placeholder="subdomain name"
+      initialValue={initialValue ?? ''}
+      placeholder={placeholder || 'subdomain name'}
       validate={value => {
         const v = sanitizeSubdomainPrefix(value)
         if (!v) return 'Subdomain name cannot be empty'

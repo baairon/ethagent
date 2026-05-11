@@ -13,26 +13,15 @@ import type {
   EnsSubdomainDeletePlan,
 } from '../../../ens/ensAutomation.js'
 import type { Erc8004RegistryConfig } from '../../../registry/erc8004.js'
+import type { AgentReconciliation } from '../../reconciliation/index.js'
 import type { EnsLinkOptions } from './ensEditCopy.js'
 
 export type EnsIssueValidation = Extract<EnsValidation, { ok: false }>
 
-export type RegisterCommitPhase = {
-  label: string
-  secret: `0x${string}`
-  price: { base: bigint; premium: bigint; total: bigint }
-}
-
 export type SimpleEnsPhase =
-  | { kind: 'discovering' }
-  | { kind: 'pick-parent' }
-  | { kind: 'manual-parent' }
-  | { kind: 'register-root-input'; error?: string }
-  | { kind: 'register-root-pricing'; label: string; secret: `0x${string}`; busy: boolean; error?: string; price?: { base: bigint; premium: bigint; total: bigint } }
-  | { kind: 'register-root-commit-tx'; label: string; secret: `0x${string}`; price: { base: bigint; premium: bigint; total: bigint } }
-  | { kind: 'register-root-wait'; label: string; secret: `0x${string}`; price: { base: bigint; premium: bigint; total: bigint }; commitMinedAt: number }
-  | { kind: 'register-root-tx'; label: string; secret: `0x${string}`; price: { base: bigint; premium: bigint; total: bigint } }
-  | { kind: 'register-root-done'; fullName: string }
+  | { kind: 'discovering'; mode?: 'simple' | 'advanced' }
+  | { kind: 'pick-parent'; mode?: 'simple' | 'advanced'; error?: string }
+  | { kind: 'manual-parent'; mode?: 'simple' | 'advanced'; error?: string }
   | { kind: 'pick-subdomain'; parent: string; label?: string; error?: string }
   | { kind: 'simple-name-missing'; fullName: string; validation: EnsIssueValidation }
   | { kind: 'simple-create-preflight'; rootName: string; label: string; fullName: string }
@@ -43,14 +32,9 @@ export type SimpleEnsPhase =
 
 export type AdvancedEnsPhase =
   | { kind: 'advanced-transfer-check' }
-  | { kind: 'advanced-root'; rootName?: string; error?: string }
   | { kind: 'advanced-root-check'; rootName: string }
   | { kind: 'advanced-subdomain'; rootName: string; label?: string; error?: string }
   | { kind: 'advanced-subdomain-check'; rootName: string; label: string }
-  | { kind: 'advanced-operator-wallet'; rootName: string; label: string; registryAction?: EnsRegistryAction; error?: string }
-  | { kind: 'advanced-operator-wallet-manual'; rootName: string; label: string; error?: string }
-  | { kind: 'advanced-operator-wallet-connecting'; rootName: string; label: string }
-  | { kind: 'advanced-preflight'; rootName: string; label: string; operatorWallet: Address }
   | { kind: 'advanced-review'; setup: EnsSetupPlan }
   | { kind: 'advanced-manual'; fallback: EnsSetupBlockedPlan }
 
@@ -81,11 +65,13 @@ export type DiscoveryState =
 export type EnsEditProps = {
   identity: EthagentIdentity
   registry: Erc8004RegistryConfig
+  reconciliation: AgentReconciliation
   onEnsLink: (fullName: string, options: EnsLinkOptions) => void
   onEnsUnlink: () => void
   onEnsRecordsUpdate: (fullName: string, records: AgentEnsRecords, options: EnsLinkOptions, clearRecords?: boolean, currentRecords?: AgentEnsRecordState) => void
   onEnsSetup: (setup: EnsSetupPlan) => void
   onManageOperatorWalletAccess: () => void
+  onWithdrawToken: () => void
   initialView?: 'advanced'
   onBack: () => void
 }

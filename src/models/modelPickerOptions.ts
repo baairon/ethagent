@@ -22,6 +22,11 @@ export function cloudProviderDisplayName(provider: CloudProviderId): string {
   }
 }
 
+export function providerDisplayName(provider: ProviderId): string {
+  if (provider === 'llamacpp') return 'llama.cpp'
+  return cloudProviderDisplayName(provider)
+}
+
 export type LocalHfPickerModel = {
   id: string
   displayName: string
@@ -31,6 +36,8 @@ export type LocalHfPickerModel = {
   task: HfTask
   status: 'ready' | 'incomplete'
 }
+
+export type CloudCredentialKind = 'apikey' | 'oauth'
 
 export type ModelPickerOptionsData = {
   llamaCpp: {
@@ -42,6 +49,7 @@ export type ModelPickerOptionsData = {
   machineSpec?: SpecSnapshot
   cloudKeys: Partial<Record<ProviderId, boolean>>
   cloudCatalogs: Partial<Record<ProviderId, ModelCatalogResult>>
+  cloudCredentialKinds?: Partial<Record<ProviderId, CloudCredentialKind>>
 }
 
 export type ModelPickerContextFit = {
@@ -78,6 +86,9 @@ export function buildModelPickerOptions(
     options.push(groupOption(`hdr:cloud:${provider}`, cloudProviderDisplayName(provider)))
     const keySet = data.cloudKeys[provider] === true
     if (!keySet) {
+      if (provider === 'openai') {
+        options.push(utilityOption('oauth:openai', 'Sign in with ChatGPT', 'Use your ChatGPT subscription'))
+      }
       options.push(utilityOption(`key:set:${provider}`, 'Add API Key'))
       continue
     }
@@ -105,7 +116,10 @@ export function buildModelPickerOptions(
       ))
     }
     options.push(utilityOption(`catalog:${provider}`, 'Full Catalog'))
-    options.push(utilityOption(`key:manage:${provider}`, 'Manage API Key'))
+    const manageLabel = provider === 'openai' && data.cloudCredentialKinds?.openai === 'oauth'
+      ? 'Manage ChatGPT Sign-in'
+      : 'Manage API Key'
+    options.push(utilityOption(`key:manage:${provider}`, manageLabel))
   }
 
   options.push(sectionOption('hdr:exit', 'Exit'))

@@ -142,7 +142,7 @@ test('identityHubReducer: ens-records-tx back returns to edit-profile-ens', () =
     identity,
     registry,
     fullName: 'ethagent.example.eth',
-    records: { token: 'eip155:1:0x1:1', profile: 'ipfs://x' },
+    records: { token: 'eip155:1:0x1:1' },
     returnTo: { kind: 'menu' },
   }
   const next = identityHubReducer(state, { type: 'back', from: state })
