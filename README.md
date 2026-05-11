@@ -49,7 +49,7 @@ Once running:
 The Identity Hub manages everything portable about the agent:
 
 - **Public Profile** edits name, description, icon, and the Agent Card.
-- **ENS Name** links the agent to a subdomain and authorizes operator wallets to write the subdomain's records.
+- **ENS Name** links the agent to a subdomain under a parent name the owner wallet controls.
 - **Custody Mode** switches between Simple and Advanced by depositing the token into its Vault or unwrapping it back out.
 - **Prepare Transfer** stages a dual-wallet snapshot before sending the token externally.
 - **Refetch Latest** pulls the most recent published snapshot back to local files.
@@ -89,7 +89,7 @@ The vault is an immutable Foundry contract at `contracts/src/Vault.sol`. New vau
 
 Subdomains live under a parent name you control, never on root `.eth` names directly. You keep `you.eth`; the agent gets `agent.you.eth`. The split makes the boundary explicit: one address speaks for the human, the other speaks for the agent.
 
-For agents in Advanced custody, the owner wallet approves operator wallets on the resolver once. After that, an approved operator wallet can update the agent's ENS profile pointer (the IPFS CID for the latest agent card) on every snapshot save without another owner signature.
+ENS records stay owner-controlled in both custody modes. Operator wallets in Advanced custody rotate the ERC-8004 token URI through the Vault (see Custody Modes), not ENS. Any ENS text-record update requires an owner signature.
 
 Save the token ID + network somewhere safe. ENS records can be cleared and rebuilt; the token ID is the durable handle.
 

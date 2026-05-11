@@ -1,6 +1,6 @@
 {
   "name": "ethagent",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "description": "A privacy-first AI agent with a portable Ethereum identity",
   "type": "module",
   "main": "bin/ethagent.js",
