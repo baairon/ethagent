@@ -11,7 +11,7 @@ import {
   type SessionMessage,
 } from '../storage/sessions.js'
 import type { MessageRow } from './MessageList.js'
-import { hidesSuccessfulToolResultContent } from './toolResultDisplay.js'
+import { hidesSuccessfulToolResultContent, toolResultDiffContent, toolResultTextContent } from './display/toolResultDisplay.js'
 
 export type TurnCheckpoint = {
   sessionId: string
@@ -62,7 +62,7 @@ export function sessionMessagesToRows(messages: SessionMessage[], nextRowId: () 
         id: nextRowId(),
         name: msg.name,
         summary: msg.name,
-        input: summarizeToolInput(msg.input),
+        input: msg.input,
       }
       restored.push(row)
       toolCallByUseId.set(msg.toolUseId, row)
@@ -70,9 +70,10 @@ export function sessionMessagesToRows(messages: SessionMessage[], nextRowId: () 
       const isError = Boolean(msg.isError)
       const summary = isError ? `${msg.name} failed` : `${msg.name} completed`
       const content = toolResultContentForRow(msg.name, msg.content, msg.isError)
+      const diff = toolResultDiffForRow(msg.content, msg.isError)
       const existing = toolCallByUseId.get(msg.toolUseId)
       if (existing) {
-        existing.result = { content, summary, isError }
+        existing.result = diff ? { content, summary, isError, diff } : { content, summary, isError }
         existing.name = msg.name
       } else {
         restored.push({
@@ -80,22 +81,12 @@ export function sessionMessagesToRows(messages: SessionMessage[], nextRowId: () 
           id: nextRowId(),
           name: msg.name,
           summary: msg.name,
-          result: { content, summary, isError },
+          result: diff ? { content, summary, isError, diff } : { content, summary, isError },
         })
       }
     }
   }
   return restored
-}
-
-export function summarizeToolInput(input: Record<string, unknown>): string {
-  try {
-    const text = JSON.stringify(input)
-    if (text.length <= 160) return text
-    return `${text.slice(0, 157)}...`
-  } catch {
-    return '[unserializable input]'
-  }
 }
 
 export function truncateForRow(text: string, max = 1200): string {
@@ -104,7 +95,12 @@ export function truncateForRow(text: string, max = 1200): string {
 }
 
 export function toolResultContentForRow(name: string, content: string, isError?: boolean): string {
-  return hidesSuccessfulToolResultContent(name, isError) ? '' : truncateForRow(content)
+  const textContent = toolResultTextContent(content)
+  return hidesSuccessfulToolResultContent(name, isError) ? '' : truncateForRow(textContent)
+}
+
+export function toolResultDiffForRow(content: string, isError?: boolean): string | undefined {
+  return toolResultDiffContent(content, isError)
 }
 
 export function splitStreamingContent(text: string): { committed: string; liveTail: string } {

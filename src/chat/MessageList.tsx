@@ -3,11 +3,16 @@ import { Box, Text } from 'ink'
 import { theme } from '../ui/theme.js'
 import { ProgressBar } from '../ui/ProgressBar.js'
 import { Spinner } from '../ui/Spinner.js'
+import { DiffView } from './display/DiffView.js'
+import { SyntaxLine } from './display/SyntaxText.js'
+import { formatToolCall } from './display/toolCallDisplay.js'
+import { BrandSplash } from '../ui/BrandSplash.js'
 
 export type ToolCallResult = {
   content: string
   summary: string
   isError: boolean
+  diff?: string
 }
 
 export type MessageRow =
@@ -19,7 +24,7 @@ export type MessageRow =
       id: string
       name: string
       summary: string
-      input?: string
+      input?: Record<string, unknown>
       result?: ToolCallResult
     }
   | { role: 'note'; id: string; kind: 'info' | 'error' | 'dim'; content: string }
@@ -33,6 +38,13 @@ export type MessageRow =
       done?: boolean
       indeterminate?: boolean
       startedAt?: number
+    }
+  | {
+      role: 'splash'
+      id: string
+      contextLine?: string
+      tipLine?: string
+      updateNotice?: string | null
     }
 
 type MessageListProps = {
@@ -55,11 +67,18 @@ type InlineToken =
 const MAX_RENDERED_MESSAGE_CHARS = 12_000
 const MAX_RENDERED_REASONING_CHARS = 10_000
 const ASSISTANT_ACCENT = theme.accentPeriwinkle
+const ASSISTANT_MARKER = '• '
 const UNREADABLE_REASONING_TEXT = 'reasoning output was not readable text'
 
 const MessageListInner: React.FC<MessageListProps> = ({ rows }) => (
   <Box flexDirection="column">
-    {rows.map(row => <RowView key={row.id} row={row} />)}
+    {rows.map((row, index) => (
+      <RowView
+        key={row.id}
+        row={row}
+        tightTop={row.role === 'tool_call' && rows[index - 1]?.role === 'tool_call'}
+      />
+    ))}
   </Box>
 )
 
@@ -102,7 +121,7 @@ export function toggleInspectableRow(rows: MessageRow[], rowId?: string): Messag
   return rows
 }
 
-const RowViewInner: React.FC<{ row: MessageRow }> = ({ row }) => {
+const RowViewInner: React.FC<{ row: MessageRow; tightTop?: boolean }> = ({ row, tightTop }) => {
   if (row.role === 'user') {
     const display = clipTextForDisplay(row.content, MAX_RENDERED_MESSAGE_CHARS)
     const lines = display.text.length === 0 ? [''] : display.text.split('\n')
@@ -132,48 +151,65 @@ const RowViewInner: React.FC<{ row: MessageRow }> = ({ row }) => {
   if (row.role === 'thinking') {
     const text = sanitizeReasoningForDisplay(reasoningText(row))
     const preview = summarizeThinking(text)
-    const borderColor = reasoningBorderColor(row)
+    const active = Boolean(row.streaming)
     const showCursor = reasoningCursorVisible(row)
     if (row.expanded) {
       return (
-        <Box flexDirection="column" marginTop={1} borderStyle="round" borderColor={borderColor} paddingX={1}>
-          <Text>
-            <Text color={theme.accentPeriwinkle} bold>reasoning</Text>
-            <Text color={theme.dim}> · expanded · alt+t collapse</Text>
-          </Text>
-          <ReasoningBody content={text} showCursor={showCursor} />
-        </Box>
+        <ReasoningBlock
+          content={text}
+          detail="alt+t collapse"
+          expanded
+          active={active}
+          showCursor={showCursor}
+        />
       )
     }
     return (
-      <Box flexDirection="column" marginTop={1} borderStyle="round" borderColor={borderColor} paddingX={1}>
-        <Text>
-          <Text color={theme.accentPeriwinkle} bold>reasoning</Text>
-          <Text color={theme.dim}> · collapsed · alt+t inspect</Text>
-        </Text>
-        <Text color={theme.textSubtle}>
-          {preview || 'thinking...'}
-          {showCursor ? <ThinkingCursor active hasPreview={Boolean(preview)} /> : null}
-        </Text>
-      </Box>
+      <ReasoningBlock
+        content={preview || 'thinking...'}
+        detail="alt+t inspect"
+        active={active}
+        showCursor={showCursor}
+      />
     )
   }
 
   if (row.role === 'tool_call') {
+    const { displayName, argSummary } = formatToolCall(row.name, row.input)
     const result = row.result
-    const inputPreview = row.input ? truncateToolInputForLine(row.input, 60) : ''
+    const showResultLine = !result || result.isError
     return (
-      <Box marginTop={1}>
+      <Box flexDirection="column" marginTop={tightTop ? 0 : 1}>
         <Text>
-          <Text color={theme.dim}>{'· '}</Text>
-          <Text color={theme.accentPeriwinkle} bold>{row.name}</Text>
-          {inputPreview ? <Text color={theme.textSubtle}>{`  ${inputPreview}`}</Text> : null}
-          {result ? (
-            <Text color={result.isError ? theme.accentError : theme.dim}>{`  ${result.summary}`}</Text>
-          ) : (
-            <Text color={theme.dim}>{'  running…'}</Text>
-          )}
+          <Text color={theme.dim}>{'● '}</Text>
+          <Text color={theme.accentPeriwinkle} bold>{displayName}</Text>
+          {row.name !== 'run_bash' && argSummary ? <Text color={theme.textSubtle}>{` ${argSummary}`}</Text> : null}
+          {result && !result.isError ? <Text color={theme.dim}>{' done'}</Text> : null}
         </Text>
+        {row.name === 'run_bash' && argSummary ? (
+          <Box marginLeft={2}>
+            <Text>
+              <Text color={theme.dim}>{'$ '}</Text>
+              <Text color={theme.text}>{argSummary}</Text>
+            </Text>
+          </Box>
+        ) : null}
+        {showResultLine ? (
+          result ? (
+            <Box marginLeft={2}>
+              <Text color={result.isError ? theme.accentError : theme.dim}>{result.summary}</Text>
+            </Box>
+          ) : (
+            <Box marginLeft={2}>
+              <Text color={theme.dim}>running…</Text>
+            </Box>
+          )
+        ) : null}
+        {result?.diff && !result.isError ? (
+          <Box flexDirection="column" marginLeft={2}>
+            <DiffView diff={result.diff} />
+          </Box>
+        ) : null}
       </Box>
     )
   }
@@ -184,6 +220,16 @@ const RowViewInner: React.FC<{ row: MessageRow }> = ({ row }) => {
       <Box marginTop={1}>
         <Text color={color}>{row.content}</Text>
       </Box>
+    )
+  }
+
+  if (row.role === 'splash') {
+    return (
+      <BrandSplash
+        contextLine={row.contextLine}
+        tipLine={row.tipLine}
+        updateNotice={row.updateNotice ?? null}
+      />
     )
   }
 
@@ -208,21 +254,60 @@ const ProgressSpinner: React.FC<{ row: Extract<MessageRow, { role: 'progress' }>
   return <Spinner active label={row.status} hint={row.suffix} startedAt={row.startedAt} />
 }
 
-export function reasoningBorderColor(row: Extract<MessageRow, { role: 'thinking' }>): string {
-  return row.streaming ? theme.accentPeriwinkle : theme.border
+const ShimmerText: React.FC<{
+  text: string
+  color: string
+  active?: boolean
+  bold?: boolean
+  italic?: boolean
+}> = ({ text, color, active = false, bold, italic }) => {
+  const [position, setPosition] = useState(0)
+
+  useEffect(() => {
+    if (!active) return
+    const period = text.length + 8
+    const timer = setInterval(() => {
+      setPosition(prev => (prev + 1) % period)
+    }, 90)
+    return () => clearInterval(timer)
+  }, [active, text.length])
+
+  if (!active) {
+    return <Text color={color} bold={bold} italic={italic}>{text}</Text>
+  }
+
+  const shimmerStart = position - 1
+  const shimmerEnd = position + 1
+  const visibleStart = Math.max(0, shimmerStart)
+  const visibleEnd = Math.min(text.length, shimmerEnd + 1)
+  const before = text.slice(0, visibleStart)
+  const shimmer = shimmerStart < text.length && shimmerEnd >= 0 ? text.slice(visibleStart, visibleEnd) : ''
+  const after = text.slice(visibleEnd)
+
+  return (
+    <>
+      {before ? <Text color={color} bold={bold} italic={italic}>{before}</Text> : null}
+      {shimmer ? <Text color={theme.accentWhite} bold italic={italic}>{shimmer}</Text> : null}
+      {after ? <Text color={color} bold={bold} italic={italic}>{after}</Text> : null}
+    </>
+  )
 }
 
-function truncateToolInputForLine(input: string, max: number): string {
-  const flat = input.replace(/\s+/g, ' ').trim()
-  if (flat.length <= max) return flat
-  return `${flat.slice(0, Math.max(1, max - 1))}…`
+export function reasoningBorderColor(row: Extract<MessageRow, { role: 'thinking' }>): string {
+  return row.streaming ? theme.accentPeriwinkle : theme.border
 }
 
 export function reasoningCursorVisible(row: Extract<MessageRow, { role: 'thinking' }>): boolean {
   return Boolean(row.streaming && row.showCursor)
 }
 
-const ReasoningBody: React.FC<{ content: string; showCursor?: boolean }> = ({ content, showCursor }) => {
+const ReasoningBlock: React.FC<{
+  content: string
+  detail: string
+  active?: boolean
+  expanded?: boolean
+  showCursor?: boolean
+}> = ({ content, detail, active = false, expanded = false, showCursor }) => {
   const display = useMemo(
     () => clipTextForDisplay(content, MAX_RENDERED_REASONING_CHARS),
     [content],
@@ -233,16 +318,35 @@ const ReasoningBody: React.FC<{ content: string; showCursor?: boolean }> = ({ co
   }, [display.text])
 
   return (
-    <Box flexDirection="column">
+    <Box flexDirection="column" marginTop={1}>
       {display.omittedChars > 0 ? (
         <Text color={theme.dim}>{`${display.omittedChars} earlier reasoning characters omitted`}</Text>
       ) : null}
-      {lines.map((line, index) => (
-        <Text key={index} color={theme.textSubtle}>
-          {line || ' '}
-          {showCursor && index === lines.length - 1 ? <ThinkingCursor active hasPreview={line.length > 0} /> : null}
-        </Text>
-      ))}
+      <Text>
+        <AssistantMarker />
+        <ShimmerText
+          text={expanded ? 'Thinking…' : 'Thinking'}
+          color={theme.accentPeriwinkle}
+          active={active}
+          bold
+          italic
+        />
+        <Text color={theme.dim}>{` · ${detail}`}</Text>
+        {!expanded && showCursor ? <ThinkingCursor active hasPreview /> : null}
+      </Text>
+      {expanded ? (
+        <Box flexDirection="column" marginLeft={2}>
+          {lines.map((line, index) => (
+            <Box key={index}>
+              <Text color={theme.textSubtle}>
+                <Text color={theme.dim}>{'  '}</Text>
+                {line || ' '}
+                {showCursor && index === lines.length - 1 ? <ThinkingCursor active hasPreview={line.length > 0} /> : null}
+              </Text>
+            </Box>
+          ))}
+        </Box>
+      ) : null}
     </Box>
   )
 }
@@ -269,22 +373,33 @@ const AssistantBody: React.FC<{ content: string; liveTail?: string; streaming?: 
           key={index}
           block={block}
           streaming={streaming && index === blocks.length - 1}
+          prefix={index === 0 || block.kind === 'code' ? <AssistantMarker /> : null}
         />
       ))}
       {streaming && blocks.length === 0 ? (
-        <Text color={ASSISTANT_ACCENT}>
-          <StreamCursor active />
+        <Text>
+          <AssistantMarker />
+          <Text color={ASSISTANT_ACCENT}><StreamCursor active /></Text>
         </Text>
       ) : null}
     </Box>
   )
 }
 
-const MarkdownBlockView: React.FC<{ block: MarkdownBlock; streaming?: boolean }> = ({ block, streaming = false }) => {
+const AssistantMarker: React.FC = () => (
+  <Text color={theme.dim}>{ASSISTANT_MARKER}</Text>
+)
+
+const MarkdownBlockView: React.FC<{ block: MarkdownBlock; streaming?: boolean; prefix?: React.ReactNode }> = ({
+  block,
+  streaming = false,
+  prefix = null,
+}) => {
   if (block.kind === 'heading') {
     return (
       <Box flexDirection="column" marginTop={1}>
         <Text>
+          {prefix}
           <InlineText text={block.text} color={ASSISTANT_ACCENT} bold />
         </Text>
       </Box>
@@ -296,6 +411,7 @@ const MarkdownBlockView: React.FC<{ block: MarkdownBlock; streaming?: boolean }>
       <Box flexDirection="column" marginTop={1}>
         {block.lines.map((line, index) => (
           <Text key={index}>
+            {index === 0 ? prefix : null}
             <Text color={ASSISTANT_ACCENT}>| </Text>
             <InlineText text={line} color={theme.dim} />
           </Text>
@@ -309,6 +425,7 @@ const MarkdownBlockView: React.FC<{ block: MarkdownBlock; streaming?: boolean }>
       <Box flexDirection="column" marginTop={1}>
         {block.items.map((item, index) => (
           <Text key={index}>
+            {index === 0 ? prefix : null}
             <Text color={ASSISTANT_ACCENT}>{block.ordered ? `${index + 1}. ` : '- '}</Text>
             <InlineText text={item} color={theme.text} />
           </Text>
@@ -319,18 +436,20 @@ const MarkdownBlockView: React.FC<{ block: MarkdownBlock; streaming?: boolean }>
 
   if (block.kind === 'code') {
     const lines = block.code.length === 0 ? [''] : block.code.split('\n')
-    const accent = codeAccent(block.lang)
+    const isShell = block.lang === 'bash' || block.lang === 'sh'
     return (
-      <Box flexDirection="column" marginTop={1} borderStyle="round" borderColor={accent}>
-        <Box paddingX={1}>
-          <Text color={accent} bold>{block.lang ? block.lang : 'code'}</Text>
-          <Text color={theme.dim}>{block.open ? '  · streaming' : '  · block'}</Text>
-        </Box>
-        <Box flexDirection="column" paddingX={1}>
+      <Box flexDirection="column" marginTop={1}>
+        <Text>
+          {prefix}
+          <Text color={theme.accentPeriwinkle} bold>{block.lang ?? 'code'}</Text>
+          {block.open ? <Text color={theme.dim}> streaming</Text> : null}
+        </Text>
+        <Box flexDirection="column" marginLeft={2}>
           {lines.map((line, index) => (
             <Text key={index}>
-              <Text color={theme.dim}>{`${String(index + 1).padStart(2, '0')} `}</Text>
-              <Text color={codeLineColor(block.lang, line)}>{line || ' '}</Text>
+              <Text color={theme.dim}>{isShell ? '$ ' : '  '}</Text>
+              <SyntaxLine line={line} lang={block.lang} fallbackColor={theme.textSubtle} />
+              {block.open && index === lines.length - 1 ? <Text color={ASSISTANT_ACCENT}> <StreamCursor active /></Text> : null}
             </Text>
           ))}
         </Box>
@@ -341,6 +460,7 @@ const MarkdownBlockView: React.FC<{ block: MarkdownBlock; streaming?: boolean }>
   return (
     <Box flexDirection="column" marginTop={1}>
       <Text>
+        {prefix}
         <InlineText text={block.text} color={theme.text} />
         {streaming ? <Text color={ASSISTANT_ACCENT}> <StreamCursor active /></Text> : null}
       </Text>
@@ -406,6 +526,14 @@ const StreamCursor: React.FC<{ active: boolean }> = ({ active }) => {
   }, [active])
 
   return <>{visible ? '|' : ' '}</>
+}
+
+function blockContentWidth(lines: string[]): number {
+  return Math.max(1, ...lines.map(displayWidth))
+}
+
+function displayWidth(line: string): number {
+  return (line || ' ').replace(/\t/g, '  ').length
 }
 
 function parseMarkdownBlocks(markdown: string): MarkdownBlock[] {
@@ -503,21 +631,6 @@ function parseMarkdownBlocks(markdown: string): MarkdownBlock[] {
   }
 
   return blocks
-}
-
-function codeAccent(_lang: string | null): string {
-  return ASSISTANT_ACCENT
-}
-
-function codeLineColor(lang: string | null, line: string): string {
-  const trimmed = line.trim()
-  if (!trimmed) return theme.textSubtle
-  if ((lang === 'json' || lang === 'jsonc') && /^["[{]/.test(trimmed)) return ASSISTANT_ACCENT
-  if (/^(\/\/|#|\/\*|\*)/.test(trimmed)) return theme.dim
-  if (/\b(function|const|let|return|if|else|class|export|import)\b/.test(trimmed)) return theme.text
-  if (/<\/?[A-Za-z]/.test(trimmed)) return ASSISTANT_ACCENT
-  if (/^[.#@]/.test(trimmed)) return ASSISTANT_ACCENT
-  return theme.textSubtle
 }
 
 function parseInlineTokens(text: string): InlineToken[] {

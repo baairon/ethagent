@@ -1,6 +1,6 @@
 import React from 'react'
 import { Box } from 'ink'
-import { TranscriptView } from './TranscriptView.js'
+import { TranscriptView } from './transcript/TranscriptView.js'
 import type { MessageRow } from './MessageList.js'
 
 type ConversationStackProps = {

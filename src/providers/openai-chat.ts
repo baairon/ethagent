@@ -5,6 +5,7 @@ import { providerErrorFromResponse } from './errors.js'
 import { fetchWithRetryStreamEvents } from './retry.js'
 import { iterSseFrames } from './sse.js'
 import { messageTextContent } from '../utils/messages.js'
+import { providerDisplayName } from '../models/providerDisplay.js'
 
 export type OpenAIToolDefinition = {
   type: 'function'
@@ -369,7 +370,7 @@ function providerNetworkErrorMessage(
 ): string {
   const message = (err as Error).message || fallback
   if (provider !== 'llamacpp') return message
-  return `${provider} request failed at ${baseUrl}: ${message}`
+  return `${providerDisplayName(provider)} request failed at ${baseUrl}: ${message}`
 }
 
 class ContentThinkingParser {

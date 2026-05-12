@@ -132,9 +132,9 @@ const COMMANDS: CommandSpec[] = [
       try {
         const next = setCwd(target, ctx.cwd)
         ctx.onChangeCwd(next)
-        return { kind: 'note', text: `cwd: ${next}`, variant: 'dim' }
+        return { kind: 'note', text: `Cwd: ${next}`, variant: 'dim' }
       } catch (err: unknown) {
-        return { kind: 'note', variant: 'error', text: `cd failed: ${(err as Error).message}` }
+        return { kind: 'note', variant: 'error', text: `Cd failed: ${(err as Error).message}` }
       }
     },
   },
@@ -200,7 +200,7 @@ const COMMANDS: CommandSpec[] = [
           return {
             kind: 'note',
             variant: 'error',
-            text: `'${name}' was not found for ${ctx.config.provider}. use /models to inspect available models.`,
+            text: `'${name}' was not found for ${providerDisplayName(ctx.config.provider)}. use /models to inspect available models.`,
           }
         }
       }
@@ -244,12 +244,12 @@ const COMMANDS: CommandSpec[] = [
       }
       const result = await rewindWorkspaceEdits(ctx.cwd, steps)
       if (result.reverted === 0) {
-        return { kind: 'note', variant: 'error', text: 'no managed edits available to rewind in this directory.' }
+        return { kind: 'note', variant: 'error', text: 'No managed edits available to rewind in this directory.' }
       }
       const files = result.files.map(file => path.relative(ctx.cwd, file) || path.basename(file))
       return {
         kind: 'note',
-        text: `rewound ${result.reverted} edit${result.reverted === 1 ? '' : 's'}.\n${files.join('\n')}`,
+        text: `Rewound ${result.reverted} edit${result.reverted === 1 ? '' : 's'}.\n${files.join('\n')}`,
         variant: 'dim',
       }
     },
@@ -276,7 +276,7 @@ const COMMANDS: CommandSpec[] = [
     run: async (args, ctx) => {
       const assistant = ctx.assistantTurns()
       if (assistant.length === 0) {
-        return { kind: 'note', variant: 'error', text: 'nothing to copy yet.' }
+        return { kind: 'note', variant: 'error', text: 'Nothing to copy yet.' }
       }
       let offset = 1
       const trimmed = args.trim()
@@ -289,17 +289,17 @@ const COMMANDS: CommandSpec[] = [
       }
       const index = assistant.length - offset
       if (index < 0) {
-        return { kind: 'note', variant: 'error', text: `only ${assistant.length} assistant reply on record.` }
+        return { kind: 'note', variant: 'error', text: `Only ${assistant.length} assistant reply on record.` }
       }
       const text = assistant[index] ?? ''
-      const label = offset === 1 ? 'latest reply' : `reply #${offset} back`
+      const label = offset === 1 ? 'Latest reply' : `Reply #${offset} back`
       const segments = parseSegments(text)
       if (segments.length <= 1) {
         const result = await copyToClipboard(text)
         if (!result.ok) {
-          return { kind: 'note', variant: 'error', text: `copy failed: ${result.error}` }
+          return { kind: 'note', variant: 'error', text: `Copy failed: ${result.error}` }
         }
-        return { kind: 'note', text: `copied ${text.length} chars via ${result.method}.`, variant: 'dim' }
+        return { kind: 'note', text: `${label} copied to clipboard · ${result.chars} chars`, variant: 'dim' }
       }
       ctx.onCopyPickerRequest(text, label)
       return { kind: 'handled' }
@@ -312,16 +312,16 @@ const COMMANDS: CommandSpec[] = [
     run: async (_args, ctx) => {
       const messages = ctx.sessionMessages()
       if (messages.length === 0) {
-        return { kind: 'note', variant: 'error', text: 'nothing to export yet.' }
+        return { kind: 'note', variant: 'error', text: 'Nothing to export yet.' }
       }
       try {
         const file = await exportSessionMarkdown(ctx.sessionId, messages, {
           model: ctx.config.model,
           provider: ctx.config.provider,
         })
-        return { kind: 'note', text: `exported to ${file}` }
+        return { kind: 'note', text: `Exported to ${file}` }
       } catch (err: unknown) {
-        return { kind: 'note', variant: 'error', text: `export failed: ${(err as Error).message}` }
+        return { kind: 'note', variant: 'error', text: `Export failed: ${(err as Error).message}` }
       }
     },
   },
@@ -437,7 +437,7 @@ async function runMcp(args: string, ctx: SlashContext): Promise<SlashResult> {
       return { kind: 'note', text: await ctx.mcp.addJson(name, json, project ? 'project' : 'user'), variant: 'dim' }
     }
   } catch (err: unknown) {
-    return { kind: 'note', variant: 'error', text: `mcp failed: ${(err as Error).message}` }
+    return { kind: 'note', variant: 'error', text: `MCP failed: ${(err as Error).message}` }
   }
 
   return {
@@ -463,7 +463,7 @@ async function runIdentity(args: string, ctx: SlashContext): Promise<SlashResult
       return {
         kind: 'note',
         variant: 'dim',
-        text: 'no Ethereum identity set. run /identity create to make one.',
+        text: 'No Ethereum identity set. Run /identity create to make one.',
       }
     }
     const lines = [
@@ -491,16 +491,16 @@ async function runIdentity(args: string, ctx: SlashContext): Promise<SlashResult
       return {
         kind: 'note',
         variant: 'error',
-        text: 'remove deletes local identity metadata and any legacy stored key. re-run with: /identity remove confirm',
+        text: 'Remove deletes local identity metadata and any legacy stored key. Re-run with: /identity remove confirm',
       }
     }
     const status = await getIdentityStatus(ctx.config)
     if (!status) {
-      return { kind: 'note', variant: 'dim', text: 'no Ethereum identity to remove.' }
+      return { kind: 'note', variant: 'dim', text: 'No Ethereum identity to remove.' }
     }
     const next = await clearIdentity(ctx.config)
     ctx.onReplaceConfig(next)
-    return { kind: 'note', text: `removed identity ${status.address}.`, variant: 'dim' }
+    return { kind: 'note', text: `Removed identity ${status.address}.`, variant: 'dim' }
   }
 
   return {
@@ -537,7 +537,7 @@ function renderStatus(ctx: SlashContext): string {
   const elapsed = minutes > 0 ? `${minutes}m${seconds.toString().padStart(2, '0')}s` : `${seconds}s`
   const displayModel = formatModelDisplayName(ctx.config.provider, ctx.config.model, { maxLength: 72 })
   return [
-    `provider   ${ctx.config.provider}`,
+    `provider   ${providerDisplayName(ctx.config.provider)}`,
     `model      ${displayModel}`,
     `cwd        ${ctx.cwd}`,
     `session    ${ctx.sessionId.slice(0, 8)}`,
@@ -560,7 +560,7 @@ function renderContext(ctx: SlashContext): string {
         : 'Context has comfortable room.'
   return [
     'context usage:',
-    `  model      ${ctx.config.provider} · ${formatModelDisplayName(ctx.config.provider, ctx.config.model, { maxLength: 72 })}`,
+    `  model      ${providerDisplayName(ctx.config.provider)} · ${formatModelDisplayName(ctx.config.provider, ctx.config.model, { maxLength: 72 })}`,
     `  used       ~${usage.usedTokens} / ${usage.windowTokens} tokens (${usage.percent}%)`,
     `  free       ~${free} tokens`,
     `  estimate   ${usage.confidence} (${usage.source})`,
@@ -585,7 +585,7 @@ function renderDoctor(
   lines.push(`  hf models  ${hfModelCount} downloaded`)
   lines.push('')
   lines.push('config:')
-  lines.push(`  provider   ${ctx.config.provider}`)
+  lines.push(`  provider   ${providerDisplayName(ctx.config.provider)}`)
   lines.push(`  model      ${formatModelDisplayName(ctx.config.provider, ctx.config.model, { maxLength: 72 })}`)
   if (ctx.config.baseUrl) lines.push(`  baseUrl    ${ctx.config.baseUrl}`)
   if (ctx.config.provider === 'llamacpp') lines.push(`  hf cache   ${getLocalHfCacheDir()}`)
@@ -593,7 +593,7 @@ function renderDoctor(
   lines.push('')
   lines.push('keys:')
   for (const [provider, present] of keys) {
-    lines.push(`  ${provider.padEnd(9)}  ${present ? 'set' : 'not set'}`)
+    lines.push(`  ${providerDisplayName(provider).padEnd(9)}  ${present ? 'set' : 'not set'}`)
   }
   lines.push('')
   lines.push('identity:')
@@ -610,8 +610,8 @@ function renderDoctor(
 
 function renderModelCatalog(catalog: ModelCatalogResult, currentModel: string): string {
   const title = catalog.status === 'fallback'
-    ? `${catalog.provider} models (fallback${catalog.error ? `: ${catalog.error}` : ''}):`
-    : `${catalog.provider} models:`
+    ? `${providerDisplayName(catalog.provider)} models (fallback${catalog.error ? `: ${catalog.error}` : ''}):`
+    : `${providerDisplayName(catalog.provider)} models:`
   const lines = catalog.entries.map(entry => {
     const marker = entry.id === currentModel ? '*' : ' '
     const suffix = entry.source === 'fallback' ? '  fallback' : ''
@@ -649,9 +649,9 @@ export async function dispatchSlash(input: string, ctx: SlashContext): Promise<S
       const promptText = await ctx.mcp?.runPromptSlash(parsed.name, parsed.args)
       if (promptText !== null && promptText !== undefined) return { kind: 'submit', text: promptText }
     } catch (err: unknown) {
-      return { kind: 'note', variant: 'error', text: `mcp prompt failed: ${(err as Error).message}` }
+      return { kind: 'note', variant: 'error', text: `MCP prompt failed: ${(err as Error).message}` }
     }
-    return { kind: 'note', variant: 'error', text: `unknown command: /${parsed.name}. try /help` }
+    return { kind: 'note', variant: 'error', text: `Unknown command: /${parsed.name}. Try /help` }
   }
   if (ctx.mode === 'plan' && cmd.blockedInPlan) {
     return { kind: 'note', variant: 'error', text: `/${cmd.name} is blocked in plan mode.` }

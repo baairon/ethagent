@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import {
   assertTokenNotInVault,
   TokenInVaultError,
-} from '../../../../src/identity/hub/effects/vault/preflight.js'
+} from '../../../../src/identity/hub/custody/preflight.js'
 import { identityFixture, registry } from './effects.fixtures.js'
 
 test('assertTokenNotInVault returns void when identity has no agentId yet', async () => {

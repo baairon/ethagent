@@ -8,33 +8,33 @@ import type { SelectableNetwork } from '../../storage/config.js'
 import { copyToClipboard } from '../../utils/clipboard.js'
 import { DEFAULT_IPFS_API_URL } from '../storage/ipfs.js'
 import { chainIdForNetwork, erc8004ConfigForSupportedChain } from '../registry/erc8004.js'
-import { shortAddress } from './model/format.js'
+import { shortAddress } from './shared/model/format.js'
 import {
   canRestoreCandidate,
   resolveAgentEnsToCandidate,
   resolveAgentTokenIdToCandidate,
-} from './effects/restore/index.js'
+} from './restore/index.js'
 import {
   runRegistrySubmit,
   runStorageSubmit,
-} from './effects/create.js'
+} from './create/effects.js'
 import {
   runRestoreRegistrySubmit,
-} from './effects/restoreAdmin.js'
-import { MenuScreen } from './components/MenuScreen.js'
-import { CreateFlow } from './flows/create/CreateFlow.js'
-import { RestoreFlow } from './flows/restore/RestoreFlow.js'
-import { NetworkScreen } from './components/NetworkScreen.js'
-import { DetailsScreen } from './components/DetailsScreen.js'
+} from './restore/restoreAdmin.js'
+import { MenuScreen } from './shared/components/MenuScreen.js'
+import { CreateFlow } from './create/CreateFlow.js'
+import { RestoreFlow } from './restore/RestoreFlow.js'
+import { NetworkScreen } from './shared/components/NetworkScreen.js'
+import { DetailsScreen } from './shared/components/DetailsScreen.js'
 import {
-  IdentityHubTokenTransferFlow,
+  TokenTransferFlow,
   isTokenTransferStep,
-} from './flows/token-transfer/IdentityHubTokenTransferFlow.js'
+} from './transfer/TokenTransferFlow.js'
 import {
   chainLabel,
   isCreateStep,
   isRestoreStep,
-} from './utils.js'
+} from './shared/utils.js'
 import { IdentityHubOperationalRoutes } from './OperationalRoutes.js'
 import type { IdentityHubController } from './useIdentityHubController.js'
 
@@ -345,7 +345,7 @@ export const IdentityHubRoutes: React.FC<{ controller: IdentityHubController }> 
 
   if (isTokenTransferStep(step)) {
     return (
-      <IdentityHubTokenTransferFlow
+      <TokenTransferFlow
         step={step}
         callbacks={callbacks}
         footer={footer}

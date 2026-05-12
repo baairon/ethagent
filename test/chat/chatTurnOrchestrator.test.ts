@@ -10,6 +10,7 @@ import type { SessionMessage } from '../../src/storage/sessions.js'
 import { toggleLatestReasoningRow, type MessageRow } from '../../src/chat/MessageList.js'
 import { privateContinuityEditReviewFromToolResult } from '../../src/chat/ChatScreen.js'
 import { buildIdentityContinuityContextMessages, runStreamingTurn } from '../../src/chat/chatTurnOrchestrator.js'
+import { formatFileChangeResult } from '../../src/tools/fileDiff.js'
 
 const wait = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms))
 
@@ -35,6 +36,29 @@ test('private continuity edit review helper extracts the TUI popup target', () =
     filePath: 'C:\\Users\\bairo\\.ethagent\\continuity\\agent\\MEMORY.md',
     summary: 'append to Durable User Preferences in MEMORY.md',
   })
+})
+
+test('private continuity edit review helper preserves saved diff for the TUI popup', () => {
+  const review = privateContinuityEditReviewFromToolResult(
+    'propose_private_continuity_edit',
+    { file: 'SOUL.md' },
+    {
+      ok: true,
+      summary: 'append to Persona in SOUL.md',
+      content: formatFileChangeResult(
+        [
+          '## Saved private continuity',
+          '',
+          '- File: `identity-vault/SOUL.md`',
+          '- Review file: `C:\\Users\\bairo\\.ethagent\\continuity\\agent\\SOUL.md`',
+        ].join('\n'),
+        '--- SOUL.md\n+++ SOUL.md\n@@ -4 +4,2 @@\n - Existing persona\n+- New standing behavior',
+      ),
+    },
+  )
+
+  assert.equal(review?.file, 'SOUL.md')
+  assert.equal(review?.diff, '--- SOUL.md\n+++ SOUL.md\n@@ -4 +4,2 @@\n - Existing persona\n+- New standing behavior')
 })
 
 test('identity continuity context auto-loads SOUL and MEMORY but never skills.json', async () => {

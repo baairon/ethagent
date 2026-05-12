@@ -7,25 +7,13 @@ import { type SelectOption } from '../ui/Select.js'
 import { formatLocalHfModelDisplayName, formatModelDisplayName } from './modelDisplay.js'
 import { localModelId, quantizationFromFilename } from './huggingface.js'
 import type { UncensoredCatalogEntry } from './uncensoredCatalog.js'
+import { cloudProviderDisplayName, providerDisplayName, type CloudProviderId } from './providerDisplay.js'
 
-export type CloudProviderId = Exclude<ProviderId, 'llamacpp'>
+export { cloudProviderDisplayName, providerDisplayName, type CloudProviderId }
 
 export const MODEL_PICKER_CLOUD_PROVIDERS: CloudProviderId[] = ['openai', 'anthropic', 'gemini']
 export const LOCAL_MODEL_LINK_HINT = 'Paste a GGUF link'
 export const LOCAL_MODEL_LINK_EXAMPLE = 'e.g. https://huggingface.co/Qwen/Qwen3-8B-GGUF'
-
-export function cloudProviderDisplayName(provider: CloudProviderId): string {
-  switch (provider) {
-    case 'openai': return 'OpenAI'
-    case 'anthropic': return 'Anthropic'
-    case 'gemini': return 'Gemini'
-  }
-}
-
-export function providerDisplayName(provider: ProviderId): string {
-  if (provider === 'llamacpp') return 'llama.cpp'
-  return cloudProviderDisplayName(provider)
-}
 
 export type LocalHfPickerModel = {
   id: string

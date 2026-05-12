@@ -5,6 +5,7 @@ import { recordRewindSnapshot } from '../storage/rewind.js'
 import type { EthagentConfig } from '../storage/config.js'
 import type { Tool } from './contracts.js'
 import { applyRequestedEdit } from './editUtils.js'
+import { formatFileChangeResult, renderUnifiedFileDiff } from './fileDiff.js'
 import { resolveWorkspacePath } from './readTool.js'
 
 const schema = z.object({
@@ -44,15 +45,16 @@ export const editTool: Tool<typeof schema> = {
       subtitle: fullPath,
       before: applied.previewBefore,
       after: applied.previewAfter,
+      diff: renderUnifiedFileDiff({ filePath: relativePath, before: applied.before, after: applied.after }),
       changeSummary: applied.summary,
     }
   },
   async execute(input, context) {
-    const { fullPath, applied, existedBefore, before } = await prepareEdit(input, context)
+    const { fullPath, relativePath, applied, existedBefore, before } = await prepareEdit(input, context)
     const rewindWarning = await tryRecordRewindSnapshot({
       workspaceRoot: context.workspaceRoot,
       filePath: fullPath,
-      relativePath: path.relative(context.workspaceRoot, fullPath) || path.basename(fullPath),
+      relativePath,
       existedBefore,
       previousContent: before,
       changeSummary: applied.summary,
@@ -68,9 +70,12 @@ export const editTool: Tool<typeof schema> = {
     return {
       ok: true,
       summary: applied.summary,
-      content: rewindWarning
-        ? `updated ${fullPath}\nwarning: ${rewindWarning}`
-        : `updated ${fullPath}`,
+      content: formatFileChangeResult(
+        rewindWarning
+          ? `updated ${fullPath}\nwarning: ${rewindWarning}`
+          : `updated ${fullPath}`,
+        renderUnifiedFileDiff({ filePath: relativePath, before: applied.before, after: applied.after }),
+      ),
     }
   },
 }

@@ -226,6 +226,7 @@ export const Spinner: React.FC<SpinnerProps> = ({
   const stickyVerbRef = useRef<string | null>(null)
   const internalStartedAtRef = useRef<number>(Date.now())
   const [frame, setFrame] = useState(0)
+  const [shimmerPos, setShimmerPos] = useState(0)
 
   useEffect(() => {
     if (!active) {
@@ -252,19 +253,40 @@ export const Spinner: React.FC<SpinnerProps> = ({
     return () => clearInterval(timer)
   }, [active])
 
-  if (!active) return null
-
   const autoLabel = stickyVerbRef.current ?? verb ?? 'thinking'
   const text = spinnerText(label ?? `${autoLabel}…`)
+
+  useEffect(() => {
+    if (!active) return
+    const period = text.length + 12
+    const timer = setInterval(() => {
+      setShimmerPos(prev => (prev + 1) % period)
+    }, 90)
+    return () => clearInterval(timer)
+  }, [active, text.length])
+
+  if (!active) return null
+
   const glyph = FRAMES[frame] ?? 'o'
   const elapsed = showElapsed ? formatElapsedSeconds(Date.now() - (startedAt ?? internalStartedAtRef.current)) : null
   const renderedHint = [rawHint, elapsed].filter(Boolean).join(' · ')
   const hint = renderedHint ? spinnerHintText(renderedHint) : ''
 
+  const shimmerStart = shimmerPos - 1
+  const shimmerEnd = shimmerPos + 1
+  const visibleStart = Math.max(0, shimmerStart)
+  const visibleEnd = Math.min(text.length, shimmerEnd + 1)
+  const before = text.slice(0, visibleStart)
+  const shimmer = shimmerStart < text.length && shimmerEnd >= 0 ? text.slice(visibleStart, visibleEnd) : ''
+  const after = text.slice(visibleEnd)
+
   return (
     <Text>
       <Text color={color}>{glyph}</Text>
-      <Text color={theme.dim}> {text}</Text>
+      <Text> </Text>
+      {before ? <Text color={theme.accentPeriwinkle}>{before}</Text> : null}
+      {shimmer ? <Text color={theme.accentWhite} bold>{shimmer}</Text> : null}
+      {after ? <Text color={theme.accentPeriwinkle}>{after}</Text> : null}
       {hint ? <Text color={theme.dim}> · {hint}</Text> : null}
     </Text>
   )

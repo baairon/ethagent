@@ -16,6 +16,7 @@ import { theme } from '../ui/theme.js'
 import { BrandSplash } from '../ui/BrandSplash.js'
 import { SessionStatus, formatTokens } from './SessionStatus.js'
 import { formatModelDisplayName } from '../models/modelDisplay.js'
+import { providerDisplayName } from '../models/providerDisplay.js'
 import { toggleReasoningRow, type MessageRow } from './MessageList.js'
 import { ConversationStack } from './ConversationStack.js'
 import type { ModelPickerSelection } from '../models/ModelPicker.js'
@@ -53,6 +54,7 @@ import type {
   PermissionRequest,
   SessionPermissionRule,
 } from '../tools/contracts.js'
+import { splitFileChangeResult } from '../tools/fileDiff.js'
 import {
   buildBaseMessages,
   sessionMessagesToRows,
@@ -63,7 +65,7 @@ import { setTokenIdentity, getIdentityStatus } from '../storage/identity.js'
 import type { IdentityHubResult } from '../identity/hub/IdentityHub.js'
 import { continuityWorkingTreeStatus } from '../identity/continuity/storage.js'
 import { listPublishedContinuitySnapshots } from '../identity/continuity/snapshots.js'
-import { localChangeStatusView } from '../identity/hub/model/continuity.js'
+import { localChangeStatusView } from '../identity/hub/continuity/state.js'
 import {
   buildResumedSessionState,
   promptHistoryFromSessionMessages,
@@ -72,9 +74,9 @@ import {
 } from './chatSessionState.js'
 import { runStreamingTurn } from './chatTurnOrchestrator.js'
 import { ensureLlamaCppRunnerReady } from '../models/llamacppPreflight.js'
-import type { PlanApprovalAction } from './PlanApprovalView.js'
-import type { ContextLimitAction } from './ContextLimitView.js'
-import type { ContinuityEditReviewAction, ContinuityEditReviewState } from './ContinuityEditReviewView.js'
+import type { PlanApprovalAction } from './views/PlanApprovalView.js'
+import type { ContextLimitAction } from './views/ContextLimitView.js'
+import type { ContinuityEditReviewAction, ContinuityEditReviewState } from './views/ContinuityEditReviewView.js'
 import { openFileInEditor } from '../identity/continuity/editor.js'
 import { EMPTY_MCP_SNAPSHOT, McpManager, type McpSnapshot } from '../mcp/manager.js'
 
@@ -154,6 +156,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
     contextUsageFromTokens(0, initialConfig.provider, initialConfig.model),
   )
   const [mcpSnapshot, setMcpSnapshot] = useState<McpSnapshot>(EMPTY_MCP_SNAPSHOT)
+  const [pendingInputDraft, setPendingInputDraft] = useState<string | null>(null)
 
   const rowsRef = useRef<MessageRow[]>([])
   const visibleReasoningIdsRef = useRef<string[]>([])
@@ -380,7 +383,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
     setModelPickerContextFit(null)
     overlayRef.current = 'none'
     setOverlay('none')
-    if (hadPendingPrompt) pushNote('pending message cancelled.', 'dim')
+    if (hadPendingPrompt) pushNote('Pending message cancelled.', 'dim')
   }, [pushNote])
 
   const changeCwd = useCallback((next: string) => {
@@ -489,7 +492,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
         modeRef.current,
       )
       if (priorMessages.length <= 5) {
-        pushNote('not enough turns to compact yet.', 'dim')
+        pushNote('Not enough turns to compact yet.', 'dim')
         return false
       }
       compactingRef.current = true
@@ -501,14 +504,14 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
         })
         if (!result.ok && result.cancelled) {
           removeCompactionProgress(compaction)
-          pushNote('compaction cancelled.', 'dim')
+          pushNote('Compaction cancelled.', 'dim')
           return false
         }
         const summary = result.ok
           ? normalizeHandoffSummary(result.summary)
           : normalizeHandoffSummary(summarizeTranscriptLocally(priorMessages, result.reason))
         if (!result.ok) {
-          pushNote(`provider summary failed; created a local summary instead: ${result.reason}`, 'dim')
+          pushNote(`Provider summary failed; created a local summary instead: ${result.reason}`, 'dim')
         }
 
         updateCompactionStage(compaction, 'saving summarized conversation')
@@ -573,9 +576,123 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
       } catch (err: unknown) {
         removeCompactionProgress(compaction)
         if (compaction.controller.signal.aborted) {
-          pushNote('compaction cancelled.', 'dim')
+          pushNote('Compaction cancelled.', 'dim')
         } else {
-          pushNote(`compact error: ${(err as Error).message}`, 'error')
+          pushNote(`Compact error: ${(err as Error).message}`, 'error')
+        }
+        return false
+      } finally {
+        compactingRef.current = false
+        compactionUiRef.current = null
+        setCompactionUi(null)
+      }
+    },
+    [beginCompactionUi, pushNote, refreshVisibleStats, removeCompactionProgress, updateCompactionStage],
+  )
+
+  const runCompactionFromTurn = useCallback(
+    async (turnId: string): Promise<boolean> => {
+      if (compactingRef.current) return false
+      const sourceSessionId = sessionIdRef.current
+      const all = sessionMessagesRef.current
+      const splitIndex = all.findIndex(m => m.turnId === turnId)
+      if (splitIndex < 0) {
+        pushNote('Could not find that prompt to summarize from.', 'error')
+        return false
+      }
+      const before = all.slice(0, splitIndex)
+      const from = all.slice(splitIndex)
+      const fromBase = buildBaseMessages(
+        from,
+        configRef.current,
+        providerRef.current.supportsTools,
+        cwdRef.current,
+        modeRef.current,
+      )
+      if (fromBase.length <= 2) {
+        pushNote('Not enough messages from that point to summarize.', 'dim')
+        return false
+      }
+      compactingRef.current = true
+      const compaction = beginCompactionUi('conversation', sourceSessionId)
+      try {
+        const result = await compactTranscript(providerRef.current, fromBase, {
+          signal: compaction.controller.signal,
+          onStage: stage => updateCompactionStage(compaction, stage),
+        })
+        if (!result.ok && result.cancelled) {
+          removeCompactionProgress(compaction)
+          pushNote('Compaction cancelled.', 'dim')
+          return false
+        }
+        const summary = result.ok
+          ? normalizeHandoffSummary(result.summary)
+          : normalizeHandoffSummary(summarizeTranscriptLocally(fromBase, result.reason))
+        if (!result.ok) {
+          pushNote(`Provider summary failed; created a local summary instead: ${result.reason}`, 'dim')
+        }
+        updateCompactionStage(compaction, 'saving summarized conversation')
+        const nextSessionId = newSessionId()
+        const summaryMessage: SessionMessage = {
+          role: 'user',
+          synthetic: true,
+          content: [
+            `Conversation handoff from ${sourceSessionId.slice(0, 8)} (summarized from a chosen prompt forward):`,
+            '',
+            summary,
+          ].join('\n'),
+          createdAt: nowIso(),
+        }
+        const acknowledgement: SessionMessage = {
+          role: 'assistant',
+          content: 'Ready to continue from this summary.',
+          createdAt: nowIso(),
+          model: configRef.current.model,
+        }
+        const context = {
+          cwd: cwdRef.current,
+          provider: configRef.current.provider,
+          model: configRef.current.model,
+          mode: modeRef.current,
+        }
+        await ensureSessionMetadata(nextSessionId, context)
+        await updateSessionActivity(nextSessionId, context, { compactedFromSessionId: sourceSessionId })
+        for (const msg of before) {
+          await appendSessionMessage(nextSessionId, msg, context)
+        }
+        await appendSessionMessage(nextSessionId, summaryMessage, context)
+        await appendSessionMessage(nextSessionId, acknowledgement, context)
+
+        updateCompactionStage(compaction, 'opening summarized conversation')
+        const nextMessages: SessionMessage[] = [...before, summaryMessage, acknowledgement]
+        compactionUiRef.current = null
+        setCompactionUi(null)
+        sessionIdRef.current = nextSessionId
+        setSessionId(nextSessionId)
+        sessionMessagesRef.current = nextMessages
+        historyScopeRef.current = 'session'
+        setHistory(promptHistoryFromSessionMessages(nextMessages))
+        statsSegmentStartRef.current = 0
+        setRows([
+          {
+            role: 'note',
+            id: nextRowId(),
+            kind: 'dim',
+            content: `kept ${sourceSessionId.slice(0, 8)} saved; summarized from a chosen prompt into ${nextSessionId.slice(0, 8)}.`,
+          },
+          ...sessionMessagesToRows(nextMessages, nextRowId),
+        ])
+        setQueuedInputs([])
+        setStatusStartedAt(Date.now())
+        refreshVisibleStats(nextMessages, providerRef.current.supportsTools, cwdRef.current, configRef.current, modeRef.current)
+        setSessionKey(key => key + 1)
+        return true
+      } catch (err: unknown) {
+        removeCompactionProgress(compaction)
+        if (compaction.controller.signal.aborted) {
+          pushNote('Compaction cancelled.', 'dim')
+        } else {
+          pushNote(`Compact error: ${(err as Error).message}`, 'error')
         }
         return false
       } finally {
@@ -707,7 +824,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
       try {
         await savePermissionRule(cwdRef.current, sessionRule)
       } catch (error: unknown) {
-        pushNote(`failed to save permission rule: ${(error as Error).message}`, 'error')
+        pushNote(`Failed to save permission rule: ${(error as Error).message}`, 'error')
       }
     },
     [pushNote],
@@ -855,7 +972,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
 
       if (streaming || pullInFlight || compactionUiRef.current) {
         if (parseSlash(value)) {
-          pushNote('slash commands cannot be queued. wait for the current task to finish.', 'dim')
+          pushNote('Slash commands cannot be queued. Wait for the current task to finish.', 'dim')
           return
         }
         setQueuedInputs(prev => [...prev, value])
@@ -892,7 +1009,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
 
   const handleContextLimitCancel = useCallback(() => {
     clearContextLimit()
-    pushNote('pending message cancelled.', 'dim')
+    pushNote('Pending message cancelled.', 'dim')
   }, [clearContextLimit, pushNote])
 
   const handleContextLimitAction = useCallback(
@@ -905,7 +1022,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
       const prompt = state.prompt
       clearContextLimit()
       if (action === 'cancel') {
-        pushNote('pending message cancelled.', 'dim')
+        pushNote('Pending message cancelled.', 'dim')
         return
       }
       if (action === 'switchModel') {
@@ -1020,7 +1137,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
         pushNote(resolution.notice, resolution.tone)
         await continuePendingPromptAfterModelSwitch(pendingPrompt)
       } catch (err: unknown) {
-        pushNote(`provider switch failed: ${(err as Error).message}`, 'error')
+        pushNote(`Provider switch failed: ${(err as Error).message}`, 'error')
         if (pendingPrompt) showContextLimitForPrompt(pendingPrompt)
       }
     },
@@ -1033,7 +1150,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
       try {
         const [loaded, metadata] = await Promise.all([loadSession(id), loadSessionMetadata(id)])
         if (loaded.length === 0) {
-          pushNote('session was empty.', 'error')
+          pushNote('Session was empty.', 'error')
           return
         }
         const resumed = buildResumedSessionState({
@@ -1068,7 +1185,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
         refreshVisibleStats(loaded, providerRef.current.supportsTools, resumedCwd, configRef.current, resumed.mode)
         setSessionKey(k => k + 1)
       } catch (err: unknown) {
-        pushNote(`resume failed: ${(err as Error).message}`, 'error')
+        pushNote(`Resume failed: ${(err as Error).message}`, 'error')
       }
     },
     [clearContextLimit, clearPendingPlan, cwd, pushNote, refreshVisibleStats],
@@ -1080,7 +1197,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
       clearTranscript()
       overlayRef.current = 'none'
       setOverlay('none')
-      pushNote('cleared saved chat logs and resume context from this machine.', 'dim')
+      pushNote('Cleared saved chat logs and resume context from this machine.', 'dim')
     },
     [clearTranscript, pushNote],
   )
@@ -1099,9 +1216,9 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
           try {
             const nextConfig = await setTokenIdentity(configRef.current, result.identity)
             applyConfigChange(nextConfig)
-            pushNote(`identity saved · ERC-8004 #${result.identity.agentId}`, 'info')
+            pushNote(`Identity saved · ERC-8004 #${result.identity.agentId}`, 'info')
           } catch (err: unknown) {
-            pushNote(`identity save failed: ${(err as Error).message}`, 'error')
+            pushNote(`Identity save failed: ${(err as Error).message}`, 'error')
           }
         })()
       }
@@ -1133,12 +1250,12 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
         })
         overlayRef.current = 'identity'
         setOverlay('identity')
-        pushNote('opening snapshot signature.', 'dim')
+        pushNote('Opening snapshot signature.', 'dim')
         return
       }
       overlayRef.current = 'none'
       setOverlay('none')
-      pushNote('snapshot not saved yet.', 'dim')
+      pushNote('Snapshot not saved yet.', 'dim')
     },
     [continuityEditReview, pushNote],
   )
@@ -1147,7 +1264,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
     setContinuityEditReview(null)
     overlayRef.current = 'none'
     setOverlay('none')
-    pushNote('snapshot not saved yet.', 'dim')
+    pushNote('Snapshot not saved yet.', 'dim')
   }, [pushNote])
 
   const handleCopyDone = useCallback(
@@ -1155,9 +1272,9 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
       setOverlay('none')
       setCopyPickerState(null)
       if (result.ok) {
-        pushNote(`copied ${label} via ${result.method}.`, 'dim')
+        pushNote(`${label} copied to clipboard · ${result.chars} chars`, 'dim')
       } else {
-        pushNote(`copy failed: ${result.error}`, 'error')
+        pushNote(`Copy failed: ${result.error}`, 'error')
       }
     },
     [pushNote],
@@ -1166,15 +1283,18 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
   const handleCopyCancel = useCallback(() => {
     setOverlay('none')
     setCopyPickerState(null)
-    pushNote('copy cancelled.', 'dim')
+    pushNote('Copy cancelled.', 'dim')
   }, [pushNote])
 
-  const handleRestoreConversation = useCallback((turnId: string) => {
+  const handleRestoreConversation = useCallback((turnId: string, promptText?: string) => {
     const restored = restoreConversationState(sessionMessagesRef.current, turnId, nextRowId)
     sessionMessagesRef.current = restored.messages
     setRows(restored.rows)
     historyScopeRef.current = 'session'
     setHistory(restored.promptHistory)
+    if (promptText != null && promptText.length > 0) {
+      setPendingInputDraft(promptText)
+    }
     if (restored.truncated) {
       setQueuedInputs([])
       statsSegmentStartRef.current = Math.min(statsSegmentStartRef.current, restored.messages.length)
@@ -1216,7 +1336,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
 
       if (priorMessages.length <= 5) {
         startFreshImplementationContext()
-        pushNote('not enough planning context to summarize; starting a plan-only implementation conversation.', 'dim')
+        pushNote('Not enough planning context to summarize; starting a plan-only implementation conversation.', 'dim')
         return true
       }
 
@@ -1229,14 +1349,14 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
         })
         if (!result.ok && result.cancelled) {
           removeCompactionProgress(compaction)
-          pushNote('plan context summary cancelled.', 'dim')
+          pushNote('Plan context summary cancelled.', 'dim')
           return false
         }
         const summary = result.ok
           ? normalizeHandoffSummary(result.summary)
           : normalizeHandoffSummary(summarizeTranscriptLocally(priorMessages, result.reason))
         if (!result.ok) {
-          pushNote(`provider summary failed; created a local summary instead: ${result.reason}`, 'dim')
+          pushNote(`Provider summary failed; created a local summary instead: ${result.reason}`, 'dim')
         }
 
         updateCompactionStage(compaction, 'saving summarized conversation')
@@ -1287,9 +1407,9 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
       } catch (err: unknown) {
         removeCompactionProgress(compaction)
         if (compaction.controller.signal.aborted) {
-          pushNote('plan context summary cancelled.', 'dim')
+          pushNote('Plan context summary cancelled.', 'dim')
         } else {
-          pushNote(`context summary error: ${(err as Error).message}`, 'error')
+          pushNote(`Context summary error: ${(err as Error).message}`, 'error')
         }
         return false
       } finally {
@@ -1323,7 +1443,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
       }
       if (plan.cwd !== cwdRef.current || plan.sessionId !== sessionIdRef.current) {
         clearPendingPlan()
-        pushNote('dismissed stale plan approval because the workspace changed.', 'dim')
+        pushNote('Dismissed stale plan approval because the workspace changed.', 'dim')
         return
       }
       if (action === 'continue') {
@@ -1387,7 +1507,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
     })
   }, [compactionUi, overlay, projectedUsageForInput, pullInFlight, pushNote, queuedInputs, runStream, showContextLimitForPrompt, streaming])
 
-  const contextLine = `${config.provider} · ${formatModelDisplayName(config.provider, config.model, { maxLength: 24 })} · ${compressHome(cwd)}`
+  const contextLine = `${providerDisplayName(config.provider)} · ${formatModelDisplayName(config.provider, config.model, { maxLength: 24 })} · ${compressHome(cwd)}`
   const tipLine = 'Tip: type /help to get started · shift+enter for newline'
 
   const placeholderHints = useMemo(() => {
@@ -1456,6 +1576,9 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
           identityOverlay={identityOverlay}
           handleIdentityResult={handleIdentityResult}
           handleRestoreConversation={handleRestoreConversation}
+          pendingInputDraft={pendingInputDraft}
+          onInputDraftConsumed={() => setPendingInputDraft(null)}
+          handleSummarizeFromTurn={runCompactionFromTurn}
           handleCopyDone={handleCopyDone}
           handleCopyCancel={handleCopyCancel}
           resolvePermission={resolvePermission}
@@ -1568,12 +1691,14 @@ export function privateContinuityEditReviewFromToolResult(
   if (name !== 'propose_private_continuity_edit' || !result.ok) return null
   const file = normalizePrivateContinuityFile(input.file)
   if (!file) return null
-  const filePath = extractReviewFilePath(result.content)
+  const parsed = splitFileChangeResult(result.content)
+  const filePath = extractReviewFilePath(parsed.content)
   if (!filePath) return null
   return {
     file,
     filePath,
     summary: result.summary,
+    ...(parsed.diff ? { diff: parsed.diff } : {}),
   }
 }
 

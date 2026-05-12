@@ -4,14 +4,14 @@ import { getAddress } from 'viem'
 import {
   applyEnsValidationState,
   applyOperatorProfileState,
-} from '../../../../src/identity/hub/effects/profile/profileState.js'
+} from '../../../../src/identity/hub/profile/state.js'
 import {
   ensRecordWritesForUpdate,
   runUpdateEnsRecords,
-} from '../../../../src/identity/hub/effects/ens/index.js'
+} from '../../../../src/identity/hub/ens/index.js'
 import {
   resolveAgentTokenIdToCandidate,
-} from '../../../../src/identity/hub/effects/restore/index.js'
+} from '../../../../src/identity/hub/restore/index.js'
 import { RegisterAgentPreflightError } from '../../../../src/identity/registry/erc8004.js'
 import { registry } from './effects.fixtures.js'
 

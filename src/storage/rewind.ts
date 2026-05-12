@@ -131,6 +131,26 @@ export async function listRewindEntries(
     .slice(offset, offset + limit)
 }
 
+export async function groupRewindEntriesByTurn(
+  workspaceRoot: string,
+  sessionId: string,
+): Promise<Map<string, RewindEntry[]>> {
+  const normalizedWorkspaceRoot = path.resolve(workspaceRoot)
+  const snapshots = await loadSnapshots()
+  const grouped = new Map<string, RewindEntry[]>()
+  for (const snapshot of snapshots) {
+    if (isIdentityMarkdownSnapshot(snapshot)) continue
+    if (!isSnapshotWithinScope(snapshot, normalizedWorkspaceRoot)) continue
+    if (snapshot.sessionId !== sessionId) continue
+    if (!snapshot.turnId) continue
+    const entry = toEntry(snapshot)
+    const bucket = grouped.get(snapshot.turnId)
+    if (bucket) bucket.push(entry)
+    else grouped.set(snapshot.turnId, [entry])
+  }
+  return grouped
+}
+
 export async function rewindWorkspaceEditsByEntryIds(
   workspaceRoot: string,
   entryIds: string[],

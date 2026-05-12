@@ -11,6 +11,7 @@ import {
   sessionMessagesToProviderMessages,
   type SessionMessage,
 } from '../../src/storage/sessions.js'
+import { formatFileChangeResult } from '../../src/tools/fileDiff.js'
 
 async function withTempHome(fn: (home: string) => Promise<void>): Promise<void> {
   const prevHome = process.env.HOME
@@ -202,6 +203,32 @@ test('sessionMessagesToProviderMessages drops unsupported assistant claims after
   assert.equal(latestUserMessageCorrectsToolState(messages), true)
   assert.doesNotMatch(projected, /does not exist/)
   assert.match(projected, /just try/)
+})
+
+test('sessionMessagesToProviderMessages strips hidden file diff UI payloads', () => {
+  const messages = sessionMessagesToProviderMessages([
+    {
+      version: 2,
+      role: 'tool_use',
+      toolUseId: 'tool-1',
+      name: 'edit_file',
+      input: { path: 'hello.py' },
+      createdAt: '2026-04-21T00:00:00.000Z',
+    },
+    {
+      version: 2,
+      role: 'tool_result',
+      toolUseId: 'tool-1',
+      name: 'edit_file',
+      content: formatFileChangeResult('updated hello.py', '--- hello.py\n+++ hello.py\n+new'),
+      createdAt: '2026-04-21T00:00:01.000Z',
+    },
+  ])
+
+  const projected = JSON.stringify(messages)
+  assert.match(projected, /updated hello\.py/)
+  assert.doesNotMatch(projected, /ethagent:file-diff/)
+  assert.doesNotMatch(projected, /\+new/)
 })
 
 test('latestUserMessageCorrectsToolState accepts terse user corrections', () => {

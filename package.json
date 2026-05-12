@@ -50,6 +50,7 @@
     "@noble/hashes": "^1.8.0",
     "@noble/post-quantum": "^0.6.1",
     "ajv": "^8.18.0",
+    "cli-highlight": "^2.1.11",
     "esbuild": "^0.27.7",
     "ink": "^6.8.0",
     "react": "^19.2.4",

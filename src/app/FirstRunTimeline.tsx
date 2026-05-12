@@ -1,5 +1,5 @@
 import React from 'react'
-import { FlowTimeline } from '../identity/hub/components/FlowTimeline.js'
+import { FlowTimeline } from '../identity/hub/shared/components/FlowTimeline.js'
 
 export const FIRST_RUN_STAGES = ['Inspect', 'Identity', 'Model'] as const
 

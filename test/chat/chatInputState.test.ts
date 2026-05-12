@@ -10,7 +10,7 @@ import {
   moveVerticalVisual,
   replaceActiveFileMention,
   type ChatBuffer,
-} from '../../src/chat/chatInputState.js'
+} from '../../src/chat/input/chatInputState.js'
 
 test('deleteToLineStart removes only the current logical line prefix', () => {
   const value = 'first line\nsecond line suffix'

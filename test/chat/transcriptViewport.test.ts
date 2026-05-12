@@ -4,13 +4,13 @@ import {
   anchorForScrollTop,
   buildLineOffsets,
   estimateMessageRowHeight,
-  promptScrollTopForPageDown,
-  promptScrollTopForPageUp,
   resolveScrollTopFromAnchor,
+  scrollTopForPageDown,
+  scrollTopForPageUp,
   selectRowsForScrollOffset,
   selectRowsForScrollTop,
   selectTailRowsForViewport,
-} from '../../src/chat/transcriptViewport.js'
+} from '../../src/chat/transcript/transcriptViewport.js'
 import type { MessageRow } from '../../src/chat/MessageList.js'
 
 test('transcript viewport anchor preserves the same row through height changes', () => {
@@ -114,32 +114,21 @@ test('transcript viewport anchor keeps reasoning row stable when it expands', ()
   assert.equal(resolveScrollTopFromAnchor(ids, afterOffsets, anchor, 8), 2)
 })
 
-test('transcript viewport page up hops to the latest prompt from the tail', () => {
-  const rows: MessageRow[] = [
-    { role: 'user', id: 'u1', content: 'one' },
-    { role: 'assistant', id: 'a1', content: 'answer one' },
-    { role: 'user', id: 'u2', content: 'two' },
-    { role: 'assistant', id: 'a2', content: 'answer two' },
-  ]
-  const offsets = buildLineOffsets([1, 3, 1, 3])
-
-  assert.equal(promptScrollTopForPageUp(rows, offsets, 4, 4, true), 4)
+test('transcript viewport page up moves half a viewport from the tail', () => {
+  assert.equal(scrollTopForPageUp(8, 8, 8), 4)
+  assert.equal(scrollTopForPageUp(4, 8, 8), 0)
+  assert.equal(scrollTopForPageUp(2, 8, 8), 0)
 })
 
-test('transcript viewport page keys hop between prompt starts and tail', () => {
-  const rows: MessageRow[] = [
-    { role: 'user', id: 'u1', content: 'one' },
-    { role: 'assistant', id: 'a1', content: 'answer one' },
-    { role: 'user', id: 'u2', content: 'two' },
-    { role: 'assistant', id: 'a2', content: 'answer two' },
-    { role: 'user', id: 'u3', content: 'three' },
-    { role: 'assistant', id: 'a3', content: 'answer three' },
-  ]
-  const offsets = buildLineOffsets([1, 3, 1, 3, 1, 3])
+test('transcript viewport page down moves half a viewport and clamps to tail', () => {
+  assert.equal(scrollTopForPageDown(0, 8, 8), 4)
+  assert.equal(scrollTopForPageDown(4, 8, 8), 8)
+  assert.equal(scrollTopForPageDown(8, 8, 8), 8)
+})
 
-  assert.equal(promptScrollTopForPageUp(rows, offsets, 8, 8, false), 4)
-  assert.equal(promptScrollTopForPageDown(rows, offsets, 4, 8), 8)
-  assert.equal(promptScrollTopForPageDown(rows, offsets, 8, 8), 8)
+test('transcript viewport page keys use viewport lines instead of prompt starts', () => {
+  assert.equal(scrollTopForPageUp(15, 20, 7), 12)
+  assert.equal(scrollTopForPageDown(12, 20, 7), 15)
 })
 
 test('message row height estimate accounts for wrapped transcript content', () => {

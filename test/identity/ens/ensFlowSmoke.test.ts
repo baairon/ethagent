@@ -31,8 +31,8 @@ test('setup-facing wallet copy uses owner/operator wallet language', () => {
     readFileSync('src/identity/wallet/page/copy.ts', 'utf8'),
   ].join('\n')
   const editFlow = ensEditFlowText()
-  const operators = readFileSync('src/identity/hub/flows/ens/OperatorWalletsScreen.tsx', 'utf8')
-  const restoreFlow = readFileSync('src/identity/hub/flows/restore/RestoreFlow.tsx', 'utf8')
+  const operators = readFileSync('src/identity/hub/flows/ens/EnsOperatorWalletsScreen.tsx', 'utf8')
+  const restoreFlow = readFileSync('src/identity/hub/restore/RestoreFlow.tsx', 'utf8')
   const identityHub = readFileSync('src/identity/hub/IdentityHub.tsx', 'utf8')
   const visibleCopy = [walletPage, editFlow, operators, restoreFlow, identityHub].join('\n')
 
@@ -58,7 +58,7 @@ test('refactored identity wallet and effects files do not contain mojibake text'
 
 test('Identity Hub advanced ENS flow remains compact and focused', () => {
   const editFlow = ensEditFlowText()
-  const operators = readFileSync('src/identity/hub/flows/ens/OperatorWalletsScreen.tsx', 'utf8')
+  const operators = readFileSync('src/identity/hub/flows/ens/EnsOperatorWalletsScreen.tsx', 'utf8')
 
   assert.match(editFlow, /title="ENS Name"/)
   assert.match(editFlow, /Current Setup/)
@@ -95,8 +95,8 @@ test('identity copy uses onchain spelling', () => {
     'README.md',
     'src/identity/ens/ensLookup.ts',
     'src/identity/hub/effects/ens/flows.ts',
-    'src/identity/hub/effects/rebackup/runRebackup.ts',
-    'src/identity/hub/flows/continuity/RecoveryConfirmScreen.tsx',
+    'src/identity/hub/continuity/runRebackup.ts',
+    'src/identity/hub/continuity/RecoveryConfirmScreen.tsx',
     'src/identity/hub/flows/token-transfer/TokenTransferScreens.tsx',
   ]
   const text = files.map(file => readFileSync(file, 'utf8')).join('\n')

@@ -612,9 +612,11 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
         ) : (
           <Select
             options={[
-              { value: 'signin', label: 'Sign in Again' },
-              { value: 'signout', label: 'Sign Out' },
-              { value: 'cancel', label: 'Back' },
+              { value: 'hdr:account', label: 'Account', disabled: true, role: 'section', bold: true },
+              { value: 'signin', label: 'Sign in Again', indent: 2 },
+              { value: 'signout', label: 'Sign Out', indent: 2 },
+              { value: 'hdr:nav', label: 'Navigation', disabled: true, role: 'section', bold: true },
+              { value: 'cancel', label: 'Back', indent: 2 },
             ]}
             onSubmit={(value) => {
               if (value === 'signin') {

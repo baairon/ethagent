@@ -7,6 +7,7 @@ import { TextInput } from '../ui/TextInput.js'
 import { theme } from '../ui/theme.js'
 import { ModelPicker, type ModelPickerSelection } from '../models/ModelPicker.js'
 import { formatModelDisplayName } from '../models/modelDisplay.js'
+import { providerDisplayName } from '../models/providerDisplay.js'
 import { detectSpec, type SpecSnapshot } from '../models/runtimeDetection.js'
 import { FEATURED_HF_REPO_URL } from '../models/modelRecommendation.js'
 import {
@@ -449,10 +450,3 @@ function formatGB(bytes: number): string {
   return gb < 10 ? `${gb.toFixed(1)}GB` : `${Math.round(gb)}GB`
 }
 
-function providerDisplayName(provider: ProviderId): string {
-  if (provider === 'openai') return 'OpenAI'
-  if (provider === 'anthropic') return 'Anthropic'
-  if (provider === 'gemini') return 'Gemini'
-  if (provider === 'llamacpp') return 'llama.cpp'
-  return provider
-}

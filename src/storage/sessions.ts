@@ -6,6 +6,7 @@ import type { Message } from '../providers/contracts.js'
 import { getCwd } from '../runtime/cwd.js'
 import type { SessionMode } from '../runtime/sessionMode.js'
 import { atomicWriteText } from './atomicWrite.js'
+import { stripFileChangeResultDiff } from '../tools/fileDiff.js'
 import {
   isUserCorrectionOfToolState,
   looksLikeToolStateClaim,
@@ -282,7 +283,7 @@ export function sessionMessagesToProviderMessages(
       content: [{
         type: 'tool_result',
         toolUseId: message.toolUseId,
-        content: message.content,
+        content: stripFileChangeResultDiff(message.content),
         isError: message.isError,
       }],
     })

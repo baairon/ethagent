@@ -1,36 +1,36 @@
 import { useEffect } from 'react'
 import type { EthagentConfig } from '../../storage/config.js'
 import { setTokenIdentity } from '../../storage/identity.js'
-import { isRegistrationPreflightError, pinataErrorText } from './model/errors.js'
+import { isRegistrationPreflightError, pinataErrorText } from './shared/model/errors.js'
 import type { ProfileUpdates, Step } from './identityHubReducer.js'
 import {
   runCreatePreflight,
   runCreateSigning,
-} from './effects/create.js'
+} from './create/effects.js'
 import {
   runRebackupSigning,
-} from './effects/rebackup/runRebackup.js'
+} from './continuity/effects.js'
 import {
   runPublicProfileSigning,
-} from './effects/publicProfile/runPublicProfileSave.js'
+} from './profile/effects.js'
 import {
   runTokenTransferSigning,
-} from './effects/token-transfer/runTokenTransfer.js'
+} from './transfer/effects.js'
 import {
   runEnsSetupRecordsTransaction,
   runEnsSetupRegistryTransaction,
   runUpdateEnsRecords,
-} from './effects/ens/index.js'
+} from './ens/index.js'
 import {
   runRecoveryRefetch,
-} from './effects/restore/index.js'
-import type { EffectCallbacks } from './effects/types.js'
-import { useRestoreFlowEffects } from './flows/restore/useRestoreFlowEffects.js'
+} from './restore/index.js'
+import type { EffectCallbacks } from './shared/effects/types.js'
+import { useRestoreEffects } from './restore/useRestoreEffects.js'
 import {
   isStorageError,
   isWalletCancelled,
   waitForMinimumBusyTime,
-} from './utils.js'
+} from './shared/utils.js'
 
 type TriggerRebackup = (
   backStep: Step,
@@ -104,7 +104,7 @@ export function useIdentityHubSideEffects({
     return () => { cancelled = true }
   }, [step])
 
-  useRestoreFlowEffects({ step, config, callbacks, handleStepError })
+  useRestoreEffects({ step, config, callbacks, handleStepError })
 
   useEffect(() => {
     if (step.kind !== 'rebackup-signing') return

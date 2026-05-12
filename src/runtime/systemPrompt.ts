@@ -76,7 +76,7 @@ function buildToolEnabledPrompt(ctx: SystemPromptContext): string {
         '**DIRECT REQUESTS**: If the user asks to change directory, list files, or read a file, respond with exactly one matching native tool call. Do not substitute prose or claim the action was taken.',
         '**EVIDENCE REQUIRED**: Do not claim a path is missing, a directory does not exist, or a file is absent unless you have a `list_directory` or `read_file` result from this conversation that confirms it.',
         '**TOOL TYPING**: Tool names are NOT shell commands. NEVER pass `list_directory`, `read_file`, `edit_file`, or `change_directory` directly to `run_bash`. Call the matching native tool.',
-        'Prefer targeted `read_file` and `edit_file` calls over general `run_bash` operations when both solve the task.',
+        '**PREFER NATIVE TOOLS**: If a request can be answered by `list_directory`, `read_file`, `edit_file`, `write_file`, `delete_file`, or `change_directory`, use that tool. Treat reaching for `run_bash` as a flag that you may be doing it wrong — only proceed if the action genuinely needs a real shell.',
         ...(ctx.mode === 'plan'
           ? [
               'Only read/list tools and permission-gated private continuity reads are available in plan mode.',
@@ -99,6 +99,8 @@ function buildToolEnabledPrompt(ctx: SystemPromptContext): string {
                   ]
                 : ['No agent identity is linked in this session. Do not attempt private identity continuity edits; ask the user to create or load an agent first.']),
               'Use `run_bash` **only** when true shell execution is necessary.',
+              '**NO BASH EXPLORATION**: Never use `run_bash` to inspect the workspace. That means no `node -e`, no heredocs (`<<EOF`, `<<\'NODE\'`), no `find`, `grep`, `cat`, `head`, `tail`, `ls`, `dir`, `type`, `tree`, or shell loops to read or walk files. Use `list_directory` for directories and `read_file` for files. `run_bash` is reserved for actions that require a real shell: running tests, builds, git operations, launching processes. If you catch yourself writing a one-liner to read or list something, stop and call the native tool instead.',
+              '**DISCOVERY BUDGET**: For exploratory or "tell me about" questions, target ≤5 tool calls total. If 5 calls of the same kind have not given you enough to answer, the question does not need more depth — answer from what you have. Do not recursively scan, walk every subdirectory, or write deeper scripts to be more thorough than the user asked for. Stop and reply.',
               'Never use `run_bash` to produce conversational text. Do not call `echo`, `printf`, or similar to emit your reply — write it as your assistant text. Bash is for actions that need a real shell, not for generating words.',
               '**CWD CONTINUITY**: The working directory below is authoritative. After `change_directory` succeeds, use the new path as the base for subsequent actions.',
               'Do not lag behind the CWD. Edit/read relative to the *current* working directory.',

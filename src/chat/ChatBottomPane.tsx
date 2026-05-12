@@ -3,26 +3,26 @@ import type { EthagentConfig } from '../storage/config.js'
 import type { PermissionDecision, PermissionRequest, SessionPermissionRule } from '../tools/contracts.js'
 import { type ModelPickerSelection, ModelPicker } from '../models/ModelPicker.js'
 import type { ModelPickerContextFit } from '../models/modelPickerOptions.js'
-import { ResumeView } from './ResumeView.js'
-import { RewindView } from './RewindView.js'
-import { PermissionsView } from './PermissionsView.js'
-import { CopyPicker } from './CopyPicker.js'
-import { PermissionPrompt } from './PermissionPrompt.js'
-import { PlanApprovalView, type PlanApprovalAction } from './PlanApprovalView.js'
-import { ChatInput } from './ChatInput.js'
+import { ResumeView } from './views/ResumeView.js'
+import { RewindView } from './views/RewindView.js'
+import { PermissionsView } from './views/PermissionsView.js'
+import { CopyPicker } from './views/CopyPicker.js'
+import { PermissionPrompt } from './views/PermissionPrompt.js'
+import { PlanApprovalView, type PlanApprovalAction } from './views/PlanApprovalView.js'
+import { ChatInput } from './input/ChatInput.js'
 import { IdentityHub, type IdentityHubInitialAction, type IdentityHubResult } from '../identity/hub/IdentityHub.js'
 import type { CopyResult } from '../utils/clipboard.js'
 import { getSlashSuggestions } from './commands.js'
 import { Box, Text } from 'ink'
 import { theme } from '../ui/theme.js'
 import { Spinner } from '../ui/Spinner.js'
-import { ContextLimitView, type ContextLimitAction } from './ContextLimitView.js'
+import { ContextLimitView, type ContextLimitAction } from './views/ContextLimitView.js'
 import type { ContextUsage } from '../runtime/compaction.js'
 import {
   ContinuityEditReviewView,
   type ContinuityEditReviewAction,
   type ContinuityEditReviewState,
-} from './ContinuityEditReviewView.js'
+} from './views/ContinuityEditReviewView.js'
 
 export type Overlay = 'none' | 'modelPicker' | 'resume' | 'rewind' | 'copyPicker' | 'permission' | 'permissions' | 'planApproval' | 'identity' | 'contextLimit' | 'continuityEditReview'
 export type CopyPickerState = { turnText: string; turnLabel: string } | null
@@ -66,7 +66,10 @@ type ChatBottomPaneProps = {
   handleResumeClearAll: () => void | Promise<void>
   identityOverlay: IdentityOverlayState | null
   handleIdentityResult: (result: IdentityHubResult) => void
-  handleRestoreConversation: (turnId: string) => void
+  handleRestoreConversation: (turnId: string, promptText?: string) => void
+  pendingInputDraft: string | null
+  onInputDraftConsumed: () => void
+  handleSummarizeFromTurn: (turnId: string) => void | Promise<unknown>
   handleCopyDone: (result: CopyResult, label: string) => void
   handleCopyCancel: () => void
   resolvePermission: (decision: PermissionDecision) => void
@@ -110,6 +113,9 @@ export function ChatBottomPane({
   identityOverlay,
   handleIdentityResult,
   handleRestoreConversation,
+  handleSummarizeFromTurn,
+  pendingInputDraft,
+  onInputDraftConsumed,
   handleCopyDone,
   handleCopyCancel,
   resolvePermission,
@@ -155,6 +161,7 @@ export function ChatBottomPane({
         cwd={cwd}
         currentSessionId={currentSessionId}
         onRestoreConversation={handleRestoreConversation}
+        onSummarizeFromTurn={handleSummarizeFromTurn}
         onDone={(message, variant = 'info') => {
           setOverlay('none')
           pushNote(message, variant)
@@ -261,10 +268,12 @@ export function ChatBottomPane({
         slashSuggestions={slashSuggestions}
         footerRight={footerRight}
         cwd={cwd}
+        seedText={pendingInputDraft}
+        onSeedConsumed={onInputDraftConsumed}
       />
       <Box marginLeft={2} marginTop={0} flexDirection="column">
         <Text>
-          <Text color={theme.dim}>workspace · </Text>
+          <Text color={theme.dim}>Workspace · </Text>
           <Text color={theme.textSubtle}>{cwd}</Text>
         </Text>
       </Box>

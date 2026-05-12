@@ -2,6 +2,7 @@ import { defaultModelFor, type EthagentConfig, type ProviderId } from '../storag
 import { getKey } from '../storage/secrets.js'
 import { loadLocalHfModels } from './huggingface.js'
 import { hasOpenAIOAuthCredentials } from '../auth/openaiOAuth/credentials.js'
+import { providerDisplayName } from './providerDisplay.js'
 
 const OPENAI_OAUTH_MODEL_IDS = ['gpt-5.5', 'gpt-5.4', 'gpt-5.4-mini', 'gpt-5.3-codex', 'gpt-5.2'] as const
 
@@ -85,7 +86,7 @@ export async function discoverProviderModels(
     if (provider === 'openai' && await hasOpenAIOAuthCredentials()) {
       return openAIOAuthCatalog()
     }
-    return fallbackResult(config, `missing ${provider} API key`)
+    return fallbackResult(config, `missing ${providerDisplayName(provider)} API key`)
   }
 
   const baseUrl = provider === 'openai' ? openAIBaseUrlFor(config) : ''

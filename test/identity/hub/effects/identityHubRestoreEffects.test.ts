@@ -4,7 +4,7 @@ import { getAddress } from 'viem'
 import {
   restoreSignatureRequestForStep,
   restoreTokenSelectionStep,
-} from '../../../../src/identity/hub/effects/restore/index.js'
+} from '../../../../src/identity/hub/restore/index.js'
 import { CONTINUITY_SNAPSHOT_ENVELOPE_VERSION } from '../../../../src/identity/continuity/envelope.js'
 import { candidate, registry } from './effects.fixtures.js'
 

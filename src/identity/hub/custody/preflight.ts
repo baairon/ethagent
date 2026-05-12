@@ -1,0 +1,50 @@
+import { getAddress, type Address, type PublicClient } from 'viem'
+import type { EthagentIdentity } from '../../../storage/config.js'
+import { readVaultAddressField } from '../../identityCompat.js'
+import { createErc8004PublicClient, type Erc8004RegistryConfig } from '../../registry/erc8004.js'
+import { isAgentInVault, resolveConfiguredVaultAddress } from '../../registry/vault.js'
+import { readCustodyMode } from './state.js'
+
+export class VaultUnavailableError extends Error {
+  constructor(chainId: number) {
+    super(`Vault is not deployed for chainId ${chainId}. Switching custody mode is unavailable until a deployment is recorded.`)
+    this.name = 'VaultUnavailableError'
+  }
+}
+
+export class TokenInVaultError extends Error {
+  constructor(public vaultAddress: Address) {
+    super('Token is in the Vault. Withdraw it first to prepare a transfer.')
+    this.name = 'TokenInVaultError'
+  }
+}
+
+export async function assertTokenNotInVault(args: {
+  identity: EthagentIdentity
+  registry: Erc8004RegistryConfig
+  operatorVaults?: Readonly<Record<string, string>>
+  client?: Pick<PublicClient, 'readContract'>
+}): Promise<void> {
+  if (!args.identity.agentId) return
+  const vaultAddress = vaultAddressForTransferPreflight(args.identity, args.operatorVaults)
+  if (!vaultAddress) return
+  const client = args.client ?? createErc8004PublicClient(args.registry)
+  const status = await isAgentInVault({
+    client,
+    vaultAddress,
+    registry: getAddress(args.registry.identityRegistryAddress),
+    agentId: BigInt(args.identity.agentId),
+  })
+  if (status.inVault) throw new TokenInVaultError(vaultAddress)
+}
+
+function vaultAddressForTransferPreflight(
+  identity: EthagentIdentity,
+  operatorVaults?: Readonly<Record<string, string>>,
+): Address | undefined {
+  const identityVault = readVaultAddressField(identity.state as Record<string, unknown> | undefined)
+  if (identityVault) return getAddress(identityVault)
+  if (readCustodyMode(identity.state as Record<string, unknown> | undefined) !== 'advanced') return undefined
+  if (!identity.chainId) return undefined
+  return resolveConfiguredVaultAddress(operatorVaults, identity.chainId)
+}

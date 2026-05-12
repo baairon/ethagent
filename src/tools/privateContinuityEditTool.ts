@@ -6,6 +6,7 @@ import {
 import { recordPrivateContinuityHistorySnapshot } from '../identity/continuity/history.js'
 import { readContinuityFiles, readPublicSkillsFile } from '../identity/continuity/storage.js'
 import type { Tool } from './contracts.js'
+import { formatFileChangeResult } from './fileDiff.js'
 
 const schema = z.object({
   file: z.preprocess(normalizePrivateContinuityFile, z.enum(['SOUL.md', 'MEMORY.md'])),
@@ -141,7 +142,10 @@ export const privateContinuityEditTool: Tool<typeof schema> = {
     return {
       ok: true,
       summary: prepared.changeSummary,
-      content: formatPrivateContinuityEditResult(prepared.file, prepared.fullPath),
+      content: formatFileChangeResult(
+        formatPrivateContinuityEditResult(prepared.file, prepared.fullPath),
+        prepared.diff,
+      ),
     }
   },
 }

@@ -6,7 +6,7 @@ import {
   releaseTxGuard,
   resetTxGuardForTest,
   txGuardBusyMessage,
-} from '../../../src/identity/hub/txGuard.js'
+} from '../../../src/identity/hub/shared/txGuard.js'
 
 test('txGuard acquire and release toggles busy flag', () => {
   resetTxGuardForTest()

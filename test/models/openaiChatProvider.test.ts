@@ -118,7 +118,7 @@ test('OpenAIChatProvider includes local provider and base URL in fetch errors', 
 
     const error = events.find(event => event.type === 'error')
     assert.ok(error)
-    assert.match(error.message, /llamacpp/)
+    assert.match(error.message, /llama\.cpp/)
     assert.match(error.message, /http:\/\/localhost:8080\/v1/)
     assert.match(error.message, /fetch failed/)
   } finally {

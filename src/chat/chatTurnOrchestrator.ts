@@ -127,7 +127,6 @@ export async function runStreamingTurn(
   let thinkingRowId: string | null = null
   let thinkingCursorActive = false
   let assistantId: string | null = null
-  let hasPendingToolUse = false
 
   const resetIteration = () => {
     accumulated = ''
@@ -135,7 +134,6 @@ export async function runStreamingTurn(
     thinkingRowId = null
     thinkingCursorActive = false
     assistantId = null
-    hasPendingToolUse = false
   }
 
   const stopThinkingCursor = () => {
@@ -192,7 +190,7 @@ export async function runStreamingTurn(
     flushStreamRows(true)
     updateRows(prev => {
       let next = finalizeStreamingRowsById(prev, assistantId, thinkingRowId, accumulated, thinkingContent)
-      if (assistantId && (hasPendingToolUse || accumulated.length === 0)) {
+      if (assistantId && accumulated.length === 0) {
         next = next.filter(r => r.id !== assistantId)
       }
       return next
@@ -294,7 +292,6 @@ export async function runStreamingTurn(
         setThinkingRowId: id => { thinkingRowId = id },
         markThinkingCursorActive: () => { thinkingCursorActive = true },
         getThinkingRowId: () => thinkingRowId,
-        markPendingToolUse: () => { hasPendingToolUse = true },
         updateRows,
         pushNote,
         nextRowId,
@@ -340,7 +337,6 @@ type EventHandlerContext = {
   setThinkingRowId: (id: string | null) => void
   getThinkingRowId: () => string | null
   markThinkingCursorActive: () => void
-  markPendingToolUse: () => void
   updateRows: (updater: (prev: MessageRow[]) => MessageRow[]) => void
   pushNote: (text: string, kind?: 'info' | 'error' | 'dim') => void
   nextRowId: () => string
@@ -403,7 +399,6 @@ async function handleEvent(ev: TurnEvent, ctx: EventHandlerContext): Promise<voi
       return
     }
     case 'tool_use_stop': {
-      ctx.markPendingToolUse()
       ctx.finalizeStreamingRows()
       return
     }
@@ -426,7 +421,6 @@ async function handleEvent(ev: TurnEvent, ctx: EventHandlerContext): Promise<voi
     }
     case 'local_tool_recovery': {
       ctx.discardStreamingRows()
-      ctx.markPendingToolUse()
       return
     }
     case 'continuation_nudge': {

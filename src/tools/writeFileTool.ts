@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { recordRewindSnapshot } from '../storage/rewind.js'
 import type { EthagentConfig } from '../storage/config.js'
 import type { Tool } from './contracts.js'
+import { formatFileChangeResult, renderUnifiedFileDiff } from './fileDiff.js'
 import { resolveWorkspacePath } from './readTool.js'
 
 const schema = z.object({
@@ -40,6 +41,7 @@ export const writeFileTool: Tool<typeof schema> = {
       subtitle: prepared.fullPath,
       before: previewText(prepared.before),
       after: previewText(input.content),
+      diff: renderUnifiedFileDiff({ filePath: prepared.relativePath, before: prepared.before, after: input.content }),
       changeSummary: prepared.existedBefore ? `replace entire ${prepared.relativePath}` : `create ${prepared.relativePath}`,
     }
   },
@@ -64,9 +66,12 @@ export const writeFileTool: Tool<typeof schema> = {
     return {
       ok: true,
       summary: prepared.existedBefore ? `replace entire ${prepared.relativePath}` : `create ${prepared.relativePath}`,
-      content: rewindWarning
-        ? `updated ${prepared.fullPath}\nwarning: ${rewindWarning}`
-        : `updated ${prepared.fullPath}`,
+      content: formatFileChangeResult(
+        rewindWarning
+          ? `updated ${prepared.fullPath}\nwarning: ${rewindWarning}`
+          : `updated ${prepared.fullPath}`,
+        renderUnifiedFileDiff({ filePath: prepared.relativePath, before: prepared.before, after: input.content }),
+      ),
     }
   },
 }

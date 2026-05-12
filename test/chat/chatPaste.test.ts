@@ -5,7 +5,7 @@ import {
   formatPastedTextRef,
   normalizePastedText,
   shouldCollapsePastedText,
-} from '../../src/chat/chatPaste.js'
+} from '../../src/chat/input/chatPaste.js'
 
 test('normalizePastedText strips paste control artifacts and normalizes newlines', () => {
   assert.equal(

@@ -9,7 +9,7 @@ import {
 import {
   normalizeApprovedOperatorWallets,
   removeApprovedOperatorWallet,
-} from '../../../src/identity/hub/operatorWallets.js'
+} from '../../../src/identity/hub/shared/operatorWallets.js'
 
 const operatorKey = '0x1000000000000000000000000000000000000000000000000000000000000001'
 const otherKey = '0x2000000000000000000000000000000000000000000000000000000000000002'

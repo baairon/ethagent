@@ -17,10 +17,7 @@ import type {
 import { setCwd as setRuntimeCwd } from './cwd.js'
 import type { EthagentConfig } from '../storage/config.js'
 import type { SessionMessage } from '../storage/sessions.js'
-import {
-  summarizeToolInput,
-  toolResultContentForRow,
-} from '../chat/chatScreenUtils.js'
+import { toolResultContentForRow, toolResultDiffForRow } from '../chat/chatScreenUtils.js'
 import type { MessageRow } from '../chat/MessageList.js'
 import { modePolicy, toPermissionMode, type SessionMode } from './sessionMode.js'
 
@@ -239,7 +236,7 @@ export async function runPendingToolUses(args: {
         id: rowId,
         name: toolUse.name,
         summary: toolUse.name,
-        input: summarizeToolInput(toolUse.input),
+        input: toolUse.input,
       },
     ])
     await args.persistTurnMessage({
@@ -282,9 +279,15 @@ async function recordToolResult(
 ): Promise<void> {
   const isError = !result.ok
   const resultContent = toolResultContentForRow(toolUse.name, result.content, isError)
+  const diff = toolResultDiffForRow(result.content, isError)
   args.updateRows(prev => prev.map(row =>
     row.role === 'tool_call' && row.id === rowId
-      ? { ...row, result: { content: resultContent, summary: result.summary, isError } }
+      ? {
+          ...row,
+          result: diff
+            ? { content: resultContent, summary: result.summary, isError, diff }
+            : { content: resultContent, summary: result.summary, isError },
+        }
       : row,
   ))
   await args.persistTurnMessage({

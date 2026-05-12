@@ -56,6 +56,7 @@ function normalize(event: StreamEvent): ProviderTurnEvent {
 }
 
 export const MAX_CONTINUATION_NUDGES = 3
+export const MAX_TOOL_USES_PER_TURN = 25
 
 export type ContinuationNudgeReason =
   | 'continuation'
@@ -63,6 +64,7 @@ export type ContinuationNudgeReason =
   | 'tool_state_claim'
   | 'tool_protocol_fake'
   | 'tool_delegation'
+  | 'tool_budget'
   | 'private_continuity_tool'
   | 'private_continuity_tool_repair'
   | 'reasoning_only'
@@ -81,6 +83,9 @@ const TOOL_PROTOCOL_FAKE_NUDGE_TEXT =
 
 const TOOL_DELEGATION_NUDGE_TEXT =
   'Do not ask the user to run native tools. You have access to the tools in this environment. Make exactly one native tool call now.'
+
+const TOOL_BUDGET_NUDGE_TEXT =
+  'You have reached the tool-call budget for this turn. Do not call any more tools. Produce your final answer now using only what you already know from earlier tool results.'
 
 const PRIVATE_CONTINUITY_NUDGE_TEXT =
   'SOUL.md and MEMORY.md are existing private identity-vault scaffold files. Do not search workspace folders, read plans/, create files, or overwrite them. If exact private text is needed for a surgical removal or targeted replacement, call read_private_continuity_file with {"file":"MEMORY.md"} or {"file":"SOUL.md"}. If the user wants private continuity changed, call propose_private_continuity_edit. For memory/preferences use {"file":"MEMORY.md","appendToSection":"Durable User Preferences","appendText":"- User preference or memory note."}. For persona use {"file":"SOUL.md","appendToSection":"Persona","appendText":"- Persona or standing behavior note."}.'
@@ -164,6 +169,7 @@ export async function* runRuntimeTurn(
   let continuationNudges = 0
   let iterationIndex = 0
   let priorIterationHadTools = false
+  let cumulativeToolUseCount = 0
   const toolEvidenceThisTurn: ToolEvidence[] = []
 
   // eslint-disable-next-line no-constant-condition
@@ -394,6 +400,29 @@ export async function* runRuntimeTurn(
       yield doneEvent(true, stopReason)
       return
     }
+
+    if (cumulativeToolUseCount + pendingToolUses.length > MAX_TOOL_USES_PER_TURN) {
+      if (continuationNudges < maxContinuationNudges) {
+        continuationNudges += 1
+        yield {
+          type: 'continuation_nudge',
+          attempt: continuationNudges,
+          reason: 'tool_budget',
+        }
+        workingMessages = [
+          ...await rebuildMessages(),
+          { role: 'user', content: TOOL_BUDGET_NUDGE_TEXT },
+        ]
+        continue
+      }
+      yield {
+        type: 'error',
+        message: `tool budget exceeded (${MAX_TOOL_USES_PER_TURN} max per turn); ask again with a narrower request`,
+      }
+      yield doneEvent(false, stopReason)
+      return
+    }
+    cumulativeToolUseCount += pendingToolUses.length
 
     const batch = await runToolBatch(pendingToolUses)
     for (const completed of batch.completedTools) {

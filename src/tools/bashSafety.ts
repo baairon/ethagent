@@ -98,16 +98,16 @@ export function assessBashCommand(command: string): BashSafetyAssessment {
   const triggeredChecks = RISKY_PATTERN_CHECKS.filter(check => check.pattern.test(command)).map(check => check.message)
 
   const warning = triggeredChecks.length > 0
-    ? `warning: ${triggeredChecks[0]}. reusable approval is limited for this command.`
+    ? `Warning: ${sentenceCase(triggeredChecks[0] ?? 'command is risky')}. Reusable approval is limited for this command.`
     : highRisk
-      ? `warning: ${firstToken} is a high-impact command. reusable approval is limited for this command.`
+      ? `Warning: ${sentenceCase(firstToken ?? '')} is a high-impact command. Reusable approval is limited for this command.`
       : undefined
 
   return {
     warning,
     canPersistExact: triggeredChecks.length === 0 && !nonPersistable,
     canPersistPrefix: triggeredChecks.length === 0 && !highRisk && Boolean(firstToken),
-    commandPrefix: firstToken,
+    commandPrefix: firstToken ?? '',
   }
 }
 
@@ -179,4 +179,8 @@ function normalizeCommandToken(token: string): string {
     ?.replace(/\.(exe|cmd|bat|ps1)$/i, '')
     .toLowerCase()
     .replace(/[^a-z0-9_.:-]/g, '') ?? ''
+}
+
+function sentenceCase(value: string): string {
+  return value ? value[0]!.toUpperCase() + value.slice(1) : value
 }

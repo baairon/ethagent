@@ -4,7 +4,7 @@ import {
   expectedAccountForSnapshotSave,
   snapshotSaveRequiresOwnerSigner,
   snapshotSaveWalletRole,
-} from '../../../../src/identity/hub/effects/shared/snapshot.js'
+} from '../../../../src/identity/hub/continuity/snapshot.js'
 import {
   multiCustodyIdentity,
   OPERATOR_WALLET,

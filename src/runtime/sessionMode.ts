@@ -24,7 +24,7 @@ export function nextSessionMode(mode: SessionMode): SessionMode {
 }
 
 export function sessionModeLabel(mode: SessionMode): string {
-  return mode === 'plan' ? 'Plan mode' : mode === 'accept-edits' ? 'Accept edits on' : ''
+  return mode === 'plan' ? 'plan mode' : mode === 'accept-edits' ? 'accept edits on' : ''
 }
 
 export function modePolicy(mode: PolicyMode): ModePolicy {

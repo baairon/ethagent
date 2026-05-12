@@ -5,8 +5,8 @@ import {
   buildPlanTransferSeedMessages,
   chatFooterShortcutText,
 } from '../../src/chat/ChatScreen.js'
-import { PLAN_APPROVAL_OPTIONS } from '../../src/chat/PlanApprovalView.js'
-import { CONTEXT_LIMIT_OPTIONS } from '../../src/chat/ContextLimitView.js'
+import { PLAN_APPROVAL_OPTIONS } from '../../src/chat/views/PlanApprovalView.js'
+import { CONTEXT_LIMIT_OPTIONS } from '../../src/chat/views/ContextLimitView.js'
 
 test('buildPlanImplementationPrompt makes native tools authoritative over bash-biased plan wording', () => {
   const prompt = buildPlanImplementationPrompt([

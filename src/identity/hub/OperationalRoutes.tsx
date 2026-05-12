@@ -1,33 +1,33 @@
 import React from 'react'
-import { hasPendingPublish } from './model/continuity.js'
+import { hasPendingPublish } from './continuity/state.js'
 import type { ProfileUpdates } from './identityHubReducer.js'
 import { clearPinataJwt, savePinataJwt } from '../storage/pinataJwt.js'
 import {
   runRebackupStorageSubmit,
-} from './effects/rebackup/runRebackup.js'
+} from './continuity/effects.js'
 import {
   runPublicProfileStorageSubmit,
-} from './effects/publicProfile/runPublicProfileSave.js'
-import { resolveVaultAddress } from './flows/custody/custodyEffects.js'
-import { WalletApprovalScreen } from './components/WalletApprovalScreen.js'
-import { RebackupStorageScreen } from './flows/continuity/RebackupStorageScreen.js'
-import { BusyScreen } from './components/BusyScreen.js'
-import { StorageCredentialScreen } from './flows/settings/StorageCredentialScreen.js'
+} from './profile/effects.js'
+import { resolveVaultAddress } from './custody/transactions.js'
+import { WalletApprovalScreen } from './shared/components/WalletApprovalScreen.js'
+import { RebackupStorageScreen } from './continuity/RebackupStorageScreen.js'
+import { BusyScreen } from './shared/components/BusyScreen.js'
+import { StorageCredentialScreen } from './settings/StorageCredentialScreen.js'
 import {
   PrivateContinuityScreen,
   PublicProfileScreen,
-} from './flows/continuity/ContinuityDashboardScreen.js'
-import { RecoveryConfirmScreen } from './flows/continuity/RecoveryConfirmScreen.js'
-import { SavePromptScreen } from './flows/continuity/SavePromptScreen.js'
-import { ErrorScreen } from './components/ErrorScreen.js'
-import { UnlinkedIdentityScreen } from './components/UnlinkedIdentityScreen.js'
-import { invalidateOwnershipCache } from './reconciliation/index.js'
+} from './continuity/ContinuityDashboardScreen.js'
+import { RecoveryConfirmScreen } from './continuity/RecoveryConfirmScreen.js'
+import { SavePromptScreen } from './continuity/SavePromptScreen.js'
+import { ErrorScreen } from './shared/components/ErrorScreen.js'
+import { UnlinkedIdentityScreen } from './shared/components/UnlinkedIdentityScreen.js'
+import { invalidateOwnershipCache } from './shared/reconciliation/index.js'
 import {
-  IdentityHubEnsFlow,
-  isIdentityHubEnsStep,
-} from './flows/ens/IdentityHubEnsFlow.js'
-import { CustodyEditFlow, isCustodyEditStep } from './flows/custody/CustodyEditFlow.js'
-import { rebackupWalletApprovalView } from './utils.js'
+  EnsFlow,
+  isEnsStep,
+} from './ens/EnsFlow.js'
+import { CustodyEditFlow, isCustodyEditStep } from './custody/CustodyEditFlow.js'
+import { rebackupWalletApprovalView } from './shared/utils.js'
 import type { IdentityHubController } from './useIdentityHubController.js'
 
 type IdentityHubOperationalRoutesProps = {
@@ -195,9 +195,9 @@ export const IdentityHubOperationalRoutes: React.FC<IdentityHubOperationalRoutes
     )
   }
 
-  if (isIdentityHubEnsStep(step)) {
+  if (isEnsStep(step)) {
     return (
-      <IdentityHubEnsFlow
+      <EnsFlow
         step={step}
         walletSession={walletSession}
         reconciliation={reconciliation}

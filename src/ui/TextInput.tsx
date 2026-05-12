@@ -2,11 +2,11 @@ import React, { useState, useRef, useEffect } from 'react'
 import { Box, Text, useStdout } from 'ink'
 import { theme } from './theme.js'
 import { useAppInput } from '../app/input/AppInputProvider.js'
-import { moveVerticalVisual } from '../chat/chatInputState.js'
+import { moveVerticalVisual } from '../chat/input/chatInputState.js'
 import {
   getVisualLineIndex,
   getVisualLines,
-} from '../chat/textCursor.js'
+} from '../chat/input/textCursor.js'
 
 const DEFAULT_CHROME_WIDTH = 10
 

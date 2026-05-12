@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { buildResumeOptions, CLEAR_ALL_SESSIONS_VALUE } from '../../src/chat/ResumeView.js'
+import { buildResumeOptions, CLEAR_ALL_SESSIONS_VALUE } from '../../src/chat/views/ResumeView.js'
 import type { SessionSummary } from '../../src/storage/sessions.js'
 
 function session(overrides: Partial<SessionSummary> = {}): SessionSummary {
@@ -28,7 +28,7 @@ test('resume options expose a clear all chat logs action', () => {
   const clear = options.find(option => option.value === CLEAR_ALL_SESSIONS_VALUE)
 
   assert.ok(clear)
-  assert.equal(clear.label, 'clear all chat logs')
+  assert.equal(clear.label, 'Clear All Chat Logs')
   assert.equal(clear.role, 'utility')
   assert.match(clear.hint ?? '', /saved chats/)
   assert.ok(options.some(option => option.value === 'session-1'))

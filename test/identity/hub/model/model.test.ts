@@ -4,21 +4,21 @@ import React from 'react'
 import { renderToString } from 'ink'
 import { RegisterAgentPreflightError } from '../../../../src/identity/registry/erc8004.js'
 import { AgentStateOwnerMismatchError } from '../../../../src/identity/crypto/backupEnvelope.js'
-import { STORAGE_CREDENTIAL_FORGET_COPY } from '../../../../src/identity/hub/flows/settings/StorageCredentialScreen.js'
-import { IdentitySummary } from '../../../../src/identity/hub/components/IdentitySummary.js'
-import { identityHubErrorView } from '../../../../src/identity/hub/model/errors.js'
+import { STORAGE_CREDENTIAL_FORGET_COPY } from '../../../../src/identity/hub/settings/StorageCredentialScreen.js'
+import { IdentitySummary } from '../../../../src/identity/hub/shared/components/IdentitySummary.js'
+import { identityHubErrorView } from '../../../../src/identity/hub/shared/model/errors.js'
 import {
   displayCustodyMode,
   identityOwnerAddress,
   identityPerspective,
   readCustodyMode,
-} from '../../../../src/identity/hub/model/custody.js'
-import { ensValidationReasonText } from '../../../../src/identity/hub/model/ens.js'
+} from '../../../../src/identity/hub/custody/state.js'
+import { ensValidationReasonText } from '../../../../src/identity/hub/ens/state.js'
 import {
   chainSummaryRow,
   networkLabel,
   networkSubtitle,
-} from '../../../../src/identity/hub/model/network.js'
+} from '../../../../src/identity/hub/shared/model/network.js'
 import {
   identitySummaryRows,
   isCurrentAgentCandidate,
@@ -26,13 +26,13 @@ import {
   tokenCandidateHint,
   tokenCandidateLabel,
   tokenCandidateSelectLabel,
-} from '../../../../src/identity/hub/model/identity.js'
+} from '../../../../src/identity/hub/profile/identity.js'
 import {
   copyableIdentityFields,
   identityValuesCopyHint,
-} from '../../../../src/identity/hub/model/copy.js'
-import { localChangeStatusView } from '../../../../src/identity/hub/model/continuity.js'
-import { transferSnapshotView } from '../../../../src/identity/hub/model/transfer.js'
+} from '../../../../src/identity/hub/shared/model/copy.js'
+import { localChangeStatusView } from '../../../../src/identity/hub/continuity/state.js'
+import { transferSnapshotView } from '../../../../src/identity/hub/transfer/state.js'
 
 test('identity hub formats insufficient-funds preflight errors for compact display', () => {
   const view = identityHubErrorView(new RegisterAgentPreflightError({

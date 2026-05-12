@@ -39,7 +39,7 @@ export const bashTool: Tool<typeof schema> = {
       command: input.command,
       commandPrefix: safety.commandPrefix,
       cwd,
-      title: 'allow shell command?',
+      title: 'Allow shell command?',
       subtitle: `${input.command}\n${cwd}`,
       warning: safety.warning,
       canPersistExact: safety.canPersistExact,

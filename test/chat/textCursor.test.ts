@@ -9,7 +9,7 @@ import {
   moveVerticalVisualCursor,
   moveVerticalCursor,
   normalizeCursor,
-} from '../../src/chat/textCursor.js'
+} from '../../src/chat/input/textCursor.js'
 
 test('moveVerticalCursor moves inside a multiline prompt before history boundaries', () => {
   const value = 'aaaaaa\naaaaa'

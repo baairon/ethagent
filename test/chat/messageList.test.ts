@@ -11,8 +11,10 @@ import {
   type MessageRow,
 } from '../../src/chat/MessageList.js'
 import { sessionMessagesToRows } from '../../src/chat/chatScreenUtils.js'
+import { syntaxLineSpans } from '../../src/chat/display/SyntaxText.js'
 import { Spinner } from '../../src/ui/Spinner.js'
 import { theme } from '../../src/ui/theme.js'
+import { formatFileChangeResult } from '../../src/tools/fileDiff.js'
 
 test('reasoning rows use mint accent while streaming', () => {
   const row: MessageRow = {
@@ -40,6 +42,26 @@ test('reasoning cursor visibility is explicit and disabled after streaming', () 
   assert.equal(reasoningCursorVisible(active), true)
   assert.equal(reasoningCursorVisible(answering), false)
   assert.equal(reasoningCursorVisible(finalized), false)
+})
+
+test('streaming reasoning label renders without a cursor or inline spinner', () => {
+  const output = renderToString(
+    React.createElement(MessageList, {
+      rows: [{
+        role: 'thinking',
+        id: 'thinking-streaming',
+        content: 'checking',
+        streaming: true,
+        showCursor: false,
+        expanded: false,
+      }],
+    }),
+  )
+
+  assert.match(output, /\u2022 Thinking/)
+  assert.match(output, /Thinking\s+\u00b7 alt\+t inspect/)
+  assert.doesNotMatch(output, /\u2022 [\u00b7\u2219\u2022]\s+Thinking/)
+  assert.doesNotMatch(output, /\|/)
 })
 
 test('toggleReasoningRow can target an older visible reasoning row', () => {
@@ -75,7 +97,7 @@ test('toggleReasoningRow skips a trailing tool_call and falls back to the latest
       id: 'tc-1',
       name: 'run_bash',
       summary: 'run_bash',
-      input: '{"command":"ls"}',
+      input: { command: 'ls' },
       result: { content: 'ok', summary: 'exit 0', isError: false },
     },
   ]
@@ -97,7 +119,7 @@ test('assistant inline markdown hides emphasis and math delimiters', () => {
     }),
   )
 
-  assert.match(output, /6\. Animalistic Return/)
+  assert.match(output, /\u2022 6\. Animalistic Return/)
   assert.equal(output.includes('**'), false)
   assert.equal(output.includes('\\{'), false)
   assert.equal(output.includes('/{'), false)
@@ -115,7 +137,7 @@ test('assistant headings render without hash indicators through level six', () =
     }),
   )
 
-  assert.match(output, /Deep Heading/)
+  assert.match(output, /\u2022 Deep Heading/)
   assert.match(output, /Body text/)
   assert.equal(output.includes('####'), false)
   assert.equal(output.includes('**'), false)
@@ -133,8 +155,55 @@ test('reasoning rows render raw markdown markers without assistant markdown styl
     }),
   )
 
+  assert.match(output, /\u2022 Thinking…/)
+  assert.match(output, /alt\+t collapse/)
   assert.match(output, /## Reasoning/)
   assert.match(output, /\*\*markers\*\*/)
+  assert.doesNotMatch(output, /▌/)
+  assert.doesNotMatch(output, /reasoning/)
+  assert.doesNotMatch(output, /01 ## Reasoning/)
+  assert.doesNotMatch(output, /[╭╮╰╯│]/)
+  assert.doesNotMatch(output, /─{4,}/)
+})
+
+test('collapsed reasoning rows render as a compact thinking label', () => {
+  const output = renderToString(
+    React.createElement(MessageList, {
+      rows: [{
+        role: 'thinking',
+        id: 'thinking-collapsed',
+        content: 'internal preview should stay hidden',
+        expanded: false,
+      }],
+    }),
+  )
+
+  assert.match(output, /\u2022 Thinking/)
+  assert.match(output, /alt\+t inspect/)
+  assert.doesNotMatch(output, /▌/)
+  assert.doesNotMatch(output, /internal preview should stay hidden/)
+  assert.doesNotMatch(output, /reasoning/)
+})
+
+test('assistant code blocks render as compact labeled blocks without panel borders or gutters', () => {
+  const output = renderToString(
+    React.createElement(MessageList, {
+      rows: [{
+        role: 'assistant',
+        id: 'assistant-code',
+        content: 'Here:\n```python\nprint("hello world!")\n```',
+      }],
+    }),
+  )
+
+  assert.match(output, /\u2022 Here:/)
+  assert.match(output, /\u2022 python/)
+  assert.match(output, /print\("hello world!"\)/)
+  assert.doesNotMatch(output, /▌/)
+  assert.doesNotMatch(output, /block/)
+  assert.doesNotMatch(output, /01 print\("hello world!"\)/)
+  assert.doesNotMatch(output, /[╭╮╰╯│]/)
+  assert.doesNotMatch(output, /─{4,}/)
 })
 
 test('reasoning sanitizer keeps readable reasoning text intact', () => {
@@ -163,14 +232,14 @@ test('successful read tool results do not surface file contents in the transcrip
         id: 'read-result',
         name: 'read_file',
         summary: 'read_file',
-        input: '{"path":"package.json"}',
+        input: { path: 'package.json' },
         result: { content: 'sensitive or very long file contents', summary: 'read package.json', isError: false },
       }],
     }),
   )
 
-  assert.match(output, /read_file/)
-  assert.match(output, /read package\.json/)
+  assert.match(output, /Read/)
+  assert.match(output, /package\.json/)
   assert.doesNotMatch(output, /sensitive or very long file contents/)
 })
 
@@ -207,7 +276,7 @@ test('restored successful read results keep file contents out of row state', () 
   assert.equal(row.result?.content, '')
 })
 
-test('tool_call rows render as a single dim line when collapsed', () => {
+test('successful tool_call rows hide the redundant result summary line', () => {
   const output = renderToString(
     React.createElement(MessageList, {
       rows: [{
@@ -215,16 +284,99 @@ test('tool_call rows render as a single dim line when collapsed', () => {
         id: 'tc-1',
         name: 'run_bash',
         summary: 'run_bash',
-        input: '{"command":"ls"}',
+        input: { command: 'ls' },
         result: { content: 'file.txt', summary: 'exit 0', isError: false },
       }],
     }),
   )
 
-  assert.match(output, /run_bash/)
-  assert.match(output, /exit 0/)
+  assert.match(output, /Bash/)
+  assert.match(output, /ls/)
+  assert.doesNotMatch(output, /▌/)
+  assert.doesNotMatch(output, /exit 0/)
+  assert.doesNotMatch(output, /⎿/)
   assert.doesNotMatch(output, /alt\+t inspect/)
   assert.doesNotMatch(output, /─{4,}/)
+})
+
+test('successful file edit tool_call rows render stored diffs inline', () => {
+  const output = renderToString(
+    React.createElement(MessageList, {
+      rows: [{
+        role: 'tool_call',
+        id: 'edit-result',
+        name: 'edit_file',
+        summary: 'edit_file',
+        input: { path: 'hello.py' },
+        result: {
+          content: 'updated hello.py',
+          summary: 'edit hello.py',
+          isError: false,
+          diff: '--- hello.py\n+++ hello.py\n@@ -1 +1 @@\n-print("old")\n+print("new")',
+        },
+      }],
+    }),
+  )
+
+  assert.match(output, /Edit/)
+  assert.match(output, /hello\.py/)
+  assert.doesNotMatch(output, /--- hello\.py/)
+  assert.doesNotMatch(output, /\+\+\+ hello\.py/)
+  assert.doesNotMatch(output, /@@ -1 \+1 @@/)
+  assert.match(output, /- print\("old"\)/)
+  assert.match(output, /\+ print\("new"\)/)
+  assert.doesNotMatch(output, /-print\("old"\)/)
+  assert.doesNotMatch(output, /\+print\("new"\)/)
+  assert.doesNotMatch(output, /edit hello\.py/)
+})
+
+test('syntax highlighting only applies language token colors to programming languages', () => {
+  const python = syntaxLineSpans('def greet(name):', 'python')
+  const markdown = syntaxLineSpans('def greet(name):', 'markdown')
+
+  assert.ok(python.some(span => span.color === theme.codeKeyword))
+  assert.deepEqual(markdown, [{ text: 'def greet(name):', color: theme.textSubtle }])
+})
+
+test('restored file edit tool results keep hidden diff for transcript display', () => {
+  let id = 0
+  const rows = sessionMessagesToRows([
+    {
+      version: 2,
+      role: 'tool_use',
+      toolUseId: 'tool-1',
+      name: 'edit_file',
+      input: { path: 'hello.py' },
+      createdAt: new Date(0).toISOString(),
+    },
+    {
+      version: 2,
+      role: 'tool_result',
+      toolUseId: 'tool-1',
+      name: 'edit_file',
+      content: formatFileChangeResult(
+        'updated hello.py',
+        '--- hello.py\n+++ hello.py\n@@ -1 +1 @@\n-old\n+new',
+      ),
+      createdAt: new Date(0).toISOString(),
+    },
+  ], () => `row-${++id}`)
+
+  assert.equal(rows[0]?.role, 'tool_call')
+  const row = rows[0] as Extract<MessageRow, { role: 'tool_call' }>
+  assert.equal(row.result?.content, 'updated hello.py')
+  assert.equal(row.result?.diff, '--- hello.py\n+++ hello.py\n@@ -1 +1 @@\n-old\n+new')
+})
+
+test('consecutive successful tool_call rows stack tight without blank lines between them', () => {
+  const rows: MessageRow[] = [
+    { role: 'tool_call', id: 'tc-a', name: 'list_directory', summary: 'list_directory', input: { path: '.' }, result: { content: '', summary: 'listed .', isError: false } },
+    { role: 'tool_call', id: 'tc-b', name: 'list_directory', summary: 'list_directory', input: { path: 'src' }, result: { content: '', summary: 'listed src', isError: false } },
+    { role: 'tool_call', id: 'tc-c', name: 'list_directory', summary: 'list_directory', input: { path: 'test' }, result: { content: '', summary: 'listed test', isError: false } },
+  ]
+  const output = renderToString(React.createElement(MessageList, { rows }))
+  const lines = output.split('\n').filter(line => line.trim().length > 0)
+  assert.equal(lines.length, 3, `expected 3 non-blank lines for 3 tight-stacked tool calls, got ${lines.length}: ${JSON.stringify(lines)}`)
 })
 
 test('tool_call rows show running state until a result attaches', () => {
@@ -235,12 +387,12 @@ test('tool_call rows show running state until a result attaches', () => {
         id: 'tc-running',
         name: 'run_bash',
         summary: 'run_bash',
-        input: '{"command":"ls"}',
+        input: { command: 'ls' },
       }],
     }),
   )
 
-  assert.match(output, /run_bash/)
+  assert.match(output, /Bash/)
   assert.match(output, /running/)
   assert.doesNotMatch(output, /alt\+t inspect/)
 })

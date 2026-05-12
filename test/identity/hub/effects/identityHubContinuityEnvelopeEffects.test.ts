@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
   createContinuityEnvelopeForSave,
-} from '../../../../src/identity/hub/effects/shared/snapshot.js'
+} from '../../../../src/identity/hub/continuity/snapshot.js'
 import {
   createWalletRestoreAccessChallenge,
   isWalletContinuitySnapshotEnvelope,

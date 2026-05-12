@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { validateAdvancedEnsRelationship } from '../../../src/identity/hub/advancedEnsValidation.js'
+import { validateAdvancedEnsRelationship } from '../../../src/identity/hub/ens/advancedEnsValidation.js'
 import type { Erc8004RegistryConfig } from '../../../src/identity/registry/erc8004.js'
 
 const registry: Erc8004RegistryConfig = {

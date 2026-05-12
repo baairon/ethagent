@@ -4,7 +4,7 @@ import { getAddress } from 'viem'
 import {
   runTokenTransferTargetSubmit,
   tokenTransferProgressForPhase,
-} from '../../../../src/identity/hub/effects/token-transfer/runTokenTransfer.js'
+} from '../../../../src/identity/hub/transfer/effects.js'
 import { identityFixture, registry } from './effects.fixtures.js'
 
 test('token transfer progress identifies the required wallet for each signing step', () => {

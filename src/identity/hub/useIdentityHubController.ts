@@ -11,35 +11,35 @@ import {
 import {
   assertTokenNotInVault,
   TokenInVaultError,
-} from './effects/vault/preflight.js'
+} from './custody/preflight.js'
 import {
   runPublicProfilePreflight,
-} from './effects/publicProfile/runPublicProfileSave.js'
+} from './profile/effects.js'
 import {
   runRebackupPreflight,
-} from './effects/rebackup/runRebackup.js'
+} from './continuity/effects.js'
 import type {
   EffectCallbacks,
   IdentityCompletionSource,
   RestoreProgress,
   TokenTransferProgress,
-} from './effects/types.js'
-import { resolveVaultAddress } from './flows/custody/custodyEffects.js'
-import { useCustodyFlow } from './flows/custody/useCustodyFlow.js'
-import { identityHubErrorView } from './model/errors.js'
-import { readCustodyMode } from './model/custody.js'
-import { selectEnsStatus } from './model/ens.js'
+} from './shared/effects/types.js'
+import { resolveVaultAddress } from './custody/transactions.js'
+import { useCustodyFlow } from './custody/useCustodyFlow.js'
+import { identityHubErrorView } from './shared/model/errors.js'
+import { readCustodyMode } from './custody/state.js'
+import { selectEnsStatus } from './ens/state.js'
 import { identityHubReducer, type ProfileUpdates, type Step } from './identityHubReducer.js'
 import type { IdentityHubProps } from './types.js'
 import {
   capitalizeFeedbackMessage,
   initialStepForAction,
   isWalletCancelled,
-} from './utils.js'
+} from './shared/utils.js'
 import {
   preflightTokenOwnership,
   useAgentReconciliation,
-} from './reconciliation/index.js'
+} from './shared/reconciliation/index.js'
 import { useIdentityHubContinuity } from './useIdentityHubContinuity.js'
 import { useIdentityHubSideEffects } from './useIdentityHubSideEffects.js'
 

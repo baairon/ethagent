@@ -3,6 +3,7 @@ import path from 'node:path'
 import { z } from 'zod'
 import { recordRewindSnapshot } from '../storage/rewind.js'
 import type { Tool } from './contracts.js'
+import { formatFileChangeResult, renderUnifiedFileDiff } from './fileDiff.js'
 import { resolveWorkspacePath } from './readTool.js'
 
 const schema = z.object({
@@ -35,6 +36,7 @@ export const deleteFileTool: Tool<typeof schema> = {
       subtitle: prepared.fullPath,
       before: preview(prepared.before),
       after: '(deleted)',
+      diff: renderUnifiedFileDiff({ filePath: prepared.relativePath, before: prepared.before, after: '' }),
       changeSummary: `delete ${prepared.relativePath}`,
     }
   },
@@ -58,9 +60,12 @@ export const deleteFileTool: Tool<typeof schema> = {
     return {
       ok: true,
       summary: `deleted ${prepared.relativePath}`,
-      content: rewindWarning
-        ? `deleted ${prepared.fullPath}\nwarning: ${rewindWarning}`
-        : `deleted ${prepared.fullPath}`,
+      content: formatFileChangeResult(
+        rewindWarning
+          ? `deleted ${prepared.fullPath}\nwarning: ${rewindWarning}`
+          : `deleted ${prepared.fullPath}`,
+        renderUnifiedFileDiff({ filePath: prepared.relativePath, before: prepared.before, after: '' }),
+      ),
     }
   },
 }

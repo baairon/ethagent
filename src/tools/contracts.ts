@@ -23,6 +23,7 @@ export type PermissionRequest =
       subtitle: string
       before: string
       after: string
+      diff: string
       changeSummary: string
     }
   | {
@@ -34,6 +35,7 @@ export type PermissionRequest =
       subtitle: string
       before: string
       after: string
+      diff: string
       changeSummary: string
     }
   | {
@@ -68,6 +70,7 @@ export type PermissionRequest =
       subtitle: string
       before: string
       after: string
+      diff: string
       changeSummary: string
     }
   | {

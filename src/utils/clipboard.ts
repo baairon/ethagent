@@ -3,26 +3,29 @@ import { mkdir, stat } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 
-export type CopyResult = { ok: true; method: string } | { ok: false; error: string }
+export type CopyResult = { ok: true; method: string; chars: number } | { ok: false; error: string }
 export type ReadResult = { ok: true; text: string; method: string } | { ok: false; error: string }
 export type ReadImageResult = { ok: true; path: string; method: string } | { ok: false; error: string }
 
+type CopyAttempt = { ok: true; method: string } | { ok: false; error: string }
+
 export async function copyToClipboard(text: string): Promise<CopyResult> {
+  const chars = text.length
   const native = await tryNative(text)
-  if (native.ok) return native
+  if (native.ok) return { ...native, chars }
 
   const tmux = await tryTmux(text)
-  if (tmux.ok) return tmux
+  if (tmux.ok) return { ...tmux, chars }
 
   try {
     process.stdout.write(osc52(text))
-    return { ok: true, method: 'osc52' }
+    return { ok: true, method: 'osc52', chars }
   } catch (err: unknown) {
     return { ok: false, error: (err as Error).message || 'osc52 write failed' }
   }
 }
 
-async function tryNative(text: string): Promise<CopyResult> {
+async function tryNative(text: string): Promise<CopyAttempt> {
   if (process.platform === 'darwin') {
     return pipeTo('pbcopy', [], text, 'pbcopy')
   }
@@ -38,12 +41,12 @@ async function tryNative(text: string): Promise<CopyResult> {
   return { ok: false, error: 'no native clipboard tool found' }
 }
 
-async function tryTmux(text: string): Promise<CopyResult> {
+async function tryTmux(text: string): Promise<CopyAttempt> {
   if (!process.env['TMUX']) return { ok: false, error: 'not in tmux' }
   return pipeTo('tmux', ['load-buffer', '-w', '-'], text, 'tmux load-buffer')
 }
 
-function pipeTo(cmd: string, args: string[], text: string, method: string): Promise<CopyResult> {
+function pipeTo(cmd: string, args: string[], text: string, method: string): Promise<CopyAttempt> {
   return new Promise(resolve => {
     let child
     try {
