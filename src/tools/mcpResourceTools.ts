@@ -30,7 +30,7 @@ export const listMcpResourcesTool: Tool<typeof ListMcpResourcesInput> = {
     const serverName = input.server ?? '*'
     return {
       kind: 'mcp',
-      title: 'allow MCP resource listing?',
+      title: 'Allow MCP resource listing?',
       subtitle: input.server ? `list resources from ${input.server}` : 'list resources from all connected MCP servers',
       serverName,
       normalizedServerName: normalizeNameForMcp(serverName),
@@ -72,7 +72,7 @@ export const readMcpResourceTool: Tool<typeof ReadMcpResourceInput> = {
   async buildPermissionRequest(input) {
     return {
       kind: 'mcp',
-      title: 'allow MCP resource read?',
+      title: 'Allow MCP resource read?',
       subtitle: `${input.server} / ${input.uri}`,
       serverName: input.server,
       normalizedServerName: normalizeNameForMcp(input.server),

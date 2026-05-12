@@ -55,6 +55,7 @@ type ChatBottomPaneProps = {
   history: string[]
   busy: boolean
   streaming: boolean
+  streamingStartedAt: number | null
   activity: BottomPaneActivity
   placeholderHints: string[]
   queuedInputs: string[]
@@ -101,6 +102,7 @@ export function ChatBottomPane({
   history,
   busy,
   streaming,
+  streamingStartedAt,
   activity,
   placeholderHints,
   queuedInputs,
@@ -257,7 +259,7 @@ export function ChatBottomPane({
         </Box>
       ) : streaming ? (
         <Box marginLeft={2} marginBottom={1}>
-          <Spinner active hint="esc to cancel" />
+          <Spinner active hint="esc to cancel" startedAt={streamingStartedAt ?? undefined} />
         </Box>
       ) : null}
       <ChatInput

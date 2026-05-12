@@ -37,7 +37,7 @@ export const readTool: Tool<typeof schema> = {
       path: fullPath,
       relativePath,
       directoryPath: path.dirname(fullPath),
-      title: 'allow file read?',
+      title: 'Allow file read?',
       subtitle: input.startLine || input.endLine
         ? `${fullPath} · lines ${input.startLine ?? 1}-${input.endLine ?? 'end'}`
         : fullPath,

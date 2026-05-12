@@ -72,16 +72,16 @@ export const PermissionPrompt: React.FC<PermissionPromptProps> = ({ request, onD
 export function permissionOptionsForRequest(request: PermissionRequest): Array<{ value: PermissionDecision; label: string; hint?: string; disabled?: boolean }> {
   if (request.kind === 'bash') {
     return [
-      { value: 'allow-once', label: 'Allow Once', hint: 'Approve only this command execution' },
+      { value: 'allow-once', label: 'Allow once', hint: 'Approve only this command execution' },
       {
         value: 'allow-command-project',
-        label: 'Allow Exact Command',
+        label: 'Allow exact command',
         hint: 'Remember this exact command for this project',
         disabled: !request.canPersistExact,
       },
       {
         value: 'allow-command-prefix-project',
-        label: request.commandPrefix ? `Allow ${request.commandPrefix} Commands` : 'Allow Command Family',
+        label: request.commandPrefix ? `Allow ${request.commandPrefix} commands` : 'Allow command family',
         hint: 'Remember this base command in this working directory for this project',
         disabled: !request.canPersistPrefix,
       },
@@ -91,63 +91,63 @@ export function permissionOptionsForRequest(request: PermissionRequest): Array<{
 
   if (request.kind === 'mcp') {
     const risk = request.destructive
-      ? 'server marks this tool as destructive'
+      ? 'Server marks this tool as destructive'
       : request.openWorld
-        ? 'server marks this tool as open-world'
+        ? 'Server marks this tool as open-world'
         : request.readOnly
-          ? 'server marks this tool as read-only'
-          : 'server did not mark this tool read-only'
+          ? 'Server marks this tool as read-only'
+          : 'Server did not mark this tool read-only'
     return [
-      { value: 'allow-once', label: 'allow once', hint: risk },
-      { value: 'allow-mcp-tool-project', label: 'always allow this MCP tool', hint: request.toolKey },
+      { value: 'allow-once', label: 'Allow once', hint: risk },
+      { value: 'allow-mcp-tool-project', label: 'Always allow this MCP tool', hint: request.toolKey },
       {
         value: 'allow-mcp-server-project',
-        label: `always allow ${request.serverName}`,
-        hint: 'remember all tools from this MCP server for this project',
+        label: `Always allow ${request.serverName}`,
+        hint: 'Remember all tools from this MCP server for this project',
         disabled: !request.canPersistServer,
       },
-      { value: 'deny', label: 'deny', hint: 'return a denial back to the model' },
+      { value: 'deny', label: 'Deny', hint: 'Return a denial back to the model' },
     ]
   }
 
   if (request.kind === 'delete') {
     return [
-      { value: 'allow-once', label: 'delete this file', hint: 'approve this deletion only' },
-      { value: 'deny', label: 'deny', hint: 'keep the file unchanged' },
+      { value: 'allow-once', label: 'Delete this file', hint: 'Approve this deletion only' },
+      { value: 'deny', label: 'Deny', hint: 'Keep the file unchanged' },
     ]
   }
 
   if (request.kind === 'private-continuity-read') {
     return [
-      { value: 'allow-once', label: 'allow once', hint: `read ${request.file}` },
-      { value: 'deny', label: 'deny', hint: 'keep private continuity hidden' },
+      { value: 'allow-once', label: 'Allow once', hint: `Read ${request.file}` },
+      { value: 'deny', label: 'Deny', hint: 'Keep private continuity hidden' },
     ]
   }
 
   if (request.kind === 'private-continuity-edit') {
     return [
-      { value: 'allow-once', label: 'Approve Once', hint: `Apply this edit to ${request.file}` },
+      { value: 'allow-once', label: 'Approve once', hint: `Apply this edit to ${request.file}` },
       { value: 'deny', label: 'Deny', hint: 'Keep private continuity unchanged' },
     ]
   }
 
   return [
-    { value: 'allow-once', label: 'allow once', hint: 'approve only this action' },
-    { value: 'allow-path-project', label: 'always allow this file', hint: request.relativePath },
-    { value: 'allow-directory-project', label: 'always allow this folder', hint: request.directoryPath },
+    { value: 'allow-once', label: 'Allow once', hint: 'Approve only this action' },
+    { value: 'allow-path-project', label: 'Always allow this file', hint: request.relativePath },
+    { value: 'allow-directory-project', label: 'Always allow this folder', hint: request.directoryPath },
     {
       value: 'allow-kind-project',
       label:
         request.kind === 'edit'
-          ? 'always allow edits'
+          ? 'Always allow edits'
           : request.kind === 'write'
-            ? 'always allow writes'
+            ? 'Always allow writes'
           : request.kind === 'cd'
-            ? 'always allow directory changes'
-            : 'always allow reads',
-      hint: 'remember this tool kind for this project',
+            ? 'Always allow directory changes'
+            : 'Always allow reads',
+      hint: 'Remember this tool kind for this project',
     },
-    { value: 'deny', label: 'deny', hint: 'return a denial back to the model' },
+    { value: 'deny', label: 'Deny', hint: 'Return a denial back to the model' },
   ]
 }
 

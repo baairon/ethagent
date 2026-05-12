@@ -37,7 +37,7 @@ export const writeFileTool: Tool<typeof schema> = {
       path: prepared.fullPath,
       relativePath: prepared.relativePath,
       directoryPath: path.dirname(prepared.fullPath),
-      title: prepared.existedBefore ? 'allow file rewrite?' : 'allow file creation?',
+      title: prepared.existedBefore ? 'Allow file rewrite?' : 'Allow file creation?',
       subtitle: prepared.fullPath,
       before: previewText(prepared.before),
       after: previewText(input.content),

@@ -243,7 +243,7 @@ export const Spinner: React.FC<SpinnerProps> = ({
   useEffect(() => {
     if (!active) return
     internalStartedAtRef.current = startedAt ?? Date.now()
-  }, [active, startedAt, label, verb])
+  }, [active, startedAt])
 
   useEffect(() => {
     if (!active) return

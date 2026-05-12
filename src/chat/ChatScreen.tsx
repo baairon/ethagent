@@ -134,6 +134,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
   const [rows, setRows] = useState<MessageRow[]>([])
   const [history, setHistory] = useState<string[]>([])
   const [streaming, setStreaming] = useState(false)
+  const [streamingStartedAt, setStreamingStartedAt] = useState<number | null>(null)
   const [queuedInputs, setQueuedInputs] = useState<string[]>([])
   const [turns, setTurns] = useState(0)
   const [approxTokens, setApproxTokens] = useState(0)
@@ -840,6 +841,10 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
       const controller = new AbortController()
       streamAbortRef.current = controller
       let planCandidate: PendingPlan | null = null
+      const setStreamingWithStart = (value: boolean) => {
+        setStreaming(value)
+        setStreamingStartedAt(value ? Date.now() : null)
+      }
       const result = await runStreamingTurn({
         provider: turnProvider,
         mode: activeMode,
@@ -854,7 +859,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
         getDisplayCwd: () => compressHome(cwdRef.current),
         getSessionMessages: () => sessionMessagesRef.current,
         setActiveCheckpoint: checkpoint => { activeCheckpointRef.current = checkpoint },
-        setStreaming,
+        setStreaming: setStreamingWithStart,
         updateRows,
         pushNote,
         persistTurnMessage: message => persistSessionMessage(attachActiveTurn(message)),
@@ -1569,6 +1574,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
           history={history}
           busy={busy}
           streaming={streaming}
+          streamingStartedAt={streamingStartedAt}
           activity={null}
           placeholderHints={placeholderHints}
           queuedInputs={queuedInputs}

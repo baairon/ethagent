@@ -441,7 +441,7 @@ export class McpManager implements McpRuntime {
       async buildPermissionRequest() {
         return {
           kind: 'mcp',
-          title: 'allow MCP tool?',
+          title: 'Allow MCP tool?',
           subtitle: `${connection.name} / ${tool.name}`,
           serverName: connection.name,
           normalizedServerName: connection.normalizedName,

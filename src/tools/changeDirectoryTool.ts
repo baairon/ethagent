@@ -32,7 +32,7 @@ export const changeDirectoryTool: Tool<typeof schema> = {
       path: fullPath,
       relativePath: path.relative(context.workspaceRoot, fullPath) || path.basename(fullPath),
       directoryPath: path.dirname(fullPath),
-      title: 'allow directory change?',
+      title: 'Allow directory change?',
       subtitle: fullPath,
     }
   },

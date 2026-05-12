@@ -14,7 +14,7 @@ test('file permission prompt renders visual diff rows instead of raw patch metad
     path: '/workspace/src/example.ts',
     relativePath: 'src/example.ts',
     directoryPath: '/workspace/src',
-    title: 'allow file edit?',
+    title: 'Allow file edit?',
     subtitle: '/workspace/src/example.ts',
     before: 'old',
     after: 'new',

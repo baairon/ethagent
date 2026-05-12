@@ -31,7 +31,7 @@ export const listDirectoryTool: Tool<typeof schema> = {
       path: fullPath,
       relativePath,
       directoryPath: fullPath,
-      title: 'allow directory listing?',
+      title: 'Allow directory listing?',
       subtitle: fullPath,
     }
   },

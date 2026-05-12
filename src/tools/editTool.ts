@@ -41,7 +41,7 @@ export const editTool: Tool<typeof schema> = {
       path: fullPath,
       relativePath,
       directoryPath: path.dirname(fullPath),
-      title: 'allow file edit?',
+      title: 'Allow file edit?',
       subtitle: fullPath,
       before: applied.previewBefore,
       after: applied.previewAfter,

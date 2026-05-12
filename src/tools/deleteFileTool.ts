@@ -32,7 +32,7 @@ export const deleteFileTool: Tool<typeof schema> = {
       path: prepared.fullPath,
       relativePath: prepared.relativePath,
       directoryPath: path.dirname(prepared.fullPath),
-      title: 'allow file delete?',
+      title: 'Allow file delete?',
       subtitle: prepared.fullPath,
       before: preview(prepared.before),
       after: '(deleted)',

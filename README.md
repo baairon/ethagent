@@ -97,7 +97,7 @@ Save the token ID + network somewhere safe. ENS records can be cleared and rebui
 
 **Prepare Token Transfer** runs before any ERC-8004 token transfer, and only when the token sits directly in your wallet. An agent in Advanced custody has to switch to Simple first from Custody Mode, which unwraps the token from its Vault back to the owner wallet.
 
-- sender signs snapshot access, receiver signs restore access.
+- Sender signs snapshot access, receiver signs restore access.
 - Sender publishes the snapshot pointer to the agent URI.
 - The actual transfer happens externally afterwards, in whichever wallet UI you prefer.
 - Once the token has moved, the receiver opens **Load Agent** with the receiving wallet and restores the same agent from the published snapshot.
