@@ -33,6 +33,12 @@ import {
   shouldCollapsePastedText,
   type PastedTextRef,
 } from './chatPaste.js'
+import {
+  expandImageRefs,
+  formatImageRefMarker,
+  pruneImageRefs,
+  type ImageRef,
+} from './imageRefs.js'
 
 type PromptInputProps = {
   onSubmit: (value: string) => void
@@ -48,6 +54,7 @@ type PromptInputProps = {
   cwd?: string
   seedText?: string | null
   onSeedConsumed?: () => void
+  onImagePaste?: (path: string) => void
 }
 
 const MAX_LENGTH = 32_768
@@ -76,6 +83,7 @@ export const ChatInput: React.FC<PromptInputProps> = ({
   cwd,
   seedText,
   onSeedConsumed,
+  onImagePaste,
 }) => {
   const { stdout } = useStdout()
   const [buffer, setBuffer] = useState<ChatBuffer>(emptyBuffer)
@@ -100,12 +108,19 @@ export const ChatInput: React.FC<PromptInputProps> = ({
   const pasteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pastedTextRefsRef = useRef<Map<number, PastedTextRef>>(new Map())
   const nextPastedTextRefIdRef = useRef(1)
+  const imageRefsRef = useRef<Map<number, ImageRef>>(new Map())
+  const nextImageRefIdRef = useRef(1)
 
   useEffect(() => { bufferRef.current = buffer }, [buffer])
   useEffect(() => { historyIndexRef.current = historyIndex }, [historyIndex])
   useEffect(() => { draftBufferRef.current = draftBuffer }, [draftBuffer])
   useEffect(() => { historyPreviewActiveRef.current = historyPreviewActive }, [historyPreviewActive])
   useEffect(() => { preferredColumnRef.current = preferredColumn }, [preferredColumn])
+
+  useEffect(() => {
+    pruneImageRefs(imageRefsRef.current, value)
+    if (imageRefsRef.current.size === 0) nextImageRefIdRef.current = 1
+  }, [value])
 
   useEffect(() => {
     const handleResize = () => {
@@ -217,6 +232,8 @@ export const ChatInput: React.FC<PromptInputProps> = ({
     })
     pastedTextRefsRef.current.clear()
     nextPastedTextRefIdRef.current = 1
+    imageRefsRef.current.clear()
+    nextImageRefIdRef.current = 1
   }, [applyBuffer, applyHistoryState])
 
   const handlePaste = useCallback((text: string) => {
@@ -257,7 +274,8 @@ export const ChatInput: React.FC<PromptInputProps> = ({
   const submit = useCallback(() => {
     const trimmed = value.trim()
     if (!trimmed) return
-    onSubmit(expandPastedTextRefs(trimmed, pastedTextRefsRef.current))
+    const withText = expandPastedTextRefs(trimmed, pastedTextRefsRef.current)
+    onSubmit(expandImageRefs(withText, imageRefsRef.current))
     resetBuffer()
   }, [value, onSubmit, resetBuffer])
 
@@ -388,7 +406,12 @@ export const ChatInput: React.FC<PromptInputProps> = ({
     if (key.meta && inputText === 'v') {
       void (async () => {
         const image = await readClipboardImage()
-        if (image.ok) insertText(`[image: ${image.path}]`)
+        if (image.ok) {
+          const id = nextImageRefIdRef.current++
+          imageRefsRef.current.set(id, { path: image.path })
+          insertText(formatImageRefMarker(id))
+          onImagePaste?.(image.path)
+        }
       })()
       return
     }

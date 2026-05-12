@@ -119,6 +119,82 @@ test('llama.cpp preflight reports different-model-running from /v1/models withou
   assert.equal(started, false)
 })
 
+test('llama.cpp preflight forwards mmprojPath when starting a fresh runner', async () => {
+  const startArgs: Array<{ modelPath: string; modelAlias: string; host?: string; mmprojPath?: string }> = []
+  const result = await ensureLlamaCppRunnerReady(config, {
+    fetchImpl: failingFetch,
+    findLocalModel: async id => localModel({ id, mmprojPath: '/models/mmproj.gguf' }),
+    startServer: async args => {
+      startArgs.push(args)
+      return { ok: true, alreadyRunning: false }
+    },
+  })
+
+  assert.deepEqual(result, { ok: true, alreadyRunning: false })
+  assert.equal(startArgs[0]?.mmprojPath, '/models/mmproj.gguf')
+})
+
+test('llama.cpp preflight stops then restarts ethagent-owned runner with mmproj when projector is needed', async () => {
+  let stopped = 0
+  const startArgs: Array<{ modelPath: string; modelAlias: string; host?: string; mmprojPath?: string }> = []
+  const result = await ensureLlamaCppRunnerReady(config, {
+    fetchImpl: modelsFetch([config.model]),
+    findLocalModel: async id => localModel({ id, mmprojPath: '/models/mmproj.gguf' }),
+    stopServer: async () => {
+      stopped += 1
+      return { ok: true, stopped: true }
+    },
+    startServer: async args => {
+      startArgs.push(args)
+      return { ok: true, alreadyRunning: false }
+    },
+  })
+
+  assert.deepEqual(result, { ok: true, alreadyRunning: false })
+  assert.equal(stopped, 1)
+  assert.equal(startArgs[0]?.mmprojPath, '/models/mmproj.gguf')
+})
+
+test('llama.cpp preflight surfaces untracked-server when running runner blocks projector', async () => {
+  let started = false
+  const result = await ensureLlamaCppRunnerReady(config, {
+    fetchImpl: modelsFetch([config.model]),
+    findLocalModel: async id => localModel({ id, mmprojPath: '/models/mmproj.gguf' }),
+    stopServer: async () => ({ ok: true, stopped: false, reason: 'untracked-server', servedModels: [config.model] }),
+    startServer: async () => {
+      started = true
+      return { ok: true, alreadyRunning: false }
+    },
+  })
+
+  assert.equal(result.ok, false)
+  if (result.ok) return
+  assert.equal(result.code, 'untracked-server')
+  assert.match(result.detail ?? '', /Stop the external process/)
+  assert.equal(started, false)
+})
+
+test('llama.cpp preflight skips stop+restart for already-running runner without projector', async () => {
+  let stopped = 0
+  let started = false
+  const result = await ensureLlamaCppRunnerReady(config, {
+    fetchImpl: modelsFetch([config.model]),
+    findLocalModel: async id => localModel({ id }),
+    stopServer: async () => {
+      stopped += 1
+      return { ok: true, stopped: true }
+    },
+    startServer: async () => {
+      started = true
+      return { ok: true, alreadyRunning: false }
+    },
+  })
+
+  assert.deepEqual(result, { ok: true, alreadyRunning: true })
+  assert.equal(stopped, 0)
+  assert.equal(started, false)
+})
+
 function localModel(overrides: Partial<LocalHfModel> = {}): LocalHfModel {
   return {
     id: 'org/model-GGUF#model.Q4_K_M.gguf',

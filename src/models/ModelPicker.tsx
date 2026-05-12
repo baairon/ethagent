@@ -13,6 +13,7 @@ import {
   installLlamaCppRunner,
   setLlamaCppServerPath,
   startLlamaCppServer,
+  stopLlamaCppServer,
   type LlamaCppInstallProgress,
   type LlamaCppInstallResult,
   type LlamaCppStartResult,
@@ -32,6 +33,8 @@ import { defaultModelFor, type EthagentConfig, type ProviderId } from '../storag
 import { clearModelCatalogCache, discoverProviderModels, isOpenAIOAuthAllowedModel, OPENAI_OAUTH_DEFAULT_MODEL, type ModelCatalogResult } from './catalog.js'
 import { contextWindowInfo } from '../runtime/compaction.js'
 import {
+  addMmprojToInstalledModel,
+  backfillMmprojForModels,
   createHfDownloadPlan,
   downloadHfModel,
   fetchHuggingFaceRepoInfo,
@@ -68,7 +71,7 @@ import { formatLocalHfModelDisplayName, formatModelDisplayName } from './modelDi
 import { fetchUncensoredGgufCatalog, type UncensoredCatalogEntry } from './uncensoredCatalog.js'
 
 export type ModelPickerSelection =
-  | { kind: 'llamacpp'; model: string }
+  | { kind: 'llamacpp'; model: string; mmprojPath?: string }
   | { kind: 'cloud'; provider: CloudProviderId; model: string; keyJustSet: boolean }
 
 type ModelPickerProps = {
@@ -113,6 +116,9 @@ type State =
   | { kind: 'localRunnerPathEntry'; data: LoadedData; model: LocalHfModel; submitting: boolean; error?: string }
   | { kind: 'localRunnerStarting'; data: LoadedData; model: LocalHfModel; startedAt: number }
   | { kind: 'localRunnerStartFail'; data: LoadedData; model: LocalHfModel; result: Extract<LlamaCppStartResult, { ok: false }> }
+  | { kind: 'mmprojOffer'; data: LoadedData; model: LocalHfModel }
+  | { kind: 'mmprojDownloading'; data: LoadedData; model: LocalHfModel; progress: HfDownloadProgress }
+  | { kind: 'mmprojError'; data: LoadedData; model: LocalHfModel; message: string }
 
 export const ModelPicker: React.FC<ModelPickerProps> = ({
   currentConfig,
@@ -244,6 +250,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
     const canDownload = plan.review.risk !== 'high' && plan.review.runtime === 'llama.cpp runnable'
     const fit = state.data.machineSpec ? estimateGgufMachineFit(plan.sizeBytes, state.data.machineSpec) : null
     const recommended = state.data.machineSpec ? recommendGgufFile(plan.repo, ggufFiles(plan.repo), state.data.machineSpec) : null
+    const mmproj = plan.mmprojCandidate
     return (
       <Surface
         title="Review Model Link"
@@ -260,15 +267,22 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
           <Text color={riskColor(plan.review.risk)}>safety: {safetyLabel(plan.review.risk)} · source: {credibilityLabel(plan.review.credibility)}</Text>
           <Text color={theme.dim}>signals: {formatSignals(plan.repo.downloads, plan.repo.likes)}</Text>
           <Text color={theme.dim}>notes: {friendlyReasons(plan.review.reasons).join('; ')}</Text>
+          {mmproj ? (
+            <Text color={theme.dim}>vision encoder available: {friendlyFileName(mmproj.filename)} (+{formatBytes(mmproj.sizeBytes)})</Text>
+          ) : null}
         </Box>
-        <Select<'download' | 'pick' | 'cancel'>
+        <Select<'download' | 'downloadWithMmproj' | 'pick' | 'cancel'>
           options={[
-            { value: 'download', label: 'Download This Model', disabled: !canDownload },
+            ...(mmproj ? [{ value: 'downloadWithMmproj' as const, label: `Download Model + Vision Encoder (+${formatBytes(mmproj.sizeBytes)}) · recommended`, disabled: !canDownload }] : []),
+            { value: 'download', label: mmproj ? 'Download Without Vision Encoder' : 'Download This Model', disabled: !canDownload },
             { value: 'pick', label: 'Pick Another File' },
             { value: 'cancel', label: 'Cancel' },
           ]}
           onSubmit={choice => {
             if (choice === 'download') void startHfDownload(state, setState, hfAbortRef, onPick)
+            else if (choice === 'downloadWithMmproj') {
+              void startHfDownload({ ...state, plan: { ...plan, includeMmproj: true } }, setState, hfAbortRef, onPick)
+            }
             else if (choice === 'pick') void inspectHfInput({ kind: 'hfInput', data: state.data }, plan.repoId, setState)
             else setState({ kind: 'list', data: state.data })
           }}
@@ -287,6 +301,68 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
       <Surface title="Downloading Model" subtitle={state.plan.displayName}>
         <Text color={theme.dim}>{state.progress.status}</Text>
         <ProgressBar progress={progress} suffix={suffix} />
+      </Surface>
+    )
+  }
+
+  if (state.kind === 'mmprojOffer') {
+    const sizeLabel = state.model.mmprojSizeBytes ? `+${formatBytes(state.model.mmprojSizeBytes)}` : 'additional download'
+    return (
+      <Surface
+        title="Add Image Support?"
+        subtitle={`${state.model.displayName} has a vision encoder available in its Hugging Face repo.`}
+        footer="enter select · esc back"
+      >
+        <Box flexDirection="column" marginBottom={1}>
+          <Text color={theme.dim}>Loading the vision encoder lets this model accept pasted images.</Text>
+          <Text color={theme.dim}>Without it, image paste is declined at submit time.</Text>
+        </Box>
+        <Select<'add' | 'skip' | 'cancel'>
+          options={[
+            { value: 'add', label: `Add Vision Encoder (${sizeLabel}) And Use` },
+            { value: 'skip', label: 'Use Without Image Support' },
+            { value: 'cancel', label: 'Cancel' },
+          ]}
+          onSubmit={choice => {
+            if (choice === 'add') void downloadMmprojAndContinue(state, setState, onPick)
+            else if (choice === 'skip') void startAndPickHfModel({ ...state.model, mmprojAvailable: false }, state, setState, onPick)
+            else setState({ kind: 'list', data: state.data })
+          }}
+          onCancel={() => setState({ kind: 'list', data: state.data })}
+        />
+      </Surface>
+    )
+  }
+
+  if (state.kind === 'mmprojDownloading') {
+    const total = state.progress.total ?? state.model.mmprojSizeBytes ?? 0
+    const completed = state.progress.completed ?? 0
+    const progress = total > 0 ? completed / total : 0
+    const suffix = total > 0 ? `${formatBytes(completed)} / ${formatBytes(total)}` : formatBytes(completed)
+    return (
+      <Surface title="Downloading Vision Encoder" subtitle={state.model.displayName}>
+        <Text color={theme.dim}>{state.progress.status}</Text>
+        <ProgressBar progress={progress} suffix={suffix} />
+      </Surface>
+    )
+  }
+
+  if (state.kind === 'mmprojError') {
+    return (
+      <Surface title="Vision Encoder Download Failed" subtitle={state.message} tone="error" footer="enter select · esc back">
+        <Select<'retry' | 'skip' | 'back'>
+          options={[
+            { value: 'retry', label: 'Retry Download' },
+            { value: 'skip', label: 'Use Without Image Support' },
+            { value: 'back', label: 'Back To Picker' },
+          ]}
+          onSubmit={choice => {
+            if (choice === 'retry') setState({ kind: 'mmprojOffer', data: state.data, model: state.model })
+            else if (choice === 'skip') void startAndPickHfModel({ ...state.model, mmprojAvailable: false }, state, setState, onPick)
+            else setState({ kind: 'list', data: state.data })
+          }}
+          onCancel={() => setState({ kind: 'list', data: state.data })}
+        />
       </Surface>
     )
   }
@@ -834,6 +910,18 @@ function handleSubmit(
     })()
     return
   }
+  if (value.startsWith('hfmmproj:') && state.kind === 'list') {
+    const id = value.slice('hfmmproj:'.length)
+    void (async () => {
+      const local = await findLocalHfModel(id)
+      if (!local) {
+        setState({ kind: 'hfError', data: state.data, message: 'local model metadata was not found' })
+        return
+      }
+      setState({ kind: 'mmprojOffer', data: state.data, model: local })
+    })()
+    return
+  }
   if (value.startsWith('uc:') && state.kind === 'localCatalog') {
     const entry = state.catalog.find(item => catalogOptionValue(item.repo.repoId, item.file.filename) === value)
     if (entry) void reviewCatalogModel(state, entry, setState)
@@ -1250,6 +1338,8 @@ function localRunnerStartFailureSubtitle(result: Extract<LlamaCppStartResult, { 
       return result.message
     case 'runner-not-installed':
       return 'this machine still needs a local runner'
+    case 'untracked-server':
+      return result.message
   }
 }
 
@@ -1445,6 +1535,39 @@ async function uninstallLocalModel(
   }
 }
 
+async function downloadMmprojAndContinue(
+  state: Extract<State, { kind: 'mmprojOffer' }>,
+  setState: (s: State) => void,
+  onPick: (sel: ModelPickerSelection) => void,
+): Promise<void> {
+  setState({ kind: 'mmprojDownloading', data: state.data, model: state.model, progress: { status: 'starting' } })
+  try {
+    for await (const progress of addMmprojToInstalledModel(state.model.id)) {
+      setState({ kind: 'mmprojDownloading', data: state.data, model: state.model, progress })
+    }
+  } catch (err: unknown) {
+    setState({ kind: 'mmprojError', data: state.data, model: state.model, message: (err as Error).message })
+    return
+  }
+  const updated = await findLocalHfModel(state.model.id)
+  if (!updated || !updated.mmprojPath) {
+    setState({ kind: 'mmprojError', data: state.data, model: state.model, message: 'projector downloaded but path was not persisted' })
+    return
+  }
+  const stopResult = await stopLlamaCppServer().catch(() => null)
+  if (stopResult && stopResult.ok && stopResult.reason === 'untracked-server') {
+    setState({
+      kind: 'mmprojError',
+      data: state.data,
+      model: updated,
+      message: 'Vision encoder downloaded, but a llama-server is already running and ethagent did not launch it. Quit ethagent, stop the external llama-server (taskkill /F /IM llama-server.exe on Windows, pkill llama-server on macOS or Linux), then reopen ethagent to load the projector.',
+    })
+    return
+  }
+  const data = { ...state.data, hfModels: await loadHfPickerModels() }
+  await startAndPickHfModel(updated, { kind: 'mmprojOffer', data, model: updated }, setState, onPick)
+}
+
 async function refreshLocalModelData(data: LoadedData): Promise<LoadedData> {
   const hfModels = await loadHfPickerModels()
   return {
@@ -1455,7 +1578,7 @@ async function refreshLocalModelData(data: LoadedData): Promise<LoadedData> {
 
 async function startAndPickHfModel(
   model: LocalHfModel,
-  state: Extract<State, { kind: 'list' | 'localCatalog' | 'hfDone' }>,
+  state: Extract<State, { kind: 'list' | 'localCatalog' | 'hfDone' | 'mmprojOffer' | 'mmprojError' }>,
   setState: (s: State) => void,
   onPick: (sel: ModelPickerSelection) => void,
 ): Promise<void> {
@@ -1463,10 +1586,15 @@ async function startAndPickHfModel(
     setState({ kind: 'hfError', data: state.data, message: 'blocked high-risk model; choose a model from a more credible source' })
     return
   }
+  if (model.mmprojAvailable && !model.mmprojPath && state.kind !== 'mmprojOffer' && state.kind !== 'mmprojError') {
+    setState({ kind: 'mmprojOffer', data: state.data, model })
+    return
+  }
   setState({ kind: 'localRunnerStarting', data: state.data, model, startedAt: Date.now() })
   const result = await startLlamaCppServer({
     modelPath: model.localPath,
     modelAlias: model.id,
+    mmprojPath: model.mmprojPath,
   })
   const llamaCpp = await probeLlamaCpp()
   const data = { ...state.data, llamaCpp }
@@ -1478,7 +1606,7 @@ async function startAndPickHfModel(
     setState({ kind: 'localRunnerStartFail', data, model, result })
     return
   }
-  onPick({ kind: 'llamacpp', model: model.id })
+  onPick({ kind: 'llamacpp', model: model.id, mmprojPath: model.mmprojPath })
 }
 
 async function installRunnerAndStart(
@@ -1576,7 +1704,8 @@ function formatContextWindow(tokens: number): string {
 
 async function loadHfPickerModels(): Promise<ModelPickerOptionsData['hfModels']> {
   const installed = await loadLocalHfModels()
-  return installed.map(model => ({
+  const backfilled = await backfillMmprojForModels(installed)
+  return backfilled.map(model => ({
     id: model.id,
     displayName: model.displayName,
     sizeBytes: model.sizeBytes,
@@ -1584,6 +1713,9 @@ async function loadHfPickerModels(): Promise<ModelPickerOptionsData['hfModels']>
     risk: model.risk,
     task: model.task,
     status: model.status,
+    mmprojPath: model.mmprojPath,
+    mmprojAvailable: model.mmprojAvailable,
+    mmprojSizeBytes: model.mmprojSizeBytes,
   }))
 }
 

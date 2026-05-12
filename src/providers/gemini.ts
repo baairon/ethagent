@@ -4,6 +4,7 @@ import { ProviderError } from './contracts.js'
 import { providerErrorFromResponse } from './errors.js'
 import { fetchWithRetryStreamEvents } from './retry.js'
 import { iterSseFrames } from './sse.js'
+import { hasImageBlocks, ImageLoadError, loadImageBlock } from '../utils/images.js'
 
 export type GeminiToolDefinition = {
   name: string
@@ -41,6 +42,7 @@ type GeminiChunk = {
 
 type GeminiContentPart =
   | { text: string }
+  | { inlineData: { mimeType: string; data: string } }
   | { functionCall: { name: string; args: Record<string, unknown> } }
   | { functionResponse: { name: string; response: Record<string, unknown> } }
 
@@ -92,8 +94,21 @@ export class GeminiProvider implements Provider {
       yield { type: 'error', message: error.message }
       return
     }
+    if (hasImageBlocks(messages) && !supportsGeminiImages(this.model)) {
+      yield { type: 'error', message: `image input is not enabled for ${this.model}` }
+      return
+    }
 
-    const payload = buildGeminiPayload(messages, this.tools, options)
+    let payload: GeminiPayload
+    try {
+      payload = await buildGeminiPayload(messages, this.tools, options)
+    } catch (err: unknown) {
+      if (err instanceof ImageLoadError) {
+        yield { type: 'error', message: err.message }
+        return
+      }
+      throw err
+    }
     const modelName = this.model.replace(/^models\//, '')
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelName)}:streamGenerateContent?alt=sse`
 
@@ -181,11 +196,11 @@ export class GeminiProvider implements Provider {
   }
 }
 
-export function buildGeminiPayload(
+export async function buildGeminiPayload(
   messages: Message[],
   tools: GeminiToolDefinition[] = [],
   options: ProviderCompleteOptions = {},
-): GeminiPayload {
+): Promise<GeminiPayload> {
   const systemParts: string[] = []
   const contents: GeminiContent[] = []
   const toolUseNamesById = new Map<string, string>()
@@ -222,6 +237,10 @@ export function buildGeminiPayload(
     for (const block of blocks) {
       if (block.type === 'text') {
         parts.push({ text: block.text })
+      } else if (block.type === 'image') {
+        const loaded = await loadImageBlock(block)
+        if (!loaded.dataBase64 || !loaded.mimeType) throw new Error(`could not load image: ${block.path}`)
+        parts.push({ inlineData: { mimeType: loaded.mimeType, data: loaded.dataBase64 } })
       } else if (block.type === 'tool_result') {
         const name = toolUseNamesById.get(block.toolUseId) ?? 'unknown'
         const response: Record<string, unknown> = block.isError
@@ -256,6 +275,13 @@ function normalizeBlocks(content: Message['content']): MessageContentBlock[] {
     if (block.type === 'text') return block.text.trim().length > 0
     return true
   })
+}
+
+export function supportsGeminiImages(model: string): boolean {
+  const normalized = model.toLowerCase()
+  return normalized.includes('gemini-1.5')
+    || normalized.includes('gemini-2.0')
+    || normalized.includes('gemini-2.5')
 }
 
 function normalizeFinishReason(reason: string, sawToolCall: boolean): DoneStopReason {

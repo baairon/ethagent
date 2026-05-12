@@ -1,3 +1,4 @@
+import path from 'node:path'
 import type { Message, MessageContentBlock } from '../providers/contracts.js'
 
 export function systemMessage(content: string): Message {
@@ -20,6 +21,7 @@ export function blocksToText(blocks: MessageContentBlock[]): string {
   return blocks
     .map(block => {
       if (block.type === 'text') return block.text
+      if (block.type === 'image') return `[image attached: ${path.basename(block.path)}]`
       if (block.type === 'tool_use') return `[tool use: ${block.name}]`
       return block.isError
         ? `[tool error: ${block.content}]`

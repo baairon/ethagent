@@ -34,6 +34,7 @@ export function createProvider(config: EthagentConfig, options: { mode?: Session
         baseUrl: localProviderBaseUrlFor('llamacpp', config.baseUrl),
         apiKey: 'llamacpp',
         tools: openAITools(mode, toolContext),
+        hasVisionProjector: Boolean(config.localMmprojPath),
       })
     case 'openai':
       return createOpenAIProvider(config, openAITools(mode, toolContext))

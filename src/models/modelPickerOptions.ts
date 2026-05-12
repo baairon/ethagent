@@ -23,6 +23,9 @@ export type LocalHfPickerModel = {
   risk: HfRisk
   task: HfTask
   status: 'ready' | 'incomplete'
+  mmprojPath?: string
+  mmprojAvailable?: boolean
+  mmprojSizeBytes?: number
 }
 
 export type CloudCredentialKind = 'apikey' | 'oauth'
@@ -185,12 +188,22 @@ function appendHfModelOptions(
       displayName: model.displayName,
       maxLength,
     })
+    const tags = ['Installed']
+    if (model.mmprojPath) tags.push('Vision encoder loaded')
     options.push(rowOption(
       `hf:${id}`,
       contextFitLabel('llamacpp', id, `${active ? '* ' : '  '}${displayName}`, context.contextFit),
       undefined,
-      modelMetadataSubtext(size, ['Installed']),
+      modelMetadataSubtext(size, tags),
     ))
+    if (model.mmprojAvailable && !model.mmprojPath) {
+      const projectorSize = model.mmprojSizeBytes ? ` (+${formatSize(model.mmprojSizeBytes)})` : ''
+      options.push(rowOption(
+        `hfmmproj:${id}`,
+        `    + Add Vision Encoder${projectorSize}`,
+        'Enable image input on this local model',
+      ))
+    }
   }
 }
 

@@ -1,9 +1,11 @@
 import type { Message, MessageContentBlock } from './contracts.js'
 import { messageTextContent } from '../utils/messages.js'
 import type { OpenAIToolDefinition } from './openai-chat.js'
+import { loadImageBlock } from '../utils/images.js'
 
 export type ResponsesInputContent =
   | { type: 'input_text'; text: string }
+  | { type: 'input_image'; image_url: string }
   | { type: 'output_text'; text: string }
 
 export type ResponsesInputItem =
@@ -30,13 +32,13 @@ export type ResponsesRequestBody = {
   max_output_tokens?: number
 }
 
-export function buildResponsesBody(args: {
+export async function buildResponsesBody(args: {
   model: string
   messages: Message[]
   tools: OpenAIToolDefinition[]
   maxOutputTokens?: number
-}): ResponsesRequestBody {
-  const { instructions, items } = splitMessages(args.messages)
+}): Promise<ResponsesRequestBody> {
+  const { instructions, items } = await splitMessages(args.messages)
   const body: ResponsesRequestBody = {
     model: args.model,
     input: items,
@@ -60,10 +62,10 @@ export function buildResponsesBody(args: {
   return body
 }
 
-function splitMessages(messages: Message[]): {
+async function splitMessages(messages: Message[]): Promise<{
   instructions?: string
   items: ResponsesInputItem[]
-} {
+}> {
   const instructions: string[] = []
   const items: ResponsesInputItem[] = []
 
@@ -100,12 +102,12 @@ function splitMessages(messages: Message[]): {
         }
         continue
       }
-      const text = blocks.filter(isTextBlock).map(block => block.text).join('')
-      if (text) {
+      const content = await toOpenAIResponsesUserContent(blocks)
+      if (content.length > 0) {
         items.push({
           type: 'message',
           role: 'user',
-          content: [{ type: 'input_text', text }],
+          content,
         })
       }
       continue
@@ -134,6 +136,25 @@ function splitMessages(messages: Message[]): {
     instructions: instructions.length > 0 ? instructions.join('\n\n') : undefined,
     items,
   }
+}
+
+async function toOpenAIResponsesUserContent(blocks: MessageContentBlock[]): Promise<ResponsesInputContent[]> {
+  const content: ResponsesInputContent[] = []
+  for (const block of blocks) {
+    if (block.type === 'text') {
+      if (block.text) content.push({ type: 'input_text', text: block.text })
+      continue
+    }
+    if (block.type === 'image') {
+      const loaded = await loadImageBlock(block)
+      if (loaded.url) {
+        content.push({ type: 'input_image', image_url: loaded.url })
+      } else if (loaded.dataBase64 && loaded.mimeType) {
+        content.push({ type: 'input_image', image_url: `data:${loaded.mimeType};base64,${loaded.dataBase64}` })
+      }
+    }
+  }
+  return content
 }
 
 function normalizeBlocks(content: Message['content']): MessageContentBlock[] {

@@ -39,6 +39,7 @@ export function resolveModelSelection(
       selection.model === currentConfig.model
       && currentConfig.provider === 'llamacpp'
       && currentConfig.baseUrl === baseUrl
+      && currentConfig.localMmprojPath === selection.mmprojPath
     ) {
       return { kind: 'noop' }
     }
@@ -49,8 +50,9 @@ export function resolveModelSelection(
         provider: 'llamacpp',
         model: selection.model,
         baseUrl,
+        localMmprojPath: selection.mmprojPath,
       },
-      notice: `Local Hugging Face model ready. Now using ${formatModelDisplayName('llamacpp', selection.model, { maxLength: 64 })}.`,
+      notice: `Local Hugging Face model ready. Now using ${formatModelDisplayName('llamacpp', selection.model, { maxLength: 64 })}${selection.mmprojPath ? ' with vision encoder' : ''}.`,
       tone: 'info',
     }
   }
@@ -65,6 +67,7 @@ export function resolveModelSelection(
     provider: nextProvider,
     model: selection.model,
     baseUrl: nextBaseUrl,
+    localMmprojPath: undefined,
   }
 
   return {

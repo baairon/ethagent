@@ -1,4 +1,6 @@
 import './utils/withRetry.test.js'
+import './utils/images.test.js'
+import './chat/chatInputImageRefs.test.js'
 import './mcp/mcp.test.js'
 import './tools/editTool.test.js'
 import './tools/writeFileTool.test.js'

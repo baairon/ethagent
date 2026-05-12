@@ -435,6 +435,7 @@ function configFromModelPickerSelection(selection: ModelPickerSelection, base: E
       provider: 'llamacpp',
       model: selection.model,
       baseUrl: defaultBaseUrlFor('llamacpp'),
+      localMmprojPath: selection.mmprojPath,
     }
   }
   return {
@@ -442,6 +443,7 @@ function configFromModelPickerSelection(selection: ModelPickerSelection, base: E
     provider: selection.provider,
     model: selection.model,
     baseUrl: undefined,
+    localMmprojPath: undefined,
   }
 }
 

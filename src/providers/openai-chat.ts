@@ -5,6 +5,7 @@ import { providerErrorFromResponse } from './errors.js'
 import { fetchWithRetryStreamEvents } from './retry.js'
 import { iterSseFrames } from './sse.js'
 import { messageTextContent } from '../utils/messages.js'
+import { hasImageBlocks, ImageLoadError, loadImageBlock } from '../utils/images.js'
 import { providerDisplayName } from '../models/providerDisplay.js'
 
 export type OpenAIToolDefinition = {
@@ -28,6 +29,7 @@ type Options = {
   loadApiKey?: () => Promise<string | null>
   tools?: OpenAIToolDefinition[]
   maxRetries?: number
+  hasVisionProjector?: boolean
 }
 
 type ChatChunk = {
@@ -76,6 +78,7 @@ export class OpenAIChatProvider implements Provider {
   private readonly loadApiKey?: () => Promise<string | null>
   private readonly tools: OpenAIToolDefinition[]
   private readonly maxRetries?: number
+  private readonly hasVisionProjector: boolean
 
   constructor(opts: Options) {
     this.id = opts.id
@@ -86,6 +89,7 @@ export class OpenAIChatProvider implements Provider {
     this.tools = opts.tools ?? []
     this.maxRetries = opts.maxRetries
     this.supportsTools = this.tools.length > 0
+    this.hasVisionProjector = opts.hasVisionProjector ?? false
   }
 
   async *complete(
@@ -99,12 +103,36 @@ export class OpenAIChatProvider implements Provider {
       yield { type: 'error', message: error.message }
       return
     }
+    if (hasImageBlocks(messages)) {
+      if (this.id === 'llamacpp' && !this.hasVisionProjector) {
+        const hint = localModelNameHintsVision(this.model)
+          ? '; open alt+p and run "Add Vision Encoder" on this model to enable image input'
+          : ''
+        yield { type: 'error', message: `image input is not enabled for local model "${this.model}" (no vision projector loaded)${hint}` }
+        return
+      }
+      if (this.id === 'openai' && !supportsOpenAIImages(this.model)) {
+        yield { type: 'error', message: `image input is not enabled for ${this.model}` }
+        return
+      }
+    }
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       Accept: 'text/event-stream',
     }
     if (apiKey) headers.Authorization = `Bearer ${apiKey}`
+
+    let wireMessages: Array<Record<string, unknown>>
+    try {
+      wireMessages = await toWireMessages(messages)
+    } catch (err: unknown) {
+      if (err instanceof ImageLoadError) {
+        yield { type: 'error', message: err.message }
+        return
+      }
+      throw err
+    }
 
     let response: Response
     try {
@@ -113,7 +141,7 @@ export class OpenAIChatProvider implements Provider {
         headers,
         body: JSON.stringify({
           model: this.model,
-          messages: toWireMessages(messages),
+          messages: wireMessages,
           tools: this.tools.length > 0 ? this.tools : undefined,
           tool_choice: this.tools.length > 0 ? 'auto' : undefined,
           stream: true,
@@ -221,12 +249,32 @@ export class OpenAIChatProvider implements Provider {
 
 }
 
-export function toWireMessages(messages: Message[]): Array<Record<string, unknown>> {
+export async function toWireMessages(messages: Message[]): Promise<Array<Record<string, unknown>>> {
   const out: Array<Record<string, unknown>> = []
 
   for (const message of messages) {
     if (typeof message.content === 'string') {
       out.push({ role: message.role, content: message.content })
+      continue
+    }
+
+    if (message.role === 'user') {
+      const toolResults = message.content.filter(isToolResultBlock)
+      if (toolResults.length > 0) {
+        for (const block of toolResults) {
+          out.push({
+            role: 'tool',
+            tool_call_id: block.toolUseId,
+            content: block.content,
+          })
+        }
+        const nonToolBlocks = message.content.filter(block => block.type !== 'tool_result')
+        if (nonToolBlocks.length > 0) {
+          out.push({ role: 'user', content: await toOpenAIUserContent(nonToolBlocks) })
+        }
+        continue
+      }
+      out.push({ role: 'user', content: await toOpenAIUserContent(message.content) })
       continue
     }
 
@@ -264,6 +312,37 @@ export function toWireMessages(messages: Message[]): Array<Record<string, unknow
   }
 
   return normalizeSystemMessages(out)
+}
+
+async function toOpenAIUserContent(blocks: MessageContentBlock[]): Promise<Array<Record<string, unknown>>> {
+  const parts: Array<Record<string, unknown>> = []
+  for (const block of blocks) {
+    if (block.type === 'text') {
+      if (block.text.length > 0) parts.push({ type: 'text', text: block.text })
+      continue
+    }
+    if (block.type === 'image') {
+      const loaded = await loadImageBlock(block)
+      if (loaded.url) {
+        parts.push({ type: 'image_url', image_url: { url: loaded.url } })
+      } else if (loaded.dataBase64 && loaded.mimeType) {
+        parts.push({ type: 'image_url', image_url: { url: `data:${loaded.mimeType};base64,${loaded.dataBase64}` } })
+      }
+      continue
+    }
+  }
+  return parts.length > 0 ? parts : [{ type: 'text', text: '' }]
+}
+
+export function supportsOpenAIImages(model: string): boolean {
+  const normalized = model.toLowerCase()
+  if (normalized.includes('gpt-3.5')) return false
+  return /gpt-4o|gpt-4\.1|gpt-4-turbo|gpt-4-vision|gpt-5|o1|o3|o4|chatgpt-4/.test(normalized)
+}
+
+export function localModelNameHintsVision(model: string): boolean {
+  const normalized = model.toLowerCase()
+  return /llava|bakllava|qwen[-_.]?vl|qwen2[-_.]?vl|qwen2\.5[-_.]?vl|minicpm-?v|llama-3\.2.*vision|mllama|cogvlm|internvl|moondream|pixtral|phi-?3[\.-]?vision|phi-?3\.5[\.-]?vision|smolvlm/.test(normalized)
 }
 
 function normalizeSystemMessages(messages: Array<Record<string, unknown>>): Array<Record<string, unknown>> {

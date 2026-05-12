@@ -15,6 +15,7 @@ import {
   createTurnCheckpoint,
   type TurnCheckpoint,
 } from './chatScreenUtils.js'
+import { collapseImagePathsToRefs, userTextToContentBlocks } from '../utils/images.js'
 
 type MutableRef<T> = { current: T }
 
@@ -101,10 +102,13 @@ export async function runStreamingTurn(
   const activeCheckpoint = createTurnCheckpoint(sessionId, userText)
   setActiveCheckpoint(activeCheckpoint)
 
-  updateRows(prev => [...prev, { role: 'user', id: nextRowId(), content: userText }])
+  const userContent = userTextToContentBlocks(userText)
+  const displayText = collapseImagePathsToRefs(userText)
+  updateRows(prev => [...prev, { role: 'user', id: nextRowId(), content: displayText }])
   await persistTurnMessage({
     role: 'user',
-    content: userText,
+    content: displayText,
+    providerContent: typeof userContent === 'string' ? undefined : userContent,
     createdAt: nowIso(),
     turnId: activeCheckpoint.turnId,
   })

@@ -11,9 +11,10 @@ import {
   isUserCorrectionOfToolState,
   looksLikeToolStateClaim,
 } from '../runtime/toolClaimGuards.js'
+import { userTextToContentBlocks } from '../utils/images.js'
 
 export type SessionMessage =
-  | { version?: 2; role: 'user'; content: string; createdAt: string; turnId?: string; synthetic?: boolean }
+  | { version?: 2; role: 'user'; content: string; providerContent?: Message['content']; createdAt: string; turnId?: string; synthetic?: boolean }
   | { version?: 2; role: 'assistant'; content: string; createdAt: string; model?: string; usage?: { in?: number; out?: number }; turnId?: string; synthetic?: boolean }
   | { version?: 2; role: 'system'; content: string; createdAt: string; turnId?: string; synthetic?: boolean }
   | { version: 2; role: 'tool_use'; toolUseId: string; name: string; input: Record<string, unknown>; createdAt: string; turnId?: string }
@@ -244,6 +245,17 @@ export type ProviderMessageProjectionOptions = {
 export const TOOL_CORRECTION_CONTEXT_MESSAGE =
   'The latest user message corrects a prior assistant claim about tool or filesystem state. Treat user correction and tool_result messages as authoritative. Ignore any recent assistant claim about files, directories, cwd, or tool execution unless it is backed by a tool_result, and retry with the appropriate tool.'
 
+function resolveUserContent(
+  message: Extract<SessionMessage, { role: 'system' | 'user' | 'assistant' }>,
+): Message['content'] {
+  if (message.role !== 'user') return message.content
+  if (message.providerContent) return message.providerContent
+  if (message.content.includes('[image:')) {
+    return userTextToContentBlocks(message.content)
+  }
+  return message.content
+}
+
 export function sessionMessagesToProviderMessages(
   messages: SessionMessage[],
   options: ProviderMessageProjectionOptions = {},
@@ -255,7 +267,7 @@ export function sessionMessagesToProviderMessages(
   for (const [index, message] of messages.entries()) {
     if (message.role === 'system' || message.role === 'user' || message.role === 'assistant') {
       if (message.role === 'assistant' && invalidatedAssistantMessages.has(index)) continue
-      out.push({ role: message.role, content: message.content })
+      out.push({ role: message.role, content: resolveUserContent(message) })
       continue
     }
     if (message.role === 'tool_use') {

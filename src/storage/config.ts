@@ -80,6 +80,7 @@ const ConfigSchema = z.object({
   provider: z.enum(PROVIDERS),
   model: z.string().min(1),
   baseUrl: z.string().url().optional(),
+  localMmprojPath: z.string().min(1).optional(),
   firstRunAt: z.string(),
   identity: IdentitySchema.optional(),
   erc8004: z.object({

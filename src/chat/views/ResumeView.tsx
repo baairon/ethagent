@@ -48,8 +48,8 @@ export const ResumeView: React.FC<ResumeViewProps> = ({ currentSessionId, onResu
 
   if (state.kind === 'loading') {
     return (
-      <Surface title="Resume Session" subtitle="Loading projects and directories...">
-        <Spinner label="loading sessions..." />
+      <Surface title="Resume Session" subtitle="Recent chats and directories." footer="esc closes">
+        <Spinner label="loading..." />
       </Surface>
     )
   }
@@ -65,7 +65,7 @@ export const ResumeView: React.FC<ResumeViewProps> = ({ currentSessionId, onResu
   if (state.kind === 'confirmClear') {
     return (
       <Surface
-        title="Clear All Chat Logs?"
+        title="Clear All Saved Sessions?"
         subtitle={`${state.sessions.length} saved session${state.sessions.length === 1 ? '' : 's'} will be removed.`}
         tone="error"
         footer="enter selects · esc returns to resume"
@@ -76,9 +76,10 @@ export const ResumeView: React.FC<ResumeViewProps> = ({ currentSessionId, onResu
           {state.error ? <Text color={theme.accentError}>{state.error}</Text> : null}
         </Box>
         <Select<'back' | 'clear'>
+          hintLayout="inline"
           options={[
-            { value: 'back', label: 'back to sessions' },
-            { value: 'clear', label: 'clear all chat logs', hint: 'cannot be undone' },
+            { value: 'back', label: 'Back to Sessions' },
+            { value: 'clear', label: 'Clear All Saved Sessions', hint: 'Cannot be undone' },
           ]}
           onSubmit={choice => {
             if (choice === 'back') {
@@ -155,11 +156,18 @@ export function buildResumeOptions(
     label: '',
     disabled: true,
   }
+  const manageHeader: SelectOption<string> = {
+    value: 'separator:manage',
+    label: 'Manage',
+    role: 'section',
+    bold: true,
+    disabled: true,
+  }
 
   const clearOption: SelectOption<string> = {
     value: CLEAR_ALL_SESSIONS_VALUE,
-    label: 'Clear All Chat Logs',
-    hint: 'removes saved chats and resume context',
+    label: 'Clear All Saved Sessions',
+    hint: 'Removes saved chats and resume context',
     role: 'utility',
   }
 
@@ -202,6 +210,7 @@ export function buildResumeOptions(
   }
 
   options.push(manageSpacer)
+  options.push(manageHeader)
   options.push(clearOption)
 
   return options

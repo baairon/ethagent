@@ -1,5 +1,6 @@
 import {
   startLlamaCppServer,
+  stopLlamaCppServer,
   type LlamaCppStartFailureCode,
   type LlamaCppStartResult,
 } from './llamacpp.js'
@@ -21,8 +22,12 @@ export type LlamaCppPreflightDeps = {
   fetchImpl?: typeof fetch
   findLocalModel?: typeof findLocalHfModel
   startServer?: typeof startLlamaCppServer
+  stopServer?: typeof stopLlamaCppServer
   timeoutMs?: number
 }
+
+const UNTRACKED_VISION_DETAIL =
+  'A llama-server is already serving this alias but ethagent did not launch it, so we cannot apply the vision projector. Stop the external process and reopen ethagent.'
 
 type ModelsProbe =
   | { up: true; models: string[] }
@@ -50,18 +55,31 @@ export async function ensureLlamaCppRunnerReady(
 
   const probe = await probeLlamaCppModels(baseUrl, deps)
   if (probe.up) {
-    if (probe.models.length === 0 || probe.models.includes(config.model)) {
-      return { ok: true, alreadyRunning: true }
+    if (probe.models.length > 0 && !probe.models.includes(config.model)) {
+      return {
+        ok: false,
+        code: 'different-model-running',
+        message: formatPreflightFailure(
+          'local runner is serving a different model',
+          config.model,
+          `a different local model is already running (${probe.models.join(', ')}); stop it before switching models`,
+        ),
+        servedModels: probe.models,
+      }
     }
-    return {
-      ok: false,
-      code: 'different-model-running',
-      message: formatPreflightFailure(
-        'local runner is serving a different model',
-        config.model,
-        `a different local model is already running (${probe.models.join(', ')}); stop it before switching models`,
-      ),
-      servedModels: probe.models,
+    if (!local.mmprojPath) return { ok: true, alreadyRunning: true }
+    const stopped = await (deps.stopServer ?? stopLlamaCppServer)().catch(() => null)
+    if (stopped && stopped.ok && stopped.reason === 'untracked-server') {
+      return withPreflightMessage(
+        {
+          ok: false,
+          code: 'untracked-server',
+          message: UNTRACKED_VISION_DETAIL,
+          detail: UNTRACKED_VISION_DETAIL,
+          servedModels: stopped.servedModels,
+        },
+        local,
+      )
     }
   }
 
@@ -69,6 +87,7 @@ export async function ensureLlamaCppRunnerReady(
     modelPath: local.localPath,
     modelAlias: local.id,
     host: llamaCppServerHostFromBaseUrl(baseUrl),
+    mmprojPath: local.mmprojPath,
   })
   if (result.ok) return { ok: true, alreadyRunning: result.alreadyRunning }
   return withPreflightMessage(result, local)

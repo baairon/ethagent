@@ -4,6 +4,7 @@ import { ProviderError } from './contracts.js'
 import { providerErrorFromResponse } from './errors.js'
 import { fetchWithRetryStreamEvents } from './retry.js'
 import { iterSseEvents } from './sse.js'
+import { hasImageBlocks, ImageLoadError, loadImageBlock } from '../utils/images.js'
 
 export type AnthropicToolDefinition = {
   name: string
@@ -75,7 +76,22 @@ export class AnthropicProvider implements Provider {
       return
     }
 
-    const { system, conversation } = splitMessages(messages)
+    if (hasImageBlocks(messages) && !supportsAnthropicImages(this.model)) {
+      yield { type: 'error', message: `image input is not enabled for ${this.model}` }
+      return
+    }
+
+    let split: { system?: string; conversation: Awaited<ReturnType<typeof splitMessages>>['conversation'] }
+    try {
+      split = await splitMessages(messages)
+    } catch (err: unknown) {
+      if (err instanceof ImageLoadError) {
+        yield { type: 'error', message: err.message }
+        return
+      }
+      throw err
+    }
+    const { system, conversation } = split
 
     let response: Response
     try {
@@ -195,22 +211,24 @@ export class AnthropicProvider implements Provider {
   }
 }
 
-function splitMessages(messages: Message[]): {
+async function splitMessages(messages: Message[]): Promise<{
   system?: string
   conversation: Array<{
     role: 'user' | 'assistant'
     content: Array<
       | { type: 'text'; text: string }
+      | { type: 'image'; source: { type: 'base64'; media_type: string; data: string } }
       | { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> }
       | { type: 'tool_result'; tool_use_id: string; content: string; is_error?: boolean }
     >
   }>
-} {
+}> {
   const systemParts: string[] = []
   const conversation: Array<{
     role: 'user' | 'assistant'
     content: Array<
       | { type: 'text'; text: string }
+      | { type: 'image'; source: { type: 'base64'; media_type: string; data: string } }
       | { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> }
       | { type: 'tool_result'; tool_use_id: string; content: string; is_error?: boolean }
     >
@@ -226,11 +244,16 @@ function splitMessages(messages: Message[]): {
     }
     conversation.push({
       role: message.role,
-      content: blocks.map(block => {
+      content: await Promise.all(blocks.map(async block => {
         if (block.type === 'text') return { type: 'text', text: block.text }
+        if (block.type === 'image') {
+          const loaded = await loadImageBlock(block)
+          if (!loaded.dataBase64 || !loaded.mimeType) throw new Error(`could not load image: ${block.path}`)
+          return { type: 'image', source: { type: 'base64', media_type: loaded.mimeType, data: loaded.dataBase64 } }
+        }
         if (block.type === 'tool_use') return { type: 'tool_use', id: block.id, name: block.name, input: block.input }
         return { type: 'tool_result', tool_use_id: block.toolUseId, content: block.content, is_error: block.isError }
-      }),
+      })),
     })
   }
 
@@ -249,6 +272,14 @@ function normalizeBlocks(content: Message['content']): MessageContentBlock[] {
     if (block.type === 'text') return block.text.trim().length > 0
     return true
   })
+}
+
+export function supportsAnthropicImages(model: string): boolean {
+  const normalized = model.toLowerCase()
+  return normalized.includes('claude-3')
+    || normalized.includes('claude-sonnet-4')
+    || normalized.includes('claude-opus-4')
+    || normalized.includes('claude-haiku-4')
 }
 
 function normalizeStopReason(value?: string): 'end_turn' | 'tool_use' | 'max_tokens' | 'stop_sequence' | 'unknown' {

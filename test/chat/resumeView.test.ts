@@ -23,14 +23,17 @@ function session(overrides: Partial<SessionSummary> = {}): SessionSummary {
   }
 }
 
-test('resume options expose a clear all chat logs action', () => {
+test('resume options expose a clear all saved sessions action under a Manage section', () => {
   const options = buildResumeOptions([session()], 'session-1')
   const clear = options.find(option => option.value === CLEAR_ALL_SESSIONS_VALUE)
+  const manageHeader = options.find(option => option.label === 'Manage' && option.role === 'section')
 
   assert.ok(clear)
-  assert.equal(clear.label, 'Clear All Chat Logs')
+  assert.equal(clear.label, 'Clear All Saved Sessions')
   assert.equal(clear.role, 'utility')
   assert.match(clear.hint ?? '', /saved chats/)
+  assert.ok(manageHeader)
+  assert.ok(options.indexOf(manageHeader!) < options.indexOf(clear!))
   assert.ok(options.some(option => option.value === 'session-1'))
 })
 

@@ -112,6 +112,17 @@ ethagent works with OpenAI, Anthropic, Gemini, and local GGUF models served thro
 - The featured local model is [Qwen3.5-9B-Uncensored](https://huggingface.co/HauhauCS/Qwen3.5-9B-Uncensored-HauhauCS-Aggressive); other Hugging Face GGUF models work by repo ID or direct URL.
 - Cloud API keys live in the OS keyring when one is available, with an encrypted local file under `~/.ethagent` as fallback.
 
+### Image Input
+
+Press `Alt+V` to paste an image from the clipboard. A marker like `[Image #1]` appears in the prompt; delete it to drop the attachment.
+
+Vision support is available on:
+
+- **OpenAI** (Chat Completions and Responses API): `gpt-4o`, `gpt-4.1`, `gpt-4-turbo`, `gpt-4-vision`, `gpt-5`, `o1`, `o3`, `o4`, `chatgpt-4`.
+- **Anthropic**: `claude-3`, `claude-sonnet-4`, `claude-opus-4`, `claude-haiku-4`.
+- **Gemini**: `gemini-1.5`, `gemini-2.0`, `gemini-2.5`.
+- **Local llama.cpp**: vision works when both the main GGUF and a `mmproj-*.gguf` projector are loaded. The picker recommends the bundle during install; if you skipped, open `Alt+P` and any installed model with a vision encoder available shows an `Add Vision Encoder` row directly beneath it.
+
 ## Tools and Sessions
 
 - File ops, shell, clipboard, and MCP tools all run through the same permission layer.

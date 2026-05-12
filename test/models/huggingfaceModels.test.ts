@@ -4,6 +4,7 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import {
+  backfillMmprojForModels,
   createHfDownloadPlan,
   fetchHuggingFaceRepoInfo,
   fileFormat,
@@ -231,6 +232,73 @@ test('download progress reporting is throttled for tiny chunks', () => {
   assert.equal(shouldReportDownloadProgress(1024, 0, 1_000, 950), false)
   assert.equal(shouldReportDownloadProgress(1024, 0, 1_051, 950), true)
   assert.equal(shouldReportDownloadProgress(16 * 1024 * 1024, 0, 1_000, 999), true)
+})
+
+test('backfillMmprojForModels probes each repo once and marks vision availability', async () => {
+  await withTempHome(async () => {
+    const visionRepoId = 'org/vision-GGUF'
+    const textRepoId = 'org/text-only-GGUF'
+    const visionModel = localModel({
+      id: localModelId(visionRepoId, 'weights.Q4_K_M.gguf'),
+      repoId: visionRepoId,
+      filename: 'weights.Q4_K_M.gguf',
+    })
+    const visionModelTwo = localModel({
+      id: localModelId(visionRepoId, 'weights.Q8_0.gguf'),
+      repoId: visionRepoId,
+      filename: 'weights.Q8_0.gguf',
+    })
+    const textModel = localModel({
+      id: localModelId(textRepoId, 'text.Q4_K_M.gguf'),
+      repoId: textRepoId,
+      filename: 'text.Q4_K_M.gguf',
+    })
+    await saveLocalHfModels([visionModel, visionModelTwo, textModel])
+
+    let probes = 0
+    const fetchImpl = (async (url: unknown) => {
+      probes += 1
+      const target = String(url)
+      const repoId = target.includes('vision-GGUF') ? visionRepoId : textRepoId
+      const siblings = target.includes('vision-GGUF')
+        ? [{ rfilename: 'weights.Q4_K_M.gguf', lfs: { size: 4_200_000_000 } }, { rfilename: 'mmproj-x-BF16.gguf', lfs: { size: 880_000_000 } }]
+        : [{ rfilename: 'text.Q4_K_M.gguf', lfs: { size: 4_200_000_000 } }]
+      return new Response(JSON.stringify({ id: repoId, sha: 'a'.repeat(40), siblings, tags: [] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+    }) as typeof fetch
+
+    const updated = await backfillMmprojForModels([visionModel, visionModelTwo, textModel], fetchImpl)
+    assert.equal(probes, 2, 'should dedupe probes by repoId')
+    const updatedVision = updated.find(m => m.id === visionModel.id)
+    const updatedVisionTwo = updated.find(m => m.id === visionModelTwo.id)
+    const updatedText = updated.find(m => m.id === textModel.id)
+    assert.equal(updatedVision?.mmprojAvailable, true)
+    assert.equal(updatedVision?.mmprojSizeBytes, 880_000_000)
+    assert.equal(updatedVisionTwo?.mmprojAvailable, true)
+    assert.equal(updatedText?.mmprojAvailable, false)
+
+    const persisted = await loadLocalHfModels()
+    assert.equal(persisted.find(m => m.id === visionModel.id)?.mmprojAvailable, true)
+    assert.equal(persisted.find(m => m.id === textModel.id)?.mmprojAvailable, false)
+  })
+})
+
+test('backfillMmprojForModels skips models that already have mmprojAvailable set', async () => {
+  await withTempHome(async () => {
+    const model = localModel()
+    const seeded: LocalHfModel = { ...model, mmprojAvailable: false }
+    await saveLocalHfModels([seeded])
+    let probed = false
+    const fetchImpl = (async () => {
+      probed = true
+      return new Response('', { status: 500 })
+    }) as typeof fetch
+    const updated = await backfillMmprojForModels([seeded], fetchImpl)
+    assert.equal(probed, false)
+    assert.equal(updated[0]?.mmprojAvailable, false)
+  })
 })
 
 test('local Hugging Face uninstall deletes model, partial, and metadata', async () => {

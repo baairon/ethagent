@@ -5,7 +5,8 @@ import { providerErrorFromResponse } from './errors.js'
 import { fetchWithRetryStreamEvents } from './retry.js'
 import { iterSseEvents } from './sse.js'
 import { buildResponsesBody } from './openai-responses-format.js'
-import type { OpenAIToolDefinition } from './openai-chat.js'
+import { supportsOpenAIImages, type OpenAIToolDefinition } from './openai-chat.js'
+import { hasImageBlocks, ImageLoadError } from '../utils/images.js'
 
 const READ_TIMEOUT_MS = 45_000
 
@@ -64,15 +65,29 @@ export class OpenAIResponsesProvider implements Provider {
       return
     }
 
+    if (hasImageBlocks(messages) && !supportsOpenAIImages(this.model)) {
+      yield { type: 'error', message: `image input is not enabled for ${this.model}` }
+      return
+    }
+
     let attempt = 0
     while (true) {
       attempt += 1
-      const body = JSON.stringify(buildResponsesBody({
-        model: this.model,
-        messages,
-        tools: this.tools,
-        maxOutputTokens: options.maxTokens,
-      }))
+      let body: string
+      try {
+        body = JSON.stringify(await buildResponsesBody({
+          model: this.model,
+          messages,
+          tools: this.tools,
+          maxOutputTokens: options.maxTokens,
+        }))
+      } catch (err: unknown) {
+        if (err instanceof ImageLoadError) {
+          yield { type: 'error', message: err.message }
+          return
+        }
+        throw err
+      }
 
       let response: Response
       try {

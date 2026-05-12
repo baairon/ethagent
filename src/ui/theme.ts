@@ -11,6 +11,8 @@ export const theme = {
   accentBlue: '#e8eefd',
   accentWhite: '#f5f8ff',
   accentError: '#d99898',
+  modePlan: '#f0c7a8',
+  modeAcceptEdits: '#c7b6f2',
   diffAdded: '#8fd49d',
   diffRemoved: '#d99898',
   diffAddedBackground: '#16351f',

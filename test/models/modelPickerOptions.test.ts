@@ -323,6 +323,73 @@ test('picker hierarchy uses provider group labels without repeated provider pref
   assert.equal(optionByValue(options, 'c:openai:gpt-5.2').label.startsWith('openai'), false)
 })
 
+test('picker emits "Add Vision Encoder" sibling row for installed models with a projector available', () => {
+  const options = buildModelPickerOptions(baseData({
+    llamaCpp: { binaryPresent: true, serverUp: false },
+    hfModels: [{
+      id: 'org/vision#model.Q4_K_M.gguf',
+      displayName: 'org/vision / model.Q4_K_M.gguf',
+      sizeBytes: 4_200_000_000,
+      quantization: 'Q4_K_M',
+      risk: 'low',
+      task: 'chat/instruct',
+      status: 'ready',
+      mmprojAvailable: true,
+      mmprojSizeBytes: 880_000_000,
+    }],
+  }), {
+    currentProvider: 'llamacpp' as ProviderId,
+    currentModel: 'org/vision#model.Q4_K_M.gguf',
+  })
+
+  const addRow = optionByValue(options, 'hfmmproj:org/vision#model.Q4_K_M.gguf')
+  assert.match(addRow.label, /Add Vision Encoder \(\+880 MB\)/)
+})
+
+test('picker omits "Add Vision Encoder" row when the projector is already loaded', () => {
+  const options = buildModelPickerOptions(baseData({
+    llamaCpp: { binaryPresent: true, serverUp: false },
+    hfModels: [{
+      id: 'org/vision#model.Q4_K_M.gguf',
+      displayName: 'org/vision / model.Q4_K_M.gguf',
+      sizeBytes: 4_200_000_000,
+      quantization: 'Q4_K_M',
+      risk: 'low',
+      task: 'chat/instruct',
+      status: 'ready',
+      mmprojAvailable: true,
+      mmprojPath: '/path/mmproj.gguf',
+    }],
+  }), {
+    currentProvider: 'llamacpp' as ProviderId,
+    currentModel: 'org/vision#model.Q4_K_M.gguf',
+  })
+
+  assert.equal(options.some(o => o.value.startsWith('hfmmproj:')), false)
+  assert.match(optionByValue(options, 'hf:org/vision#model.Q4_K_M.gguf').subtext ?? '', /Vision encoder loaded/)
+})
+
+test('picker omits "Add Vision Encoder" row when the repo has no projector available', () => {
+  const options = buildModelPickerOptions(baseData({
+    llamaCpp: { binaryPresent: true, serverUp: false },
+    hfModels: [{
+      id: 'org/text-only#model.Q4_K_M.gguf',
+      displayName: 'org/text-only / model.Q4_K_M.gguf',
+      sizeBytes: 4_200_000_000,
+      quantization: 'Q4_K_M',
+      risk: 'low',
+      task: 'chat/instruct',
+      status: 'ready',
+      mmprojAvailable: false,
+    }],
+  }), {
+    currentProvider: 'llamacpp' as ProviderId,
+    currentModel: 'org/text-only#model.Q4_K_M.gguf',
+  })
+
+  assert.equal(options.some(o => o.value.startsWith('hfmmproj:')), false)
+})
+
 test('Hugging Face picker shows installed models and link-only download action', () => {
   const options = buildModelPickerOptions(baseData({
     llamaCpp: {

@@ -8,6 +8,14 @@ export type TextBlock = {
   text: string
 }
 
+export type ImageBlock = {
+  type: 'image'
+  path: string
+  mimeType?: string
+  url?: string
+  dataBase64?: string
+}
+
 export type ToolUseBlock = {
   type: 'tool_use'
   id: string
@@ -22,7 +30,7 @@ export type ToolResultBlock = {
   isError?: boolean
 }
 
-export type MessageContentBlock = TextBlock | ToolUseBlock | ToolResultBlock
+export type MessageContentBlock = TextBlock | ImageBlock | ToolUseBlock | ToolResultBlock
 
 export type Message = {
   role: Role

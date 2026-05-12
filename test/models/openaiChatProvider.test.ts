@@ -126,8 +126,8 @@ test('OpenAIChatProvider includes local provider and base URL in fetch errors', 
   }
 })
 
-test('toWireMessages keeps system content in one leading message', () => {
-  const messages = toWireMessages([
+test('toWireMessages keeps system content in one leading message', async () => {
+  const messages = await toWireMessages([
     { role: 'system', content: 'base instructions' },
     { role: 'user', content: 'hello' },
     { role: 'system', content: 'correction context' },
@@ -139,8 +139,8 @@ test('toWireMessages keeps system content in one leading message', () => {
   assert.deepEqual(messages.map(message => message.role), ['system', 'user', 'assistant'])
 })
 
-test('toWireMessages preserves tool call and result wire shapes while moving systems', () => {
-  const messages = toWireMessages([
+test('toWireMessages preserves tool call and result wire shapes while moving systems', async () => {
+  const messages = await toWireMessages([
     { role: 'user', content: 'list files' },
     { role: 'assistant', content: [{ type: 'tool_use', id: 'tool-1', name: 'list_directory', input: { path: '.' } }] },
     { role: 'system', content: 'late system context' },
@@ -159,4 +159,63 @@ test('toWireMessages preserves tool call and result wire shapes while moving sys
   }])
   assert.equal(messages[3]?.tool_call_id, 'tool-1')
   assert.equal(messages[3]?.content, 'README.md')
+})
+
+test('OpenAIChatProvider gates llamacpp images on hasVisionProjector, not on model name', async () => {
+  const originalFetch = globalThis.fetch
+  let fetched = false
+  globalThis.fetch = (async () => {
+    fetched = true
+    return new Response('data: [DONE]\n\n', { status: 200, headers: { 'content-type': 'text/event-stream' } })
+  }) as typeof fetch
+  try {
+    const provider = new OpenAIChatProvider({
+      id: 'llamacpp',
+      model: 'llava-1.6-mistral-7b.Q4_K_M.gguf',
+      baseUrl: 'http://localhost:8080/v1',
+      apiKey: 'llamacpp',
+    })
+    const events: StreamEvent[] = []
+    for await (const event of provider.complete([
+      { role: 'user', content: [{ type: 'image', path: '/tmp/x.png', mimeType: 'image/png', dataBase64: 'AAAA' }] },
+    ], new AbortController().signal)) {
+      events.push(event)
+    }
+    const error = events.find(event => event.type === 'error')
+    assert.ok(error, 'expected an error event')
+    assert.match(error?.type === 'error' ? error.message : '', /no vision projector loaded/)
+    assert.equal(fetched, false, 'should not contact the server when gate fires')
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test('OpenAIChatProvider passes images when hasVisionProjector is true', async () => {
+  const originalFetch = globalThis.fetch
+  let body: string | null = null
+  globalThis.fetch = (async (_url: unknown, init: RequestInit | undefined) => {
+    body = typeof init?.body === 'string' ? init.body : null
+    return new Response('data: [DONE]\n\n', { status: 200, headers: { 'content-type': 'text/event-stream' } })
+  }) as typeof fetch
+  try {
+    const provider = new OpenAIChatProvider({
+      id: 'llamacpp',
+      model: 'llava-1.6-mistral-7b.Q4_K_M.gguf',
+      baseUrl: 'http://localhost:8080/v1',
+      apiKey: 'llamacpp',
+      hasVisionProjector: true,
+    })
+    const events: StreamEvent[] = []
+    for await (const event of provider.complete([
+      { role: 'user', content: [{ type: 'image', path: '/tmp/x.png', mimeType: 'image/png', dataBase64: 'AAAA' }] },
+    ], new AbortController().signal)) {
+      events.push(event)
+    }
+    const errors = events.filter(event => event.type === 'error')
+    assert.equal(errors.length, 0, `expected no errors, got: ${errors.map(e => e.type === 'error' ? e.message : '').join('; ')}`)
+    assert.ok(body !== null, 'expected request body')
+    assert.match(body ?? '', /image_url/)
+  } finally {
+    globalThis.fetch = originalFetch
+  }
 })

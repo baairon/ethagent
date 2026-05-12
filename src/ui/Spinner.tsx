@@ -295,8 +295,20 @@ export const Spinner: React.FC<SpinnerProps> = ({
 function formatElapsedSeconds(milliseconds: number): string {
   const seconds = Math.max(0, Math.floor(milliseconds / 1000))
   if (seconds < 60) return `${seconds}s`
-  const minutes = Math.floor(seconds / 60)
-  return `${minutes}:${(seconds % 60).toString().padStart(2, '0')}`
+
+  const hours = Math.floor(seconds / 3600)
+  const minutes = Math.floor((seconds % 3600) / 60)
+  const remainingSeconds = seconds % 60
+
+  if (hours > 0) {
+    return remainingSeconds > 0
+      ? `${hours}h ${minutes}min ${remainingSeconds}s`
+      : `${hours}h ${minutes}min`
+  }
+
+  return remainingSeconds > 0
+    ? `${minutes}min ${remainingSeconds}s`
+    : `${minutes}min`
 }
 
 function restoreSpinnerTerms(value: string): string {

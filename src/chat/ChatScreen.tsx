@@ -1197,7 +1197,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
       clearTranscript()
       overlayRef.current = 'none'
       setOverlay('none')
-      pushNote('Cleared saved chat logs and resume context from this machine.', 'dim')
+      pushNote('Cleared saved sessions and resume context from this machine.', 'dim')
     },
     [clearTranscript, pushNote],
   )
@@ -1517,17 +1517,23 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
 
   const exitHint = exitState.pending ? 'ctrl+c again to quit' : null
   const runtimeModeLabel = sessionModeLabel(mode)
+  const runtimeModeColor =
+    mode === 'plan'
+      ? theme.modePlan
+      : mode === 'accept-edits'
+        ? theme.modeAcceptEdits
+        : theme.text
   const footerRight = (
     <Box flexDirection="row">
       {exitHint ? (
         <>
-          <Text color={theme.text}>{exitHint}</Text>
+          <Text color={theme.accentPeriwinkle}>{exitHint}</Text>
           <Text color={theme.dim}> · </Text>
         </>
       ) : null}
       {runtimeModeLabel ? (
         <>
-          <Text bold>{runtimeModeLabel}</Text>
+          <Text color={runtimeModeColor} bold>{runtimeModeLabel}</Text>
           <Text color={theme.dim}> (</Text>
           <Text color={theme.accentPeriwinkle}>shift+tab to cycle</Text>
           <Text color={theme.dim}>) · </Text>
@@ -1613,7 +1619,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
 }
 
 export function chatFooterShortcutText(canScrollTranscript: boolean): string {
-  return `${canScrollTranscript ? 'pgup/pgdn scroll · ' : ''}alt+p model · alt+i identity`
+  return 'alt+p model · alt+i identity'
 }
 
 function formatContextLabel(usage: ContextUsage): string {

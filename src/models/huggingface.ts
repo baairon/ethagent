@@ -54,6 +54,12 @@ export type HfSafetyReview = {
   reasons: string[]
 }
 
+export type HfMmprojCandidate = {
+  filename: string
+  sizeBytes: number
+  localPath: string
+}
+
 export type HfDownloadPlan = {
   repo: HuggingFaceRepoInfo
   repoId: string
@@ -64,6 +70,8 @@ export type HfDownloadPlan = {
   localPath: string
   displayName: string
   review: HfSafetyReview
+  mmprojCandidate?: HfMmprojCandidate
+  includeMmproj?: boolean
 }
 
 export type LocalHfModel = {
@@ -90,6 +98,9 @@ export type LocalHfModel = {
   installedAt: string
   status: LocalHfStatus
   sha256?: string
+  mmprojPath?: string
+  mmprojAvailable?: boolean
+  mmprojSizeBytes?: number
 }
 
 export type HfDownloadProgress = {
@@ -291,6 +302,14 @@ export function ggufFiles(repo: HuggingFaceRepoInfo): HuggingFaceSibling[] {
     .sort((a, b) => a.filename.localeCompare(b.filename))
 }
 
+export function isMmprojFilename(filename: string): boolean {
+  return filename.toLowerCase().startsWith('mmproj-') && filename.toLowerCase().endsWith('.gguf')
+}
+
+export function findMmprojSibling(repo: HuggingFaceRepoInfo): HuggingFaceSibling | undefined {
+  return repo.siblings.find(file => isMmprojFilename(file.filename))
+}
+
 export async function createHfDownloadPlan(
   input: string,
   filename?: string,
@@ -320,6 +339,14 @@ export async function createHfDownloadPlan(
     requestedRevision,
     resolvedRevision,
   })
+  const mmprojSibling = findMmprojSibling(repo)
+  const mmprojCandidate: HfMmprojCandidate | undefined = mmprojSibling
+    ? {
+      filename: mmprojSibling.filename,
+      sizeBytes: mmprojSibling.sizeBytes ?? 0,
+      localPath: localPathFor(repo.repoId, resolvedRevision, mmprojSibling.filename),
+    }
+    : undefined
   return {
     repo,
     repoId: repo.repoId,
@@ -330,6 +357,7 @@ export async function createHfDownloadPlan(
     localPath: localPathFor(repo.repoId, resolvedRevision, selected.filename),
     displayName: displayNameFor(repo.repoId, selected.filename),
     review,
+    mmprojCandidate,
   }
 }
 
@@ -432,8 +460,149 @@ export async function* downloadHfModel(
   }
 
   await fs.rename(partialPath, plan.localPath)
-  await upsertLocalHfModel(modelFromPlan(plan, hash.digest('hex'), 'ready'))
+
+  let mmprojPath: string | undefined
+  if (plan.includeMmproj && plan.mmprojCandidate) {
+    yield* downloadMmprojFile(plan.repoId, plan.resolvedRevision, plan.mmprojCandidate, signal, fetchImpl)
+    mmprojPath = plan.mmprojCandidate.localPath
+  }
+
+  await upsertLocalHfModel(modelFromPlan(plan, hash.digest('hex'), 'ready', mmprojPath))
   yield { status: 'success', completed, total: Number.isFinite(total) ? total : completed }
+}
+
+async function* downloadMmprojFile(
+  repoId: string,
+  resolvedRevision: string,
+  candidate: HfMmprojCandidate,
+  signal: AbortSignal | undefined,
+  fetchImpl: FetchImpl,
+): AsyncIterable<HfDownloadProgress> {
+  await fs.mkdir(path.dirname(candidate.localPath), { recursive: true })
+  const partialPath = `${candidate.localPath}.partial`
+  const response = await fetchImpl(resolveUrl(repoId, resolvedRevision, candidate.filename), { signal })
+  if (!response.ok || !response.body) {
+    throw new Error(response.ok ? 'empty projector download body' : `projector download HTTP ${response.status}`)
+  }
+
+  const total = Number.parseInt(response.headers.get('content-length') ?? '', 10)
+  const handle = await fs.open(partialPath, 'w')
+  let completed = 0
+  let complete = false
+  let lastProgressAt = Date.now()
+  let lastProgressBytes = 0
+  yield { status: 'downloading-mmproj', completed, total: Number.isFinite(total) ? total : undefined }
+  try {
+    const reader = response.body.getReader()
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      if (signal?.aborted) throw new Error('Cancelled')
+      const buffer = Buffer.from(value)
+      await handle.write(buffer)
+      completed += buffer.byteLength
+      const now = Date.now()
+      if (shouldReportDownloadProgress(completed, lastProgressBytes, now, lastProgressAt)) {
+        lastProgressAt = now
+        lastProgressBytes = completed
+        yield { status: 'downloading-mmproj', completed, total: Number.isFinite(total) ? total : undefined }
+      }
+    }
+    complete = true
+  } finally {
+    await handle.close()
+    if (!complete) {
+      await fs.unlink(partialPath).catch(() => {})
+    }
+  }
+
+  await fs.rename(partialPath, candidate.localPath)
+}
+
+export async function backfillMmprojAvailability(
+  model: LocalHfModel,
+  fetchImpl: FetchImpl = fetch,
+): Promise<LocalHfModel> {
+  if (model.mmprojAvailable !== undefined) return model
+  try {
+    const repo = await fetchHuggingFaceRepoInfo({ repoId: model.repoId }, fetchImpl)
+    const sibling = findMmprojSibling(repo)
+    const next: LocalHfModel = {
+      ...model,
+      mmprojAvailable: Boolean(sibling),
+      mmprojSizeBytes: sibling?.sizeBytes,
+    }
+    await upsertLocalHfModel(next)
+    return next
+  } catch {
+    return model
+  }
+}
+
+export async function backfillMmprojForModels(
+  models: LocalHfModel[],
+  fetchImpl: FetchImpl = fetch,
+): Promise<LocalHfModel[]> {
+  const repoIdToProbe = new Map<string, Promise<HuggingFaceRepoInfo | null>>()
+  for (const model of models) {
+    if (model.mmprojAvailable !== undefined) continue
+    if (repoIdToProbe.has(model.repoId)) continue
+    repoIdToProbe.set(
+      model.repoId,
+      fetchHuggingFaceRepoInfo({ repoId: model.repoId }, fetchImpl).catch(() => null),
+    )
+  }
+  if (repoIdToProbe.size === 0) return models
+  const resolved = new Map<string, HuggingFaceRepoInfo | null>()
+  for (const [repoId, promise] of repoIdToProbe) {
+    resolved.set(repoId, await promise)
+  }
+  const out: LocalHfModel[] = []
+  for (const model of models) {
+    if (model.mmprojAvailable !== undefined) {
+      out.push(model)
+      continue
+    }
+    const repo = resolved.get(model.repoId)
+    if (!repo) {
+      out.push(model)
+      continue
+    }
+    const sibling = findMmprojSibling(repo)
+    const next: LocalHfModel = {
+      ...model,
+      mmprojAvailable: Boolean(sibling),
+      mmprojSizeBytes: sibling?.sizeBytes,
+    }
+    await upsertLocalHfModel(next)
+    out.push(next)
+  }
+  return out
+}
+
+export async function* addMmprojToInstalledModel(
+  modelId: string,
+  signal?: AbortSignal,
+  deps: { fetchImpl?: FetchImpl } = {},
+): AsyncIterable<HfDownloadProgress> {
+  const fetchImpl = deps.fetchImpl ?? fetch
+  const existing = await findLocalHfModel(modelId)
+  if (!existing) throw new Error(`model not installed: ${modelId}`)
+  if (existing.mmprojPath) {
+    yield { status: 'success', completed: 0 }
+    return
+  }
+  const repo = await fetchHuggingFaceRepoInfo({ repoId: existing.repoId }, fetchImpl)
+  const sibling = findMmprojSibling(repo)
+  if (!sibling) throw new Error(`no vision encoder available for ${existing.repoId}`)
+  const candidate: HfMmprojCandidate = {
+    filename: sibling.filename,
+    sizeBytes: sibling.sizeBytes ?? 0,
+    localPath: localPathFor(existing.repoId, existing.resolvedRevision, sibling.filename),
+  }
+  yield* downloadMmprojFile(existing.repoId, existing.resolvedRevision, candidate, signal, fetchImpl)
+  await upsertLocalHfModel({ ...existing, mmprojPath: candidate.localPath })
+  yield { status: 'success', completed: candidate.sizeBytes }
 }
 
 export function shouldReportDownloadProgress(
@@ -446,7 +615,13 @@ export function shouldReportDownloadProgress(
     || completed - lastCompleted >= DOWNLOAD_PROGRESS_MIN_BYTES
 }
 
-export function modelFromPlan(plan: HfDownloadPlan, sha256: string | undefined, status: LocalHfStatus): LocalHfModel {
+export function modelFromPlan(
+  plan: HfDownloadPlan,
+  sha256: string | undefined,
+  status: LocalHfStatus,
+  mmprojPath?: string,
+): LocalHfModel {
+  const mmprojAvailable = Boolean(plan.mmprojCandidate)
   const now = new Date().toISOString()
   return {
     id: localModelId(plan.repoId, plan.filename),
@@ -472,6 +647,9 @@ export function modelFromPlan(plan: HfDownloadPlan, sha256: string | undefined, 
     installedAt: now,
     status,
     sha256,
+    mmprojPath,
+    mmprojAvailable,
+    mmprojSizeBytes: plan.mmprojCandidate?.sizeBytes,
   }
 }
 

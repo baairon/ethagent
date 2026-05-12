@@ -50,6 +50,7 @@ export type LlamaCppStartFailureCode =
   | 'spawn-failed'
   | 'runner-exited'
   | 'readiness-timeout'
+  | 'untracked-server'
 
 export type LlamaCppStartResult =
   | { ok: true; alreadyRunning: boolean }
@@ -362,23 +363,43 @@ export async function startLlamaCppServer(args: {
   modelAlias: string
   host?: string
   ctxSize?: number
+  mmprojPath?: string
   readinessTimeoutMs?: number
   pollMs?: number
   deps?: LlamaCppStartDeps
 }): Promise<LlamaCppStartResult> {
   const host = args.host ?? DEFAULT_LLAMA_HOST
   const initialStatus = await servedModelStatus(host, args.modelAlias)
-  if (initialStatus.state === 'ready') return { ok: true, alreadyRunning: true }
+  if (initialStatus.state === 'ready') {
+    if (args.mmprojPath) {
+      const pid = await readPidFile()
+      if (!pid) {
+        return startFailure('untracked-server', {
+          detail: 'A llama-server is already serving this alias but ethagent did not launch it, so we cannot apply the vision projector. Stop the external process and reopen ethagent.',
+        })
+      }
+    }
+    return { ok: true, alreadyRunning: true }
+  }
   if (initialStatus.state === 'different') {
     return startFailure('different-model-running', {
       servedModels: initialStatus.models,
     })
   }
 
+  const accessFn = args.deps?.access ?? fs.access
   try {
-    await (args.deps?.access ?? fs.access)(args.modelPath)
+    await accessFn(args.modelPath)
   } catch {
     return startFailure('model-file-missing', { detail: args.modelPath })
+  }
+
+  if (args.mmprojPath) {
+    try {
+      await accessFn(args.mmprojPath)
+    } catch {
+      return startFailure('model-file-missing', { detail: args.mmprojPath })
+    }
   }
 
   const binaryPath = args.deps?.binaryPath ?? (await findAndPersistLlamaCppServer()).path
@@ -390,21 +411,23 @@ export async function startLlamaCppServer(args: {
   const listenHost = url.hostname || '127.0.0.1'
   const port = url.port || (url.protocol === 'https:' ? '443' : '8080')
   const spawnImpl = args.deps?.spawnImpl ?? spawn
+  const spawnArgs: string[] = [
+    '-m',
+    args.modelPath,
+    '--host',
+    listenHost,
+    '--port',
+    port,
+    '--alias',
+    args.modelAlias,
+    '--ctx-size',
+    String(args.ctxSize ?? 32768),
+    '--jinja',
+  ]
+  if (args.mmprojPath) spawnArgs.push('--mmproj', args.mmprojPath)
   let child: ReturnType<typeof spawn>
   try {
-    child = spawnImpl(binaryPath, [
-      '-m',
-      args.modelPath,
-      '--host',
-      listenHost,
-      '--port',
-      port,
-      '--alias',
-      args.modelAlias,
-      '--ctx-size',
-      String(args.ctxSize ?? 32768),
-      '--jinja',
-    ], {
+    child = spawnImpl(binaryPath, spawnArgs, {
       detached: true,
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true,
@@ -424,6 +447,9 @@ export async function startLlamaCppServer(args: {
     })
   })
   child.unref()
+  if (typeof child.pid === 'number') {
+    await writePidFile(child.pid).catch(() => {})
+  }
 
   const ready = await waitForServedModel({
     host,
@@ -468,6 +494,73 @@ async function waitForServedModel(args: {
   return startFailure('readiness-timeout')
 }
 
+function pidFilePath(): string {
+  return path.join(getConfigDir(), 'llamacpp.pid')
+}
+
+async function writePidFile(pid: number): Promise<void> {
+  await ensureConfigDir()
+  await atomicWriteText(pidFilePath(), String(pid))
+}
+
+async function readPidFile(): Promise<number | null> {
+  try {
+    const raw = await fs.readFile(pidFilePath(), 'utf8')
+    const pid = Number.parseInt(raw.trim(), 10)
+    return Number.isInteger(pid) && pid > 0 ? pid : null
+  } catch {
+    return null
+  }
+}
+
+async function clearPidFile(): Promise<void> {
+  await fs.rm(pidFilePath(), { force: true }).catch(() => {})
+}
+
+export async function stopLlamaCppServer(args: {
+  host?: string
+  timeoutMs?: number
+  pollMs?: number
+  killImpl?: (pid: number, signal?: NodeJS.Signals | number) => void
+} = {}): Promise<
+  | { ok: true; stopped: boolean; reason?: 'untracked-server'; servedModels?: string[] }
+  | { ok: false; message: string }
+> {
+  const pid = await readPidFile()
+  if (!pid) {
+    const host = args.host ?? DEFAULT_LLAMA_HOST
+    const { up, models } = await fetchServedModels(host, 1500)
+    if (up && models.length > 0) {
+      return { ok: true, stopped: false, reason: 'untracked-server', servedModels: models }
+    }
+    return { ok: true, stopped: false }
+  }
+  const kill = args.killImpl ?? ((p, signal) => process.kill(p, signal))
+  try {
+    kill(pid, 'SIGTERM')
+  } catch (err: unknown) {
+    const code = (err as NodeJS.ErrnoException).code
+    if (code === 'ESRCH') {
+      await clearPidFile()
+      return { ok: true, stopped: false }
+    }
+    return { ok: false, message: (err as Error).message }
+  }
+  const host = args.host ?? DEFAULT_LLAMA_HOST
+  const deadline = Date.now() + (args.timeoutMs ?? 5000)
+  const pollMs = args.pollMs ?? 250
+  while (Date.now() < deadline) {
+    const status = await servedModelStatus(host, '__nothing__')
+    if (status.state === 'not-up' || status.models.length === 0) {
+      await clearPidFile()
+      return { ok: true, stopped: true }
+    }
+    await new Promise<void>(resolve => setTimeout(resolve, pollMs))
+  }
+  await clearPidFile()
+  return { ok: true, stopped: true }
+}
+
 async function servedModelStatus(host: string, modelAlias: string): Promise<
   | { state: 'not-up'; models: string[] }
   | { state: 'ready'; models: string[] }
@@ -507,6 +600,8 @@ function startFailureMessage(code: LlamaCppStartFailureCode, servedModels: strin
       return 'local runner closed before becoming ready'
     case 'readiness-timeout':
       return 'local runner is still loading or did not answer in time'
+    case 'untracked-server':
+      return detail ?? 'a llama-server is already running and ethagent did not launch it; cannot apply the vision encoder until that process is stopped'
   }
 }
 

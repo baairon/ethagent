@@ -2,8 +2,8 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { buildResponsesBody } from '../../src/providers/openai-responses-format.js'
 
-test('Responses body folds system messages into instructions', () => {
-  const body = buildResponsesBody({
+test('Responses body folds system messages into instructions', async () => {
+  const body = await buildResponsesBody({
     model: 'gpt-5',
     messages: [
       { role: 'system', content: 'You are helpful.' },
@@ -25,8 +25,8 @@ test('Responses body folds system messages into instructions', () => {
   assert.equal(body.store, false)
 })
 
-test('Responses body emits function_call and function_call_output items', () => {
-  const body = buildResponsesBody({
+test('Responses body emits function_call and function_call_output items', async () => {
+  const body = await buildResponsesBody({
     model: 'gpt-5-codex',
     messages: [
       { role: 'user', content: 'list files' },
@@ -80,8 +80,8 @@ test('Responses body emits function_call and function_call_output items', () => 
   }
 })
 
-test('Responses body omits instructions when no system messages are present', () => {
-  const body = buildResponsesBody({
+test('Responses body omits instructions when no system messages are present', async () => {
+  const body = await buildResponsesBody({
     model: 'gpt-5',
     messages: [{ role: 'user', content: 'hello' }],
     tools: [],

@@ -13,6 +13,7 @@ import { ChatInput } from './input/ChatInput.js'
 import { IdentityHub, type IdentityHubInitialAction, type IdentityHubResult } from '../identity/hub/IdentityHub.js'
 import type { CopyResult } from '../utils/clipboard.js'
 import { getSlashSuggestions } from './commands.js'
+import { modelSupportsImages } from '../utils/images.js'
 import { Box, Text } from 'ink'
 import { theme } from '../ui/theme.js'
 import { Spinner } from '../ui/Spinner.js'
@@ -270,6 +271,14 @@ export function ChatBottomPane({
         cwd={cwd}
         seedText={pendingInputDraft}
         onSeedConsumed={onInputDraftConsumed}
+        onImagePaste={() => {
+          if (!modelSupportsImages(config.provider, config.model, { mmprojPath: config.localMmprojPath })) {
+            const hint = config.provider === 'llamacpp'
+              ? ' · run "Add Vision Encoder" in alt+p to enable image input on this model'
+              : ' · switch via alt+p'
+            pushNote(`current model "${config.model}" does not accept image input${hint}`, 'error')
+          }
+        }}
       />
       <Box marginLeft={2} marginTop={0} flexDirection="column">
         <Text>
