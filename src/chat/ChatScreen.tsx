@@ -23,6 +23,7 @@ import type { ModelPickerSelection } from '../models/ModelPicker.js'
 import type { ModelPickerContextFit } from '../models/modelPickerOptions.js'
 import type { CopyResult } from '../utils/clipboard.js'
 import { useKeybinding, useRegisterKeybindingContext } from '../app/keybindings/KeybindingProvider.js'
+import { TITLE_ANIMATION_FRAMES, TITLE_ANIMATION_INTERVAL_MS, TITLE_STATIC, setTerminalTitle } from '../ui/terminalTitle.js'
 import { useCancelRequest } from '../app/hooks/useCancelRequest.js'
 import { useExitOnCtrlC } from '../app/hooks/useExitOnCtrlC.js'
 import {
@@ -1475,7 +1476,22 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
     ],
   )
 
-  const busy = pullInFlight || Boolean(compactionUi)
+  const busy = streaming || pullInFlight || Boolean(compactionUi)
+
+  useEffect(() => {
+    if (!busy) {
+      setTerminalTitle(TITLE_STATIC)
+      return
+    }
+    let i = 0
+    setTerminalTitle(TITLE_ANIMATION_FRAMES[0])
+    const id = setInterval(() => {
+      i = (i + 1) % TITLE_ANIMATION_FRAMES.length
+      setTerminalTitle(TITLE_ANIMATION_FRAMES[i] ?? TITLE_STATIC)
+    }, TITLE_ANIMATION_INTERVAL_MS)
+    return () => clearInterval(id)
+  }, [busy])
+
   const slashSuggestions = useMemo(
     () => getSlashSuggestions(mcpManagerRef.current?.getPromptSuggestions() ?? []),
     [mcpSnapshot],

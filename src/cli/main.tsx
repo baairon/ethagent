@@ -14,6 +14,7 @@ import { runResetCommand } from './reset.js'
 import { runPreviewCommand } from './preview.js'
 import { checkForUpdates } from './updateNotice.js'
 import { Spinner } from '../ui/Spinner.js'
+import { TITLE_STATIC, clearTerminalTitle, setTerminalTitle } from '../ui/terminalTitle.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -88,6 +89,10 @@ const AppRoot: React.FC<{ setExitCode: (code: number) => void; currentVersion: s
   }, [currentVersion])
 
   useEffect(() => {
+    setTerminalTitle(TITLE_STATIC)
+  }, [])
+
+  useEffect(() => {
     if (phase.kind === 'cancelled') {
       setExitCode(1)
       const t = setTimeout(() => exit(), 10)
@@ -152,6 +157,8 @@ const AppRoot: React.FC<{ setExitCode: (code: number) => void; currentVersion: s
 
 async function runDefault(currentVersion: string): Promise<number> {
   let exitCode = 0
+  setTerminalTitle(TITLE_STATIC)
+  process.once('exit', clearTerminalTitle)
   const instance = render(
     <AppInputProvider>
       <KeybindingProvider>

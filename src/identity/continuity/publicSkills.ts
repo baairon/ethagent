@@ -15,7 +15,7 @@ type PublicSkillsProfile = {
   name: string
   description: string
   version: string
-  agentWallet: string
+  agentWallet?: string
   imageUrl?: string
   skills: PublicSkill[]
 }
@@ -34,7 +34,7 @@ type AgentCard = {
     pushNotifications: boolean
   }
   producer: { name: string; url: string }
-  agent_wallet: string
+  agent_wallet?: string
   skills: Array<{
     id: string
     name: string
@@ -66,7 +66,7 @@ export function defaultPublicSkillsProfile(identity: EthagentIdentity): PublicSk
     name,
     description,
     version: '1.0.0',
-    agentWallet,
+    ...(agentWallet ? { agentWallet } : {}),
     ...(imageUrl ? { imageUrl } : {}),
     skills: [
       {
@@ -135,7 +135,7 @@ export function renderPublicSkillsJson(profile: PublicSkillsProfile): string {
   const summary = {
     schema: 'ethagent.public-skills.v1',
     producer: ETHAGENT_PRODUCER,
-    agent_wallet: profile.agentWallet,
+    ...(profile.agentWallet ? { agent_wallet: profile.agentWallet } : {}),
     visibility: 'public',
     name: profile.name,
     description: profile.description,
@@ -191,6 +191,7 @@ export function createAgentCard(profile: PublicSkillsProfile, url?: string): Age
     name: profile.name,
     description: profile.description,
     version: profile.version,
+    ...(profile.agentWallet ? { agent_wallet: profile.agentWallet } : {}),
     protocolVersion: '0.2.6',
     ...(url ? { url } : {}),
     ...(profile.imageUrl ? { image: profile.imageUrl } : {}),
@@ -201,7 +202,6 @@ export function createAgentCard(profile: PublicSkillsProfile, url?: string): Age
       pushNotifications: false,
     },
     producer: ETHAGENT_PRODUCER,
-    agent_wallet: profile.agentWallet,
     skills: profile.skills.map(skill => ({
       id: skill.id,
       name: skill.name,
