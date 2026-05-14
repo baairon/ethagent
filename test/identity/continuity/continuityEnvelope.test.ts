@@ -61,7 +61,7 @@ test('continuity snapshot challenge explains purpose, scope, and wallet safety',
   assert.match(challenge, /Private: SOUL\.md, MEMORY\.md/)
   assert.match(challenge, /Public: public skills and profile/)
   assert.match(challenge, /Safety: no transaction, spending, or approvals/)
-  assert.match(challenge, /Version: 1$/)
+  assert.match(challenge, /Version: 2$/)
 })
 
 test('serialized continuity snapshot excludes plaintext private files and wallet signature', () => {
@@ -684,9 +684,9 @@ test('v2 purpose-bound challenge survives a full save and restore round trip', (
   const ownerAccessKey = createWalletRestoreAccessKey({ token, ownerAddress, walletAddress: ownerAddress, walletSignature: ownerSignature, accessEpoch: 1, purpose: 'clear-ens-snapshot' })
   const operatorAccessKey = createWalletRestoreAccessKey({ token, ownerAddress, walletAddress: operatorAddress, walletSignature: operatorSignature, accessEpoch: 1, purpose: 'operator-proof' })
 
-  assert.match(ownerAccessKey.challenge, /^Clear ENS from Agent Snapshot\n/)
+  assert.match(ownerAccessKey.challenge, /^Unlink ENS from Agent\n/)
   assert.match(ownerAccessKey.challenge, /No onchain ENS records change\./)
-  assert.match(ownerAccessKey.challenge, /Version: 2$/)
+  assert.match(ownerAccessKey.challenge, /Version: 3$/)
   assert.match(operatorAccessKey.challenge, /^Authorize Operator Wallet Restore Access\n/)
 
   const envelope = createWalletContinuitySnapshotEnvelope({
@@ -708,7 +708,7 @@ test('v2 purpose-bound challenge survives a full save and restore round trip', (
   const operatorSlot = envelope.slots.find(s => s.address.toLowerCase() === operatorAddress.toLowerCase())
   assert.ok(ownerSlot)
   assert.ok(operatorSlot)
-  assert.match(ownerSlot!.challenge, /^Clear ENS from Agent Snapshot\n/)
+  assert.match(ownerSlot!.challenge, /^Unlink ENS from Agent\n/)
   assert.match(operatorSlot!.challenge, /^Authorize Operator Wallet Restore Access\n/)
 
   const ownerRestored = restoreContinuitySnapshotEnvelope({
@@ -735,7 +735,7 @@ test('v1 envelopes still restore after the v2 change (back-compat passthrough)',
   }
   const v1Challenge = createWalletRestoreAccessChallenge({ token, ownerAddress, walletAddress: ownerAddress, accessEpoch: 1 })
   assert.match(v1Challenge, /^Authorize Wallet Restore Access\n/)
-  assert.match(v1Challenge, /Version: 1$/)
+  assert.match(v1Challenge, /Version: 2$/)
 
   const v1Signature = signMessage(ownerKey, v1Challenge)
   const v1AccessKey = createWalletRestoreAccessKey({ token, ownerAddress, walletAddress: ownerAddress, walletSignature: v1Signature, accessEpoch: 1 })

@@ -20,15 +20,15 @@ interface RecoveryConfirmScreenProps {
 
 export const RecoveryConfirmScreen: React.FC<RecoveryConfirmScreenProps> = ({ mode, workingStatus, pendingPublish, footer, onConfirm, onBack }) => {
   const isPublish = mode === 'publish'
-  const title = isPublish ? 'Save Snapshot?' : 'Refetch Latest From Chain?'
+  const title = isPublish ? 'Save Snapshot?' : 'Refetch Latest From Onchain?'
   const subtitle = isPublish
-    ? 'Saves SOUL.md, MEMORY.md, skills.json, and profile changes.'
+    ? 'Saves SOUL.md, MEMORY.md, skills, and profile changes.'
     : 'This overwrites local files with the onchain version.'
 
   const headlineColor = theme.accentPeriwinkle
   const headline = isPublish
     ? 'Saving updates the onchain pointer for this agent.'
-    : 'Refetching replaces SOUL.md, MEMORY.md, and skills.json with what is onchain.'
+    : 'Refetching replaces SOUL.md, MEMORY.md, and skills with what is onchain.'
   const detail = isPublish
     ? 'Your local continuity files and profile edits become the saved state. The previous snapshot pointer is overwritten.'
     : 'Unsaved local edits will be lost. Use this when local files are missing or out of sync with the latest saved snapshot.'
@@ -47,7 +47,7 @@ export const RecoveryConfirmScreen: React.FC<RecoveryConfirmScreenProps> = ({ mo
         )}
         {!isPublish && pendingPublish ? (
           <Box marginTop={1} flexDirection="column">
-            <Text color={theme.accentError} bold>Local snapshot is ahead of chain.</Text>
+            <Text color={theme.accentError} bold>Local snapshot is ahead of onchain.</Text>
             <Text color={theme.textSubtle}>Local edits have not yet been rotated to the onchain pointer. Refetching discards them and reverts to the last published snapshot.</Text>
           </Box>
         ) : null}
@@ -63,7 +63,7 @@ export const RecoveryConfirmScreen: React.FC<RecoveryConfirmScreenProps> = ({ mo
             { value: 'confirm', role: 'section', label: isPublish ? 'Save' : 'Refetch' },
             {
               value: 'confirm',
-              label: isPublish ? 'Yes, Save Snapshot Now' : 'Yes, Refetch From Chain',
+              label: isPublish ? 'Yes, Save Snapshot Now' : 'Yes, Refetch From Onchain',
               hint: isPublish ? 'Sign and save the encrypted snapshot' : 'Wallet decrypts and overwrites local files',
             },
             { value: 'back', role: 'section', label: 'Navigation' },

@@ -112,7 +112,7 @@ export const MenuScreen: React.FC<MenuScreenProps> = ({
   const options: Array<SelectOption<Action>> = identity
     ? [
         { value: 'public-profile', role: 'section', label: 'Public Identity' },
-        { value: 'public-profile', label: 'Public Profile', hint: 'Identity card and profile fields' },
+        { value: 'public-profile', label: 'Public Profile', hint: 'Agent card and profile fields' },
         { value: 'ens-name', label: 'ENS Name', hint: ensNameHint, disabled: flags?.ensNameDisabled ?? false },
         { value: 'continuity', role: 'section', label: 'Continuity' },
         { value: 'continuity', label: 'Soul & Memory', hint: 'Edit SOUL.md and MEMORY.md' },
@@ -197,7 +197,7 @@ function renderReconciliationBanner(r: AgentReconciliation, identity: EthagentId
       return (
         <>
           <Text color={theme.accentError} bold>Agent Unlinked</Text>
-          <Text color={theme.textSubtle}>{tokenLabel} was transferred. Local SOUL.md, MEMORY.md, skills.json remain. Back them up before this directory is reused.</Text>
+          <Text color={theme.textSubtle}>{tokenLabel} was transferred. Local SOUL.md, MEMORY.md, and skills remain. Back them up before this directory is reused.</Text>
           <Text color={theme.textSubtle}>Use Load Agent or New Agent to re-enable disabled actions.</Text>
         </>
       )
@@ -205,7 +205,7 @@ function renderReconciliationBanner(r: AgentReconciliation, identity: EthagentId
     return (
       <>
         <Text color={theme.accentError} bold>Agent Unlinked</Text>
-        <Text color={theme.textSubtle}>{tokenLabel} left without Prepare Transfer. Back up local SOUL.md, MEMORY.md, skills.json before loading another agent.</Text>
+        <Text color={theme.textSubtle}>{tokenLabel} left without Prepare Transfer. Back up local SOUL.md, MEMORY.md, and skills before loading another agent.</Text>
         <Text color={theme.textSubtle}>For continuity handoff: ask the new holder to return the token, then run Prepare Transfer before re-sending.</Text>
         <Text color={theme.textSubtle}>Use Load Agent or New Agent to re-enable disabled actions.</Text>
       </>
@@ -224,7 +224,7 @@ function renderReconciliationBanner(r: AgentReconciliation, identity: EthagentId
   }
   const lines: string[] = []
   if (r.custody === 'mid-flow-uri-pending') lines.push('Advanced setup pending. Open Custody Mode to finish.')
-  if (r.agentUri === 'local-newer') lines.push('Local state newer than chain. Save Snapshot Now to publish.')
+  if (r.agentUri === 'local-newer') lines.push('Local state newer than onchain. Save Snapshot Now to publish.')
   if (r.agentUri === 'chain-newer') lines.push('Onchain agentURI is newer than local. Refetch Latest.')
   if (r.vault === 'missing') lines.push('Recorded vault address has no contract at it. Open Custody Mode to redeploy.')
   if (r.workingTree === 'dirty') lines.push('Local edits pending. Save Snapshot Now to publish.')

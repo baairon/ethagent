@@ -57,6 +57,6 @@ export function menuFlagsFromReconciliation(r: AgentReconciliation, perspective:
     custodyAsterisk: custodyAsterisk && !isOperator,
     ...(custodyHint ? { custodyHint } : {}),
     saveSnapshotAsterisk: r.agentUri === 'local-newer',
-    ...(r.agentUri === 'local-newer' ? { saveSnapshotHint: 'Local newer than chain' } : {}),
+    ...(r.agentUri === 'local-newer' ? { saveSnapshotHint: 'Local newer than onchain' } : {}),
   }
 }

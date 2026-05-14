@@ -20,12 +20,8 @@ import {
 import { SkillsTreeScreen } from './continuity/skills/SkillsTreeScreen.js'
 import { NewSkillScreen } from './continuity/skills/NewSkillScreen.js'
 import { NewSkillVisibilityScreen } from './continuity/skills/NewSkillVisibilityScreen.js'
-import { DeleteSkillScreen } from './continuity/skills/DeleteSkillScreen.js'
+import { SkillActionsScreen } from './continuity/skills/SkillActionsScreen.js'
 import { DeleteSkillConfirmScreen } from './continuity/skills/DeleteSkillConfirmScreen.js'
-import {
-  SkillVisibilityListScreen,
-  SkillVisibilityPickScreen,
-} from './continuity/skills/SkillVisibilityScreen.js'
 import { RecoveryConfirmScreen } from './continuity/RecoveryConfirmScreen.js'
 import { SavePromptScreen } from './continuity/SavePromptScreen.js'
 import { ErrorScreen } from './shared/components/ErrorScreen.js'
@@ -136,9 +132,9 @@ export const IdentityHubOperationalRoutes: React.FC<IdentityHubOperationalRoutes
     return (
       <WalletApprovalScreen
         title="Refetch Latest Snapshot"
-        subtitle="Wallet signature decrypts the latest saved snapshot and restores SOUL.md, MEMORY.md, and skills.json."
+        subtitle="Wallet signature decrypts the latest saved snapshot and restores SOUL.md, MEMORY.md, and skills."
         walletSession={walletSession}
-        label={restoreProgress?.label ?? 'fetching latest snapshot from chain...'}
+        label={restoreProgress?.label ?? 'fetching latest snapshot from onchain...'}
         onCancel={() => setStep(step.back)}
       />
     )
@@ -170,37 +166,25 @@ export const IdentityHubOperationalRoutes: React.FC<IdentityHubOperationalRoutes
         notice={step.notice}
         editorOpened={step.editorOpened}
         footer={footer}
-        onOpenSkill={relativePath => { void openSkillFile(relativePath) }}
+        onOpenSkill={relativePath => setStep({ kind: 'continuity-skill-actions', relativePath })}
         onNewSkill={() => setStep({ kind: 'continuity-skill-new' })}
-        onDelete={() => setStep({ kind: 'continuity-skill-delete' })}
-        onVisibility={() => setStep({ kind: 'continuity-skill-visibility' })}
-        onViewPublicManifest={() => { void openContinuityFile('skills') }}
         onOpenFolder={() => { void openSkillsFolder() }}
         onBack={back}
       />
     )
   }
 
-  if (step.kind === 'continuity-skill-visibility') {
+  if (step.kind === 'continuity-skill-actions') {
     return (
-      <SkillVisibilityListScreen
-        identity={identity}
-        notice={step.notice}
-        footer={footer}
-        onPick={relativePath => setStep({ kind: 'continuity-skill-visibility-pick', relativePath })}
-        onCancel={back}
-      />
-    )
-  }
-
-  if (step.kind === 'continuity-skill-visibility-pick') {
-    return (
-      <SkillVisibilityPickScreen
+      <SkillActionsScreen
         identity={identity}
         relativePath={step.relativePath}
+        {...(step.notice ? { notice: step.notice } : {})}
         footer={footer}
-        onSelect={visibility => { void setSkillVisibility(step.relativePath, visibility) }}
-        onCancel={back}
+        onOpenSkill={relativePath => { void openSkillFile(relativePath) }}
+        onSetVisibility={(relativePath, visibility) => { void setSkillVisibility(relativePath, visibility) }}
+        onDelete={relativePath => setStep({ kind: 'continuity-skill-delete-confirm', target: { kind: 'skill', relativePath } })}
+        onBack={back}
       />
     )
   }
@@ -223,18 +207,6 @@ export const IdentityHubOperationalRoutes: React.FC<IdentityHubOperationalRoutes
         {...(step.error ? { error: step.error } : {})}
         footer={footer}
         onSelect={visibility => { void createSkill(step.name, visibility) }}
-        onCancel={back}
-      />
-    )
-  }
-
-  if (step.kind === 'continuity-skill-delete') {
-    return (
-      <DeleteSkillScreen
-        identity={identity}
-        notice={step.notice}
-        footer={footer}
-        onPick={target => setStep({ kind: 'continuity-skill-delete-confirm', target })}
         onCancel={back}
       />
     )

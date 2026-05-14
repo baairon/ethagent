@@ -6,7 +6,6 @@ import { theme } from '../../../ui/theme.js'
 import type { EthagentConfig, EthagentIdentity } from '../../../storage/config.js'
 import type { ContinuityWorkingTreeStatus } from '../../continuity/storage.js'
 import { IdentitySummary } from '../shared/components/IdentitySummary.js'
-import { changedContinuitySnapshotFiles } from './state.js'
 import { readIdentityStateString } from '../custody/state.js'
 import { shortCid } from '../shared/model/format.js'
 
@@ -22,23 +21,6 @@ interface CommonProps {
   editorOpened?: boolean
   footer: React.ReactNode
   onBack: () => void
-}
-
-const SaveFromHubHint: React.FC<{ workingStatus?: ContinuityWorkingTreeStatus | null }> = ({ workingStatus }) => {
-  const needsBackup = workingStatus?.publishState === 'local-changes'
-    || workingStatus?.publishState === 'not-published'
-    || workingStatus?.publishState === 'verify-needed'
-  if (!needsBackup) return null
-  const files = changedContinuitySnapshotFiles(workingStatus)
-  return (
-    <Box marginTop={1} flexDirection="column">
-      <Text color={theme.accentError} bold>
-        Unsaved changes
-        {files.length > 0 ? `: ${files.join(', ')}` : ''}
-      </Text>
-      <Text color={theme.dim}>Save Snapshot Now to publish.</Text>
-    </Box>
-  )
 }
 
 export const PrivateContinuityScreen: React.FC<CommonProps & {
@@ -57,8 +39,7 @@ export const PrivateContinuityScreen: React.FC<CommonProps & {
   onBack,
 }) => (
   <Surface title="Soul & Memory" subtitle={notice ?? privateSubtitle(ready)} footer={footer}>
-    <IdentitySummary identity={identity} config={config} workingStatus={workingStatus} hideLocalChanges />
-    <SaveFromHubHint workingStatus={workingStatus} />
+    <IdentitySummary identity={identity} config={config} workingStatus={workingStatus} hideLocalChanges compact />
     {editorOpened && (
       <Box marginTop={1}>
         <Text color={theme.accentPeriwinkle}>Save with ctrl+s in your editor</Text>
@@ -90,8 +71,7 @@ export const PublicProfileScreen: React.FC<CommonProps & {
 }> = ({ identity, config, workingStatus, notice, editorOpened, footer, onEditProfile, onBack }) => {
   return (
     <Surface title="Public Profile" subtitle={notice ?? 'Manage the public name, description, icon, and Agent Card.'} footer={footer}>
-      <IdentitySummary identity={identity} config={config} workingStatus={workingStatus} hideLocalChanges />
-      <SaveFromHubHint workingStatus={workingStatus} />
+      <IdentitySummary identity={identity} config={config} workingStatus={workingStatus} hideLocalChanges compact />
       {editorOpened && (
         <Box marginTop={1}>
           <Text color={theme.accentPeriwinkle}>Save with ctrl+s in your editor</Text>
@@ -101,7 +81,7 @@ export const PublicProfileScreen: React.FC<CommonProps & {
         <Select<PublicAction>
           options={[
             { value: 'edit', role: 'section', label: 'Profile' },
-            { value: 'edit', label: 'Edit Name, Description, Icon', hint: 'Update public profile fields used in the Agent Card' },
+            { value: 'edit', label: 'Edit Profile', hint: 'Name, description, icon' },
             { value: 'back', role: 'section', label: 'Navigation' },
             { value: 'back', label: 'Back', hint: 'Return to Identity Hub menu', role: 'utility' },
           ]}

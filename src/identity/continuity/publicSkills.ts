@@ -1,5 +1,7 @@
 import type { EthagentIdentity } from '../../storage/config.js'
 import type { SkillIndexEntry } from './skills/types.js'
+import { identityOwnerAddress } from '../hub/custody/state.js'
+import { toChecksumAddress } from '../crypto/eth.js'
 
 type PublicSkill = {
   id: string
@@ -13,6 +15,7 @@ type PublicSkillsProfile = {
   name: string
   description: string
   version: string
+  agentWallet: string
   imageUrl?: string
   skills: PublicSkill[]
 }
@@ -30,6 +33,8 @@ type AgentCard = {
     streaming: boolean
     pushNotifications: boolean
   }
+  producer: { name: string; url: string }
+  agent_wallet: string
   skills: Array<{
     id: string
     name: string
@@ -38,6 +43,11 @@ type AgentCard = {
     outputModes: string[]
   }>
 }
+
+const ETHAGENT_PRODUCER = {
+  name: 'ethagent',
+  url: 'https://github.com/baairon/ethagent',
+} as const
 
 export function defaultPublicSkillsProfile(identity: EthagentIdentity): PublicSkillsProfile {
   const state = identity.state ?? {}
@@ -50,10 +60,13 @@ export function defaultPublicSkillsProfile(identity: EthagentIdentity): PublicSk
   const imageUrl = typeof state.imageUrl === 'string' && state.imageUrl.trim()
     ? state.imageUrl.trim()
     : undefined
+  const ownerAddress = identityOwnerAddress(identity)
+  const agentWallet = ownerAddress ? toChecksumAddress(ownerAddress) : ''
   return {
     name,
     description,
     version: '1.0.0',
+    agentWallet,
     ...(imageUrl ? { imageUrl } : {}),
     skills: [
       {
@@ -121,6 +134,8 @@ export function renderPublicSkillsJson(profile: PublicSkillsProfile): string {
   const outputModes = unique(profile.skills.flatMap(skill => skill.outputModes))
   const summary = {
     schema: 'ethagent.public-skills.v1',
+    producer: ETHAGENT_PRODUCER,
+    agent_wallet: profile.agentWallet,
     visibility: 'public',
     name: profile.name,
     description: profile.description,
@@ -185,6 +200,8 @@ export function createAgentCard(profile: PublicSkillsProfile, url?: string): Age
       streaming: true,
       pushNotifications: false,
     },
+    producer: ETHAGENT_PRODUCER,
+    agent_wallet: profile.agentWallet,
     skills: profile.skills.map(skill => ({
       id: skill.id,
       name: skill.name,

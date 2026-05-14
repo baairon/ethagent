@@ -28,9 +28,10 @@ interface IdentitySummaryProps {
   hideHeader?: boolean
   tokenLinked?: boolean
   onchainOwner?: string
+  compact?: boolean
 }
 
-export const IdentitySummary: React.FC<IdentitySummaryProps> = ({ identity, config, workingStatus, hideLocalChanges = false, hideHeader = false, tokenLinked = true, onchainOwner }) => {
+export const IdentitySummary: React.FC<IdentitySummaryProps> = ({ identity, config, workingStatus, hideLocalChanges = false, hideHeader = false, tokenLinked = true, onchainOwner, compact = false }) => {
   if (!identity) {
     return (
       <Text color={theme.dim}>No agent yet. Create or load one.</Text>
@@ -58,6 +59,25 @@ export const IdentitySummary: React.FC<IdentitySummaryProps> = ({ identity, conf
   const tokenLine = identity.agentId
     ? `${tokenValue} · ${displayValue(networkValue)}`
     : displayValue(tokenValue)
+
+  if (compact) {
+    const name = stateName || 'Active Agent'
+    const tokenSegment = identity.agentId ? `#${identity.agentId}` : null
+    const networkSegment = identity.agentId ? displayValue(networkValue) : null
+    const ensSegment = ensStatus.kind === 'linked'
+      ? ensStatus.name
+      : ensStatus.kind === 'issue'
+        ? ensStatus.name
+        : null
+    return (
+      <Text>
+        <Text color={theme.accentPeriwinkle} bold>{name}</Text>
+        {tokenSegment ? <><Text color={theme.dim}> · </Text><Text color={theme.text}>{tokenSegment}</Text></> : null}
+        {networkSegment ? <><Text color={theme.dim}> · </Text><Text color={theme.text}>{networkSegment}</Text></> : null}
+        {ensSegment ? <><Text color={theme.dim}> · </Text><Text color={ensStatus.kind === 'issue' ? theme.accentError : theme.accentPeriwinkle}>{ensSegment}</Text></> : null}
+      </Text>
+    )
+  }
 
   return (
     <Box flexDirection="column">
@@ -100,7 +120,7 @@ export const IdentitySummary: React.FC<IdentitySummaryProps> = ({ identity, conf
         }
         const pendingCell = {
           label: 'Pending',
-          value: <Text color={theme.dim}>local ahead of chain, owner rotates pointer</Text>,
+          value: <Text color={theme.dim}>local ahead of onchain, owner rotates pointer</Text>,
         }
         return (
           <>

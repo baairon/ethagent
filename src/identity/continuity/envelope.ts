@@ -224,10 +224,10 @@ export class ContinuitySnapshotRestoreSlotMissingError extends Error {
 const CONTINUITY_SNAPSHOT_CHALLENGE_MESSAGES = [
   'Save or Restore Identity Files',
   'Action: encrypt or decrypt local identity files',
-  'Private: SOUL.md, MEMORY.md',
+  'Private: SOUL.md, MEMORY.md, skills',
   'Public: public skills and profile',
   'Safety: no transaction, spending, or approvals',
-  'Version: 1',
+  'Version: 2',
 ] as const
 
 export function createContinuitySnapshotChallenge(ownerAddress: string): string {
@@ -265,10 +265,10 @@ export function createTransferContinuitySnapshotChallenge(args: {
     `Sender Owner: ${ownerAddress}`,
     `Receiver Owner: ${targetAddress}`,
     'Action: encrypt or decrypt local identity files for this token transfer',
-    'Private: SOUL.md, MEMORY.md',
+    'Private: SOUL.md, MEMORY.md, skills',
     'Public: public skills and profile',
     'Safety: no transaction, spending, or approvals',
-    'Version: 1',
+    'Version: 2',
   ].join('\n')
 }
 
@@ -290,7 +290,7 @@ const WALLET_CHALLENGE_V2_COPY: Record<WalletChallengePurpose, { title: string; 
   'create-agent':              { title: 'Create Agent Snapshot Key',                action: 'Action: encrypt the new agent snapshot for owner restore' },
   'update-snapshot':           { title: 'Save Snapshot Encryption Key',              action: 'Action: encrypt the updated agent snapshot' },
   'update-ens-snapshot':       { title: 'Update ENS in Agent Snapshot',              action: 'Action: encrypt the snapshot with the new ENS name. No onchain ENS records change.' },
-  'clear-ens-snapshot':        { title: 'Clear ENS from Agent Snapshot',             action: 'Action: encrypt the snapshot with no ENS name. No onchain ENS records change.' },
+  'clear-ens-snapshot':        { title: 'Unlink ENS from Agent',                     action: 'Action: encrypt the snapshot with no ENS name. No onchain ENS records change.' },
   'update-profile-snapshot':   { title: 'Update Public Profile Snapshot Key',        action: 'Action: encrypt the snapshot with the updated profile' },
   'update-operators-snapshot': { title: 'Update Operator Wallets Snapshot Key',      action: 'Action: encrypt the snapshot with the updated operator list' },
   'refetch-snapshot':          { title: 'Refetch Latest Snapshot',                   action: 'Action: decrypt the latest published snapshot' },
@@ -322,9 +322,9 @@ export function createWalletRestoreAccessChallenge(args: {
       `Wallet: ${walletAddress}`,
       `Access Epoch: ${args.accessEpoch ?? 1}`,
       copy.action,
-      'Private: SOUL.md, MEMORY.md',
+      'Private: SOUL.md, MEMORY.md, skills',
       'Safety: no transaction, spending, or approvals',
-      'Version: 2',
+      'Version: 3',
     ].join('\n')
   }
   return [
@@ -336,9 +336,9 @@ export function createWalletRestoreAccessChallenge(args: {
     `Wallet: ${walletAddress}`,
     `Access Epoch: ${args.accessEpoch ?? 1}`,
     'Action: create a restore key for encrypted identity snapshots',
-    'Private: SOUL.md, MEMORY.md',
+    'Private: SOUL.md, MEMORY.md, skills',
     'Safety: no transaction, spending, or approvals',
-    'Version: 1',
+    'Version: 2',
   ].join('\n')
 }
 

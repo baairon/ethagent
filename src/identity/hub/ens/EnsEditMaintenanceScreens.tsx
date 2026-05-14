@@ -19,7 +19,6 @@ import {
   EnsSetupRow,
   footerHint,
 } from './EnsEditShared.js'
-import { IdentitySummary } from '../shared/components/IdentitySummary.js'
 import { UnlinkEnsReviewScreen } from './EnsEditReviewScreens.js'
 import {
   DeleteSubdomainTxRunner,

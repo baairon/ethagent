@@ -20,15 +20,15 @@ export function changedContinuitySnapshotFiles(
   workingStatus?: ContinuityWorkingTreeStatus | null,
 ): string[] {
   if (!workingStatus?.localContentHashes || !workingStatus.publishedContentHashes) return []
-  const files: Array<keyof typeof workingStatus.localContentHashes> = ['SOUL.md', 'MEMORY.md', 'skills.json', 'private-skills']
-  return files
-    .filter(file => (workingStatus.localContentHashes?.[file] ?? '') !== (workingStatus.publishedContentHashes?.[file] ?? ''))
-    .map(displayContinuitySnapshotFile)
-}
-
-function displayContinuitySnapshotFile(file: keyof NonNullable<ContinuityWorkingTreeStatus['localContentHashes']>): string {
-  if (file === 'private-skills') return 'skills/'
-  return file
+  const local = workingStatus.localContentHashes
+  const published = workingStatus.publishedContentHashes
+  const changed = (file: keyof typeof local): boolean =>
+    (local[file] ?? '') !== (published[file] ?? '')
+  const result: string[] = []
+  if (changed('SOUL.md')) result.push('SOUL.md')
+  if (changed('MEMORY.md')) result.push('MEMORY.md')
+  if (changed('skills.json') || changed('private-skills')) result.push('Skills')
+  return result
 }
 
 export function localChangeStatusView(

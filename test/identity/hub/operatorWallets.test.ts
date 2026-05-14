@@ -106,23 +106,23 @@ test('active operator wallet must be changed before removal', () => {
 test('v2 challenge titles vary by purpose and bump the Version line', () => {
   const ownerProof = createWalletRestoreAccessChallenge({ token, ownerAddress: owner, walletAddress: operator, accessEpoch: 1, purpose: 'operator-proof' })
   assert.match(ownerProof, /^Authorize Operator Wallet Restore Access\n/)
-  assert.match(ownerProof, /Version: 2$/)
+  assert.match(ownerProof, /Version: 3$/)
 
   const clearEns = createWalletRestoreAccessChallenge({ token, ownerAddress: owner, walletAddress: operator, accessEpoch: 1, purpose: 'clear-ens-snapshot' })
-  assert.match(clearEns, /^Clear ENS from Agent Snapshot\n/)
+  assert.match(clearEns, /^Unlink ENS from Agent\n/)
   assert.match(clearEns, /No onchain ENS records change\./)
-  assert.match(clearEns, /Version: 2$/)
+  assert.match(clearEns, /Version: 3$/)
 
   const profile = createWalletRestoreAccessChallenge({ token, ownerAddress: owner, walletAddress: operator, accessEpoch: 1, purpose: 'update-profile-snapshot' })
   assert.match(profile, /^Update Public Profile Snapshot Key\n/)
   assert.doesNotMatch(profile, /Authorize Wallet Restore Access/)
 })
 
-test('v1 challenge text stays byte-identical when no purpose is supplied (back-compat)', () => {
+test('legacy no-purpose challenge keeps Authorize Wallet Restore Access wording', () => {
   const v1 = createWalletRestoreAccessChallenge({ token, ownerAddress: owner, walletAddress: operator, accessEpoch: 1 })
   assert.match(v1, /^Authorize Wallet Restore Access\n/)
   assert.match(v1, /Action: create a restore key for encrypted identity snapshots/)
-  assert.match(v1, /Version: 1$/)
+  assert.match(v1, /Version: 2$/)
 })
 
 test('access key created with a purpose stores the v2 challenge in its slot', () => {

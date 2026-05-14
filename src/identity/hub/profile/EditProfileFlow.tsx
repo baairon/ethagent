@@ -57,7 +57,7 @@ export const EditProfileFlow: React.FC<EditProfileFlowProps> = ({
     const currentName = step.name ?? readIdentityStateString(step.identity.state, 'name')
     return (
       <Surface
-        title="Edit Name, Description, Icon"
+        title="Edit Profile"
         subtitle={<FlowTimeline steps={EDIT_PROFILE_STEPS} current={1} />}
         footer={footerHint(EDIT_NEXT_FOOTER)}
       >
@@ -112,7 +112,7 @@ export const EditProfileFlow: React.FC<EditProfileFlowProps> = ({
   const draftDescription = step.description ?? currentDescription
   return (
     <Surface
-      title="Edit Name, Description, Icon"
+      title="Edit Profile"
       subtitle={<FlowTimeline steps={EDIT_PROFILE_STEPS} current={2} />}
       footer={footerHint(EDIT_DESCRIPTION_FOOTER)}
     >
@@ -145,7 +145,7 @@ const AgentIconStep: React.FC<{
   if (entryMode) {
     return (
       <Surface
-        title="Edit Name, Description, Icon"
+        title="Edit Profile"
         subtitle={<FlowTimeline steps={EDIT_PROFILE_STEPS} current={3} />}
         footer={footerHint(EDIT_NEXT_FOOTER)}
       >
@@ -165,7 +165,7 @@ const AgentIconStep: React.FC<{
 
   return (
     <Surface
-      title="Edit Name, Description, Icon"
+      title="Edit Profile"
       subtitle={<FlowTimeline steps={EDIT_PROFILE_STEPS} current={3} />}
       footer={footerHint('enter select · esc back')}
     >
@@ -208,7 +208,7 @@ const EditProfileReviewStep: React.FC<{
   const currentIcon = readIdentityStateString(step.identity.state, 'imageUrl')
   return (
     <Surface
-      title="Edit Name, Description, Icon"
+      title="Edit Profile"
       subtitle={<FlowTimeline steps={EDIT_PROFILE_STEPS} current={4} />}
       footer={footerHint('enter save · esc back')}
     >

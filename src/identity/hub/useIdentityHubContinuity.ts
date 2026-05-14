@@ -208,7 +208,7 @@ export function useIdentityHubContinuity({
 
   const deleteSkill = async (relativePath: string): Promise<void> => {
     await mutateSkillsTree({
-      backStep: { kind: 'continuity-skill-delete' },
+      backStep: { kind: 'continuity-skills-tree' },
       run: async id => {
         await deleteSkillEntry(id, relativePath)
         return `deleted ${relativePath}`
@@ -221,8 +221,8 @@ export function useIdentityHubContinuity({
     visibility: SkillVisibility,
   ): Promise<void> => {
     await mutateSkillsTree({
-      backStep: { kind: 'continuity-skill-visibility' },
-      successStep: notice => ({ kind: 'continuity-skill-visibility', notice }),
+      backStep: { kind: 'continuity-skill-actions', relativePath },
+      successStep: notice => ({ kind: 'continuity-skill-actions', relativePath, notice }),
       run: async id => {
         await setSkillVisibilityStorage(id, relativePath, visibility)
         const display = relativePath.split('/')[0] ?? relativePath

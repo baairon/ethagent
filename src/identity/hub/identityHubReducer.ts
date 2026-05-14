@@ -62,10 +62,8 @@ export type Step =
   | { kind: 'continuity-skills-tree'; notice?: string; editorOpened?: boolean }
   | { kind: 'continuity-skill-new'; error?: string }
   | { kind: 'continuity-skill-new-visibility'; name: string; error?: string }
-  | { kind: 'continuity-skill-delete'; notice?: string }
+  | { kind: 'continuity-skill-actions'; relativePath: string; notice?: string }
   | { kind: 'continuity-skill-delete-confirm'; target: { kind: 'skill'; relativePath: string } }
-  | { kind: 'continuity-skill-visibility'; notice?: string }
-  | { kind: 'continuity-skill-visibility-pick'; relativePath: string }
   | { kind: 'rebackup-confirm'; back: Step }
   | { kind: 'recovery-refetch-confirm'; back: Step }
   | { kind: 'recovery-refetching'; identity: EthagentIdentity; registry: Erc8004RegistryConfig; back: Step }
@@ -186,14 +184,10 @@ function backStep(from: Step): Step {
       return { kind: 'continuity-skills-tree' }
     case 'continuity-skill-new-visibility':
       return { kind: 'continuity-skill-new' }
-    case 'continuity-skill-delete':
+    case 'continuity-skill-actions':
       return { kind: 'continuity-skills-tree' }
     case 'continuity-skill-delete-confirm':
-      return { kind: 'continuity-skill-delete' }
-    case 'continuity-skill-visibility':
-      return { kind: 'continuity-skills-tree' }
-    case 'continuity-skill-visibility-pick':
-      return { kind: 'continuity-skill-visibility' }
+      return { kind: 'continuity-skill-actions', relativePath: from.target.relativePath }
     case 'rebackup-confirm':
     case 'recovery-refetch-confirm':
     case 'recovery-refetching':

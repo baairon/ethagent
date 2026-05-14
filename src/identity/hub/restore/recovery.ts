@@ -78,7 +78,7 @@ export async function runRecoveryRefetch(
     walletSignature: wallet.signature,
     currentOwnerAddress: getAddress(wallet.account),
   })
-  callbacks.onRestoreProgress?.({ phase: 'writing', label: 'restoring SOUL.md, MEMORY.md, and skills.json...' })
+  callbacks.onRestoreProgress?.({ phase: 'writing', label: 'restoring SOUL.md, MEMORY.md, and skills...' })
   const transferSnapshot = transferSnapshotMetadataFromEnvelope(envelope)
   const refreshedBackup: BackupMetadata = {
     cid: candidate.backup.cid,
@@ -136,10 +136,10 @@ export async function runRecoveryRefetch(
   const publicSkillsRestored = await restorePublishedPublicSkills(nextIdentity, apiUrl, candidate.publicDiscovery?.skillsCid)
   await ensureIdentityMarkdownScaffold(nextIdentity)
   await syncPublicSkillsManifest(nextIdentity).catch(() => null)
-  await recordPublishedContinuitySnapshot({ identity: nextIdentity, label: 'Refetched Latest Snapshot From Chain' }).catch(() => null)
+  await recordPublishedContinuitySnapshot({ identity: nextIdentity, label: 'Refetched Latest Snapshot From Onchain' }).catch(() => null)
   if (publicSkillsRestored) {
     const contentHashes = await localContinuitySnapshotContentHashes(nextIdentity)
     await updatePublishedContinuitySnapshotContentHashes(nextIdentity, candidate.backup.cid, contentHashes).catch(() => null)
   }
-  await callbacks.onIdentityComplete(nextIdentity, 'Latest Published Snapshot Restored From Chain', 'update')
+  await callbacks.onIdentityComplete(nextIdentity, 'Latest Published Snapshot Restored From Onchain', 'update')
 }

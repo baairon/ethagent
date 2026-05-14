@@ -15,9 +15,6 @@ import type { ContinuityWorkingTreeStatus } from '../../../continuity/storage.js
 type SkillsTreeAction =
   | { kind: 'skill'; relativePath: string }
   | { kind: 'new' }
-  | { kind: 'delete' }
-  | { kind: 'visibility' }
-  | { kind: 'view-manifest' }
   | { kind: 'open-folder' }
   | { kind: 'noop' }
   | { kind: 'back' }
@@ -31,9 +28,6 @@ interface SkillsTreeScreenProps {
   footer: React.ReactNode
   onOpenSkill: (relativePath: string) => void
   onNewSkill: () => void
-  onDelete: () => void
-  onVisibility: () => void
-  onViewPublicManifest: () => void
   onOpenFolder: () => void
   onBack: () => void
 }
@@ -47,9 +41,6 @@ export const SkillsTreeScreen: React.FC<SkillsTreeScreenProps> = ({
   footer,
   onOpenSkill,
   onNewSkill,
-  onDelete,
-  onVisibility,
-  onViewPublicManifest,
   onOpenFolder,
   onBack,
 }) => {
@@ -92,7 +83,7 @@ export const SkillsTreeScreen: React.FC<SkillsTreeScreenProps> = ({
 
   return (
     <Surface title="Skills" subtitle={subtitle} footer={footer}>
-      <IdentitySummary identity={identity} config={config} workingStatus={workingStatus} />
+      <IdentitySummary identity={identity} config={config} workingStatus={workingStatus} compact />
       {error && (
         <Box marginTop={1}>
           <Text color={theme.accentError}>{error}</Text>
@@ -110,9 +101,6 @@ export const SkillsTreeScreen: React.FC<SkillsTreeScreenProps> = ({
           onSubmit={choice => {
             if (choice.kind === 'skill') return onOpenSkill(choice.relativePath)
             if (choice.kind === 'new') return onNewSkill()
-            if (choice.kind === 'delete') return onDelete()
-            if (choice.kind === 'visibility') return onVisibility()
-            if (choice.kind === 'view-manifest') return onViewPublicManifest()
             if (choice.kind === 'open-folder') return onOpenFolder()
             if (choice.kind === 'back') return onBack()
           }}
@@ -166,37 +154,17 @@ function buildOptions(
     }
   }
 
-  rows.push({ value: noopValue, role: 'notice', label: '' })
   rows.push({ value: noopValue, role: 'section', label: 'Manage' })
   rows.push({
     value: { kind: 'new' },
     label: 'New Skill',
     hint: 'Scaffold a new skill folder with SKILL.md',
   })
-  if (hasAny) {
-    rows.push({
-      value: { kind: 'delete' },
-      label: 'Delete Skill',
-      hint: 'Remove a skill folder and all its supporting files',
-    })
-    rows.push({
-      value: { kind: 'visibility' },
-      label: 'Change Visibility',
-      hint: 'Toggle public, discoverable, or private',
-    })
-  }
-  rows.push({ value: noopValue, role: 'section', label: 'Inspect' })
-  rows.push({
-    value: { kind: 'view-manifest' },
-    label: 'Edit skills.json',
-    hint: 'Open skills.json in your editor',
-  })
   rows.push({
     value: { kind: 'open-folder' },
     label: 'Open Skills Folder',
     hint: 'Reveal skills/ in your file manager',
   })
-  rows.push({ value: noopValue, role: 'section', label: 'Navigation' })
   rows.push({
     value: { kind: 'back' },
     label: 'Back',

@@ -68,6 +68,7 @@ export function buildModelPickerOptions(
 
   options.push(sectionOption('hdr:local', 'Local Models'))
   appendHfModelOptions(options, data, context, 'Added From Links', 46)
+  options.push(groupOption('hdr:local:manage', 'Manage'))
   options.push(utilityOption('hf:download', 'Add Local Model File', LOCAL_MODEL_LINK_HINT))
   options.push(utilityOption('local:catalog', 'View Full Catalog', 'Curated local GGUF files'))
   if (data.hfModels.length > 0) {
@@ -109,6 +110,7 @@ export function buildModelPickerOptions(
           contextFitLabel(provider, model, `${displayName}${active ? '  *' : ''}`, context.contextFit),
         ))
       }
+      options.push(groupOption(`hdr:cloud:${provider}:manage`, 'Manage'))
       options.push(utilityOption(`catalog:${provider}`, 'Full Catalog'))
       const manageLabel = provider === 'openai' && data.cloudCredentialKinds?.openai === 'oauth'
         ? 'Manage ChatGPT Sign-in'

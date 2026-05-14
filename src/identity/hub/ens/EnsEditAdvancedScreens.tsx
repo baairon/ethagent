@@ -19,7 +19,6 @@ import { shortAddress } from '../shared/model/format.js'
 import {
   footerHint,
 } from './EnsEditShared.js'
-import { IdentitySummary } from '../shared/components/IdentitySummary.js'
 import {
   EnsSetupBlockedScreen,
   EnsSetupReviewScreen,

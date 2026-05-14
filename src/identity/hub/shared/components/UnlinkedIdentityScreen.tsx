@@ -33,7 +33,7 @@ export const UnlinkedIdentityScreen: React.FC<UnlinkedIdentityScreenProps> = ({
   ]
   if (onRetry) {
     options.push({ value: 'retry', role: 'section', label: 'Recheck' })
-    options.push({ value: 'retry', label: 'Retry Ownership Check', hint: 'Re-query the chain to confirm the current owner', role: 'utility' })
+    options.push({ value: 'retry', label: 'Retry Ownership Check', hint: 'Re-query onchain to confirm the current owner', role: 'utility' })
   }
 
   const tokenLabel = agentId ? `Token #${agentId}` : 'Token'
@@ -48,13 +48,13 @@ export const UnlinkedIdentityScreen: React.FC<UnlinkedIdentityScreenProps> = ({
       <Box flexDirection="column">
         {transferSnapshot ? (
           <Text color={theme.textSubtle}>
-            {tokenLabel} was transferred. Local SOUL.md, MEMORY.md, skills.json remain. Back them up before this directory is reused.
+            {tokenLabel} was transferred. Local SOUL.md, MEMORY.md, and skills remain. Back them up before this directory is reused.
           </Text>
         ) : (
           <>
             <Text color={theme.accentPeriwinkle}>{tokenLabel} left this wallet without Prepare Transfer, so the new holder has no continuity handoff.</Text>
             <Text color={theme.textSubtle}>
-              Local SOUL.md, MEMORY.md, skills.json remain. Back them up before this directory is reused.
+              Local SOUL.md, MEMORY.md, and skills remain. Back them up before this directory is reused.
             </Text>
           </>
         )}

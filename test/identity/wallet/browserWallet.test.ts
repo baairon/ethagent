@@ -140,7 +140,7 @@ test('browser wallet page differentiates transaction requests', () => {
     },
   })
 
-  assert.match(page, /Transaction Request/)
+  assert.match(page, /Onchain Transaction/)
   assert.match(page, /Submit Transaction/)
   assert.match(page, /eth_sendTransaction/)
   assert.match(page, /Base/)
@@ -161,8 +161,8 @@ test('browser wallet page supports the single signature and transaction flow', (
     message: 'identity update',
   })
 
-  assert.match(page, /Identity Signature/)
-  assert.match(page, /Sign And Save/)
+  assert.match(page, /Snapshot Signature/)
+  assert.match(page, /Sign Snapshot/)
   assert.match(page, /post\("\/prepare-transaction"/)
   assert.match(page, /approve-sign/)
   assert.match(page, /approve-transaction/)
@@ -186,7 +186,7 @@ test('browser wallet page supports account-only connection requests', () => {
     kind: 'account',
   })
 
-  assert.match(page, /Wallet Request/)
+  assert.match(page, /Connection Request/)
   assert.match(page, /"kind":"account"/)
   assert.match(page, /requirePurposeSubCopy\("account"\)/)
 })
@@ -199,7 +199,7 @@ test('browser wallet page labels operator-wallet account connection requests', (
 
   assert.match(page, /"purpose":"connect-operator-wallet"/)
   assert.match(page, /Connect Wallet/)
-  assert.match(page, /Reads your operator wallet address/)
+  assert.match(page, /Reads the operator wallet address/)
   assert.match(page, /No signature or transaction/)
 })
 
@@ -229,7 +229,7 @@ test('browser wallet page clearly requests owner wallet for restore signatures',
   assert.match(page, /Owner Wallet Required/)
   assert.match(page, /Sign With Owner Wallet/)
   assert.match(page, /Decrypts this snapshot/)
-  assert.match(page, /Expected Wallet:/)
+  assert.match(page, /Required wallet:/)
   assert.match(page, /0x0+c01d/)
 })
 
@@ -245,7 +245,7 @@ test('browser wallet page clearly requests operator wallet for restore signature
   assert.match(page, /Operator Wallet Required/)
   assert.match(page, /Sign With Operator Wallet/)
   assert.match(page, /Decrypts this snapshot/)
-  assert.match(page, /Expected Wallet:/)
+  assert.match(page, /Required wallet:/)
 })
 
 test('browser wallet page explains ENS record clearing on Ethereum mainnet', () => {
@@ -260,9 +260,9 @@ test('browser wallet page explains ENS record clearing on Ethereum mainnet', () 
     },
   })
 
-  assert.match(page, /Use ENS Owner Wallet/)
-  assert.match(page, /Use ENS Owner Wallet/)
-  assert.match(page, /Expected Wallet:/)
+  assert.match(page, /Submit With ENS Controller Wallet/)
+  assert.match(page, /Submit With ENS Controller Wallet/)
+  assert.match(page, /Required wallet:/)
   assert.match(page, /Ethereum Mainnet/)
   assert.match(page, /eth_sendTransaction/)
 })

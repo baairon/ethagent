@@ -54,7 +54,7 @@ export function renderCustodyStep({
         footer={<Text color={theme.dim}>esc cancel</Text>}
       >
         <Box marginTop={1}>
-          <Text color={theme.textSubtle}>Reading vault state from chain...</Text>
+          <Text color={theme.textSubtle}>Reading vault state from onchain...</Text>
         </Box>
       </Surface>
     )

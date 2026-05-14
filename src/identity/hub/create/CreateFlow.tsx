@@ -143,7 +143,7 @@ export const CreateFlow: React.FC<CreateFlowProps> = ({
       <BusyScreen
         title="Getting Ready"
         subtitle={indicator}
-        label="checking IPFS storage and chain..."
+        label="checking IPFS storage and onchain..."
         onCancel={onBack}
       />
     )
