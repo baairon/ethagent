@@ -491,6 +491,166 @@ test('runRuntimeTurn fires the private continuity repair nudge for cloud provide
   assert.deepEqual(events.at(-1), { type: 'done', finishedNormally: true })
 })
 
+test('runRuntimeTurn fires a write_file repair nudge after rejected input', async () => {
+  const responses: StreamEvent[][] = [
+    [
+      {
+        type: 'tool_use_stop',
+        id: 'tool-empty',
+        name: 'write_file',
+        input: {},
+      },
+      { type: 'done', stopReason: 'tool_use' },
+    ],
+    [
+      {
+        type: 'tool_use_stop',
+        id: 'tool-valid',
+        name: 'write_file',
+        input: { path: 'notes.txt', content: 'hello\n' },
+      },
+      { type: 'done', stopReason: 'tool_use' },
+    ],
+    [
+      { type: 'text', delta: 'Wrote the file.' },
+      { type: 'done', stopReason: 'end_turn' },
+    ],
+  ]
+  let callIndex = 0
+  const seenMessages: Message[][] = []
+  const provider: Provider = {
+    id: 'llamacpp',
+    model: 'qwen-test',
+    supportsTools: true,
+    async *complete(messages): AsyncIterable<StreamEvent> {
+      seenMessages.push(messages)
+      const events = responses[callIndex] ?? []
+      callIndex += 1
+      for (const ev of events) yield ev
+    },
+  }
+
+  const events = await collect(
+    runRuntimeTurn({
+      provider,
+      signal: new AbortController().signal,
+      initialMessages: [{ role: 'user', content: 'write hello to notes.txt' }],
+      rebuildMessages: () => [{ role: 'user', content: 'write hello to notes.txt' }],
+      runToolBatch: async pending => ({
+        cancelled: false,
+        completedTools: pending.map(t => ({
+          ...t,
+          cwd: '/tmp',
+          result: Object.keys(t.input).length === 0
+            ? {
+                ok: false,
+                summary: 'write_file rejected input',
+                content: 'missing required fields: path, content',
+              }
+            : {
+                ok: true,
+                summary: 'create notes.txt',
+                content: 'wrote notes.txt',
+              },
+        })),
+      }),
+    }),
+  )
+
+  assert.equal(callIndex, 3)
+  assert.deepEqual(
+    events.find(e => e.type === 'continuation_nudge'),
+    { type: 'continuation_nudge', attempt: 1, reason: 'write_file_repair' },
+  )
+  assert.ok(seenMessages[1]!.some(message =>
+    message.role === 'user'
+    && typeof message.content === 'string'
+    && /previous write_file call was rejected/.test(message.content),
+  ))
+  assert.deepEqual(events.at(-1), { type: 'done', finishedNormally: true })
+})
+
+test('runRuntimeTurn gives up with a write_file-specific error after exhausting repair nudges', async () => {
+  let callIndex = 0
+  const provider: Provider = {
+    id: 'llamacpp',
+    model: 'qwen-test',
+    supportsTools: true,
+    async *complete(): AsyncIterable<StreamEvent> {
+      callIndex += 1
+      yield {
+        type: 'tool_use_stop',
+        id: `tool-${callIndex}`,
+        name: 'write_file',
+        input: {},
+      }
+      yield { type: 'done', stopReason: 'tool_use' }
+    },
+  }
+
+  const events = await collect(
+    runRuntimeTurn({
+      provider,
+      signal: new AbortController().signal,
+      initialMessages: [{ role: 'user', content: 'write notes' }],
+      rebuildMessages: () => [{ role: 'user', content: 'write notes' }],
+      runToolBatch: async pending => ({
+        cancelled: false,
+        completedTools: pending.map(t => ({
+          ...t,
+          cwd: '/tmp',
+          result: {
+            ok: false,
+            summary: 'write_file rejected input',
+            content: 'missing required fields: path, content',
+          },
+        })),
+      }),
+    }),
+  )
+
+  assert.equal(callIndex, 1 + MAX_CONTINUATION_NUDGES)
+  assert.ok(events.some(e =>
+    e.type === 'error'
+    && e.message === 'Model called write_file with invalid input after corrective nudges',
+  ))
+  const done = events.at(-1)
+  assert.equal(done?.type, 'done')
+  assert.equal((done as { finishedNormally: boolean }).finishedNormally, false)
+})
+
+test('runRuntimeTurn forwards thinking_end events to consumers', async () => {
+  const provider: Provider = {
+    id: 'llamacpp',
+    model: 'qwen-test',
+    supportsTools: true,
+    async *complete(): AsyncIterable<StreamEvent> {
+      yield { type: 'thinking', delta: 'reasoning' }
+      yield { type: 'thinking_end' }
+      yield { type: 'text', delta: 'answer' }
+      yield { type: 'done', stopReason: 'end_turn' }
+    },
+  }
+
+  const events = await collect(
+    runRuntimeTurn({
+      provider,
+      signal: new AbortController().signal,
+      initialMessages: [{ role: 'user', content: 'hi' }],
+      rebuildMessages: () => [{ role: 'user', content: 'hi' }],
+      runToolBatch: async () => ({ cancelled: false, completedTools: [] }),
+    }),
+  )
+
+  const types = events.map(e => e.type)
+  const thinkingIdx = types.indexOf('thinking')
+  const thinkingEndIdx = types.indexOf('thinking_end')
+  const textIdx = types.indexOf('text')
+  assert.ok(thinkingEndIdx !== -1, `expected thinking_end to be forwarded, got: ${types.join(',')}`)
+  assert.ok(thinkingIdx < thinkingEndIdx && thinkingEndIdx < textIdx,
+    `expected thinking -> thinking_end -> text, got: ${types.join(',')}`)
+})
+
 test('runRuntimeTurn retries when the provider emits reasoning with no visible answer', async () => {
   const seenMessages: Message[][] = []
   let calls = 0
@@ -986,7 +1146,7 @@ test('runRuntimeTurn errors after repeated native tool delegation prose', async 
     MAX_CONTINUATION_NUDGES,
   )
   assert.ok(events.some(e =>
-    e.type === 'error' && e.message === 'model asked the user to run a tool instead of making a tool call',
+    e.type === 'error' && e.message === 'Model asked the user to run a tool instead of making a tool call',
   ))
   assert.ok(events.every(e =>
     e.type !== 'assistant_message_committed' || !e.text.includes('Please run list_directory'),

@@ -28,7 +28,7 @@ export const writeFileTool: Tool<typeof schema> = {
     required: ['path', 'content'],
   },
   parse(input) {
-    return schema.parse(input)
+    return schema.parse(normalizeWriteFileInput(input))
   },
   async buildPermissionRequest(input, context) {
     const prepared = await prepareWrite(input, context)
@@ -74,6 +74,26 @@ export const writeFileTool: Tool<typeof schema> = {
       ),
     }
   },
+}
+
+function normalizeWriteFileInput(input: unknown): unknown {
+  let value: unknown = input
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    if (trimmed.startsWith('{')) {
+      try {
+        value = JSON.parse(trimmed)
+      } catch {
+        return input
+      }
+    }
+  }
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return value
+  const normalized: Record<string, unknown> = { ...(value as Record<string, unknown>) }
+  if (typeof normalized.path === 'string' && normalized.path.trim() === '') {
+    normalized.path = undefined
+  }
+  return normalized
 }
 
 async function prepareWrite(

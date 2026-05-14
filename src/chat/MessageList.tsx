@@ -7,6 +7,7 @@ import { DiffView } from './display/DiffView.js'
 import { SyntaxLine } from './display/SyntaxText.js'
 import { formatToolCall } from './display/toolCallDisplay.js'
 import { BrandSplash } from '../ui/BrandSplash.js'
+import type { RowSlice } from './transcript/transcriptViewport.js'
 
 export type ToolCallResult = {
   content: string
@@ -48,7 +49,11 @@ export type MessageRow =
     }
 
 type MessageListProps = {
-  rows: MessageRow[]
+  slices: Array<RowSlice<MessageRow>>
+}
+
+export function rowsToFullSlices(rows: MessageRow[]): Array<RowSlice<MessageRow>> {
+  return rows.map(row => ({ row, clipStart: 0, clipEnd: Number.MAX_SAFE_INTEGER, rowHeight: Number.MAX_SAFE_INTEGER }))
 }
 
 type MarkdownBlock =
@@ -70,13 +75,13 @@ const ASSISTANT_ACCENT = theme.accentPeriwinkle
 const ASSISTANT_MARKER = '• '
 const UNREADABLE_REASONING_TEXT = 'reasoning output was not readable text'
 
-const MessageListInner: React.FC<MessageListProps> = ({ rows }) => (
+const MessageListInner: React.FC<MessageListProps> = ({ slices }) => (
   <Box flexDirection="column">
-    {rows.map((row, index) => (
+    {slices.map((slice, index) => (
       <RowView
-        key={row.id}
-        row={row}
-        tightTop={row.role === 'tool_call' && rows[index - 1]?.role === 'tool_call'}
+        key={slice.row.id}
+        slice={slice}
+        tightTop={slice.row.role === 'tool_call' && slices[index - 1]?.row.role === 'tool_call'}
       />
     ))}
   </Box>
@@ -121,7 +126,8 @@ export function toggleInspectableRow(rows: MessageRow[], rowId?: string): Messag
   return rows
 }
 
-const RowViewInner: React.FC<{ row: MessageRow; tightTop?: boolean }> = ({ row, tightTop }) => {
+const RowViewInner: React.FC<{ slice: RowSlice<MessageRow>; tightTop?: boolean }> = ({ slice, tightTop }) => {
+  const { row, clipStart, clipEnd, rowHeight } = slice
   if (row.role === 'user') {
     const display = clipTextForDisplay(row.content, MAX_RENDERED_MESSAGE_CHARS)
     const lines = display.text.length === 0 ? [''] : display.text.split('\n')
@@ -141,9 +147,18 @@ const RowViewInner: React.FC<{ row: MessageRow; tightTop?: boolean }> = ({ row, 
   }
 
   if (row.role === 'assistant') {
+    const showTopMargin = clipStart === 0
+    const bodyClipStart = showTopMargin ? 0 : clipStart - 1
+    const bodyClipEnd = clipEnd !== undefined ? Math.max(0, clipEnd - 1) : undefined
     return (
-      <Box flexDirection="column" marginTop={1}>
-        <AssistantBody content={row.content} liveTail={row.liveTail} streaming={row.streaming} />
+      <Box flexDirection="column" marginTop={showTopMargin ? 1 : 0}>
+        <AssistantBody
+          content={row.content}
+          liveTail={row.liveTail}
+          streaming={row.streaming}
+          clipStart={bodyClipStart}
+          clipEnd={bodyClipEnd}
+        />
       </Box>
     )
   }
@@ -161,6 +176,9 @@ const RowViewInner: React.FC<{ row: MessageRow; tightTop?: boolean }> = ({ row, 
           expanded
           active={active}
           showCursor={showCursor}
+          clipStart={clipStart}
+          clipEnd={clipEnd}
+          rowHeight={rowHeight}
         />
       )
     }
@@ -170,6 +188,9 @@ const RowViewInner: React.FC<{ row: MessageRow; tightTop?: boolean }> = ({ row, 
         detail="alt+t inspect"
         active={active}
         showCursor={showCursor}
+        clipStart={clipStart}
+        clipEnd={clipEnd}
+        rowHeight={rowHeight}
       />
     )
   }
@@ -307,7 +328,10 @@ const ReasoningBlock: React.FC<{
   active?: boolean
   expanded?: boolean
   showCursor?: boolean
-}> = ({ content, detail, active = false, expanded = false, showCursor }) => {
+  clipStart?: number
+  clipEnd?: number
+  rowHeight?: number
+}> = ({ content, detail, active = false, expanded = false, showCursor, clipStart = 0, clipEnd, rowHeight }) => {
   const display = useMemo(
     () => clipTextForDisplay(content, MAX_RENDERED_REASONING_CHARS),
     [content],
@@ -317,31 +341,54 @@ const ReasoningBlock: React.FC<{
     return normalized.length === 0 ? [''] : normalized.split('\n')
   }, [display.text])
 
+  const omittedVisible = display.omittedChars > 0
+  const totalLines = rowHeight ?? (1 + (omittedVisible ? 1 : 0) + 1 + (expanded ? lines.length : 0))
+  const effClipEnd = clipEnd ?? totalLines
+
+  const lineInClip = (n: number) => n >= clipStart && n < effClipEnd
+  const showMargin = lineInClip(0)
+  const omittedLine = 1
+  const headerLine = omittedVisible ? 2 : 1
+  const bodyStartLine = headerLine + 1
+
+  const lastBodyIndex = lines.length - 1
+  const visibleBody: Array<{ index: number; text: string }> = []
+  if (expanded) {
+    for (let i = 0; i < lines.length; i += 1) {
+      const ln = bodyStartLine + i
+      if (ln >= effClipEnd) break
+      if (ln < clipStart) continue
+      visibleBody.push({ index: i, text: lines[i] ?? '' })
+    }
+  }
+
   return (
-    <Box flexDirection="column" marginTop={1}>
-      {display.omittedChars > 0 ? (
+    <Box flexDirection="column" marginTop={showMargin ? 1 : 0}>
+      {omittedVisible && lineInClip(omittedLine) ? (
         <Text color={theme.dim}>{`${display.omittedChars} earlier reasoning characters omitted`}</Text>
       ) : null}
-      <Text>
-        <AssistantMarker />
-        <ShimmerText
-          text={expanded ? 'Thinking…' : 'Thinking'}
-          color={theme.accentPeriwinkle}
-          active={active}
-          bold
-          italic
-        />
-        <Text color={theme.dim}>{` · ${detail}`}</Text>
-        {!expanded && showCursor ? <ThinkingCursor active hasPreview /> : null}
-      </Text>
-      {expanded ? (
+      {lineInClip(headerLine) ? (
+        <Text>
+          <AssistantMarker />
+          <ShimmerText
+            text={expanded ? 'Thinking…' : 'Thinking'}
+            color={theme.accentPeriwinkle}
+            active={active}
+            bold
+            italic
+          />
+          <Text color={theme.dim}>{` · ${detail}`}</Text>
+          {!expanded && showCursor ? <ThinkingCursor active hasPreview /> : null}
+        </Text>
+      ) : null}
+      {expanded && visibleBody.length > 0 ? (
         <Box flexDirection="column" marginLeft={2}>
-          {lines.map((line, index) => (
+          {visibleBody.map(({ index, text }) => (
             <Box key={index}>
               <Text color={theme.textSubtle}>
                 <Text color={theme.dim}>{'  '}</Text>
-                {line || ' '}
-                {showCursor && index === lines.length - 1 ? <ThinkingCursor active hasPreview={line.length > 0} /> : null}
+                {text || ' '}
+                {showCursor && index === lastBodyIndex ? <ThinkingCursor active hasPreview={text.length > 0} /> : null}
               </Text>
             </Box>
           ))}
@@ -351,39 +398,133 @@ const ReasoningBlock: React.FC<{
   )
 }
 
-const AssistantBody: React.FC<{ content: string; liveTail?: string; streaming?: boolean }> = ({
-  content,
-  liveTail,
-  streaming,
-}) => {
+const AssistantBody: React.FC<{
+  content: string
+  liveTail?: string
+  streaming?: boolean
+  clipStart?: number
+  clipEnd?: number
+}> = ({ content, liveTail, streaming, clipStart = 0, clipEnd }) => {
   const fullText = liveTail ? content + liveTail : content
-  const display = useMemo(
-    () => clipTextForDisplay(fullText, MAX_RENDERED_MESSAGE_CHARS),
-    [fullText],
+  const nodes = useMemo(
+    () => flattenAssistantBody(fullText, Boolean(streaming)),
+    [fullText, streaming],
   )
-  const blocks = useMemo(() => parseMarkdownBlocks(display.text), [display.text])
-
+  const effClipEnd = clipEnd ?? nodes.length
+  const visible = nodes.slice(clipStart, effClipEnd)
   return (
     <Box flexDirection="column">
-      {display.omittedChars > 0 ? (
-        <Text color={theme.dim}>{`${display.omittedChars} earlier characters omitted`}</Text>
-      ) : null}
-      {blocks.map((block, index) => (
-        <MarkdownBlockView
-          key={index}
-          block={block}
-          streaming={streaming && index === blocks.length - 1}
-          prefix={index === 0 || block.kind === 'code' ? <AssistantMarker /> : null}
-        />
+      {visible.map((node, i) => (
+        <React.Fragment key={clipStart + i}>{node}</React.Fragment>
       ))}
-      {streaming && blocks.length === 0 ? (
+    </Box>
+  )
+}
+
+export function flattenAssistantBody(fullText: string, streaming: boolean): React.ReactNode[] {
+  const display = clipTextForDisplay(fullText, MAX_RENDERED_MESSAGE_CHARS)
+  const blocks = parseMarkdownBlocks(display.text)
+  const nodes: React.ReactNode[] = []
+
+  if (display.omittedChars > 0) {
+    nodes.push(
+      <Text color={theme.dim}>{`${display.omittedChars} earlier characters omitted`}</Text>,
+    )
+  }
+
+  if (blocks.length === 0) {
+    if (streaming) {
+      nodes.push(
         <Text>
           <AssistantMarker />
           <Text color={ASSISTANT_ACCENT}><StreamCursor active /></Text>
-        </Text>
-      ) : null}
-    </Box>
-  )
+        </Text>,
+      )
+    }
+    return nodes
+  }
+
+  for (let bi = 0; bi < blocks.length; bi += 1) {
+    const block = blocks[bi]!
+    const isLastBlock = bi === blocks.length - 1
+    const prefix = bi === 0 || block.kind === 'code' ? <AssistantMarker /> : null
+    const streamingLast = streaming && isLastBlock
+
+    nodes.push(<Text> </Text>)
+
+    if (block.kind === 'heading') {
+      nodes.push(
+        <Text>
+          {prefix}
+          <InlineText text={block.text} color={ASSISTANT_ACCENT} bold />
+        </Text>,
+      )
+      continue
+    }
+
+    if (block.kind === 'quote') {
+      block.lines.forEach((line, li) => {
+        nodes.push(
+          <Text>
+            {li === 0 ? prefix : null}
+            <Text color={ASSISTANT_ACCENT}>| </Text>
+            <InlineText text={line} color={theme.dim} />
+          </Text>,
+        )
+      })
+      continue
+    }
+
+    if (block.kind === 'list') {
+      block.items.forEach((item, li) => {
+        nodes.push(
+          <Text>
+            {li === 0 ? prefix : null}
+            <Text color={ASSISTANT_ACCENT}>{block.ordered ? `${li + 1}. ` : '- '}</Text>
+            <InlineText text={item} color={theme.text} />
+          </Text>,
+        )
+      })
+      continue
+    }
+
+    if (block.kind === 'code') {
+      nodes.push(
+        <Text>
+          {prefix}
+          <Text color={theme.accentPeriwinkle} bold>{block.lang ?? 'code'}</Text>
+          {block.open ? <Text color={theme.dim}> streaming</Text> : null}
+        </Text>,
+      )
+      const codeLines = block.code.length === 0 ? [''] : block.code.split('\n')
+      const isShell = block.lang === 'bash' || block.lang === 'sh'
+      codeLines.forEach((line, li) => {
+        const isLastCode = li === codeLines.length - 1
+        nodes.push(
+          <Text>
+            <Text color={theme.dim}>{`  ${isShell ? '$ ' : '  '}`}</Text>
+            <SyntaxLine line={line} lang={block.lang} fallbackColor={theme.textSubtle} />
+            {block.open && isLastCode ? <Text color={ASSISTANT_ACCENT}> <StreamCursor active /></Text> : null}
+          </Text>,
+        )
+      })
+      continue
+    }
+
+    const paragraphLines = block.text.split('\n')
+    paragraphLines.forEach((line, li) => {
+      const isLastLine = li === paragraphLines.length - 1
+      nodes.push(
+        <Text>
+          {li === 0 ? prefix : null}
+          <InlineText text={line} color={theme.text} />
+          {streamingLast && isLastLine ? <Text color={ASSISTANT_ACCENT}> <StreamCursor active /></Text> : null}
+        </Text>,
+      )
+    })
+  }
+
+  return nodes
 }
 
 const AssistantMarker: React.FC = () => (

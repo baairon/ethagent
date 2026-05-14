@@ -1,4 +1,4 @@
-import test from 'node:test'
+﻿import test from 'node:test'
 import assert from 'node:assert/strict'
 import React from 'react'
 import { renderToString } from 'ink'
@@ -6,6 +6,7 @@ import {
   MessageList,
   reasoningBorderColor,
   reasoningCursorVisible,
+  rowsToFullSlices,
   sanitizeReasoningForDisplay,
   toggleReasoningRow,
   type MessageRow,
@@ -47,14 +48,14 @@ test('reasoning cursor visibility is explicit and disabled after streaming', () 
 test('streaming reasoning label renders without a cursor or inline spinner', () => {
   const output = renderToString(
     React.createElement(MessageList, {
-      rows: [{
+      slices: rowsToFullSlices([{
         role: 'thinking',
         id: 'thinking-streaming',
         content: 'checking',
         streaming: true,
         showCursor: false,
         expanded: false,
-      }],
+      }]),
     }),
   )
 
@@ -111,11 +112,11 @@ test('toggleReasoningRow skips a trailing tool_call and falls back to the latest
 test('assistant inline markdown hides emphasis and math delimiters', () => {
   const output = renderToString(
     React.createElement(MessageList, {
-      rows: [{
+      slices: rowsToFullSlices([{
         role: 'assistant',
         id: 'assistant-1',
         content: ' **6. Animalistic Return**\nMath: \\{x\\}, $y$, and /{z/}',
-      }],
+      }]),
     }),
   )
 
@@ -129,11 +130,11 @@ test('assistant inline markdown hides emphasis and math delimiters', () => {
 test('assistant headings render without hash indicators through level six', () => {
   const output = renderToString(
     React.createElement(MessageList, {
-      rows: [{
+      slices: rowsToFullSlices([{
         role: 'assistant',
         id: 'assistant-1',
         content: '#### **Deep Heading**\nBody text',
-      }],
+      }]),
     }),
   )
 
@@ -146,41 +147,41 @@ test('assistant headings render without hash indicators through level six', () =
 test('reasoning rows render raw markdown markers without assistant markdown styling', () => {
   const output = renderToString(
     React.createElement(MessageList, {
-      rows: [{
+      slices: rowsToFullSlices([{
         role: 'thinking',
         id: 'thinking-raw',
         content: '## Reasoning\nKeep **markers** visible.',
         expanded: true,
-      }],
+      }]),
     }),
   )
 
-  assert.match(output, /\u2022 Thinking…/)
+  assert.match(output, /\u2022 Thinkingâ€¦/)
   assert.match(output, /alt\+t collapse/)
   assert.match(output, /## Reasoning/)
   assert.match(output, /\*\*markers\*\*/)
-  assert.doesNotMatch(output, /▌/)
+  assert.doesNotMatch(output, /â–Œ/)
   assert.doesNotMatch(output, /reasoning/)
   assert.doesNotMatch(output, /01 ## Reasoning/)
-  assert.doesNotMatch(output, /[╭╮╰╯│]/)
-  assert.doesNotMatch(output, /─{4,}/)
+  assert.doesNotMatch(output, /[â•­â•®â•°â•¯â”‚]/)
+  assert.doesNotMatch(output, /â”€{4,}/)
 })
 
 test('collapsed reasoning rows render as a compact thinking label', () => {
   const output = renderToString(
     React.createElement(MessageList, {
-      rows: [{
+      slices: rowsToFullSlices([{
         role: 'thinking',
         id: 'thinking-collapsed',
         content: 'internal preview should stay hidden',
         expanded: false,
-      }],
+      }]),
     }),
   )
 
   assert.match(output, /\u2022 Thinking/)
   assert.match(output, /alt\+t inspect/)
-  assert.doesNotMatch(output, /▌/)
+  assert.doesNotMatch(output, /â–Œ/)
   assert.doesNotMatch(output, /internal preview should stay hidden/)
   assert.doesNotMatch(output, /reasoning/)
 })
@@ -188,22 +189,22 @@ test('collapsed reasoning rows render as a compact thinking label', () => {
 test('assistant code blocks render as compact labeled blocks without panel borders or gutters', () => {
   const output = renderToString(
     React.createElement(MessageList, {
-      rows: [{
+      slices: rowsToFullSlices([{
         role: 'assistant',
         id: 'assistant-code',
         content: 'Here:\n```python\nprint("hello world!")\n```',
-      }],
+      }]),
     }),
   )
 
   assert.match(output, /\u2022 Here:/)
   assert.match(output, /\u2022 python/)
   assert.match(output, /print\("hello world!"\)/)
-  assert.doesNotMatch(output, /▌/)
+  assert.doesNotMatch(output, /â–Œ/)
   assert.doesNotMatch(output, /block/)
   assert.doesNotMatch(output, /01 print\("hello world!"\)/)
-  assert.doesNotMatch(output, /[╭╮╰╯│]/)
-  assert.doesNotMatch(output, /─{4,}/)
+  assert.doesNotMatch(output, /[â•­â•®â•°â•¯â”‚]/)
+  assert.doesNotMatch(output, /â”€{4,}/)
 })
 
 test('reasoning sanitizer keeps readable reasoning text intact', () => {
@@ -227,14 +228,14 @@ test('reasoning sanitizer strips control characters without mutating readable te
 test('successful read tool results do not surface file contents in the transcript', () => {
   const output = renderToString(
     React.createElement(MessageList, {
-      rows: [{
+      slices: rowsToFullSlices([{
         role: 'tool_call',
         id: 'read-result',
         name: 'read_file',
         summary: 'read_file',
         input: { path: 'package.json' },
         result: { content: 'sensitive or very long file contents', summary: 'read package.json', isError: false },
-      }],
+      }]),
     }),
   )
 
@@ -246,13 +247,13 @@ test('successful read tool results do not surface file contents in the transcrip
 test('failed read tool results surface the failure summary, not the error body', () => {
   const output = renderToString(
     React.createElement(MessageList, {
-      rows: [{
+      slices: rowsToFullSlices([{
         role: 'tool_call',
         id: 'read-error',
         name: 'read_file',
         summary: 'read_file',
         result: { content: 'file does not exist', summary: 'read_file failed', isError: true },
-      }],
+      }]),
     }),
   )
 
@@ -279,30 +280,30 @@ test('restored successful read results keep file contents out of row state', () 
 test('successful tool_call rows hide the redundant result summary line', () => {
   const output = renderToString(
     React.createElement(MessageList, {
-      rows: [{
+      slices: rowsToFullSlices([{
         role: 'tool_call',
         id: 'tc-1',
         name: 'run_bash',
         summary: 'run_bash',
         input: { command: 'ls' },
         result: { content: 'file.txt', summary: 'exit 0', isError: false },
-      }],
+      }]),
     }),
   )
 
   assert.match(output, /Bash/)
   assert.match(output, /ls/)
-  assert.doesNotMatch(output, /▌/)
+  assert.doesNotMatch(output, /â–Œ/)
   assert.doesNotMatch(output, /exit 0/)
-  assert.doesNotMatch(output, /⎿/)
+  assert.doesNotMatch(output, /âŽ¿/)
   assert.doesNotMatch(output, /alt\+t inspect/)
-  assert.doesNotMatch(output, /─{4,}/)
+  assert.doesNotMatch(output, /â”€{4,}/)
 })
 
 test('successful file edit tool_call rows render stored diffs inline', () => {
   const output = renderToString(
     React.createElement(MessageList, {
-      rows: [{
+      slices: rowsToFullSlices([{
         role: 'tool_call',
         id: 'edit-result',
         name: 'edit_file',
@@ -314,7 +315,7 @@ test('successful file edit tool_call rows render stored diffs inline', () => {
           isError: false,
           diff: '--- hello.py\n+++ hello.py\n@@ -1 +1 @@\n-print("old")\n+print("new")',
         },
-      }],
+      }]),
     }),
   )
 
@@ -374,7 +375,7 @@ test('consecutive successful tool_call rows stack tight without blank lines betw
     { role: 'tool_call', id: 'tc-b', name: 'list_directory', summary: 'list_directory', input: { path: 'src' }, result: { content: '', summary: 'listed src', isError: false } },
     { role: 'tool_call', id: 'tc-c', name: 'list_directory', summary: 'list_directory', input: { path: 'test' }, result: { content: '', summary: 'listed test', isError: false } },
   ]
-  const output = renderToString(React.createElement(MessageList, { rows }))
+  const output = renderToString(React.createElement(MessageList, { slices: rowsToFullSlices(rows) }))
   const lines = output.split('\n').filter(line => line.trim().length > 0)
   assert.equal(lines.length, 3, `expected 3 non-blank lines for 3 tight-stacked tool calls, got ${lines.length}: ${JSON.stringify(lines)}`)
 })
@@ -382,13 +383,13 @@ test('consecutive successful tool_call rows stack tight without blank lines betw
 test('tool_call rows show running state until a result attaches', () => {
   const output = renderToString(
     React.createElement(MessageList, {
-      rows: [{
+      slices: rowsToFullSlices([{
         role: 'tool_call',
         id: 'tc-running',
         name: 'run_bash',
         summary: 'run_bash',
         input: { command: 'ls' },
-      }],
+      }]),
     }),
   )
 
@@ -400,7 +401,7 @@ test('tool_call rows show running state until a result attaches', () => {
 test('indeterminate progress rows render as spinner activity', () => {
   const output = renderToString(
     React.createElement(MessageList, {
-      rows: [{
+      slices: rowsToFullSlices([{
         role: 'progress',
         id: 'compact-1',
         title: 'compacting conversation',
@@ -408,7 +409,7 @@ test('indeterminate progress rows render as spinner activity', () => {
         status: 'summarizing with local model',
         suffix: 'esc to cancel',
         indeterminate: true,
-      }],
+      }]),
     }),
   )
 

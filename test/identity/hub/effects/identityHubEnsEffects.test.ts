@@ -8,10 +8,10 @@ import {
 import {
   ensRecordWritesForUpdate,
   runUpdateEnsRecords,
-} from '../../../../src/identity/hub/ens/index.js'
+} from '../../../../src/identity/hub/ens/transactions.js'
 import {
   resolveAgentTokenIdToCandidate,
-} from '../../../../src/identity/hub/restore/index.js'
+} from '../../../../src/identity/hub/restore/resolve.js'
 import { RegisterAgentPreflightError } from '../../../../src/identity/registry/erc8004.js'
 import { registry } from './effects.fixtures.js'
 

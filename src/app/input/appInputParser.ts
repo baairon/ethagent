@@ -175,9 +175,11 @@ function parseNormalInput(source: string, flushing: boolean): NormalParseResult 
 
   if (source.length >= 2) {
     const next = source.slice(1, 2)
+    const code = next.charCodeAt(0)
+    const altInput = code >= 0x20 && code <= 0x7e ? next : ''
     return {
       kind: 'event',
-      event: createInputEvent(next, { meta: true }, source.slice(0, 2)),
+      event: createInputEvent(altInput, { meta: true }, source.slice(0, 2)),
       length: 2,
     }
   }
@@ -187,6 +189,18 @@ function parseNormalInput(source: string, flushing: boolean): NormalParseResult 
     event: createInputEvent('', { escape: true, meta: true }, ESC),
     length: 1,
   }
+}
+
+const PRINTABLE_CHAR_RE = /[\p{L}\p{N}\p{M}\p{P}\p{S}\p{Z}]/u
+
+function stripNoise(text: string): string {
+  let out = ''
+  for (const ch of text) {
+    if (ch === '\uFFFD') continue
+    if (!PRINTABLE_CHAR_RE.test(ch)) continue
+    out += ch
+  }
+  return out
 }
 
 function createTextEvent(text: string): AppInputEvent {
@@ -204,7 +218,8 @@ function createTextEvent(text: string): AppInputEvent {
     }
     if (/[A-Z]/.test(text)) return createInputEvent(text, { shift: true }, text)
   }
-  return createInputEvent(text, {}, text)
+  const cleaned = stripNoise(text)
+  return createInputEvent(cleaned, {}, text)
 }
 
 function keycodeEvent(raw: string, codepoint: number, modifier: number): AppInputEvent {
@@ -212,8 +227,8 @@ function keycodeEvent(raw: string, codepoint: number, modifier: number): AppInpu
   if (codepoint === 9)  return createInputEvent('', { ...key, tab: true }, raw)
   if (codepoint === 13) return createInputEvent('', { ...key, return: true }, raw)
   if (codepoint === 27) return createInputEvent('', { ...key, escape: true, meta: true }, raw)
-  const char = String.fromCodePoint(codepoint)
-  return createInputEvent(char, key, raw)
+  const printable = codepoint >= 0x20 && codepoint <= 0x7e
+  return createInputEvent(printable ? String.fromCodePoint(codepoint) : '', key, raw)
 }
 
 function decodeModifier(modifier: number): Partial<Key> {

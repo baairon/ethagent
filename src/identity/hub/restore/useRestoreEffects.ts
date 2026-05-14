@@ -1,11 +1,9 @@
 import { useEffect } from 'react'
 import type { EthagentConfig } from '../../../storage/config.js'
-import {
-  runRestoreAuthorize,
-  runRestoreConnectWallet,
-  runRestoreDiscover,
-  runRestoreFetch,
-} from './index.js'
+import { runRestoreAuthorize } from './apply.js'
+import { runRestoreConnectWallet } from './auth.js'
+import { runRestoreDiscover } from './discover.js'
+import { runRestoreFetch } from './fetch.js'
 import type { EffectCallbacks } from '../shared/effects/types.js'
 import type { Step } from '../identityHubReducer.js'
 

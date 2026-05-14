@@ -23,8 +23,8 @@ type TranscriptViewProps = {
   onScrollabilityChange?: (canScroll: boolean) => void
 }
 
-const PROMPT_RESERVED_LINES = 7
-const OVERLAY_RESERVED_LINES = 12
+const PROMPT_RESERVED_LINES = 12
+const OVERLAY_RESERVED_LINES = 16
 const MIN_TRANSCRIPT_LINES = 6
 const MAX_TRANSCRIPT_LINES = 240
 
@@ -73,8 +73,10 @@ export const TranscriptView: React.FC<TranscriptViewProps> = ({
   )
   const visibleReasoningIds = useMemo(
     () => selection.rows
-      .filter((row): row is Extract<MessageRow, { role: 'thinking' }> => row.role === 'thinking')
-      .map(row => row.id),
+      .filter((slice): slice is { row: Extract<MessageRow, { role: 'thinking' }>; clipStart: number; clipEnd: number; rowHeight: number } =>
+        slice.row.role === 'thinking',
+      )
+      .map(slice => slice.row.id),
     [selection.rows],
   )
 
@@ -129,7 +131,7 @@ export const TranscriptView: React.FC<TranscriptViewProps> = ({
           {` saves the full transcript`}
         </Text>
       ) : null}
-      <MessageList rows={selection.rows} />
+      <MessageList slices={selection.rows} />
       {selection.hiddenAfter > 0 ? (
         <Text color={theme.dim}>
           {`  ${selection.hiddenAfter} later message${selection.hiddenAfter === 1 ? '' : 's'} below · `}

@@ -9,15 +9,21 @@ import {
 import {
   continuityAgentSnapshot,
   continuityVaultStatus,
+  prepareSyncedSkillsTree,
   readContinuityFiles,
   readPublicSkillsFile,
   writePublicSkillsFile,
 } from '../../continuity/storage.js'
 import {
+  appendPublicSkillEntries,
   createAgentCard,
   defaultPublicSkillsProfile,
   serializeAgentCard,
 } from '../../continuity/publicSkills.js'
+import {
+  derivePublicSkillEntries,
+  syncPublicSkillsManifest,
+} from '../../continuity/skills/publicSkillsSync.js'
 import { recordPublishedContinuitySnapshot } from '../../continuity/snapshots.js'
 import { addToIpfs, DEFAULT_IPFS_API_URL, isPinataUploadUrl } from '../../storage/ipfs.js'
 import {
@@ -161,16 +167,22 @@ export async function runTokenTransferSigning(
   }
   const nextIdentityForFiles: EthagentIdentity = { ...step.identity, state }
   const continuityFiles = await readContinuityFiles(nextIdentityForFiles)
-  const publicSkillsJson = await readPublicSkillsFile(nextIdentityForFiles)
+  const publicSkillsJson = await syncPublicSkillsManifest(nextIdentityForFiles)
   const publicSkillsPin = await addToIpfs(DEFAULT_IPFS_API_URL, publicSkillsJson, fetch, { pinataJwt: step.pinataJwt })
   assertVerifiedPin(publicSkillsPin)
+  const publicSkillEntries = await derivePublicSkillEntries(nextIdentityForFiles)
+  const augmentedPublicProfile = appendPublicSkillEntries(
+    defaultPublicSkillsProfile(nextIdentityForFiles),
+    publicSkillEntries,
+  )
   const agentCardPin = await addToIpfs(
     DEFAULT_IPFS_API_URL,
-    serializeAgentCard(createAgentCard(defaultPublicSkillsProfile(nextIdentityForFiles))),
+    serializeAgentCard(createAgentCard(augmentedPublicProfile)),
     fetch,
     { pinataJwt: step.pinataJwt },
   )
   assertVerifiedPin(agentCardPin)
+  const skillsTree = await prepareSyncedSkillsTree(nextIdentityForFiles)
   const envelope = createTransferContinuitySnapshotEnvelope({
     ownerAddress,
     ownerWalletSignature: senderSignature.signature,
@@ -181,6 +193,7 @@ export async function runTokenTransferSigning(
     payload: {
       agent: continuityAgentSnapshot(nextIdentityForFiles),
       files: continuityFiles,
+      ...(Object.keys(skillsTree).length > 0 ? { skills: skillsTree } : {}),
       transcript: [],
       state,
     },

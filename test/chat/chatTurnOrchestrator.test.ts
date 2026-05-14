@@ -810,6 +810,41 @@ test('runStreamingTurn keeps reasoning collapsed and out of session history', as
   assert.equal(expandedReasoning.expanded, true)
 })
 
+test('runStreamingTurn hides the reasoning cursor on thinking_end before any text arrives', async () => {
+  const cwd = await fs.mkdtemp(path.join(os.tmpdir(), 'ethagent-orch-'))
+  const sessionMessages: SessionMessage[] = []
+  const rows: MessageRow[] = []
+  let checkedAfterThinkingEnd = false
+
+  const provider: Provider = {
+    id: 'llamacpp',
+    model: 'qwen-test',
+    supportsTools: true,
+    async *complete(): AsyncIterable<StreamEvent> {
+      yield { type: 'thinking', delta: 'Working...' }
+      yield { type: 'thinking_end' }
+      await wait(5)
+      const reasoning = rows.find((row): row is Extract<MessageRow, { role: 'thinking' }> => row.role === 'thinking')
+      assert.ok(reasoning)
+      assert.equal(reasoning.showCursor, false, 'cursor should stop immediately on thinking_end, before any text')
+      checkedAfterThinkingEnd = true
+      yield { type: 'text', delta: 'Answer.' }
+      yield { type: 'done', stopReason: 'end_turn' }
+    },
+  }
+
+  await runStreamingTurn(makeContext({
+    cwd,
+    provider,
+    userText: 'think then answer',
+    sessionMessages,
+    rows,
+    mode: 'chat',
+  }))
+
+  assert.equal(checkedAfterThinkingEnd, true)
+})
+
 test('runStreamingTurn hides the reasoning cursor as soon as answer text starts', async () => {
   const cwd = await fs.mkdtemp(path.join(os.tmpdir(), 'ethagent-orch-'))
   const sessionMessages: SessionMessage[] = []

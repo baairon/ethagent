@@ -52,7 +52,7 @@ export function resolveModelSelection(
         baseUrl,
         localMmprojPath: selection.mmprojPath,
       },
-      notice: `Local Hugging Face model ready. Now using ${formatModelDisplayName('llamacpp', selection.model, { maxLength: 64 })}${selection.mmprojPath ? ' with vision encoder' : ''}.`,
+      notice: `llama.cpp ready. Now using ${formatModelDisplayName('llamacpp', selection.model, { maxLength: 64 })}${selection.mmprojPath ? ' · vision' : ''}.`,
       tone: 'info',
     }
   }

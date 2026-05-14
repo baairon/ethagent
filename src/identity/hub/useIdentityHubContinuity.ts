@@ -2,15 +2,23 @@ import { useEffect, useState } from 'react'
 import type { EthagentIdentity } from '../../storage/config.js'
 import { catFromIpfs, DEFAULT_IPFS_API_URL } from '../storage/ipfs.js'
 import {
-  continuityVaultRef,
   continuityVaultStatus,
   continuityWorkingTreeStatus,
   ensurePublicSkillsFile,
   type ContinuityWorkingTreeStatus,
 } from '../continuity/storage.js'
-import { openFileInEditor } from '../continuity/editor.js'
-import { exportLocalBackup } from '../continuity/localBackup.js'
+import { openFileInEditor, openInFileManager } from '../continuity/editor.js'
 import { listPublishedContinuitySnapshots } from '../continuity/snapshots.js'
+import {
+  createSkillFile,
+  deleteSkillEntry,
+  invalidateSkillsCache,
+  readSkillByRelativePath,
+  setSkillVisibility as setSkillVisibilityStorage,
+} from '../continuity/skills/loadSkills.js'
+import type { SkillVisibility } from '../continuity/skills/types.js'
+import { syncPublicSkillsManifest } from '../continuity/skills/publicSkillsSync.js'
+import { continuityVaultRef } from '../continuity/storage.js'
 import type { Step } from './identityHubReducer.js'
 
 type UseIdentityHubContinuityArgs = {
@@ -30,7 +38,11 @@ export function useIdentityHubContinuity({
   setContinuityReady: (ready: boolean) => void
   workingStatus: ContinuityWorkingTreeStatus | null
   openContinuityFile: (kind: 'soul' | 'memory' | 'skills') => Promise<void>
-  exportLocalBackupZip: () => Promise<void>
+  openSkillFile: (relativePath: string) => Promise<void>
+  openSkillsFolder: () => Promise<void>
+  createSkill: (name: string, visibility: SkillVisibility) => Promise<void>
+  deleteSkill: (relativePath: string) => Promise<void>
+  setSkillVisibility: (relativePath: string, visibility: SkillVisibility) => Promise<void>
 } {
   const [continuityReady, setContinuityReady] = useState<boolean>(false)
   const [workingStatus, setWorkingStatus] = useState<ContinuityWorkingTreeStatus | null>(null)
@@ -55,6 +67,7 @@ export function useIdentityHubContinuity({
       step.kind !== 'menu'
       && step.kind !== 'continuity-private'
       && step.kind !== 'continuity-public'
+      && step.kind !== 'continuity-skills-tree'
       && step.kind !== 'save-prompt'
       && step.kind !== 'rebackup-confirm'
     ) return
@@ -78,8 +91,39 @@ export function useIdentityHubContinuity({
     }
   }, [identity, step.kind])
 
+  const requireReadyVault = async (): Promise<EthagentIdentity> => {
+    if (!identity) throw new Error('No active identity')
+    const status = await continuityVaultStatus(identity)
+    if (!status.ready) {
+      throw new Error('Restore local continuity files before editing the skills tree')
+    }
+    return identity
+  }
+
+  const mutateSkillsTree = async (args: {
+    backStep: Step
+    run: (id: EthagentIdentity) => Promise<string>
+    successStep?: (notice: string) => Step
+  }): Promise<void> => {
+    try {
+      const id = await requireReadyVault()
+      const notice = await args.run(id)
+      invalidateSkillsCache(id)
+      await syncPublicSkillsManifest(id)
+      const next = args.successStep
+        ? args.successStep(notice)
+        : { kind: 'continuity-skills-tree' as const, notice }
+      setStep(next)
+    } catch (err: unknown) {
+      handleStepError(err, args.backStep)
+    }
+  }
+
   const openContinuityFile = async (kind: 'soul' | 'memory' | 'skills'): Promise<void> => {
     if (!identity) return
+    const returnKind: 'continuity-private' | 'continuity-skills-tree' = kind === 'skills'
+      ? 'continuity-skills-tree'
+      : 'continuity-private'
     try {
       if (kind === 'skills') {
         await ensurePublicSkillsFile(identity, {
@@ -89,32 +133,102 @@ export function useIdentityHubContinuity({
       const ref = continuityVaultRef(identity)
       const file = kind === 'soul' ? ref.soulPath : kind === 'memory' ? ref.memoryPath : ref.publicSkillsPath
       const result = await openFileInEditor(file)
-      const displayName = kind === 'soul' ? 'SOUL.md' : kind === 'memory' ? 'MEMORY.md' : 'skills.json'
-      const message = result.ok
-        ? `opened ${displayName} with ${result.method}.`
-        : `open failed: ${result.error}`
-      setStep({ kind: 'continuity-private', notice: message, editorOpened: result.ok })
+      if (result.ok) {
+        setStep({ kind: returnKind, editorOpened: true })
+      } else {
+        setStep({ kind: returnKind, notice: `open failed: ${result.error}`, editorOpened: false })
+      }
     } catch (err: unknown) {
-      handleStepError(err, { kind: 'continuity-private' })
+      handleStepError(err, { kind: returnKind })
     }
   }
 
-  const exportLocalBackupZip = async (): Promise<void> => {
+  const openSkillFile = async (relativePath: string): Promise<void> => {
     if (!identity) return
     try {
-      await ensurePublicSkillsFile(identity, {
-        fallback: () => readPublishedPublicSkills(identity),
-      })
-      const result = await exportLocalBackup(identity)
-      const message = result.ok
-        ? `Saved local backup to ${result.path}`
-        : result.cancelled
-          ? 'Backup cancelled'
-          : `Backup failed: ${result.error}`
-      setStep({ kind: 'continuity-private', notice: message })
+      const skill = await readSkillByRelativePath(identity, relativePath)
+      const result = await openFileInEditor(skill.absolutePath)
+      invalidateSkillsCache(identity)
+      try {
+        await syncPublicSkillsManifest(identity)
+      } catch (syncErr: unknown) {
+        const failPrefix = result.ok ? '' : `open failed: ${result.error}; `
+        setStep({ kind: 'continuity-skills-tree', notice: `${failPrefix}public manifest sync failed: ${(syncErr as Error).message}`, editorOpened: result.ok })
+        return
+      }
+      if (result.ok) {
+        setStep({ kind: 'continuity-skills-tree', editorOpened: true })
+      } else {
+        setStep({ kind: 'continuity-skills-tree', notice: `open failed: ${result.error}`, editorOpened: false })
+      }
     } catch (err: unknown) {
-      handleStepError(err, { kind: 'continuity-private' })
+      handleStepError(err, { kind: 'continuity-skills-tree' })
     }
+  }
+
+  const openSkillsFolder = async (): Promise<void> => {
+    if (!identity) return
+    try {
+      const ref = continuityVaultRef(identity)
+      const result = await openInFileManager(ref.skillsDir)
+      if (result.ok) {
+        setStep({ kind: 'continuity-skills-tree', editorOpened: true })
+      } else {
+        setStep({ kind: 'continuity-skills-tree', notice: `open failed: ${result.error}`, editorOpened: false })
+      }
+    } catch (err: unknown) {
+      handleStepError(err, { kind: 'continuity-skills-tree' })
+    }
+  }
+
+  const createSkill = async (name: string, visibility: SkillVisibility): Promise<void> => {
+    const normalizedName = sanitizeSkillSegment(name)
+    if (!normalizedName) {
+      handleStepError(
+        new Error('Folder name must contain only letters, numbers, dashes, underscores, or dots'),
+        { kind: 'continuity-skill-new' },
+      )
+      return
+    }
+    try {
+      const id = await requireReadyVault()
+      const created = await createSkillFile(id, { name: normalizedName, visibility })
+      invalidateSkillsCache(id)
+      await syncPublicSkillsManifest(id)
+      const result = await openFileInEditor(created.absolutePath)
+      if (result.ok) {
+        setStep({ kind: 'continuity-skills-tree', editorOpened: true })
+      } else {
+        setStep({ kind: 'continuity-skills-tree', notice: `created ${created.relativePath}; open failed: ${result.error}`, editorOpened: false })
+      }
+    } catch (err: unknown) {
+      handleStepError(err, { kind: 'continuity-skill-new' })
+    }
+  }
+
+  const deleteSkill = async (relativePath: string): Promise<void> => {
+    await mutateSkillsTree({
+      backStep: { kind: 'continuity-skill-delete' },
+      run: async id => {
+        await deleteSkillEntry(id, relativePath)
+        return `deleted ${relativePath}`
+      },
+    })
+  }
+
+  const setSkillVisibility = async (
+    relativePath: string,
+    visibility: SkillVisibility,
+  ): Promise<void> => {
+    await mutateSkillsTree({
+      backStep: { kind: 'continuity-skill-visibility' },
+      successStep: notice => ({ kind: 'continuity-skill-visibility', notice }),
+      run: async id => {
+        await setSkillVisibilityStorage(id, relativePath, visibility)
+        const display = relativePath.split('/')[0] ?? relativePath
+        return `${display} now ${visibility}`
+      },
+    })
   }
 
   return {
@@ -122,8 +236,16 @@ export function useIdentityHubContinuity({
     setContinuityReady,
     workingStatus,
     openContinuityFile,
-    exportLocalBackupZip,
+    openSkillFile,
+    openSkillsFolder,
+    createSkill,
+    deleteSkill,
+    setSkillVisibility,
   }
+}
+
+export function sanitizeSkillSegment(value: string): string {
+  return value.trim().toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60)
 }
 
 async function readPublishedPublicSkills(identity: EthagentIdentity): Promise<string> {

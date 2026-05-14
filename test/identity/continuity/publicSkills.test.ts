@@ -1,11 +1,13 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
+  appendPublicSkillEntries,
   createAgentCard,
   defaultPublicSkillsProfile,
   renderPublicSkillsJson,
   serializeAgentCard,
 } from '../../../src/identity/continuity/publicSkills.js'
+import type { SkillIndexEntry } from '../../../src/identity/continuity/skills/types.js'
 import type { EthagentIdentity } from '../../../src/storage/config.js'
 
 const identity: EthagentIdentity = {
@@ -84,4 +86,36 @@ test('agent card omits placeholder URL when no endpoint is supplied', () => {
   assert.equal(card.url, undefined)
   assert.equal(serialized.includes('pending-agent-endpoint'), false)
   assert.equal('iconUrl' in card, false)
+})
+
+test('appendPublicSkillEntries hides private skills and surfaces discoverable + public', () => {
+  const profile = defaultPublicSkillsProfile(identity)
+  const entries: SkillIndexEntry[] = [
+    {
+      name: 'private-skill',
+      description: 'kept hidden',
+      visibility: 'private',
+      relativePath: 'private-skill/SKILL.md',
+      absolutePath: '/tmp/private-skill/SKILL.md',
+    },
+    {
+      name: 'discoverable-skill',
+      description: 'in the manifest',
+      visibility: 'discoverable',
+      relativePath: 'discoverable-skill/SKILL.md',
+      absolutePath: '/tmp/discoverable-skill/SKILL.md',
+    },
+    {
+      name: 'public-skill',
+      description: 'also in the manifest',
+      visibility: 'public',
+      relativePath: 'public-skill/SKILL.md',
+      absolutePath: '/tmp/public-skill/SKILL.md',
+    },
+  ]
+  const appended = appendPublicSkillEntries(profile, entries)
+  const skillIds = appended.skills.map(s => s.id)
+  assert.equal(skillIds.includes('private-skill'), false)
+  assert.ok(skillIds.includes('discoverable-skill'))
+  assert.ok(skillIds.includes('public-skill'))
 })

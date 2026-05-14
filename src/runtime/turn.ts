@@ -10,6 +10,7 @@ import {
 type ProviderTurnEvent =
   | { type: 'text'; delta: string }
   | { type: 'thinking'; delta: string }
+  | { type: 'thinking_end' }
   | ProviderRetryStreamEvent
   | { type: 'tool_use_start'; id: string; name: string }
   | { type: 'tool_use_delta'; id: string; delta: string }
@@ -46,6 +47,7 @@ function normalize(event: StreamEvent): ProviderTurnEvent {
   switch (event.type) {
     case 'text': return { type: 'text', delta: event.delta }
     case 'thinking': return { type: 'thinking', delta: event.delta }
+    case 'thinking_end': return { type: 'thinking_end' }
     case 'retry': return event
     case 'tool_use_start': return event
     case 'tool_use_delta': return event
@@ -67,6 +69,7 @@ export type ContinuationNudgeReason =
   | 'tool_budget'
   | 'private_continuity_tool'
   | 'private_continuity_tool_repair'
+  | 'write_file_repair'
   | 'reasoning_only'
 
 const CONTINUATION_NUDGE_TEXT =
@@ -93,6 +96,9 @@ const PRIVATE_CONTINUITY_NUDGE_TEXT =
 const PRIVATE_CONTINUITY_REPAIR_NUDGE_TEXT =
   'The previous propose_private_continuity_edit call had invalid or missing input. Retry the same native tool now with complete arguments. Do not answer in prose and do not search for markdown files. For memory/preferences use {"file":"MEMORY.md","appendToSection":"Durable User Preferences","appendText":"- User preference or memory note."}. For persona use {"file":"SOUL.md","appendToSection":"Persona","appendText":"- Persona or standing behavior note."}.'
 
+const WRITE_FILE_REPAIR_NUDGE_TEXT =
+  'The previous write_file call was rejected because the arguments were missing or malformed. Retry the same native tool now with a JSON object (not a JSON string) shaped exactly like {"path":"relative/path.ext","content":"...complete file contents..."}. Both fields are required and must be non-empty. Do not answer in prose.'
+
 const REASONING_ONLY_NUDGE_TEXT =
   'You produced private reasoning but no user-visible answer. Answer the user now in visible text. Do not continue only with reasoning.'
 
@@ -100,6 +106,7 @@ export type TurnEvent =
   | { type: 'iteration_start'; index: number }
   | { type: 'text'; delta: string }
   | { type: 'thinking'; delta: string }
+  | { type: 'thinking_end' }
   | ProviderRetryStreamEvent
   | { type: 'tool_use_start'; id: string; name: string }
   | { type: 'tool_use_delta'; id: string; delta: string }
@@ -203,6 +210,8 @@ export async function* runRuntimeTurn(
         } else if (ev.type === 'thinking') {
           thinkingSeen = true
           yield { type: 'thinking', delta: ev.delta }
+        } else if (ev.type === 'thinking_end') {
+          yield { type: 'thinking_end' }
         } else if (ev.type === 'tool_use_start') {
           yield { type: 'tool_use_start', id: ev.id, name: ev.name }
         } else if (ev.type === 'tool_use_delta') {
@@ -279,7 +288,7 @@ export async function* runRuntimeTurn(
       }
       yield {
         type: 'error',
-        message: 'model printed tool names instead of making a tool call',
+        message: 'Model printed tool names instead of making a tool call',
         discardAssistant: true,
       }
       yield doneEvent(false, stopReason)
@@ -302,7 +311,7 @@ export async function* runRuntimeTurn(
       }
       yield {
         type: 'error',
-        message: 'model asked the user to run a tool instead of making a tool call',
+        message: 'Model asked the user to run a tool instead of making a tool call',
         discardAssistant: true,
       }
       yield doneEvent(false, stopReason)
@@ -333,7 +342,7 @@ export async function* runRuntimeTurn(
         }
         yield {
           type: 'error',
-          message: 'model claimed workspace state without matching tool evidence',
+          message: 'Model claimed workspace state without matching tool evidence',
           discardAssistant: true,
         }
         yield doneEvent(false, stopReason)
@@ -342,26 +351,18 @@ export async function* runRuntimeTurn(
     }
 
     if (pendingToolUses.length === 0) {
-      if (!assistantText && thinkingSeen) {
-        if (continuationNudges < maxContinuationNudges) {
-          continuationNudges += 1
-          yield {
-            type: 'continuation_nudge',
-            attempt: continuationNudges,
-            reason: 'reasoning_only',
-          }
-          workingMessages = [
-            ...await rebuildMessages(),
-            { role: 'user', content: REASONING_ONLY_NUDGE_TEXT },
-          ]
-          continue
-        }
+      if (!assistantText && thinkingSeen && continuationNudges < maxContinuationNudges) {
+        continuationNudges += 1
         yield {
-          type: 'error',
-          message: 'model produced reasoning but no visible answer',
+          type: 'continuation_nudge',
+          attempt: continuationNudges,
+          reason: 'reasoning_only',
         }
-        yield doneEvent(false, stopReason)
-        return
+        workingMessages = [
+          ...await rebuildMessages(),
+          { role: 'user', content: REASONING_ONLY_NUDGE_TEXT },
+        ]
+        continue
       }
 
       const nudge = nextNudge(provider, assistantText)
@@ -387,7 +388,7 @@ export async function* runRuntimeTurn(
       if (assistantText && nudge?.reason === 'tool_capability') {
         yield {
           type: 'error',
-          message: 'model refused available tools after corrective nudges',
+          message: 'Model refused available tools after corrective nudges',
         }
         yield doneEvent(false, stopReason)
         return
@@ -456,17 +457,17 @@ export async function* runRuntimeTurn(
         yield {
           type: 'continuation_nudge',
           attempt: continuationNudges,
-          reason: 'private_continuity_tool_repair',
+          reason: repairNudge.reason,
         }
         workingMessages = [
           ...await rebuildMessages(),
-          { role: 'user', content: repairNudge },
+          { role: 'user', content: repairNudge.text },
         ]
         continue
       }
       yield {
         type: 'error',
-        message: 'model called propose_private_continuity_edit with invalid input after corrective nudges',
+        message: repairNudge.failureMessage,
         discardAssistant: true,
       }
       yield doneEvent(false, stopReason)
@@ -485,26 +486,56 @@ function doneEvent(finishedNormally: boolean, stopReason?: TurnStopReason): Extr
   return { type: 'done', finishedNormally }
 }
 
+type RepairNudge = {
+  text: string
+  reason: ContinuationNudgeReason
+  failureMessage: string
+}
+
 function nextToolResultRepairNudge(
   provider: Pick<Provider, 'id' | 'supportsTools'>,
   completedTools: ExecutedToolUse[],
-): string | null {
+): RepairNudge | null {
   if (!provider.supportsTools) return null
   const failedPrivateEdit = completedTools.some(completed =>
     completed.name === 'propose_private_continuity_edit'
     && !completed.result.ok
     && completed.result.summary === 'propose_private_continuity_edit rejected input',
   )
-  if (failedPrivateEdit) return PRIVATE_CONTINUITY_REPAIR_NUDGE_TEXT
+  if (failedPrivateEdit) {
+    return {
+      text: PRIVATE_CONTINUITY_REPAIR_NUDGE_TEXT,
+      reason: 'private_continuity_tool_repair',
+      failureMessage: 'Model called propose_private_continuity_edit with invalid input after corrective nudges',
+    }
+  }
+
+  const failedWriteFile = completedTools.some(completed =>
+    completed.name === 'write_file'
+    && !completed.result.ok
+    && completed.result.summary === 'write_file rejected input',
+  )
+  if (failedWriteFile) {
+    return {
+      text: WRITE_FILE_REPAIR_NUDGE_TEXT,
+      reason: 'write_file_repair',
+      failureMessage: 'Model called write_file with invalid input after corrective nudges',
+    }
+  }
 
   const failedWorkspacePrivateRead = completedTools.some(completed =>
     completed.name === 'read_file'
     && !completed.result.ok
     && /read_private_continuity_file/.test(completed.result.content),
   )
-  return failedWorkspacePrivateRead
-    ? 'The previous read_file call targeted private identity continuity markdown. Retry now with read_private_continuity_file and complete input such as {"file":"MEMORY.md"} or {"file":"SOUL.md"}. Do not search workspace folders.'
-    : null
+  if (failedWorkspacePrivateRead) {
+    return {
+      text: 'The previous read_file call targeted private identity continuity markdown. Retry now with read_private_continuity_file and complete input such as {"file":"MEMORY.md"} or {"file":"SOUL.md"}. Do not search workspace folders.',
+      reason: 'private_continuity_tool_repair',
+      failureMessage: 'Model kept reading private continuity files via read_file after corrective nudges',
+    }
+  }
+  return null
 }
 
 export function parseLocalModelTextToolUse(

@@ -43,7 +43,7 @@ test('transcript viewport selects only the tail rows within the render budget', 
   ]
   const selected = selectTailRowsForViewport(rows, 5, row => row.id === 'c' ? 3 : 2)
 
-  assert.deepEqual(selected.rows.map(row => row.id), ['b', 'c'])
+  assert.deepEqual(selected.rows.map(slice => slice.row.id), ['b', 'c'])
   assert.equal(selected.hiddenCount, 1)
 })
 
@@ -54,7 +54,7 @@ test('transcript viewport always keeps at least the newest row', () => {
   ]
   const selected = selectTailRowsForViewport(rows, 1, row => row.id === 'b' ? 20 : 1)
 
-  assert.deepEqual(selected.rows.map(row => row.id), ['b'])
+  assert.deepEqual(selected.rows.map(slice => slice.row.id), ['b'])
   assert.equal(selected.hiddenCount, 1)
 })
 
@@ -66,12 +66,12 @@ test('transcript viewport scroll offset pages back from the live tail', () => {
   ]
 
   const tail = selectRowsForScrollOffset(rows, 4, 0, () => 2)
-  assert.deepEqual(tail.rows.map(row => row.id), ['b', 'c'])
+  assert.deepEqual(tail.rows.map(slice => slice.row.id), ['b', 'c'])
   assert.equal(tail.hiddenBefore, 1)
   assert.equal(tail.hiddenAfter, 0)
 
   const pageUp = selectRowsForScrollOffset(rows, 4, 2, () => 2)
-  assert.deepEqual(pageUp.rows.map(row => row.id), ['a', 'b'])
+  assert.deepEqual(pageUp.rows.map(slice => slice.row.id), ['a', 'b'])
   assert.equal(pageUp.hiddenBefore, 0)
   assert.equal(pageUp.hiddenAfter, 1)
   assert.equal(pageUp.maxScrollOffset, 2)
@@ -86,7 +86,7 @@ test('transcript viewport selects rows from an absolute scroll top', () => {
 
   const selected = selectRowsForScrollTop(rows, 4, 0, () => 2)
 
-  assert.deepEqual(selected.rows.map(row => row.id), ['a', 'b'])
+  assert.deepEqual(selected.rows.map(slice => slice.row.id), ['a', 'b'])
   assert.equal(selected.hiddenBefore, 0)
   assert.equal(selected.hiddenAfter, 1)
   assert.equal(selected.maxScrollOffset, 2)
@@ -114,21 +114,21 @@ test('transcript viewport anchor keeps reasoning row stable when it expands', ()
   assert.equal(resolveScrollTopFromAnchor(ids, afterOffsets, anchor, 8), 2)
 })
 
-test('transcript viewport page up moves half a viewport from the tail', () => {
-  assert.equal(scrollTopForPageUp(8, 8, 8), 4)
-  assert.equal(scrollTopForPageUp(4, 8, 8), 0)
+test('transcript viewport page up moves almost a full viewport from the tail', () => {
+  assert.equal(scrollTopForPageUp(8, 8, 8), 2)
   assert.equal(scrollTopForPageUp(2, 8, 8), 0)
+  assert.equal(scrollTopForPageUp(1, 8, 8), 0)
 })
 
-test('transcript viewport page down moves half a viewport and clamps to tail', () => {
-  assert.equal(scrollTopForPageDown(0, 8, 8), 4)
-  assert.equal(scrollTopForPageDown(4, 8, 8), 8)
+test('transcript viewport page down moves almost a full viewport and clamps to tail', () => {
+  assert.equal(scrollTopForPageDown(0, 8, 8), 6)
+  assert.equal(scrollTopForPageDown(6, 8, 8), 8)
   assert.equal(scrollTopForPageDown(8, 8, 8), 8)
 })
 
 test('transcript viewport page keys use viewport lines instead of prompt starts', () => {
-  assert.equal(scrollTopForPageUp(15, 20, 7), 12)
-  assert.equal(scrollTopForPageDown(12, 20, 7), 15)
+  assert.equal(scrollTopForPageUp(15, 20, 7), 10)
+  assert.equal(scrollTopForPageDown(10, 20, 7), 15)
 })
 
 test('message row height estimate accounts for wrapped transcript content', () => {
@@ -144,4 +144,44 @@ test('expanded reasoning rows account for full content height', () => {
   const collapsedHeight = estimateMessageRowHeight(collapsed, 32)
   assert.ok(collapsedHeight > 2)
   assert.ok(estimateMessageRowHeight(expanded, 32) > collapsedHeight)
+})
+
+test('viewport clips a tall row to the visible line range', () => {
+  const rows = [
+    { id: 'a', value: 'tall row' },
+  ]
+  const selected = selectRowsForScrollTop(rows, 5, 3, () => 20)
+  assert.equal(selected.rows.length, 1)
+  assert.equal(selected.rows[0]!.row.id, 'a')
+  assert.equal(selected.rows[0]!.clipStart, 3)
+  assert.equal(selected.rows[0]!.clipEnd, 8)
+  assert.equal(selected.rows[0]!.rowHeight, 20)
+})
+
+test('viewport clips edges when window straddles two rows', () => {
+  const rows = [
+    { id: 'a', value: 'first' },
+    { id: 'b', value: 'second' },
+  ]
+  const selected = selectRowsForScrollTop(rows, 6, 4, () => 10)
+  assert.equal(selected.rows.length, 2)
+  assert.equal(selected.rows[0]!.row.id, 'a')
+  assert.equal(selected.rows[0]!.clipStart, 4)
+  assert.equal(selected.rows[0]!.clipEnd, 10)
+  assert.equal(selected.rows[1]!.row.id, 'b')
+  assert.equal(selected.rows[1]!.clipStart, 0)
+  assert.equal(selected.rows[1]!.clipEnd, 10)
+})
+
+test('viewport tail selection reports each row clipped at full height', () => {
+  const rows = [
+    { id: 'a', value: 'first' },
+    { id: 'b', value: 'second' },
+  ]
+  const selected = selectTailRowsForViewport(rows, 5, () => 2)
+  assert.equal(selected.rows.length, 2)
+  selected.rows.forEach(slice => {
+    assert.equal(slice.clipStart, 0)
+    assert.equal(slice.clipEnd, slice.rowHeight)
+  })
 })

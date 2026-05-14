@@ -389,7 +389,11 @@ export function useIdentityHubController({
     openTokenTransferFlow,
     openPublicProfileEdit,
     openContinuityFile: continuity.openContinuityFile,
-    exportLocalBackupZip: continuity.exportLocalBackupZip,
+    openSkillFile: continuity.openSkillFile,
+    openSkillsFolder: continuity.openSkillsFolder,
+    createSkill: continuity.createSkill,
+    deleteSkill: continuity.deleteSkill,
+    setSkillVisibility: continuity.setSkillVisibility,
   }
 }
 

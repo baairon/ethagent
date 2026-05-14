@@ -61,7 +61,9 @@ const CHILD_INDENT = 4
 export function buildModelPickerOptions(
   data: ModelPickerOptionsData,
   context: ModelPickerOptionsContext,
+  options_: { localOnly?: boolean } = {},
 ): SelectOption<string>[] {
+  const localOnly = options_.localOnly === true
   const options: SelectOption<string>[] = []
 
   options.push(sectionOption('hdr:local', 'Local Models'))
@@ -72,49 +74,53 @@ export function buildModelPickerOptions(
     options.push(utilityOption('local:uninstall', 'Uninstall Downloaded GGUF'))
   }
 
-  options.push(sectionOption('hdr:cloud', 'Cloud'))
-  for (const provider of MODEL_PICKER_CLOUD_PROVIDERS) {
-    options.push(groupOption(`hdr:cloud:${provider}`, cloudProviderDisplayName(provider)))
-    const keySet = data.cloudKeys[provider] === true
-    if (!keySet) {
-      if (provider === 'openai') {
-        options.push(utilityOption('oauth:openai', 'Sign in with ChatGPT', 'Use your ChatGPT subscription'))
+  if (!localOnly) {
+    options.push(sectionOption('hdr:cloud', 'Cloud'))
+    for (const provider of MODEL_PICKER_CLOUD_PROVIDERS) {
+      options.push(groupOption(`hdr:cloud:${provider}`, cloudProviderDisplayName(provider)))
+      const keySet = data.cloudKeys[provider] === true
+      if (!keySet) {
+        if (provider === 'openai') {
+          options.push(utilityOption('oauth:openai', 'Sign in with ChatGPT', 'Use your ChatGPT subscription'))
+        }
+        options.push(utilityOption(`key:set:${provider}`, 'Add API Key'))
+        continue
       }
-      options.push(utilityOption(`key:set:${provider}`, 'Add API Key'))
-      continue
-    }
 
-    const catalog = data.cloudCatalogs[provider]
-    if (catalog?.status === 'fallback') {
-      const reason = catalog.error ? ` · ${catalog.error}` : ''
-      options.push(noticeOption(
-        `hdr:cloud-fallback:${provider}`,
-        `Catalog unavailable${reason} · showing configured model`,
-        CHILD_INDENT,
-      ))
-    }
+      const catalog = data.cloudCatalogs[provider]
+      if (catalog?.status === 'fallback') {
+        const reason = catalog.error ? ` · ${catalog.error}` : ''
+        options.push(noticeOption(
+          `hdr:cloud-fallback:${provider}`,
+          `Catalog unavailable${reason} · showing configured model`,
+          CHILD_INDENT,
+        ))
+      }
 
-    const models = orderModelsForContextFit(provider, cloudPickerModels(provider, catalog, context), context.contextFit)
-    if (models.length === 0) {
-      options.push(noticeOption(`hdr:cloud-empty:${provider}`, 'No selectable models', CHILD_INDENT))
+      const models = orderModelsForContextFit(provider, cloudPickerModels(provider, catalog, context), context.contextFit)
+      if (models.length === 0) {
+        options.push(noticeOption(`hdr:cloud-empty:${provider}`, 'No selectable models', CHILD_INDENT))
+      }
+      for (const model of models) {
+        const active = context.currentProvider === provider && context.currentModel === model
+        const displayName = formatModelDisplayName(provider, model, { maxLength: 58 })
+        options.push(rowOption(
+          `c:${provider}:${model}`,
+          contextFitLabel(provider, model, `${displayName}${active ? '  *' : ''}`, context.contextFit),
+        ))
+      }
+      options.push(utilityOption(`catalog:${provider}`, 'Full Catalog'))
+      const manageLabel = provider === 'openai' && data.cloudCredentialKinds?.openai === 'oauth'
+        ? 'Manage ChatGPT Sign-in'
+        : 'Manage API Key'
+      options.push(utilityOption(`key:manage:${provider}`, manageLabel))
     }
-    for (const model of models) {
-      const active = context.currentProvider === provider && context.currentModel === model
-      const displayName = formatModelDisplayName(provider, model, { maxLength: 58 })
-      options.push(rowOption(
-        `c:${provider}:${model}`,
-        contextFitLabel(provider, model, `${displayName}${active ? '  *' : ''}`, context.contextFit),
-      ))
-    }
-    options.push(utilityOption(`catalog:${provider}`, 'Full Catalog'))
-    const manageLabel = provider === 'openai' && data.cloudCredentialKinds?.openai === 'oauth'
-      ? 'Manage ChatGPT Sign-in'
-      : 'Manage API Key'
-    options.push(utilityOption(`key:manage:${provider}`, manageLabel))
   }
 
-  options.push(sectionOption('hdr:exit', 'Exit'))
-  options.push(utilityOption('cancel', 'Close Model Picker', 'Return to chat without changing model'))
+  if (!localOnly) {
+    options.push(sectionOption('hdr:exit', 'Exit'))
+    options.push(utilityOption('cancel', 'Close Model Picker', 'Return to chat'))
+  }
 
   return options
 }

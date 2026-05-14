@@ -28,6 +28,7 @@ type MenuScreenProps = {
   onEnsName: () => void
   onWalletSetup: () => void
   onContinuity: () => void
+  onSkillsTree: () => void
   onIdentityValues: () => void
   onPrepareTransfer: () => void
   onStorage: () => void
@@ -40,6 +41,7 @@ type Action =
   | 'ens-name'
   | 'wallet-setup'
   | 'continuity'
+  | 'skills-tree'
   | 'backup'
   | 'refetch'
   | 'identity-values'
@@ -66,6 +68,7 @@ export const MenuScreen: React.FC<MenuScreenProps> = ({
   onEnsName,
   onWalletSetup,
   onContinuity,
+  onSkillsTree,
   onIdentityValues,
   onPrepareTransfer,
   onStorage,
@@ -91,47 +94,46 @@ export const MenuScreen: React.FC<MenuScreenProps> = ({
       : null)
 
   const walletSetupBaseHint = custodyMode === 'advanced'
-    ? 'Advanced. Owner wallet, Vault, authorized operator wallets'
-    : 'Simple. Switch to Advanced to delegate URI rotation through a dedicated Vault'
+    ? 'Owner wallet, vault, operators'
+    : 'Simple mode, switch for vault delegation'
 
   const walletSetupLabel = flags?.custodyAsterisk ? 'Custody Mode *' : 'Custody Mode'
   const walletSetupHint = flags?.custodyModeReason ?? flags?.custodyHint ?? walletSetupBaseHint
 
-  const saveSnapshotLabel = flags?.saveSnapshotAsterisk ? 'Save Snapshot Now *' : 'Save Snapshot Now'
-  const saveSnapshotHint = flags?.saveSnapshotHint ?? 'Encrypt and publish latest snapshot'
+  const saveSnapshotLabel = flags?.saveSnapshotAsterisk ? 'Save Snapshot *' : 'Save Snapshot'
+  const saveSnapshotHint = flags?.saveSnapshotHint ?? 'Publish encrypted snapshot'
 
-  const ensNameHint = flags?.ensNameReason ?? 'Public name or subdomain for this agent'
+  const ensNameHint = flags?.ensNameReason ?? 'Public name or subdomain'
 
-  const prepareTransferHint = flags?.prepareTransferReason ?? 'Create transfer snapshot and handoff slots'
+  const prepareTransferHint = flags?.prepareTransferReason ?? 'Hand off this agent'
 
   const tokenValuesHint = flags?.tokenValuesUnlinkedNote ?? identityValuesCopyHint(identity)
 
   const options: Array<SelectOption<Action>> = identity
     ? [
         { value: 'public-profile', role: 'section', label: 'Public Identity' },
-        { value: 'public-profile', label: 'Public Profile', hint: 'Name, description, icon, and Agent Card' },
+        { value: 'public-profile', label: 'Public Profile', hint: 'Identity card and profile fields' },
         { value: 'ens-name', label: 'ENS Name', hint: ensNameHint, disabled: flags?.ensNameDisabled ?? false },
         { value: 'continuity', role: 'section', label: 'Continuity' },
-        { value: 'continuity', label: 'Soul, Memory, Skills', hint: 'SOUL.md, MEMORY.md, skills.json on this device' },
+        { value: 'continuity', label: 'Soul & Memory', hint: 'Edit SOUL.md and MEMORY.md' },
+        { value: 'skills-tree', label: 'Skills', hint: 'Browse and edit SKILL.md files' },
         { value: 'backup', label: saveSnapshotLabel, hint: saveSnapshotHint, disabled: !canRebackup || (flags?.saveSnapshotDisabled ?? false) },
-        { value: 'refetch', label: 'Refetch Latest', hint: 'Restore local files from latest saved snapshot', disabled: !canRefetch || (flags?.refetchLatestDisabled ?? false) },
+        { value: 'refetch', label: 'Refetch Snapshot', hint: 'Restore latest snapshot', disabled: !canRefetch || (flags?.refetchLatestDisabled ?? false) },
         { value: 'wallet-setup', role: 'section', label: 'Custody' },
         { value: 'wallet-setup', label: walletSetupLabel, hint: walletSetupHint, disabled: !identity.agentId || (flags?.custodyModeDisabled ?? false) },
         { value: 'prepare-transfer', label: 'Prepare Transfer', hint: prepareTransferHint, disabled: flags?.prepareTransferDisabled ?? false },
         { value: 'identity-values', role: 'section', label: 'Token' },
         { value: 'identity-values', label: 'Token Values', hint: tokenValuesHint },
-        { value: 'load', label: 'Load Agent', hint: 'Refresh this agent from chain, or load a different one' },
-        { value: 'create', label: 'New Agent', hint: 'Mint another token and make it active' },
-        { value: 'storage', role: 'section', label: 'Storage' },
-        { value: 'storage', label: 'IPFS Storage', hint: 'Publishing credentials for encrypted snapshots' },
+        { value: 'load', label: 'Load Agent', hint: 'Refresh or load another agent' },
+        { value: 'create', label: 'New Agent', hint: 'Mint another agent' },
+        { value: 'storage', label: 'IPFS Storage', hint: 'Publishing credentials' },
         { value: 'cancel', role: 'section', label: 'Exit' },
-        { value: 'cancel', label: 'Close Identity Hub', hint: 'Return to chat without changing identity', role: 'utility' },
+        { value: 'cancel', label: 'Close Identity Hub', hint: 'Return to chat', role: 'utility' },
       ]
     : [
         { value: 'create', role: 'section', label: 'Setup' },
         { value: 'create', label: 'Create New Agent', hint: 'Mint a wallet-owned token for this machine' },
         { value: 'load', label: 'Load Existing Agent', hint: 'Find a token owned by this wallet or linked to it' },
-        { value: mode === 'first-run' ? 'skip' : 'cancel', role: 'section', label: 'Exit' },
         ...(mode === 'first-run'
           ? [
               { value: 'skip' as Action, label: 'Skip For Now', hint: 'Continue now, use /identity later', role: 'utility' as const },
@@ -170,6 +172,7 @@ export const MenuScreen: React.FC<MenuScreenProps> = ({
             if (choice === 'ens-name') return onEnsName()
             if (choice === 'wallet-setup') return onWalletSetup()
             if (choice === 'continuity') return onContinuity()
+            if (choice === 'skills-tree') return onSkillsTree()
             if (choice === 'backup') return onBackupNow()
             if (choice === 'refetch') return onRefetchLatest()
             if (choice === 'identity-values') return onIdentityValues()

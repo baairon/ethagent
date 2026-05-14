@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { Box, Text } from 'ink'
 import { BrandSplash as Splash } from '../ui/BrandSplash.js'
 import { Select } from '../ui/Select.js'
+import { Spinner } from '../ui/Spinner.js'
 import { Surface } from '../ui/Surface.js'
 import { TextInput } from '../ui/TextInput.js'
 import { theme } from '../ui/theme.js'
@@ -10,6 +11,9 @@ import { formatModelDisplayName } from '../models/modelDisplay.js'
 import { providerDisplayName } from '../models/providerDisplay.js'
 import { detectSpec, type SpecSnapshot } from '../models/runtimeDetection.js'
 import { FEATURED_HF_REPO_URL } from '../models/modelRecommendation.js'
+import { OPENAI_OAUTH_DEFAULT_MODEL } from '../models/catalog.js'
+import { OpenAIOAuthService } from '../auth/openaiOAuth/index.js'
+import { openExternalUrl } from '../utils/openExternal.js'
 import {
   loadConfig,
   saveConfigWithMerge,
@@ -31,6 +35,8 @@ type Step =
   | { kind: 'choose-path'; spec: SpecSnapshot }
   | { kind: 'hf-setup'; spec: SpecSnapshot }
   | { kind: 'cloud-provider' }
+  | { kind: 'cloud-openai-auth' }
+  | { kind: 'cloud-openai-oauth'; phase: 'waiting' | 'exchanging' | 'error'; url?: string; message?: string }
   | { kind: 'cloud-key'; provider: ProviderId; error?: string }
   | { kind: 'cloud-key-saving'; provider: ProviderId }
   | { kind: 'cloud-model'; provider: ProviderId }
@@ -44,17 +50,19 @@ type FirstRunProps = {
 }
 
 const TITLE: Record<string, string> = {
-  'detecting':         'Inspecting Machine',
-  'detect-error':      'Detection Failed',
-  'choose-path':       'Choose How To Run',
-  'hf-setup':          'Local Model',
-  'cloud-provider':    'Pick A Cloud Provider',
-  'cloud-key':         'Paste API Key',
-  'cloud-key-saving':  'Storing Key',
-  'cloud-model':       'Pick A Model',
-  'saving':            'Saving Config',
-  'save-error':        'Save Failed',
-  'done':              'Ready',
+  'detecting':              'Inspecting Machine',
+  'detect-error':           'Detection Failed',
+  'choose-path':            'Choose How To Run',
+  'hf-setup':               'Local Model',
+  'cloud-provider':         'Pick A Cloud Provider',
+  'cloud-openai-auth':      'Sign in with ChatGPT or API Key',
+  'cloud-openai-oauth':     'Sign in with ChatGPT',
+  'cloud-key':              'Paste API Key',
+  'cloud-key-saving':       'Storing Key',
+  'cloud-model':            'Pick A Model',
+  'saving':                 'Saving Config',
+  'save-error':             'Save Failed',
+  'done':                   'Ready',
 }
 
 const NAV_BACK = '↑↓ navigate · enter select · esc back'
@@ -65,6 +73,7 @@ export const FirstRun: React.FC<FirstRunProps> = ({ onComplete, onCancel }) => {
   const [history, setHistory] = useState<Step[]>([])
   const [firstRunIdentity, setFirstRunIdentity] = useState<EthagentConfig['identity']>(undefined)
   const [firstRunConfig, setFirstRunConfig] = useState<EthagentConfig | undefined>(undefined)
+  const oauthServiceRef = useRef<OpenAIOAuthService | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -171,6 +180,51 @@ export const FirstRun: React.FC<FirstRunProps> = ({ onComplete, onCancel }) => {
 
   const navHint = (canBack: boolean): string => canBack ? NAV_BACK : NAV_CANCEL
 
+  const startFirstRunOpenAIOAuth = async (): Promise<void> => {
+    oauthServiceRef.current?.cleanup()
+    const service = new OpenAIOAuthService()
+    oauthServiceRef.current = service
+    goTo({ kind: 'cloud-openai-oauth', phase: 'waiting' })
+    try {
+      const result = await service.start(authUrl => {
+        openExternalUrl(authUrl)
+        setStep({ kind: 'cloud-openai-oauth', phase: 'waiting', url: authUrl })
+      })
+      if (oauthServiceRef.current !== service) return
+      setStep({ kind: 'cloud-openai-oauth', phase: 'exchanging' })
+      if (result.kind === 'apikey') {
+        if (typeof result.apiKey !== 'string' || result.apiKey.length === 0) {
+          throw new Error('OAuth result was apikey kind but no key was returned')
+        }
+        await setKey('openai', result.apiKey)
+      }
+      if (oauthServiceRef.current !== service) return
+      oauthServiceRef.current = null
+      if (result.kind === 'oauth-only') {
+        setStep({
+          kind: 'saving',
+          config: withFirstRunIdentity({
+            version: 1,
+            provider: 'openai',
+            model: OPENAI_OAUTH_DEFAULT_MODEL,
+            firstRunAt: new Date().toISOString(),
+          }),
+        })
+        return
+      }
+      setStep({ kind: 'cloud-model', provider: 'openai' })
+    } catch (err: unknown) {
+      if (oauthServiceRef.current !== service) return
+      oauthServiceRef.current = null
+      const message = err instanceof Error ? err.message : String(err)
+      if (message === 'OpenAI sign-in was cancelled.') {
+        setStep({ kind: 'cloud-openai-auth' })
+        return
+      }
+      setStep({ kind: 'cloud-openai-oauth', phase: 'error', message })
+    }
+  }
+
   const withFirstRunIdentity = (config: EthagentConfig): EthagentConfig => {
     const merged: EthagentConfig = firstRunConfig
       ? {
@@ -271,11 +325,12 @@ export const FirstRun: React.FC<FirstRunProps> = ({ onComplete, onCancel }) => {
             {spec.isAppleSilicon ? ', Apple Silicon' : ''}
           </Text>
         </Box>
-        <Select<'cloud' | 'hf'>
+        <Select<'hf' | 'cloud'>
           options={[
-            { value: 'cloud', label: 'Cloud API', hint: 'OpenAI, Anthropic, or Gemini' },
             { value: 'hf', label: 'Local Model', hint: 'Download and run locally' },
+            { value: 'cloud', label: 'Cloud API', hint: 'OpenAI, Anthropic, or Gemini' },
           ]}
+          hintLayout="inline"
           onSubmit={choice => {
             if (choice === 'cloud') goTo({ kind: 'cloud-provider' })
             else goTo({ kind: 'hf-setup', spec })
@@ -300,6 +355,7 @@ export const FirstRun: React.FC<FirstRunProps> = ({ onComplete, onCancel }) => {
         currentProvider="llamacpp"
         currentModel={modelPickerConfig.model}
         featuredHfRepo={FEATURED_HF_REPO_URL}
+        localOnly
         onPick={(selection: ModelPickerSelection) => {
           goTo({ kind: 'saving', config: configFromModelPickerSelection(selection, modelPickerConfig) })
         }}
@@ -316,10 +372,94 @@ export const FirstRun: React.FC<FirstRunProps> = ({ onComplete, onCancel }) => {
           { value: 'anthropic', label: 'Anthropic' },
           { value: 'gemini', label: 'Gemini' },
         ]}
-        onSubmit={provider => goTo({ kind: 'cloud-key', provider })}
+        onSubmit={provider => {
+          if (provider === 'openai') goTo({ kind: 'cloud-openai-auth' })
+          else goTo({ kind: 'cloud-key', provider })
+        }}
         onCancel={goBack}
       />
     ), navHint(true))
+  }
+
+  if (step.kind === 'cloud-openai-auth') {
+    return renderShell(step.kind, TITLE['cloud-openai-auth']!, (
+      <Select<'oauth' | 'apikey'>
+        options={[
+          { value: 'oauth', role: 'section', label: 'Recommended' },
+          { value: 'oauth', label: 'Sign in with ChatGPT', hint: 'Use your ChatGPT subscription', bold: true },
+          { value: 'apikey', role: 'section', label: 'Alternative' },
+          { value: 'apikey', label: 'Paste API Key', hint: 'Use an OpenAI platform key', role: 'utility' },
+        ]}
+        hintLayout="inline"
+        onSubmit={choice => {
+          if (choice === 'oauth') void startFirstRunOpenAIOAuth()
+          else goTo({ kind: 'cloud-key', provider: 'openai' })
+        }}
+        onCancel={goBack}
+      />
+    ), navHint(true))
+  }
+
+  if (step.kind === 'cloud-openai-oauth') {
+    if (step.phase === 'error') {
+      return renderShell(step.kind, TITLE['cloud-openai-oauth']!, (
+        <>
+          <Text color={theme.accentError}>{step.message ?? 'Sign-in did not complete.'}</Text>
+          <Box marginTop={1}>
+            <Select<'retry' | 'apikey' | 'back'>
+              options={[
+                { value: 'retry', role: 'section', label: 'Recovery' },
+                { value: 'retry', label: 'Try Again', hint: 'Reopen the browser sign-in flow' },
+                { value: 'apikey', label: 'Use API Key Instead', hint: 'Paste an OpenAI platform key' },
+                { value: 'back', role: 'section', label: 'Navigation' },
+                { value: 'back', label: 'Back', hint: 'Return to sign-in choice', role: 'utility' },
+              ]}
+              hintLayout="inline"
+              onSubmit={choice => {
+                if (choice === 'retry') void startFirstRunOpenAIOAuth()
+                else if (choice === 'apikey') goTo({ kind: 'cloud-key', provider: 'openai' })
+                else goTo({ kind: 'cloud-openai-auth' })
+              }}
+              onCancel={() => goTo({ kind: 'cloud-openai-auth' })}
+            />
+          </Box>
+        </>
+      ), navHint(true))
+    }
+    if (step.phase === 'exchanging') {
+      return renderShell(step.kind, TITLE['cloud-openai-oauth']!, (
+        <Box marginTop={1}>
+          <Spinner label="completing sign-in..." />
+        </Box>
+      ))
+    }
+    return renderShell(step.kind, TITLE['cloud-openai-oauth']!, (
+      <>
+        <Spinner label="waiting for browser sign-in..." />
+        {step.url ? (
+          <Box flexDirection="column" marginTop={1}>
+            <Text color={theme.dim}>If the browser did not open, visit:</Text>
+            <Text color={theme.dim}>{step.url}</Text>
+          </Box>
+        ) : null}
+        <Box marginTop={1}>
+          <Select<'cancel'>
+            options={[{ value: 'cancel', label: 'Cancel Sign-in', role: 'utility' }]}
+            hintLayout="inline"
+            onSubmit={() => {
+              oauthServiceRef.current?.cleanup()
+              oauthServiceRef.current = null
+              goTo({ kind: 'cloud-openai-auth' })
+            }}
+            onCancel={() => {
+              oauthServiceRef.current?.cleanup()
+              oauthServiceRef.current = null
+              goTo({ kind: 'cloud-openai-auth' })
+            }}
+          />
+        </Box>
+      </>
+    ))
   }
 
   if (step.kind === 'cloud-key' || step.kind === 'cloud-key-saving') {

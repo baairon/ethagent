@@ -2,7 +2,7 @@
 
 A privacy-first AI agent with a portable Ethereum identity.
 
-ethagent binds an AI agent to a wallet-owned ERC-8004 token. Soul and memory stay encrypted under your wallet signature and pinned to IPFS. Public skills publish as plain JSON so other agents can discover what the agent does. Swap models, switch machines, or restore the same agent from a single onchain pointer.
+Switch providers or machines and the AI agent you customized stays behind. `ethagent` ties the agent to a wallet you own, so its soul, memory, and skills follow you across providers, machines, and models.
 
 - **Portable.** The ERC-8004 token is the agent's durable identity. Use the ENS name as a readable handle, or the token ID plus chain as the permanent reference, to restore the same agent anywhere.
 - **Private.** Soul and memory are encrypted before they are pinned to IPFS. The wallet signature used to unlock them stays local and never submits a transaction, spends funds, or grants token approval.
@@ -61,13 +61,16 @@ Every agent has a continuity directory at `~/.ethagent/continuity`.
 
 ## Continuity
 
-Each agent's continuity directory holds three files. Two are private and encrypted before they ever reach IPFS; one is public so other agents can discover what the agent does.
+Each agent's continuity directory holds a small set of files. Private files are encrypted before they ever reach IPFS; public files are plain JSON so other agents can discover what the agent does.
 
 | File | Visibility | Purpose |
 | --- | --- | --- |
 | `SOUL.md` | Private | Soul, boundaries, standing instructions, and identity framing. |
 | `MEMORY.md` | Private | Durable preferences, project context, decisions, and operating notes. |
-| `skills.json` | Public | Machine-readable capabilities. |
+| `skills/` | Mixed | Skill folders. Each skill is private, discoverable, or public; new skills default to discoverable. |
+| `skills.json` | Public | Machine-readable capabilities derived from public skills. |
+
+`SOUL.md`, `MEMORY.md`, and each `SKILL.md` are plain Markdown you edit through the Identity Hub under Continuity. Skills carry extra metadata: the frontmatter at the top of each `SKILL.md` (name, description, when_to_use, visibility, tags) tells the agent when to load it. Visibility is `private` (local-only, never shared), `discoverable` (indexed in `skills.json` so other agents can find it), or `public` (indexed and surfaced on the Agent Card).
 
 - **Save Snapshot Now** encrypts the private files, pins them to IPFS, and rotates the onchain pointer to the new CID.
 - **Refetch Latest** reads the pointer back, signs the decrypt challenge with your wallet, and overwrites local files from the snapshot.

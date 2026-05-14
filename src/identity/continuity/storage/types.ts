@@ -8,14 +8,15 @@ export type ContinuityVaultRef = {
   soulPath: string
   memoryPath: string
   publicSkillsPath: string
+  skillsDir: string
 }
 
 export type IdentityMarkdownScaffold = ContinuityFiles & {
   'skills.json': string
 }
 
-export type ContinuitySnapshotFile = PrivateContinuityFile | 'skills.json'
-export type ContinuitySnapshotContentHashes = Record<ContinuitySnapshotFile, string>
+export type ContinuitySnapshotFile = PrivateContinuityFile | 'skills.json' | 'private-skills'
+export type ContinuitySnapshotContentHashes = Partial<Record<ContinuitySnapshotFile, string>> & Record<PrivateContinuityFile | 'skills.json', string>
 export type ContinuityPublishState = 'not-restored' | 'not-published' | 'verify-needed' | 'local-changes' | 'published'
 export type ContinuityWorkingTreeStatus = {
   ready: boolean

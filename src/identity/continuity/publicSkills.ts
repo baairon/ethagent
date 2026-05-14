@@ -1,4 +1,5 @@
 import type { EthagentIdentity } from '../../storage/config.js'
+import type { SkillIndexEntry } from './skills/types.js'
 
 type PublicSkill = {
   id: string
@@ -45,7 +46,7 @@ export function defaultPublicSkillsProfile(identity: EthagentIdentity): PublicSk
     : identity.agentId ? `ethagent #${identity.agentId}` : 'ethagent'
   const description = typeof state.description === 'string' && state.description.trim()
     ? state.description.trim()
-    : 'A wallet-owned AI coding agent.'
+    : 'privacy-first AI agent with a portable Ethereum identity'
   const imageUrl = typeof state.imageUrl === 'string' && state.imageUrl.trim()
     ? state.imageUrl.trim()
     : undefined
@@ -78,6 +79,41 @@ export function defaultPublicSkillsProfile(identity: EthagentIdentity): PublicSk
       },
     ],
   }
+}
+
+export function appendPublicSkillEntries(
+  profile: PublicSkillsProfile,
+  entries: readonly SkillIndexEntry[],
+): PublicSkillsProfile {
+  if (entries.length === 0) return profile
+  const baselineIds = new Set(profile.skills.map(skill => skill.id))
+  const appended: PublicSkill[] = []
+  const usedIds = new Set(baselineIds)
+  for (const entry of entries) {
+    if (entry.visibility !== 'public' && entry.visibility !== 'discoverable') continue
+    const id = uniqueSkillId(entry.name, usedIds)
+    usedIds.add(id)
+    appended.push({
+      id,
+      name: entry.displayName ?? entry.name,
+      description: entry.description || entry.name,
+      inputModes: ['text/markdown'],
+      outputModes: ['text/markdown'],
+    })
+  }
+  if (appended.length === 0) return profile
+  return {
+    ...profile,
+    skills: [...profile.skills, ...appended],
+  }
+}
+
+function uniqueSkillId(base: string, used: Set<string>): string {
+  const slug = base.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'skill'
+  if (!used.has(slug)) return slug
+  let i = 2
+  while (used.has(`${slug}-${i}`)) i++
+  return `${slug}-${i}`
 }
 
 export function renderPublicSkillsJson(profile: PublicSkillsProfile): string {

@@ -118,18 +118,24 @@ export const PermissionsView: React.FC<PermissionsViewProps> = ({
 }
 
 function buildOptions(rules: SessionPermissionRule[]): Array<SelectOption<SessionPermissionRule | typeof CLEAR_ALL_VALUE>> {
-  return [
-    ...rules.map(rule => ({
-      value: rule,
-      label: describeRule(rule),
-      hint: describeRuleScope(rule),
-    })),
-    {
-      value: CLEAR_ALL_VALUE,
-      label: 'Remove all saved rules',
-      hint: 'Clear all remembered permissions for this project',
-    },
-  ]
+  const out: Array<SelectOption<SessionPermissionRule | typeof CLEAR_ALL_VALUE>> = []
+  if (rules.length > 0) {
+    out.push({ value: CLEAR_ALL_VALUE, role: 'section', label: 'Saved Rules' })
+    for (const rule of rules) {
+      out.push({
+        value: rule,
+        label: describeRule(rule),
+        hint: describeRuleScope(rule),
+      })
+    }
+  }
+  out.push({ value: CLEAR_ALL_VALUE, role: 'section', label: 'Manage' })
+  out.push({
+    value: CLEAR_ALL_VALUE,
+    label: 'Remove all saved rules',
+    hint: 'Clear all remembered permissions for this project',
+  })
+  return out
 }
 
 function describeRule(rule: SessionPermissionRule): string {

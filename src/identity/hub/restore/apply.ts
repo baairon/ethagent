@@ -5,7 +5,12 @@ import {
   restoreContinuitySnapshotEnvelope,
   transferSnapshotMetadataFromEnvelope,
 } from '../../continuity/envelope.js'
-import { ensureIdentityMarkdownScaffold, writeContinuityFiles } from '../../continuity/storage.js'
+import {
+  ensureIdentityMarkdownScaffold,
+  restoreSkillsTree,
+  writeContinuityFiles,
+} from '../../continuity/storage.js'
+import { syncPublicSkillsManifest } from '../../continuity/skills/publicSkillsSync.js'
 import { recordPublishedContinuitySnapshot } from '../../continuity/snapshots.js'
 import { requestBrowserWalletSignature } from '../../wallet/browserWallet.js'
 import { setVaultAddressField } from '../../identityCompat.js'
@@ -31,6 +36,7 @@ export async function runRestoreAuthorize(
   callbacks.onRestoreProgress?.({ phase: 'decrypting', label: 'signature received · decrypting encrypted snapshot...' })
   let restored: ReturnType<typeof restoreAgentStateBackupEnvelope> | ReturnType<typeof restoreContinuitySnapshotEnvelope>
   let continuityFiles: ReturnType<typeof restoreContinuitySnapshotEnvelope>['files'] | undefined
+  let continuitySkills: ReturnType<typeof restoreContinuitySnapshotEnvelope>['skills']
   if (isContinuitySnapshotEnvelope(step.envelope)) {
     const payload = restoreContinuitySnapshotEnvelope({
       envelope: step.envelope,
@@ -39,6 +45,7 @@ export async function runRestoreAuthorize(
     })
     restored = payload
     continuityFiles = payload.files
+    continuitySkills = payload.skills
   } else {
     restored = restoreAgentStateBackupEnvelope({
       envelope: step.envelope,
@@ -104,9 +111,13 @@ export async function runRestoreAuthorize(
   if (continuityFiles) {
     await writeContinuityFiles(nextIdentity, continuityFiles)
   }
+  if (continuitySkills) {
+    await restoreSkillsTree(nextIdentity, continuitySkills)
+  }
   callbacks.onRestoreProgress?.({ phase: 'finishing', label: 'finalizing restored identity...' })
   await restorePublishedPublicSkills(nextIdentity, step.apiUrl, step.candidate.publicDiscovery?.skillsCid)
   await ensureIdentityMarkdownScaffold(nextIdentity)
+  await syncPublicSkillsManifest(nextIdentity).catch(() => null)
   await recordPublishedContinuitySnapshot({ identity: nextIdentity, label: 'restored from agent backup' }).catch(() => null)
   await callbacks.onIdentityComplete(nextIdentity, `ERC-8004 agent restored · #${step.candidate.agentId.toString()}`, 'restore')
 }

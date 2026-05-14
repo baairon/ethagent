@@ -11,6 +11,8 @@ export type FirstRunStepKind =
   | 'choose-path'
   | 'hf-setup'
   | 'cloud-provider'
+  | 'cloud-openai-auth'
+  | 'cloud-openai-oauth'
   | 'cloud-key'
   | 'cloud-key-saving'
   | 'cloud-model'
@@ -29,6 +31,8 @@ export function firstRunStageNumber(stepKind: FirstRunStepKind): number {
     case 'choose-path':
     case 'hf-setup':
     case 'cloud-provider':
+    case 'cloud-openai-auth':
+    case 'cloud-openai-oauth':
     case 'cloud-key':
     case 'cloud-key-saving':
     case 'cloud-model':

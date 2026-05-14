@@ -1,6 +1,14 @@
 import { atomicWriteText } from '../../../storage/atomicWrite.js'
 import type { EthagentIdentity } from '../../../storage/config.js'
-import type { ContinuityFiles } from '../envelope.js'
+import type { ContinuityFiles, ContinuitySkillsTree } from '../envelope.js'
+import {
+  loadSkillsTree,
+  materializeSkillsTree,
+} from '../skills/loadSkills.js'
+import {
+  renderPublicSkillsJsonForIdentity,
+  syncPublicSkillsManifest,
+} from '../skills/publicSkillsSync.js'
 import { defaultContinuityFiles, defaultPublicSkillsJson } from './defaults.js'
 import {
   ensureContinuityFiles,
@@ -20,9 +28,10 @@ export async function ensureIdentityMarkdownScaffold(
 ): Promise<IdentityMarkdownScaffold> {
   const privateFiles = await ensureContinuityFiles(identity)
   const publicSkills = await ensurePublicSkillsFile(identity, { fallback: options.publicSkillsFallback })
+  const syncedPublic = await syncPublicSkillsManifest(identity).catch(() => publicSkills)
   return {
     ...privateFiles,
-    'skills.json': publicSkills,
+    'skills.json': syncedPublic,
   }
 }
 
@@ -47,9 +56,8 @@ export async function syncIdentityMarkdownScaffold(identity: EthagentIdentity): 
 export async function prepareSyncedIdentityMarkdownScaffold(identity: EthagentIdentity): Promise<IdentityMarkdownScaffold> {
   await ensureIdentityMarkdownScaffold(identity)
   const privateFiles = await readContinuityFiles(identity)
-  const publicSkills = await readPublicSkillsFile(identity)
   const privateDefaults = defaultContinuityFiles(identity)
-  const publicDefault = defaultPublicSkillsJson(identity)
+  const publicDefault = await renderPublicSkillsJsonForIdentity(identity)
   return {
     'SOUL.md': syncGeneratedMarkdown(privateFiles['SOUL.md'], privateDefaults['SOUL.md'], [
       { marker: 'identity' },
@@ -57,33 +65,27 @@ export async function prepareSyncedIdentityMarkdownScaffold(identity: EthagentId
     'MEMORY.md': syncGeneratedMarkdown(privateFiles['MEMORY.md'], privateDefaults['MEMORY.md'], [
       { marker: 'identity' },
     ]),
-    'skills.json': syncSkillsJson(publicSkills, publicDefault),
+    'skills.json': publicDefault,
   }
 }
 
 export async function prepareSyncedPublicSkillsJson(identity: EthagentIdentity): Promise<string> {
   await ensurePublicSkillsFile(identity)
-  const publicSkills = await readPublicSkillsFile(identity)
-  return syncSkillsJson(publicSkills, defaultPublicSkillsJson(identity))
+  return renderPublicSkillsJsonForIdentity(identity)
 }
 
-function syncSkillsJson(existing: string, fresh: string): string {
-  try {
-    const existingParsed = JSON.parse(existing)
-    const freshParsed = JSON.parse(fresh)
-    const merged = {
-      ...existingParsed,
-      ...freshParsed,
-      skills: existingParsed.skills || freshParsed.skills,
-      inputModes: existingParsed.inputModes || freshParsed.inputModes,
-      outputModes: existingParsed.outputModes || freshParsed.outputModes,
-    }
-    if (!Object.hasOwn(freshParsed, 'imageUrl')) delete merged.imageUrl
-    return `${JSON.stringify(merged, null, 2)}\n`
-  } catch {
-    return fresh
-  }
+export async function prepareSyncedSkillsTree(identity: EthagentIdentity): Promise<ContinuitySkillsTree> {
+  await ensureContinuityVault(identity)
+  return loadSkillsTree(identity)
 }
+
+export async function restoreSkillsTree(
+  identity: EthagentIdentity,
+  tree: ContinuitySkillsTree | undefined,
+): Promise<void> {
+  await materializeSkillsTree(identity, tree)
+}
+
 
 export async function ensurePublicSkillsFile(
   identity: EthagentIdentity,

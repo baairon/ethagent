@@ -20,13 +20,14 @@ export function changedContinuitySnapshotFiles(
   workingStatus?: ContinuityWorkingTreeStatus | null,
 ): string[] {
   if (!workingStatus?.localContentHashes || !workingStatus.publishedContentHashes) return []
-  const files: Array<keyof typeof workingStatus.localContentHashes> = ['SOUL.md', 'MEMORY.md', 'skills.json']
+  const files: Array<keyof typeof workingStatus.localContentHashes> = ['SOUL.md', 'MEMORY.md', 'skills.json', 'private-skills']
   return files
-    .filter(file => workingStatus.localContentHashes?.[file] !== workingStatus.publishedContentHashes?.[file])
+    .filter(file => (workingStatus.localContentHashes?.[file] ?? '') !== (workingStatus.publishedContentHashes?.[file] ?? ''))
     .map(displayContinuitySnapshotFile)
 }
 
 function displayContinuitySnapshotFile(file: keyof NonNullable<ContinuityWorkingTreeStatus['localContentHashes']>): string {
+  if (file === 'private-skills') return 'skills/'
   return file
 }
 

@@ -48,6 +48,29 @@ test('getVisualLines char-wraps logical lines and preserves empty rows', () => {
   ])
 })
 
+test('getVisualLines breaks at word boundaries when a space is available', () => {
+  const value = 'anyways i think'
+  const lines = getVisualLines(value, 10)
+  assert.ok(lines.length >= 2)
+  const first = lines[0]!
+  const firstText = value.slice(first.start, first.end)
+  assert.ok(!firstText.startsWith('anyways i') || firstText === 'anyways i ', `first line should keep 'anyways' intact, got ${JSON.stringify(firstText)}`)
+  assert.ok(firstText.includes('anyways'), `first line should contain 'anyways', got ${JSON.stringify(firstText)}`)
+  const joined = lines.map(line => value.slice(line.start, line.end)).join('')
+  assert.equal(joined, value)
+})
+
+test('getVisualLines hard-wraps tokens longer than the column width', () => {
+  const value = 'supercalifragilistic'
+  const lines = getVisualLines(value, 5)
+  assert.ok(lines.length >= 4, `expected hard wrap at width 5, got ${lines.length} lines`)
+  for (const line of lines) {
+    assert.ok(line.end - line.start <= 5, `every line must fit within width 5, got ${line.end - line.start}`)
+  }
+  const joined = lines.map(line => value.slice(line.start, line.end)).join('')
+  assert.equal(joined, value)
+})
+
 test('getVisualLineIndex finds the cursor visual row at wrap boundaries', () => {
   const lines = getVisualLines('abcdefgh', 4)
 

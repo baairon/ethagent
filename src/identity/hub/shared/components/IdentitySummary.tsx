@@ -67,59 +67,67 @@ export const IdentitySummary: React.FC<IdentitySummaryProps> = ({ identity, conf
           <Text color={identity.agentId ? theme.text : theme.dim} bold={Boolean(identity.agentId)}>{tokenLine}</Text>
         </>
       )}
-      <Text>
-        <Text color={theme.dim}>{'ENS'.padEnd(12)}</Text>
-        {ensStatus.kind === 'linked'
-          ? <Text color={theme.accentPeriwinkle}>{ensStatus.name}</Text>
-          : ensStatus.kind === 'issue'
-            ? <Text color={theme.accentError}>{ensStatus.name} ({ensValidationReasonText(ensStatus.reason)})</Text>
-            : <Text color={theme.dim}>Not Linked</Text>}
-      </Text>
-      {tokenLinked ? (
-        <Text>
-          <Text color={theme.dim}>{'Custody'.padEnd(12)}</Text>
-          <Text color={custodyMode ? theme.text : theme.dim}>{displayCustodyMode(custodyMode)}</Text>
-        </Text>
-      ) : null}
-      {ownerAddress ? (
-        <Text>
-          <Text color={theme.dim}>{'Owner'.padEnd(12)}</Text>
-          <Text color={theme.text}>{shortAddress(ownerAddress)}</Text>
-        </Text>
-      ) : null}
+      <SummaryRow
+        left={{
+          label: 'ENS',
+          value: ensStatus.kind === 'linked'
+            ? <Text color={theme.accentPeriwinkle}>{ensStatus.name}</Text>
+            : ensStatus.kind === 'issue'
+              ? <Text color={theme.accentError}>{ensStatus.name} ({ensValidationReasonText(ensStatus.reason)})</Text>
+              : <Text color={theme.dim}>Not Linked</Text>,
+        }}
+        right={tokenLinked
+          ? {
+              label: 'Custody',
+              value: <Text color={custodyMode ? theme.text : theme.dim}>{displayCustodyMode(custodyMode)}</Text>,
+            }
+          : undefined}
+      />
       {(() => {
-        if (custodyMode !== 'advanced') return null
-        const vaultAddress = readIdentityStateString(identity.state, 'operatorVaultAddress')
-        if (!vaultAddress) return null
+        const vaultAddress = custodyMode === 'advanced'
+          ? readIdentityStateString(identity.state, 'operatorVaultAddress')
+          : undefined
+        const pairedOperatorsValue = custodyMode === 'advanced' && tokenLinked
+          ? approvedOperatorCount > 1
+            ? <Text color={theme.text}>{`${approvedOperatorCount} authorized`}</Text>
+            : activeOperator
+              ? <Text color={theme.text}>{shortAddress(activeOperator)}</Text>
+              : <Text color={theme.dim}>None Authorized</Text>
+          : null
+        const lastSavedCell = {
+          label: 'Last Saved',
+          value: <Text color={lastBackup === 'never' ? theme.dim : theme.text}>{displayValue(lastBackup)}</Text>,
+        }
+        const pendingCell = {
+          label: 'Pending',
+          value: <Text color={theme.dim}>local ahead of chain, owner rotates pointer</Text>,
+        }
         return (
-          <Text>
-            <Text color={theme.dim}>{'Vault'.padEnd(12)}</Text>
-            <Text color={theme.text}>{shortAddress(vaultAddress)}</Text>
-          </Text>
+          <>
+            {ownerAddress ? (
+              <SummaryRow
+                left={{
+                  label: 'Owner',
+                  value: <Text color={theme.text}>{shortAddress(ownerAddress)}</Text>,
+                }}
+                {...(pairedOperatorsValue
+                  ? { right: { label: 'Operators', value: pairedOperatorsValue } }
+                  : {})}
+              />
+            ) : null}
+            {vaultAddress ? (
+              <SummaryRow
+                left={{ label: 'Vault', value: <Text color={theme.text}>{shortAddress(vaultAddress)}</Text> }}
+                right={hasPendingPublish(identity) ? pendingCell : lastSavedCell}
+              />
+            ) : (
+              hasPendingPublish(identity)
+                ? <SummaryRow left={lastSavedCell} right={pendingCell} />
+                : <SummaryRow left={lastSavedCell} />
+            )}
+          </>
         )
       })()}
-      {tokenLinked && custodyMode === 'advanced' ? (
-        <Text>
-          <Text color={theme.dim}>{'Operators'.padEnd(12)}</Text>
-          {approvedOperatorCount > 1 ? (
-            <Text color={theme.text}>{`${approvedOperatorCount} authorized${activeOperator ? ` (active ${shortAddress(activeOperator)})` : ''}`}</Text>
-          ) : activeOperator ? (
-            <Text color={theme.text}>{shortAddress(activeOperator)}</Text>
-          ) : (
-            <Text color={theme.dim}>None Authorized</Text>
-          )}
-        </Text>
-      ) : null}
-      <Text>
-        <Text color={theme.dim}>{'Last Saved'.padEnd(12)}</Text>
-        <Text color={lastBackup === 'never' ? theme.dim : theme.text}>{displayValue(lastBackup)}</Text>
-      </Text>
-      {hasPendingPublish(identity) ? (
-        <Text>
-          <Text color={theme.dim}>{'Pending'.padEnd(12)}</Text>
-          <Text color={theme.dim}>local snapshot ahead of chain, owner wallet rotates the pointer</Text>
-        </Text>
-      ) : null}
       {transferSnapshot ? (
         <Box marginTop={1}>
           <TransferSnapshotStatus status={transferSnapshot} />
@@ -130,6 +138,39 @@ export const IdentitySummary: React.FC<IdentitySummaryProps> = ({ identity, conf
           <LocalChangeStatusLine status={localChangeStatus} />
         </Box>
       )}
+    </Box>
+  )
+}
+
+type SummaryCell = { label: string; value: React.ReactNode }
+
+const LEFT_LABEL_WIDTH = 12
+const LEFT_VALUE_WIDTH = 30
+const RIGHT_CELL_WIDTH = 36
+
+const SummaryRow: React.FC<{ left: SummaryCell; right?: SummaryCell }> = ({ left, right }) => {
+  if (!right) {
+    return (
+      <Text>
+        <Text color={theme.dim}>{left.label.padEnd(LEFT_LABEL_WIDTH)}</Text>
+        {left.value}
+      </Text>
+    )
+  }
+  return (
+    <Box flexDirection="row">
+      <Box width={LEFT_LABEL_WIDTH + LEFT_VALUE_WIDTH}>
+        <Text>
+          <Text color={theme.dim}>{left.label.padEnd(LEFT_LABEL_WIDTH)}</Text>
+          {left.value}
+        </Text>
+      </Box>
+      <Box width={RIGHT_CELL_WIDTH}>
+        <Text>
+          <Text color={theme.dim}>{right.label.padEnd(LEFT_LABEL_WIDTH)}</Text>
+          {right.value}
+        </Text>
+      </Box>
     </Box>
   )
 }
@@ -163,10 +204,13 @@ const TransferSnapshotStatus: React.FC<{ status: NonNullable<TransferSnapshotVie
 const LocalChangeStatusLine: React.FC<{ status: LocalChangeStatusView }> = ({ status }) => {
   if (status.hasLocalChanges) {
     return (
-      <Text color={theme.accentError} bold>
-        Local changes detected
-        {status.files.length > 0 ? `: ${status.files.join(', ')}` : ''}
-      </Text>
+      <Box flexDirection="column">
+        <Text color={theme.accentError} bold>
+          Local changes detected
+          {status.files.length > 0 ? `: ${status.files.join(', ')}` : ''}
+        </Text>
+        <Text color={theme.dim}>Save Snapshot Now to publish.</Text>
+      </Box>
     )
   }
 

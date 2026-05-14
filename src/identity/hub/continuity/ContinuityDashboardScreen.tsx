@@ -10,7 +10,7 @@ import { changedContinuitySnapshotFiles } from './state.js'
 import { readIdentityStateString } from '../custody/state.js'
 import { shortCid } from '../shared/model/format.js'
 
-type PrivateAction = 'soul' | 'memory' | 'skills' | 'export-backup' | 'back'
+type PrivateAction = 'soul' | 'memory' | 'back'
 type PublicAction = 'edit' | 'back'
 
 interface CommonProps {
@@ -36,7 +36,7 @@ const SaveFromHubHint: React.FC<{ workingStatus?: ContinuityWorkingTreeStatus | 
         Unsaved changes
         {files.length > 0 ? `: ${files.join(', ')}` : ''}
       </Text>
-      <Text color={theme.dim}>Use Save Snapshot Now in the Identity Hub menu, or relaunch ethagent.</Text>
+      <Text color={theme.dim}>Save Snapshot Now to publish.</Text>
     </Box>
   )
 }
@@ -44,8 +44,6 @@ const SaveFromHubHint: React.FC<{ workingStatus?: ContinuityWorkingTreeStatus | 
 export const PrivateContinuityScreen: React.FC<CommonProps & {
   onOpenSoul: () => void
   onOpenMemory: () => void
-  onOpenSkills: () => void
-  onExportBackup: () => void
 }> = ({
   identity,
   config,
@@ -56,13 +54,10 @@ export const PrivateContinuityScreen: React.FC<CommonProps & {
   footer,
   onOpenSoul,
   onOpenMemory,
-  onOpenSkills,
-  onExportBackup,
   onBack,
 }) => (
-  <Surface title="Soul, Memory, and Skills" subtitle={notice ?? privateSubtitle(ready)} footer={footer}>
+  <Surface title="Soul & Memory" subtitle={notice ?? privateSubtitle(ready)} footer={footer}>
     <IdentitySummary identity={identity} config={config} workingStatus={workingStatus} hideLocalChanges />
-    <PrivateRows identity={identity} ready={ready} />
     <SaveFromHubHint workingStatus={workingStatus} />
     {editorOpened && (
       <Box marginTop={1}>
@@ -72,13 +67,9 @@ export const PrivateContinuityScreen: React.FC<CommonProps & {
     <Box marginTop={1}>
       <Select<PrivateAction>
         options={[
-          { value: 'soul', role: 'section', label: 'Private Continuity' },
+          { value: 'soul', role: 'section', label: 'Files' },
           { value: 'soul', label: 'Edit Soul', hint: 'Voice, behavior, and operating preferences', disabled: !ready },
           { value: 'memory', label: 'Edit Memory', hint: 'Durable owner memory for this agent', disabled: !ready },
-          { value: 'skills', role: 'section', label: 'Public Capabilities' },
-          { value: 'skills', label: 'Edit skills.json', hint: 'Machine-readable capabilities for discovery', disabled: !ready },
-          { value: 'export-backup', role: 'section', label: 'Local Backup' },
-          { value: 'export-backup', label: 'Save Local Backup', hint: 'Bundle SOUL.md, MEMORY.md, skills.json into a zip you can keep anywhere', disabled: !ready },
           { value: 'back', role: 'section', label: 'Navigation' },
           { value: 'back', label: 'Back', hint: 'Return to Identity Hub menu', role: 'utility' },
         ]}
@@ -86,8 +77,6 @@ export const PrivateContinuityScreen: React.FC<CommonProps & {
           onSubmit={choice => {
             if (choice === 'soul') return onOpenSoul()
             if (choice === 'memory') return onOpenMemory()
-            if (choice === 'skills') return onOpenSkills()
-            if (choice === 'export-backup') return onExportBackup()
             return onBack()
           }}
         onCancel={onBack}
@@ -102,7 +91,6 @@ export const PublicProfileScreen: React.FC<CommonProps & {
   return (
     <Surface title="Public Profile" subtitle={notice ?? 'Manage the public name, description, icon, and Agent Card.'} footer={footer}>
       <IdentitySummary identity={identity} config={config} workingStatus={workingStatus} hideLocalChanges />
-      <PublicProfileRows identity={identity} />
       <SaveFromHubHint workingStatus={workingStatus} />
       {editorOpened && (
         <Box marginTop={1}>
@@ -129,42 +117,8 @@ export const PublicProfileScreen: React.FC<CommonProps & {
   )
 }
 
-const PrivateRows: React.FC<{ identity?: EthagentIdentity; ready: boolean }> = ({ identity, ready }) => (
-  <Box flexDirection="column" marginTop={1}>
-    <Text>
-      <Text color={theme.dim}>{'Private'.padEnd(13)}</Text>
-      <Text color={ready ? theme.text : theme.dim}>{ready ? 'Local Files Ready' : 'Missing Local Working Files'}</Text>
-    </Text>
-    <Text>
-      <Text color={theme.dim}>{'Snapshot'.padEnd(13)}</Text>
-      <Text color={identity?.backup?.cid ? theme.text : theme.dim}>{identity?.backup?.cid ? shortCid(identity.backup.cid) : 'Not Saved Yet'}</Text>
-    </Text>
-    <Text>
-      <Text color={theme.dim}>{'Skills'.padEnd(13)}</Text>
-      <Text color={identity?.publicSkills?.cid ? theme.text : theme.dim}>{identity?.publicSkills?.cid ? shortCid(identity.publicSkills.cid) : 'Not Saved'}</Text>
-    </Text>
-  </Box>
-)
-
-const PublicProfileRows: React.FC<{ identity?: EthagentIdentity }> = ({ identity }) => (
-  <Box flexDirection="column" marginTop={1}>
-    <Text>
-      <Text color={theme.dim}>{publicProfileLabel('Agent Card')}</Text>
-      <Text color={identity?.publicSkills?.agentCardCid ? theme.text : theme.dim}>{identity?.publicSkills?.agentCardCid ? shortCid(identity.publicSkills.agentCardCid) : 'Not Saved'}</Text>
-    </Text>
-    <Text>
-      <Text color={theme.dim}>{publicProfileLabel('Agent Icon')}</Text>
-      <Text color={readIdentityStateString(identity?.state, 'imageUrl') ? theme.text : theme.dim}>{readIdentityStateString(identity?.state, 'imageUrl') ? 'Attached' : 'Not Attached'}</Text>
-    </Text>
-  </Box>
-)
-
-function publicProfileLabel(label: string): string {
-  return label.padEnd(16)
-}
-
 function privateSubtitle(ready: boolean): string {
   return ready
-    ? 'Edit local continuity files. Public skills are saved with the same snapshot.'
+    ? 'Edit the durable persona and memory files for this identity.'
     : 'Use "Refetch Latest Snapshot" from the Identity Hub menu to recover files.'
 }

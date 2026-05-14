@@ -9,6 +9,8 @@ import type { EthagentConfig } from '../storage/config.js'
 import type { SessionMessage } from '../storage/sessions.js'
 import type { SessionPermissionRule, ToolResult } from '../tools/contracts.js'
 import { readContinuityFiles } from '../identity/continuity/storage.js'
+import { listSkillsTree } from '../identity/continuity/skills/loadSkills.js'
+import { isDraftScaffold } from '../identity/continuity/skills/scaffold.js'
 import type { MessageRow } from './MessageList.js'
 import {
   buildBaseMessages,
@@ -121,6 +123,7 @@ export async function runStreamingTurn(
     return [
       ...(baseSystem ? [baseSystem] : []),
       ...await buildIdentityContinuityContextMessages(getConfig()),
+      ...await buildSkillsIndexMessage(getConfig()),
       ...conversationMessages,
       ...mentionContextMessages,
     ]
@@ -399,6 +402,11 @@ async function handleEvent(ev: TurnEvent, ctx: EventHandlerContext): Promise<voi
       ctx.flushStreamRows()
       return
     }
+    case 'thinking_end': {
+      ctx.flushStreamRows(true)
+      ctx.stopThinkingCursor()
+      return
+    }
     case 'retry': {
       return
     }
@@ -563,6 +571,57 @@ async function buildFileMentionContextMessages(
       ].join('\n'),
     },
   ]
+}
+
+const PRIVATE_SKILLS_INDEX_BUDGET = 2048
+
+export async function buildSkillsIndexMessage(
+  config: EthagentConfig,
+): Promise<Message[]> {
+  const identity = config.identity
+  if (!identity) return []
+  try {
+    const { skills, supportingCounts } = await listSkillsTree(identity)
+    const entries = skills.filter(entry => !isDraftScaffold(entry))
+    if (entries.length === 0) return []
+    const header = [
+      '<private_skills index="true" visibility="private">',
+      'Private skills are owner-authored content packs available for this active identity.',
+      'Each line shows skill_name — description. When an entry ends with (+N supporting files), call list_private_skill_files to see relative + absolute paths for each file. Read text content via read_private_skill with file:; run executable supporting scripts with run_bash using the absolute path returned by list_private_skill_files. Call list_private_skills for the full index.',
+    ]
+    const lines: string[] = []
+    let charCount = header.reduce((sum, line) => sum + line.length + 1, 0)
+    let included = 0
+    let dropped = 0
+    for (const entry of entries) {
+      const displayName = entry.displayName ?? entry.name
+      const desc = entry.description ? ` — ${entry.description}` : ''
+      const hint = entry.whenToUse ? ` (when: ${entry.whenToUse})` : ''
+      const supporting = supportingCounts[entry.name] ?? 0
+      const trailer = supporting > 0
+        ? ` (+${supporting} supporting file${supporting === 1 ? '' : 's'})`
+        : ''
+      const line = `- ${displayName}${desc}${hint}${trailer}`
+      if (charCount + line.length + 1 > PRIVATE_SKILLS_INDEX_BUDGET && included > 0) {
+        dropped = entries.length - included
+        break
+      }
+      lines.push(line)
+      charCount += line.length + 1
+      included++
+    }
+    const footer: string[] = []
+    if (dropped > 0) {
+      footer.push(`(${dropped} more — call list_private_skills to enumerate)`)
+    }
+    footer.push('</private_skills>')
+    return [{
+      role: 'system',
+      content: [...header, ...lines, ...footer].join('\n'),
+    }]
+  } catch {
+    return []
+  }
 }
 
 export async function buildIdentityContinuityContextMessages(

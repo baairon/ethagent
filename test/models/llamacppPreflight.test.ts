@@ -155,25 +155,6 @@ test('llama.cpp preflight stops then restarts ethagent-owned runner with mmproj 
   assert.equal(startArgs[0]?.mmprojPath, '/models/mmproj.gguf')
 })
 
-test('llama.cpp preflight surfaces untracked-server when running runner blocks projector', async () => {
-  let started = false
-  const result = await ensureLlamaCppRunnerReady(config, {
-    fetchImpl: modelsFetch([config.model]),
-    findLocalModel: async id => localModel({ id, mmprojPath: '/models/mmproj.gguf' }),
-    stopServer: async () => ({ ok: true, stopped: false, reason: 'untracked-server', servedModels: [config.model] }),
-    startServer: async () => {
-      started = true
-      return { ok: true, alreadyRunning: false }
-    },
-  })
-
-  assert.equal(result.ok, false)
-  if (result.ok) return
-  assert.equal(result.code, 'untracked-server')
-  assert.match(result.detail ?? '', /Stop the external process/)
-  assert.equal(started, false)
-})
-
 test('llama.cpp preflight skips stop+restart for already-running runner without projector', async () => {
   let stopped = 0
   let started = false

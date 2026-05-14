@@ -2,6 +2,7 @@ import { getAddress, type Address, type Hex } from 'viem'
 import type { EthagentIdentity } from '../../../storage/config.js'
 import {
   prepareSyncedIdentityMarkdownScaffold,
+  prepareSyncedSkillsTree,
   readContinuityFiles,
   readPublicSkillsFile,
   writeIdentityMarkdownScaffold,
@@ -10,13 +11,20 @@ import {
 import {
   createWalletRestoreAccessChallenge,
   serializeContinuitySnapshotEnvelope,
+  type ContinuityFiles,
+  type ContinuitySkillsTree,
   type WalletChallengePurpose,
 } from '../../continuity/envelope.js'
 import {
+  appendPublicSkillEntries,
   createAgentCard,
   defaultPublicSkillsProfile,
   serializeAgentCard,
 } from '../../continuity/publicSkills.js'
+import {
+  derivePublicSkillEntries,
+  syncPublicSkillsManifest,
+} from '../../continuity/skills/publicSkillsSync.js'
 import { recordPublishedContinuitySnapshot } from '../../continuity/snapshots.js'
 import { addToIpfs, DEFAULT_IPFS_API_URL } from '../../storage/ipfs.js'
 import {
@@ -58,6 +66,11 @@ type VaultPublishPrepared = {
   nextIdentity: EthagentIdentity
   markdownScaffold?: IdentityMarkdownScaffold
   completionMessage: string
+  publishedSources: {
+    privateFiles: ContinuityFiles
+    publicSkills: string
+    skills: ContinuitySkillsTree
+  }
 }
 
 export async function runOperatorWalletRebackup(args: {
@@ -129,18 +142,22 @@ export async function runOperatorWalletRebackup(args: {
   const continuityFiles = markdownScaffold
     ? { 'SOUL.md': markdownScaffold['SOUL.md'], 'MEMORY.md': markdownScaffold['MEMORY.md'] }
     : await readContinuityFiles(nextIdentityForFiles)
-  const publicSkillsJson = markdownScaffold
-    ? markdownScaffold['skills.json']
-    : await readPublicSkillsFile(nextIdentityForFiles)
+  const publicSkillsJson = await syncPublicSkillsManifest(nextIdentityForFiles)
   const publicSkillsPin = await addToIpfs(DEFAULT_IPFS_API_URL, publicSkillsJson, fetch, { pinataJwt: step.pinataJwt })
   assertVerifiedPin(publicSkillsPin)
+  const publicSkillEntries = await derivePublicSkillEntries(nextIdentityForFiles)
+  const augmentedPublicProfile = appendPublicSkillEntries(
+    defaultPublicSkillsProfile(nextIdentityForFiles),
+    publicSkillEntries,
+  )
   const agentCardPin = await addToIpfs(
     DEFAULT_IPFS_API_URL,
-    serializeAgentCard(createAgentCard(defaultPublicSkillsProfile(nextIdentityForFiles))),
+    serializeAgentCard(createAgentCard(augmentedPublicProfile)),
     fetch,
     { pinataJwt: step.pinataJwt },
   )
   assertVerifiedPin(agentCardPin)
+  const skillsTree = await prepareSyncedSkillsTree(nextIdentityForFiles)
   const envelope = createContinuityEnvelopeForSave({
     identity: nextIdentityForFiles,
     registry: step.registry,
@@ -149,6 +166,7 @@ export async function runOperatorWalletRebackup(args: {
     walletSignature: wallet.signature,
     state,
     files: continuityFiles,
+    skills: skillsTree,
     walletAccess,
     ...(challengePurpose ? { challengePurpose } : {}),
   })
@@ -185,7 +203,11 @@ export async function runOperatorWalletRebackup(args: {
     await writeIdentityMarkdownScaffold(nextIdentity, markdownScaffold)
   }
   await recordPublishedContinuitySnapshot({ identity: nextIdentity, label: 'local operator-wallet snapshot' }).catch(() => null)
-  await markCurrentContinuityFilesPublished(nextIdentity).catch(() => null)
+  await markCurrentContinuityFilesPublished(nextIdentity, {
+    privateFiles: continuityFiles,
+    publicSkills: publicSkillsJson,
+    skills: skillsTree,
+  }).catch(() => null)
   const completionMessage = nextEnsName !== undefined && nextEnsName !== ((step.identity.state as Record<string, unknown> | undefined)?.ensName as string | undefined)
     ? 'Snapshot saved locally. Owner wallet still needs to publish to make ENS changes discoverable.'
     : uploadedImageUri !== undefined
@@ -262,18 +284,22 @@ async function runOperatorWalletVaultPublish(args: {
       const continuityFiles = markdownScaffold
         ? { 'SOUL.md': markdownScaffold['SOUL.md'], 'MEMORY.md': markdownScaffold['MEMORY.md'] }
         : await readContinuityFiles(nextIdentityForFiles)
-      const publicSkillsJson = markdownScaffold
-        ? markdownScaffold['skills.json']
-        : await readPublicSkillsFile(nextIdentityForFiles)
+      const publicSkillsJson = await syncPublicSkillsManifest(nextIdentityForFiles)
       const publicSkillsPin = await addToIpfs(DEFAULT_IPFS_API_URL, publicSkillsJson, fetch, { pinataJwt: step.pinataJwt })
       assertVerifiedPin(publicSkillsPin)
+      const publicSkillEntries = await derivePublicSkillEntries(nextIdentityForFiles)
+      const augmentedPublicProfile = appendPublicSkillEntries(
+        defaultPublicSkillsProfile(nextIdentityForFiles),
+        publicSkillEntries,
+      )
       const agentCardPin = await addToIpfs(
         DEFAULT_IPFS_API_URL,
-        serializeAgentCard(createAgentCard(defaultPublicSkillsProfile(nextIdentityForFiles))),
+        serializeAgentCard(createAgentCard(augmentedPublicProfile)),
         fetch,
         { pinataJwt: step.pinataJwt },
       )
       assertVerifiedPin(agentCardPin)
+      const skillsTree = await prepareSyncedSkillsTree(nextIdentityForFiles)
       const envelope = createContinuityEnvelopeForSave({
         identity: nextIdentityForFiles,
         registry: step.registry,
@@ -282,6 +308,7 @@ async function runOperatorWalletVaultPublish(args: {
         walletSignature: wallet.signature,
         state,
         files: continuityFiles,
+        skills: skillsTree,
         walletAccess,
         ...(challengePurpose ? { challengePurpose } : {}),
       })
@@ -354,6 +381,11 @@ async function runOperatorWalletVaultPublish(args: {
           nextIdentity,
           ...(markdownScaffold ? { markdownScaffold } : {}),
           completionMessage,
+          publishedSources: {
+            privateFiles: continuityFiles,
+            publicSkills: publicSkillsJson,
+            skills: skillsTree,
+          },
         },
       }
     },
@@ -373,6 +405,6 @@ async function runOperatorWalletVaultPublish(args: {
     await writeIdentityMarkdownScaffold(nextIdentity, result.prepared.markdownScaffold)
   }
   await recordPublishedContinuitySnapshot({ identity: nextIdentity, label: 'operator-published snapshot' }).catch(() => null)
-  await markCurrentContinuityFilesPublished(nextIdentity).catch(() => null)
+  await markCurrentContinuityFilesPublished(nextIdentity, result.prepared.publishedSources).catch(() => null)
   await callbacks.onIdentityComplete(nextIdentity, result.prepared.completionMessage, 'update')
 }

@@ -214,7 +214,7 @@ export const CustodyEditFlow: React.FC<CustodyEditFlowProps> = ({
       <Surface
         title="Switch to Advanced"
         subtitle="Move this token into its own Vault so authorized operator wallets can update this agent onchain without your signature each time."
-        footer={footerHint('enter confirm, esc back')}
+        footer={footerHint('enter confirm · esc back')}
       >
         <Box flexDirection="column">
           <Row label="Token" value={tokenLabel} />
@@ -236,7 +236,7 @@ export const CustodyEditFlow: React.FC<CustodyEditFlowProps> = ({
               { value: 'confirm', label: 'Yes, Switch to Advanced', hint: `Sign with ${shortAddress(ownerAddress || tokenOwner)} to deposit this token into its Vault` },
               { value: 'transfer', role: 'section', label: 'Move Token First' },
               { value: 'transfer', label: 'Prepare Token Transfer', hint: 'Move the token to a different wallet first, with snapshot handoff' },
-              { value: 'back', role: 'section', label: 'Cancel' },
+              { value: 'back', role: 'section', label: 'Navigation' },
               { value: 'back', label: 'No, Go Back', hint: 'Return without changing custody', role: 'utility' },
             ]}
             hintLayout="inline"
@@ -278,7 +278,7 @@ export const CustodyEditFlow: React.FC<CustodyEditFlowProps> = ({
           options={[
             { value: 'confirm', role: 'section', label: 'Confirm' },
             { value: 'confirm', label: 'Yes, Switch to Simple', hint: `Sign with the owner wallet to unwrap ${tokenLabel} from its Vault` },
-            { value: 'back', role: 'section', label: 'Cancel' },
+            { value: 'back', role: 'section', label: 'Navigation' },
             { value: 'back', label: 'No, Go Back', hint: 'Return without changing custody', role: 'utility' },
           ]}
           hintLayout="inline"

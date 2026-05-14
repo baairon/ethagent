@@ -6,12 +6,14 @@ import { Select, type SelectOption } from '../../../../ui/Select.js'
 import type { EthagentConfig, EthagentIdentity } from '../../../../storage/config.js'
 import { copyableIdentityFields, identityValuesCopyHint } from '../model/copy.js'
 import { IdentitySummary } from './IdentitySummary.js'
+import type { ContinuityWorkingTreeStatus } from '../../../continuity/storage.js'
 
 type CopyAction = `copy:${string}` | 'back'
 
 type DetailsScreenProps = {
   identity?: EthagentIdentity
   config?: EthagentConfig
+  workingStatus?: ContinuityWorkingTreeStatus | null
   copyNotice?: string | null
   unlinked?: boolean
   onchainOwner?: string
@@ -23,6 +25,7 @@ type DetailsScreenProps = {
 export const DetailsScreen: React.FC<DetailsScreenProps> = ({
   identity,
   config,
+  workingStatus,
   copyNotice,
   unlinked,
   onchainOwner,
@@ -45,7 +48,7 @@ export const DetailsScreen: React.FC<DetailsScreenProps> = ({
 
   return (
     <Surface title="Token Values" subtitle={unlinked ? 'Token no longer linked to this wallet, values retained for reference.' : `${identityValuesCopyHint(identity)}.`} footer={footer}>
-      <IdentitySummary identity={identity} config={config} onchainOwner={onchainOwner} />
+      <IdentitySummary identity={identity} config={config} workingStatus={workingStatus} onchainOwner={onchainOwner} />
       {copyNotice ? <Text color={theme.accentPeriwinkle} bold>{copyNotice}</Text> : null}
       <Box marginTop={1}>
         <Select<CopyAction>

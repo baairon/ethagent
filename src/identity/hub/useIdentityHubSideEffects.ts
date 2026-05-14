@@ -20,10 +20,8 @@ import {
   runEnsSetupRecordsTransaction,
   runEnsSetupRegistryTransaction,
   runUpdateEnsRecords,
-} from './ens/index.js'
-import {
-  runRecoveryRefetch,
-} from './restore/index.js'
+} from './ens/transactions.js'
+import { runRecoveryRefetch } from './restore/recovery.js'
 import type { EffectCallbacks } from './shared/effects/types.js'
 import { useRestoreEffects } from './restore/useRestoreEffects.js'
 import {

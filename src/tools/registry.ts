@@ -8,8 +8,11 @@ import { changeDirectoryTool } from './changeDirectoryTool.js'
 import { deleteFileTool } from './deleteFileTool.js'
 import { editTool } from './editTool.js'
 import { listDirectoryTool } from './listDirectoryTool.js'
+import { listSkillsTool } from './listSkillsTool.js'
+import { listSkillFilesTool } from './listSkillFilesTool.js'
 import { privateContinuityEditTool } from './privateContinuityEditTool.js'
 import { privateContinuityReadTool } from './privateContinuityReadTool.js'
+import { readSkillTool } from './readSkillTool.js'
 import { readTool } from './readTool.js'
 import { listMcpResourcesTool, readMcpResourceTool } from './mcpResourceTools.js'
 import { writeFileTool } from './writeFileTool.js'
@@ -19,6 +22,9 @@ export const BUILTIN_TOOLS: Tool[] = [
   listDirectoryTool,
   readTool,
   privateContinuityReadTool,
+  listSkillsTool,
+  listSkillFilesTool,
+  readSkillTool,
   listMcpResourcesTool,
   readMcpResourceTool,
   writeFileTool,

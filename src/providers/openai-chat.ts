@@ -171,6 +171,7 @@ export class OpenAIChatProvider implements Provider {
     let stopReason: DoneStopReason = 'unknown'
     const toolCalls = new Map<number, StreamingToolCall>()
     const contentThinkingParser = new ContentThinkingParser(this.id)
+    let reasoningPending = false
 
     try {
       for await (const frame of iterSseFrames(response.body, signal, READ_TIMEOUT_MS)) {
@@ -194,18 +195,34 @@ export class OpenAIChatProvider implements Provider {
                 ? delta.thinking
                 : ''
 
-        if (reasoning.length > 0) yield { type: 'thinking', delta: reasoning }
+        if (reasoning.length > 0) {
+          yield { type: 'thinking', delta: reasoning }
+          reasoningPending = true
+        }
         if (text.length > 0) {
+          if (reasoningPending) {
+            yield { type: 'thinking_end' }
+            reasoningPending = false
+          }
           for (const event of contentThinkingParser.push(text)) {
             yield event
           }
         }
 
-        for (const event of applyStreamingToolCallDelta(toolCalls, delta?.tool_calls ?? [])) {
+        const toolCallDeltas = delta?.tool_calls ?? []
+        if (toolCallDeltas.length > 0 && reasoningPending) {
+          yield { type: 'thinking_end' }
+          reasoningPending = false
+        }
+        for (const event of applyStreamingToolCallDelta(toolCalls, toolCallDeltas)) {
           yield event
         }
 
         if (choice?.finish_reason) {
+          if (reasoningPending) {
+            yield { type: 'thinking_end' }
+            reasoningPending = false
+          }
           stopReason = normalizeFinishReason(choice.finish_reason)
         }
         if (parsed.usage) {
@@ -222,6 +239,10 @@ export class OpenAIChatProvider implements Provider {
     if (signal.aborted) return
     for (const event of contentThinkingParser.flush()) {
       yield event
+    }
+    if (reasoningPending) {
+      yield { type: 'thinking_end' }
+      reasoningPending = false
     }
 
     let streamEmittedToolUses = 0
@@ -383,17 +404,35 @@ function isToolResultBlock(block: MessageContentBlock): block is Extract<Message
 
 function parseToolArguments(inputJson: string): Record<string, unknown> {
   if (!inputJson.trim()) return {}
+  const direct = tryParseJsonOnce(inputJson)
+  if (direct !== undefined) return coerceToToolArguments(direct)
+  const repaired = repairJsonObject(inputJson)
+  if (!repaired) return {}
+  const parsedRepaired = tryParseJsonOnce(repaired)
+  return parsedRepaired === undefined ? {} : coerceToToolArguments(parsedRepaired)
+}
+
+function tryParseJsonOnce(value: string): unknown {
   try {
-    return JSON.parse(inputJson) as Record<string, unknown>
+    return JSON.parse(value)
   } catch {
-    const repaired = repairJsonObject(inputJson)
-    if (!repaired) return {}
-    try {
-      return JSON.parse(repaired) as Record<string, unknown>
-    } catch {
-      return {}
-    }
+    return undefined
   }
+}
+
+function coerceToToolArguments(value: unknown): Record<string, unknown> {
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+      const inner = tryParseJsonOnce(trimmed)
+      if (inner !== undefined) return coerceToToolArguments(inner)
+    }
+    return {}
+  }
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    return value as Record<string, unknown>
+  }
+  return {}
 }
 
 function* applyStreamingToolCallDelta(
@@ -486,7 +525,9 @@ class ContentThinkingParser {
           yield { type: this.state === 'thinking' ? 'thinking' : 'text', delta: before }
         }
         this.buffer = this.buffer.slice(tagIndex + tag.length)
+        const wasThinking = this.state === 'thinking'
         this.state = this.state === 'text' ? 'thinking' : 'text'
+        if (wasThinking) yield { type: 'thinking_end' }
         continue
       }
 

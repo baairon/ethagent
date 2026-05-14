@@ -19,8 +19,10 @@ export {
   ensureIdentityMarkdownScaffold,
   ensurePublicSkillsFile,
   prepareSyncedIdentityMarkdownScaffold,
+  prepareSyncedSkillsTree,
   prepareSyncedPublicSkillsJson,
   readPublicSkillsFile,
+  restoreSkillsTree,
   syncIdentityMarkdownScaffold,
   writeIdentityMarkdownScaffold,
   writePublicSkillsFile,
@@ -28,5 +30,6 @@ export {
 export {
   continuityVaultStatus,
   continuityWorkingTreeStatus,
+  continuitySnapshotContentHashesFromSources,
   localContinuitySnapshotContentHashes,
 } from './storage/status.js'

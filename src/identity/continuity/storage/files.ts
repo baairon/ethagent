@@ -9,6 +9,7 @@ import type { ContinuityVaultRef } from './types.js'
 export async function ensureContinuityVault(identity: EthagentIdentity): Promise<ContinuityVaultRef> {
   const ref = continuityVaultRef(identity)
   await fs.mkdir(ref.dir, { recursive: true, mode: 0o700 })
+  await fs.mkdir(ref.skillsDir, { recursive: true, mode: 0o700 })
   return ref
 }
 

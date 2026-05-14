@@ -25,9 +25,9 @@ export function menuFlagsFromReconciliation(r: AgentReconciliation, perspective:
 
   let prepareTransferReason: string | undefined
   if (isOperator) {
-    prepareTransferReason = 'Operators cannot transfer the token.'
+    prepareTransferReason = 'Owner-only action'
   } else if (!unlinked && (r.custody === 'advanced' || r.custody === 'mid-flow-uri-pending')) {
-    prepareTransferReason = 'Token is in the vault. Withdraw it first in Custody Mode.'
+    prepareTransferReason = 'Withdraw from vault first'
   }
 
   const custodyAsterisk = r.custody === 'mid-flow-uri-pending' || r.vault === 'missing'
@@ -35,17 +35,13 @@ export function menuFlagsFromReconciliation(r: AgentReconciliation, perspective:
   if (isOperator) {
     custodyHint = undefined
   } else if (r.custody === 'mid-flow-uri-pending') {
-    custodyHint = 'Advanced setup pending. Open to finish.'
+    custodyHint = 'Setup pending, open to finish'
   } else if (r.vault === 'missing') {
-    custodyHint = 'Vault contract not found. Open to redeploy.'
+    custodyHint = 'Vault missing, open to redeploy'
   }
 
-  const custodyModeReason = isOperator
-    ? 'Operators cannot change custody, withdraw the token, or manage operators.'
-    : undefined
-  const ensNameReason = isOperator
-    ? 'Operators cannot change the ENS subdomain or its records.'
-    : undefined
+  const custodyModeReason = isOperator ? 'Owner-only action' : undefined
+  const ensNameReason = isOperator ? 'Owner-only action' : undefined
 
   return {
     prepareTransferDisabled: unlinked || inVault || isOperator,
@@ -56,11 +52,11 @@ export function menuFlagsFromReconciliation(r: AgentReconciliation, perspective:
     ...(ensNameReason ? { ensNameReason } : {}),
     saveSnapshotDisabled: unlinked,
     refetchLatestDisabled: unlinked,
-    ...(unlinked ? { tokenValuesUnlinkedNote: 'Token no longer linked to this wallet, values retained for reference' } : {}),
+    ...(unlinked ? { tokenValuesUnlinkedNote: 'Unlinked, retained for reference' } : {}),
 
     custodyAsterisk: custodyAsterisk && !isOperator,
     ...(custodyHint ? { custodyHint } : {}),
     saveSnapshotAsterisk: r.agentUri === 'local-newer',
-    ...(r.agentUri === 'local-newer' ? { saveSnapshotHint: 'Local state newer than chain. Save to publish the latest agentURI.' } : {}),
+    ...(r.agentUri === 'local-newer' ? { saveSnapshotHint: 'Local newer than chain' } : {}),
   }
 }

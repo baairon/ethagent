@@ -59,6 +59,13 @@ export type Step =
   | { kind: 'public-profile-storage'; identity: EthagentIdentity; registry: Erc8004RegistryConfig; error?: string; pinataJwt?: string; profileUpdates?: ProfileUpdates; returnTo?: Step; vaultAddress?: `0x${string}` }
   | { kind: 'continuity-private'; notice?: string; editorOpened?: boolean }
   | { kind: 'continuity-public'; notice?: string; editorOpened?: boolean }
+  | { kind: 'continuity-skills-tree'; notice?: string; editorOpened?: boolean }
+  | { kind: 'continuity-skill-new'; error?: string }
+  | { kind: 'continuity-skill-new-visibility'; name: string; error?: string }
+  | { kind: 'continuity-skill-delete'; notice?: string }
+  | { kind: 'continuity-skill-delete-confirm'; target: { kind: 'skill'; relativePath: string } }
+  | { kind: 'continuity-skill-visibility'; notice?: string }
+  | { kind: 'continuity-skill-visibility-pick'; relativePath: string }
   | { kind: 'rebackup-confirm'; back: Step }
   | { kind: 'recovery-refetch-confirm'; back: Step }
   | { kind: 'recovery-refetching'; identity: EthagentIdentity; registry: Erc8004RegistryConfig; back: Step }
@@ -173,6 +180,20 @@ function backStep(from: Step): Step {
     case 'continuity-private':
     case 'continuity-public':
       return { kind: 'menu' }
+    case 'continuity-skills-tree':
+      return { kind: 'menu' }
+    case 'continuity-skill-new':
+      return { kind: 'continuity-skills-tree' }
+    case 'continuity-skill-new-visibility':
+      return { kind: 'continuity-skill-new' }
+    case 'continuity-skill-delete':
+      return { kind: 'continuity-skills-tree' }
+    case 'continuity-skill-delete-confirm':
+      return { kind: 'continuity-skill-delete' }
+    case 'continuity-skill-visibility':
+      return { kind: 'continuity-skills-tree' }
+    case 'continuity-skill-visibility-pick':
+      return { kind: 'continuity-skill-visibility' }
     case 'rebackup-confirm':
     case 'recovery-refetch-confirm':
     case 'recovery-refetching':

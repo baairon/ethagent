@@ -522,6 +522,9 @@ export const ChatInput: React.FC<PromptInputProps> = ({
     }
     if (key.tab || key.escape) return
     if (key.ctrl || key.meta) return
+    if (key.return || key.backspace || key.delete) return
+    if (key.upArrow || key.downArrow || key.leftArrow || key.rightArrow) return
+    if (key.pageUp || key.pageDown || key.home || key.end) return
 
     if (inputText) {
       insertText(inputText)

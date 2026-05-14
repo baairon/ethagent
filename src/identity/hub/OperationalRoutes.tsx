@@ -17,6 +17,15 @@ import {
   PrivateContinuityScreen,
   PublicProfileScreen,
 } from './continuity/ContinuityDashboardScreen.js'
+import { SkillsTreeScreen } from './continuity/skills/SkillsTreeScreen.js'
+import { NewSkillScreen } from './continuity/skills/NewSkillScreen.js'
+import { NewSkillVisibilityScreen } from './continuity/skills/NewSkillVisibilityScreen.js'
+import { DeleteSkillScreen } from './continuity/skills/DeleteSkillScreen.js'
+import { DeleteSkillConfirmScreen } from './continuity/skills/DeleteSkillConfirmScreen.js'
+import {
+  SkillVisibilityListScreen,
+  SkillVisibilityPickScreen,
+} from './continuity/skills/SkillVisibilityScreen.js'
 import { RecoveryConfirmScreen } from './continuity/RecoveryConfirmScreen.js'
 import { SavePromptScreen } from './continuity/SavePromptScreen.js'
 import { ErrorScreen } from './shared/components/ErrorScreen.js'
@@ -66,7 +75,11 @@ export const IdentityHubOperationalRoutes: React.FC<IdentityHubOperationalRoutes
     openTokenTransferFlow,
     openPublicProfileEdit,
     openContinuityFile,
-    exportLocalBackupZip,
+    openSkillFile,
+    openSkillsFolder,
+    createSkill,
+    deleteSkill,
+    setSkillVisibility,
   } = controller
 
   if (step.kind === 'rebackup-confirm') {
@@ -143,9 +156,98 @@ export const IdentityHubOperationalRoutes: React.FC<IdentityHubOperationalRoutes
         editorOpened={step.editorOpened}
         onOpenSoul={() => { void openContinuityFile('soul') }}
         onOpenMemory={() => { void openContinuityFile('memory') }}
-        onOpenSkills={() => { void openContinuityFile('skills') }}
-        onExportBackup={() => { void exportLocalBackupZip() }}
         onBack={back}
+      />
+    )
+  }
+
+  if (step.kind === 'continuity-skills-tree') {
+    return (
+      <SkillsTreeScreen
+        identity={identity}
+        config={config}
+        workingStatus={workingStatus}
+        notice={step.notice}
+        editorOpened={step.editorOpened}
+        footer={footer}
+        onOpenSkill={relativePath => { void openSkillFile(relativePath) }}
+        onNewSkill={() => setStep({ kind: 'continuity-skill-new' })}
+        onDelete={() => setStep({ kind: 'continuity-skill-delete' })}
+        onVisibility={() => setStep({ kind: 'continuity-skill-visibility' })}
+        onViewPublicManifest={() => { void openContinuityFile('skills') }}
+        onOpenFolder={() => { void openSkillsFolder() }}
+        onBack={back}
+      />
+    )
+  }
+
+  if (step.kind === 'continuity-skill-visibility') {
+    return (
+      <SkillVisibilityListScreen
+        identity={identity}
+        notice={step.notice}
+        footer={footer}
+        onPick={relativePath => setStep({ kind: 'continuity-skill-visibility-pick', relativePath })}
+        onCancel={back}
+      />
+    )
+  }
+
+  if (step.kind === 'continuity-skill-visibility-pick') {
+    return (
+      <SkillVisibilityPickScreen
+        identity={identity}
+        relativePath={step.relativePath}
+        footer={footer}
+        onSelect={visibility => { void setSkillVisibility(step.relativePath, visibility) }}
+        onCancel={back}
+      />
+    )
+  }
+
+  if (step.kind === 'continuity-skill-new') {
+    return (
+      <NewSkillScreen
+        error={step.error}
+        footer={footer}
+        onSubmit={name => setStep({ kind: 'continuity-skill-new-visibility', name })}
+        onCancel={back}
+      />
+    )
+  }
+
+  if (step.kind === 'continuity-skill-new-visibility') {
+    return (
+      <NewSkillVisibilityScreen
+        name={step.name}
+        {...(step.error ? { error: step.error } : {})}
+        footer={footer}
+        onSelect={visibility => { void createSkill(step.name, visibility) }}
+        onCancel={back}
+      />
+    )
+  }
+
+  if (step.kind === 'continuity-skill-delete') {
+    return (
+      <DeleteSkillScreen
+        identity={identity}
+        notice={step.notice}
+        footer={footer}
+        onPick={target => setStep({ kind: 'continuity-skill-delete-confirm', target })}
+        onCancel={back}
+      />
+    )
+  }
+
+  if (step.kind === 'continuity-skill-delete-confirm') {
+    return (
+      <DeleteSkillConfirmScreen
+        identity={identity}
+        target={step.target}
+        footer={footer}
+        onConfirm={() => { void deleteSkill(step.target.relativePath) }}
+        onCancel={back}
       />
     )
   }

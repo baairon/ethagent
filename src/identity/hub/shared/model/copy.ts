@@ -28,8 +28,6 @@ export function copyableIdentityFields(identity?: EthagentIdentity, config?: Eth
   return fields
 }
 
-export function identityValuesCopyHint(identity?: EthagentIdentity): string {
-  return readIdentityStateString(identity?.state, 'ensName')
-    ? 'Copy token, ENS, and token URI pointers'
-    : 'Copy token and token URI pointers'
+export function identityValuesCopyHint(_identity?: EthagentIdentity): string {
+  return 'Copy token and pointers'
 }

@@ -1,0 +1,32 @@
+import { atomicWriteText } from '../../../storage/atomicWrite.js'
+import type { EthagentIdentity } from '../../../storage/config.js'
+import {
+  appendPublicSkillEntries,
+  defaultPublicSkillsProfile,
+  renderPublicSkillsJson,
+} from '../publicSkills.js'
+import { ensureContinuityVault, ensureTrailingNewline, readOrDefault } from '../storage/files.js'
+import { listSkills } from './loadSkills.js'
+import type { SkillIndexEntry } from './types.js'
+
+export async function derivePublicSkillEntries(identity: EthagentIdentity): Promise<SkillIndexEntry[]> {
+  const entries = await listSkills(identity)
+  return entries.filter(entry => entry.visibility === 'public' || entry.visibility === 'discoverable')
+}
+
+export async function renderPublicSkillsJsonForIdentity(identity: EthagentIdentity): Promise<string> {
+  const publicEntries = await derivePublicSkillEntries(identity)
+  const profile = appendPublicSkillEntries(defaultPublicSkillsProfile(identity), publicEntries)
+  return renderPublicSkillsJson(profile)
+}
+
+export async function syncPublicSkillsManifest(identity: EthagentIdentity): Promise<string> {
+  const ref = await ensureContinuityVault(identity)
+  const next = await renderPublicSkillsJsonForIdentity(identity)
+  const current = await readOrDefault(ref.publicSkillsPath, '')
+  if (current === ensureTrailingNewline(next) || current === next) {
+    return current
+  }
+  await atomicWriteText(ref.publicSkillsPath, ensureTrailingNewline(next), { mode: 0o644 })
+  return next
+}

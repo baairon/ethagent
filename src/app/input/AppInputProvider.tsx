@@ -1,3 +1,6 @@
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef } from 'react'
 import { useStdin, useStdout } from 'ink'
 import type { AppInputEvent } from './appInputParser.js'
@@ -12,6 +15,21 @@ import {
   hasPendingAppInput,
   parseAppInput,
 } from './appInputParser.js'
+
+const DEBUG_INPUT = Boolean(process.env.ETHAGENT_DEBUG_INPUT)
+const DEBUG_LOG_PATH = path.join(os.homedir(), '.ethagent', 'input-debug.log')
+
+function logRawChunk(chunk: Buffer | string): void {
+  if (!DEBUG_INPUT) return
+  try {
+    const text = typeof chunk === 'string' ? chunk : chunk.toString('utf8')
+    const codepoints = [...text].map(c => c.codePointAt(0)?.toString(16).padStart(4, '0') ?? '????').join(' ')
+    const hex = Buffer.isBuffer(chunk) ? chunk.toString('hex') : Buffer.from(chunk, 'utf8').toString('hex')
+    const line = `[${new Date().toISOString()}] codepoints=${codepoints} hex=${hex} text=${JSON.stringify(text)}\n`
+    fs.appendFileSync(DEBUG_LOG_PATH, line)
+  } catch {
+  }
+}
 
 type InputHandler = (input: string, key: AppInputEvent['key'], event: AppInputEvent) => void
 
@@ -57,6 +75,7 @@ export const AppInputProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     if (!stdin.isTTY || typeof stdin.setRawMode !== 'function') return
 
     const handleData = (chunk: Buffer | string) => {
+      logRawChunk(chunk)
       if (flushTimerRef.current) {
         clearTimeout(flushTimerRef.current)
         flushTimerRef.current = null

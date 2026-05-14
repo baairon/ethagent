@@ -1,3 +1,5 @@
+import wrapAnsi from 'wrap-ansi'
+
 export type TextCursor = {
   value: string
   offset: number
@@ -60,10 +62,18 @@ export function getVisualLines(value: string, wrapWidth: number): VisualLine[] {
     if (start === end) {
       lines.push({ start, end })
     } else {
-      for (let chunkStart = start; chunkStart < end; chunkStart += safeWrapWidth) {
-        lines.push({ start: chunkStart, end: Math.min(chunkStart + safeWrapWidth, end) })
+      const logical = value.slice(start, end)
+      const wrapped = wrapAnsi(logical, safeWrapWidth, { trim: false, hard: true, wordWrap: true })
+      const wrappedLines = wrapped.split('\n')
+      let cursor = start
+      let lastEnd = start
+      for (const line of wrappedLines) {
+        const lineEnd = cursor + line.length
+        lines.push({ start: cursor, end: lineEnd })
+        cursor = lineEnd
+        lastEnd = lineEnd
       }
-      if (end === value.length && (end - start) % safeWrapWidth === 0) {
+      if (end === value.length && lastEnd === end && wrappedLines[wrappedLines.length - 1]!.length === safeWrapWidth) {
         lines.push({ start: end, end })
       }
     }

@@ -276,13 +276,28 @@ function parseToolArguments(input: string): Record<string, unknown> {
   const trimmed = input.trim()
   if (!trimmed) return {}
   try {
-    const parsed = JSON.parse(trimmed) as unknown
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-      ? (parsed as Record<string, unknown>)
-      : {}
+    return coerceToToolArguments(JSON.parse(trimmed))
   } catch {
     return {}
   }
+}
+
+function coerceToToolArguments(value: unknown): Record<string, unknown> {
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+      try {
+        return coerceToToolArguments(JSON.parse(trimmed))
+      } catch {
+        return {}
+      }
+    }
+    return {}
+  }
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    return value as Record<string, unknown>
+  }
+  return {}
 }
 
 function networkErrorMessage(baseUrl: string, err: unknown, fallback = 'network error'): string {

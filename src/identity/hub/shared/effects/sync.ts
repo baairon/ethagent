@@ -16,7 +16,11 @@ import {
 } from '../reconciliation/index.js'
 import { normalizeApprovedOperatorWallets } from '../operatorWallets.js'
 import { readOwnerAddressField } from '../../../identityCompat.js'
-import { localContinuitySnapshotContentHashes } from '../../../continuity/storage.js'
+import {
+  continuitySnapshotContentHashesFromSources,
+  localContinuitySnapshotContentHashes,
+} from '../../../continuity/storage.js'
+import type { ContinuityFiles, ContinuitySkillsTree } from '../../../continuity/envelope.js'
 import { updatePublishedContinuitySnapshotContentHashes } from '../../../continuity/snapshots.js'
 import type { EffectCallbacks } from './types.js'
 import { awaitConfirmedReceipt } from './receipts.js'
@@ -141,9 +145,18 @@ export async function syncVaultMetadataOperatorsAfterOwnerSave(args: {
   }
 }
 
-export async function markCurrentContinuityFilesPublished(identity: EthagentIdentity): Promise<void> {
+export async function markCurrentContinuityFilesPublished(
+  identity: EthagentIdentity,
+  publishedSources?: {
+    privateFiles: ContinuityFiles
+    publicSkills: string
+    skills: ContinuitySkillsTree
+  },
+): Promise<void> {
   const cid = identity.backup?.cid
   if (!cid) return
-  const contentHashes = await localContinuitySnapshotContentHashes(identity)
+  const contentHashes = publishedSources
+    ? continuitySnapshotContentHashesFromSources(publishedSources)
+    : await localContinuitySnapshotContentHashes(identity)
   await updatePublishedContinuitySnapshotContentHashes(identity, cid, contentHashes).catch(() => null)
 }

@@ -6,15 +6,21 @@ import {
   type WalletChallengePurpose,
 } from '../../continuity/envelope.js'
 import {
+  prepareSyncedSkillsTree,
   prepareSyncedPublicSkillsJson,
   readContinuityFiles,
   writePublicSkillsFile,
 } from '../../continuity/storage.js'
 import {
+  appendPublicSkillEntries,
   createAgentCard,
   defaultPublicSkillsProfile,
   serializeAgentCard,
 } from '../../continuity/publicSkills.js'
+import {
+  derivePublicSkillEntries,
+  syncPublicSkillsManifest,
+} from '../../continuity/skills/publicSkillsSync.js'
 import { recordPublishedContinuitySnapshot } from '../../continuity/snapshots.js'
 import { addToIpfs, DEFAULT_IPFS_API_URL, isPinataUploadUrl } from '../../storage/ipfs.js'
 import {
@@ -151,7 +157,7 @@ async function runPublicProfileSigningInner(
         includeLastBackedUpAt: false,
       })
       const nextIdentityForFiles: EthagentIdentity = { ...step.identity, state }
-      const publicSkillsJson = await prepareSyncedPublicSkillsJson(nextIdentityForFiles)
+      const publicSkillsJson = await syncPublicSkillsManifest(nextIdentityForFiles)
       const publicSkillsPin = await addToIpfs(DEFAULT_IPFS_API_URL, publicSkillsJson, fetch, { pinataJwt: step.pinataJwt })
       assertVerifiedPin(publicSkillsPin)
       const agentCardPin = await addToIpfs(
@@ -395,18 +401,24 @@ async function prepareOperatorProfileArtifacts(args: {
   })
   const nextIdentityForFiles: EthagentIdentity = { ...step.identity, state }
 
-  const publicSkillsJson = await prepareSyncedPublicSkillsJson(nextIdentityForFiles)
+  const publicSkillsJson = await syncPublicSkillsManifest(nextIdentityForFiles)
   const publicSkillsPin = await addToIpfs(DEFAULT_IPFS_API_URL, publicSkillsJson, fetch, { pinataJwt: step.pinataJwt })
   assertVerifiedPin(publicSkillsPin)
+  const publicSkillEntries = await derivePublicSkillEntries(nextIdentityForFiles)
+  const augmentedPublicProfile = appendPublicSkillEntries(
+    defaultPublicSkillsProfile(nextIdentityForFiles),
+    publicSkillEntries,
+  )
   const agentCardPin = await addToIpfs(
     DEFAULT_IPFS_API_URL,
-    serializeAgentCard(createAgentCard(defaultPublicSkillsProfile(nextIdentityForFiles))),
+    serializeAgentCard(createAgentCard(augmentedPublicProfile)),
     fetch,
     { pinataJwt: step.pinataJwt },
   )
   assertVerifiedPin(agentCardPin)
 
   const continuityFiles = await readContinuityFiles(nextIdentityForFiles)
+  const skillsTree = await prepareSyncedSkillsTree(nextIdentityForFiles)
   const envelope = createContinuityEnvelopeForSave({
     identity: nextIdentityForFiles,
     registry: step.registry,
@@ -415,6 +427,7 @@ async function prepareOperatorProfileArtifacts(args: {
     walletSignature: wallet.signature,
     state,
     files: continuityFiles,
+    skills: skillsTree,
     walletAccess,
     challengePurpose,
   })

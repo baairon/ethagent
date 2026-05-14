@@ -57,6 +57,54 @@ test('OpenAIChatProvider finalizes collected tool calls even when finish_reason 
   }
 })
 
+test('OpenAIChatProvider unwraps doubly-stringified tool arguments from llama.cpp', async () => {
+  const originalFetch = globalThis.fetch
+  const chunks = [
+    'data: ' + JSON.stringify({
+      choices: [{
+        delta: {
+          tool_calls: [{
+            index: 0,
+            id: 'call-1',
+            type: 'function',
+            function: {
+              name: 'write_file',
+              arguments: JSON.stringify(JSON.stringify({ path: 'notes.txt', content: 'hi' })),
+            },
+          }],
+        },
+      }],
+    }),
+    'data: ' + JSON.stringify({ choices: [{ delta: {}, finish_reason: 'tool_calls' }] }),
+    'data: [DONE]',
+  ].join('\n\n')
+
+  globalThis.fetch = (async () => new Response(chunks, {
+    status: 200,
+    headers: { 'content-type': 'text/event-stream' },
+  })) as typeof fetch
+
+  try {
+    const provider = new OpenAIChatProvider({
+      id: 'llamacpp',
+      model: 'qwen-test',
+      baseUrl: 'http://localhost:8080/v1',
+      apiKey: 'llamacpp',
+    })
+    const events: StreamEvent[] = []
+    for await (const event of provider.complete([{ role: 'user', content: 'write a file' }], new AbortController().signal)) {
+      events.push(event)
+    }
+
+    const stop = events.find(event => event.type === 'tool_use_stop')
+    assert.ok(stop && stop.type === 'tool_use_stop')
+    assert.equal(stop.name, 'write_file')
+    assert.deepEqual(stop.input, { path: 'notes.txt', content: 'hi' })
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
 test('OpenAIChatProvider separates llama.cpp think-tag content into reasoning events', async () => {
   const originalFetch = globalThis.fetch
   const chunks = [
@@ -185,6 +233,114 @@ test('OpenAIChatProvider gates llamacpp images on hasVisionProjector, not on mod
     assert.ok(error, 'expected an error event')
     assert.match(error?.type === 'error' ? error.message : '', /no vision projector loaded/)
     assert.equal(fetched, false, 'should not contact the server when gate fires')
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test('OpenAIChatProvider emits thinking_end between reasoning_content and content', async () => {
+  const originalFetch = globalThis.fetch
+  const chunks = [
+    'data: ' + JSON.stringify({ choices: [{ delta: { reasoning_content: 'figuring it out' } }] }),
+    'data: ' + JSON.stringify({ choices: [{ delta: { reasoning_content: ' some more' } }] }),
+    'data: ' + JSON.stringify({ choices: [{ delta: { content: 'answer' } }] }),
+    'data: ' + JSON.stringify({ choices: [{ delta: {}, finish_reason: 'stop' }] }),
+    'data: [DONE]',
+  ].join('\n\n')
+
+  globalThis.fetch = (async () => new Response(chunks, {
+    status: 200,
+    headers: { 'content-type': 'text/event-stream' },
+  })) as typeof fetch
+
+  try {
+    const provider = new OpenAIChatProvider({
+      id: 'openai',
+      model: 'qwen3-test',
+      baseUrl: 'https://example.com/v1',
+      apiKey: 'k',
+    })
+    const events: StreamEvent[] = []
+    for await (const event of provider.complete([{ role: 'user', content: 'hi' }], new AbortController().signal)) {
+      events.push(event)
+    }
+
+    const thinkingEndIndex = events.findIndex(event => event.type === 'thinking_end')
+    const firstTextIndex = events.findIndex(event => event.type === 'text')
+    assert.ok(thinkingEndIndex !== -1, 'expected thinking_end event')
+    assert.ok(firstTextIndex !== -1, 'expected text event')
+    assert.ok(thinkingEndIndex < firstTextIndex, 'thinking_end must precede first text event')
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test('OpenAIChatProvider emits thinking_end when finish_reason arrives after reasoning only', async () => {
+  const originalFetch = globalThis.fetch
+  const chunks = [
+    'data: ' + JSON.stringify({ choices: [{ delta: { reasoning_content: 'pure reasoning' } }] }),
+    'data: ' + JSON.stringify({ choices: [{ delta: {}, finish_reason: 'stop' }] }),
+    'data: [DONE]',
+  ].join('\n\n')
+
+  globalThis.fetch = (async () => new Response(chunks, {
+    status: 200,
+    headers: { 'content-type': 'text/event-stream' },
+  })) as typeof fetch
+
+  try {
+    const provider = new OpenAIChatProvider({
+      id: 'openai',
+      model: 'qwen3-test',
+      baseUrl: 'https://example.com/v1',
+      apiKey: 'k',
+    })
+    const events: StreamEvent[] = []
+    for await (const event of provider.complete([{ role: 'user', content: 'hi' }], new AbortController().signal)) {
+      events.push(event)
+    }
+
+    assert.ok(events.some(event => event.type === 'thinking_end'))
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test('OpenAIChatProvider emits thinking_end after closing </think> in llama.cpp inline parser', async () => {
+  const originalFetch = globalThis.fetch
+  const chunks = [
+    'data: ' + JSON.stringify({ choices: [{ delta: { content: '<think>plan' } }] }),
+    'data: ' + JSON.stringify({ choices: [{ delta: { content: 'ning</think>answer' } }] }),
+    'data: ' + JSON.stringify({ choices: [{ delta: {}, finish_reason: 'stop' }] }),
+    'data: [DONE]',
+  ].join('\n\n')
+
+  globalThis.fetch = (async () => new Response(chunks, {
+    status: 200,
+    headers: { 'content-type': 'text/event-stream' },
+  })) as typeof fetch
+
+  try {
+    const provider = new OpenAIChatProvider({
+      id: 'llamacpp',
+      model: 'qwen3-gguf',
+      baseUrl: 'http://localhost:8080/v1',
+      apiKey: 'llamacpp',
+    })
+    const events: StreamEvent[] = []
+    for await (const event of provider.complete([{ role: 'user', content: 'hi' }], new AbortController().signal)) {
+      events.push(event)
+    }
+
+    const types = events.map(event => event.type)
+    const thinkingIdx = types.indexOf('thinking')
+    const thinkingEndIdx = types.indexOf('thinking_end')
+    const textIdx = types.indexOf('text')
+    assert.ok(thinkingIdx !== -1, `expected a thinking event, got types: ${types.join(',')}`)
+    assert.ok(thinkingEndIdx !== -1, `expected a thinking_end event, got types: ${types.join(',')}`)
+    assert.ok(textIdx !== -1, `expected a text event, got types: ${types.join(',')}`)
+    assert.ok(thinkingIdx < thinkingEndIdx && thinkingEndIdx <= textIdx,
+      `expected order thinking -> thinking_end -> text, got: ${types.join(',')}`)
   } finally {
     globalThis.fetch = originalFetch
   }

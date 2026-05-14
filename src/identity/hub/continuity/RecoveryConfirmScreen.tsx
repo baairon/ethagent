@@ -66,7 +66,7 @@ export const RecoveryConfirmScreen: React.FC<RecoveryConfirmScreenProps> = ({ mo
               label: isPublish ? 'Yes, Save Snapshot Now' : 'Yes, Refetch From Chain',
               hint: isPublish ? 'Sign and save the encrypted snapshot' : 'Wallet decrypts and overwrites local files',
             },
-            { value: 'back', role: 'section', label: 'Cancel' },
+            { value: 'back', role: 'section', label: 'Navigation' },
             {
               value: 'back',
               label: 'No, Go Back',

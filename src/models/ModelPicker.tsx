@@ -7,10 +7,10 @@ import { Surface } from '../ui/Surface.js'
 import { ProgressBar } from '../ui/ProgressBar.js'
 import { theme } from '../ui/theme.js'
 import {
-  buildLlamaCppRunner,
   DEFAULT_LLAMA_HOST,
   detectLlamaCpp,
   installLlamaCppRunner,
+  killRogueLlamaProcesses,
   setLlamaCppServerPath,
   startLlamaCppServer,
   stopLlamaCppServer,
@@ -80,6 +80,7 @@ type ModelPickerProps = {
   currentModel: string
   contextFit?: ModelPickerContextFit | null
   featuredHfRepo?: string
+  localOnly?: boolean
   onPick: (selection: ModelPickerSelection) => void
   onCancel: () => void
 }
@@ -126,12 +127,20 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
   currentModel,
   contextFit,
   featuredHfRepo,
+  localOnly = false,
   onPick,
   onCancel,
 }) => {
   const [state, setState] = useState<State>({ kind: 'loading' })
   const hfAbortRef = useRef<AbortController | null>(null)
   const oauthServiceRef = useRef<OpenAIOAuthService | null>(null)
+  const dismissToList = (data: LoadedData) => () => {
+    if (localOnly) {
+      onCancel()
+    } else {
+      setState({ kind: 'list', data })
+    }
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -193,8 +202,20 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
 
   if (state.kind === 'loading') {
     return (
-      <Surface title={contextFit ? 'Switch to Larger-Context Model' : 'Switch Provider · Model'} subtitle="Loading providers and models.">
-        <Spinner label="loading providers..." />
+      <Surface
+        title={localOnly ? 'Local Model' : (contextFit ? 'Switch to Larger-Context Model' : 'Switch Provider · Model')}
+        subtitle="Loading providers and models."
+        footer="esc back"
+      >
+        <Spinner label={localOnly ? 'loading local models...' : 'loading providers...'} />
+        <Box marginTop={1}>
+          <Select<'cancel'>
+            options={[{ value: 'cancel', label: 'Back', hint: 'Return to the previous screen', role: 'utility' }]}
+            hintLayout="inline"
+            onSubmit={() => onCancel()}
+            onCancel={() => onCancel()}
+          />
+        </Box>
       </Surface>
     )
   }
@@ -210,7 +231,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
           label="Model Link"
           placeholder={LOCAL_MODEL_LINK_HINT}
           onSubmit={value => void inspectHfInput(state, value, setState)}
-          onCancel={() => setState({ kind: 'list', data: state.data })}
+          onCancel={dismissToList(state.data)}
         />
         {state.error ? <Text color={theme.accentError}>{state.error}</Text> : null}
       </Surface>
@@ -273,10 +294,12 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
         </Box>
         <Select<'download' | 'downloadWithMmproj' | 'pick' | 'cancel'>
           options={[
+            { value: 'download', role: 'section', label: 'Download' },
             ...(mmproj ? [{ value: 'downloadWithMmproj' as const, label: `Download Model + Vision Encoder (+${formatBytes(mmproj.sizeBytes)}) · recommended`, disabled: !canDownload }] : []),
             { value: 'download', label: mmproj ? 'Download Without Vision Encoder' : 'Download This Model', disabled: !canDownload },
+            { value: 'pick', role: 'section', label: 'Navigation' },
             { value: 'pick', label: 'Pick Another File' },
-            { value: 'cancel', label: 'Cancel' },
+            { value: 'cancel', label: 'Cancel', role: 'utility' },
           ]}
           onSubmit={choice => {
             if (choice === 'download') void startHfDownload(state, setState, hfAbortRef, onPick)
@@ -284,9 +307,9 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
               void startHfDownload({ ...state, plan: { ...plan, includeMmproj: true } }, setState, hfAbortRef, onPick)
             }
             else if (choice === 'pick') void inspectHfInput({ kind: 'hfInput', data: state.data }, plan.repoId, setState)
-            else setState({ kind: 'list', data: state.data })
+            else dismissToList(state.data)()
           }}
-          onCancel={() => setState({ kind: 'list', data: state.data })}
+          onCancel={dismissToList(state.data)}
         />
       </Surface>
     )
@@ -326,9 +349,9 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
           onSubmit={choice => {
             if (choice === 'add') void downloadMmprojAndContinue(state, setState, onPick)
             else if (choice === 'skip') void startAndPickHfModel({ ...state.model, mmprojAvailable: false }, state, setState, onPick)
-            else setState({ kind: 'list', data: state.data })
+            else dismissToList(state.data)()
           }}
-          onCancel={() => setState({ kind: 'list', data: state.data })}
+          onCancel={dismissToList(state.data)}
         />
       </Surface>
     )
@@ -359,9 +382,9 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
           onSubmit={choice => {
             if (choice === 'retry') setState({ kind: 'mmprojOffer', data: state.data, model: state.model })
             else if (choice === 'skip') void startAndPickHfModel({ ...state.model, mmprojAvailable: false }, state, setState, onPick)
-            else setState({ kind: 'list', data: state.data })
+            else dismissToList(state.data)()
           }}
-          onCancel={() => setState({ kind: 'list', data: state.data })}
+          onCancel={dismissToList(state.data)}
         />
       </Surface>
     )
@@ -381,9 +404,9 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
           ]}
           onSubmit={choice => {
             if (choice === 'use') void startAndPickHfModel(state.model, state, setState, onPick)
-            else setState({ kind: 'list', data: state.data })
+            else dismissToList(state.data)()
           }}
-          onCancel={() => setState({ kind: 'list', data: state.data })}
+          onCancel={dismissToList(state.data)}
         />
       </Surface>
     )
@@ -399,9 +422,9 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
           ]}
           onSubmit={choice => {
             if (choice === 'retry') setState({ kind: 'hfInput', data: state.data, error: state.input ? undefined : state.message })
-            else setState({ kind: 'list', data: state.data })
+            else dismissToList(state.data)()
           }}
-          onCancel={() => setState({ kind: 'list', data: state.data })}
+          onCancel={dismissToList(state.data)}
         />
       </Surface>
     )
@@ -431,7 +454,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
               const target = targets.find(item => `${item.kind}:${item.id}` === value)
               if (target) setState({ kind: 'localUninstallConfirm', data: state.data, target })
             }}
-            onCancel={() => setState({ kind: 'list', data: state.data })}
+            onCancel={dismissToList(state.data)}
           />
         )}
       </Surface>
@@ -477,8 +500,8 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
       <Surface title="Local Model Uninstalled" subtitle={state.modelName} footer="enter back to picker · esc close">
         <Select<'back'>
           options={[{ value: 'back', label: 'Back To Picker' }]}
-          onSubmit={() => setState({ kind: 'list', data: state.data })}
-          onCancel={() => setState({ kind: 'list', data: state.data })}
+          onSubmit={dismissToList(state.data)}
+          onCancel={dismissToList(state.data)}
         />
       </Surface>
     )
@@ -494,9 +517,9 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
           ]}
           onSubmit={choice => {
             if (choice === 'retry') void uninstallLocalModel({ kind: 'localUninstallConfirm', data: state.data, target: state.target }, setState)
-            else setState({ kind: 'list', data: state.data })
+            else dismissToList(state.data)()
           }}
-          onCancel={() => setState({ kind: 'list', data: state.data })}
+          onCancel={dismissToList(state.data)}
         />
       </Surface>
     )
@@ -525,9 +548,9 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
             if (choice === 'download') setState({ kind: 'hfInput', data: state.data })
             else if (choice === 'install') void installRunnerAndStart(state, setState, onPick)
             else if (choice === 'path') setState({ kind: 'localRunnerPathEntry', data: state.data, model: state.model, submitting: false })
-            else setState({ kind: 'list', data: state.data })
+            else dismissToList(state.data)()
           }}
-          onCancel={() => setState({ kind: 'list', data: state.data })}
+          onCancel={dismissToList(state.data)}
         />
       </Surface>
     )
@@ -546,15 +569,20 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
     const options = buildRunnerRecoveryOptions(state.result)
     return (
       <Surface title="Runner Setup Needs Attention" subtitle={state.result.message} tone="error" footer="enter select · esc back">
-        <Select<'retry' | 'build' | 'path' | 'back'>
+        <Select<'stop-and-retry' | 'path' | 'back'>
           options={options}
+          hintLayout="inline"
           onSubmit={choice => {
-            if (choice === 'retry') void installRunnerAndStart({ kind: 'localRunnerSetup', data: state.data, model: state.model }, setState, onPick)
-            else if (choice === 'build') void buildRunnerAndStart({ kind: 'localRunnerSetup', data: state.data, model: state.model }, setState, onPick)
+            if (choice === 'stop-and-retry') {
+              void (async () => {
+                await killRogueLlamaProcesses()
+                await installRunnerAndStart({ kind: 'localRunnerSetup', data: state.data, model: state.model }, setState, onPick)
+              })()
+            }
             else if (choice === 'path') setState({ kind: 'localRunnerPathEntry', data: state.data, model: state.model, submitting: false })
-            else setState({ kind: 'list', data: state.data })
+            else dismissToList(state.data)()
           }}
-          onCancel={() => setState({ kind: 'list', data: state.data })}
+          onCancel={dismissToList(state.data)}
         />
       </Surface>
     )
@@ -604,9 +632,9 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
             if (choice === 'retry') void startAndPickHfModel(state.model, { kind: 'hfDone', data: state.data, model: state.model }, setState, onPick)
             else if (choice === 'path') setState({ kind: 'localRunnerPathEntry', data: state.data, model: state.model, submitting: false })
             else if (choice === 'install') void installRunnerAndStart({ kind: 'localRunnerSetup', data: state.data, model: state.model }, setState, onPick)
-            else setState({ kind: 'list', data: state.data })
+            else dismissToList(state.data)()
           }}
-          onCancel={() => setState({ kind: 'list', data: state.data })}
+          onCancel={dismissToList(state.data)}
         />
       </Surface>
     )
@@ -630,7 +658,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
             placeholder={providerKeyPlaceholder(provider)}
             isSecret
             onSubmit={(value) => void submitKey(state, value, currentConfig, setState)}
-            onCancel={() => setState({ kind: 'list', data: state.data })}
+            onCancel={dismissToList(state.data)}
           />
         )}
         {error ? <Text color={theme.accentError}>{error}</Text> : null}
@@ -652,9 +680,11 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
         ) : (
           <Select
             options={[
+              { value: 'edit', role: 'section', label: 'Credential' },
               { value: 'edit', label: 'Replace Stored API Key' },
               { value: 'delete', label: 'Remove Stored API Key' },
-              { value: 'cancel', label: 'Back' },
+              { value: 'cancel', role: 'section', label: 'Navigation' },
+              { value: 'cancel', label: 'Back', role: 'utility' },
             ]}
             onSubmit={(value) => {
               if (value === 'edit') {
@@ -667,7 +697,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
               }
               void deleteKey(state, currentConfig, setState, onPick, currentProvider)
             }}
-            onCancel={() => setState({ kind: 'list', data: state.data })}
+            onCancel={dismissToList(state.data)}
           />
         )}
         {error ? <Text color={theme.accentError}>{error}</Text> : null}
@@ -705,7 +735,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
               }
               void signOutOAuth(state, currentConfig, setState, onPick, currentProvider)
             }}
-            onCancel={() => setState({ kind: 'list', data: state.data })}
+            onCancel={dismissToList(state.data)}
           />
         )}
         {error ? <Text color={theme.accentError}>{error}</Text> : null}
@@ -731,9 +761,9 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
             onSubmit={choice => {
               if (choice === 'retry') void startOpenAIOAuthFlow(state.data, currentConfig, setState, oauthServiceRef, onPick)
               else if (choice === 'apikey') setState({ kind: 'keyEntry', provider: 'openai', action: 'set', data: state.data, submitting: false })
-              else setState({ kind: 'list', data: state.data })
+              else dismissToList(state.data)()
             }}
-            onCancel={() => setState({ kind: 'list', data: state.data })}
+            onCancel={dismissToList(state.data)}
           />
         </Surface>
       )
@@ -795,11 +825,12 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
           options={options}
           initialIndex={initialIndex === -1 ? 0 : initialIndex}
           maxVisible={12}
+          hintLayout="inline"
           onSubmit={(value) => {
             const parsed = parseFullCatalogValue(value)
             if (parsed) onPick({ kind: 'cloud', provider: parsed.provider, model: parsed.model, keyJustSet: false })
           }}
-          onCancel={() => setState({ kind: 'list', data: state.data })}
+          onCancel={dismissToList(state.data)}
         />
       </Surface>
     )
@@ -825,9 +856,9 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
           onSubmit={choice => {
             if (choice === 'retry') void openLocalCatalog(state.data, setState)
             else if (choice === 'paste') setState({ kind: 'hfInput', data: state.data })
-            else setState({ kind: 'list', data: state.data })
+            else dismissToList(state.data)()
           }}
-          onCancel={() => setState({ kind: 'list', data: state.data })}
+          onCancel={dismissToList(state.data)}
         />
       </Surface>
     )
@@ -846,28 +877,30 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
           options={options}
           initialIndex={initialIndex === -1 ? 0 : initialIndex}
           maxVisible={12}
-          onSubmit={(value) => handleSubmit(value, state, setState, onPick, onCancel, currentConfig, oauthServiceRef)}
-          onCancel={() => setState({ kind: 'list', data: state.data })}
+          hintLayout="inline"
+          onSubmit={(value) => handleSubmit(value, state, setState, onPick, onCancel, currentConfig, oauthServiceRef, localOnly)}
+          onCancel={dismissToList(state.data)}
         />
       </Surface>
     )
   }
 
   const { data } = state
-  const options = buildModelPickerOptions(data, { currentProvider, currentModel, contextFit })
+  const options = buildModelPickerOptions(data, { currentProvider, currentModel, contextFit }, { localOnly })
   const initialIndex = localOrCloudOptionIndex(options, currentProvider, currentModel)
 
   return (
     <Surface
-      title={contextFit ? 'Switch to Larger-Context Model' : 'Switch Provider · Model'}
-      subtitle={contextFit ? contextFitSubtitle(contextFit) : 'Downloaded GGUF files · cloud providers'}
-      footer="enter select · esc close · /models lists installed models"
+      title={localOnly ? 'Local Model' : (contextFit ? 'Switch to Larger-Context Model' : 'Switch Provider · Model')}
+      subtitle={localOnly ? 'Downloaded GGUF files and curated catalog' : (contextFit ? contextFitSubtitle(contextFit) : 'Downloaded GGUF files · cloud providers')}
+      footer={localOnly ? 'enter select · esc back' : 'enter select · esc close · /models lists installed models'}
     >
       <Select
         options={options}
         initialIndex={initialIndex === -1 ? 0 : initialIndex}
         maxVisible={10}
-        onSubmit={(value) => handleSubmit(value, state, setState, onPick, onCancel, currentConfig, oauthServiceRef)}
+        hintLayout="inline"
+        onSubmit={(value) => handleSubmit(value, state, setState, onPick, onCancel, currentConfig, oauthServiceRef, localOnly)}
         onCancel={onCancel}
       />
     </Surface>
@@ -882,6 +915,7 @@ function handleSubmit(
   onCancel: () => void,
   currentConfig: EthagentConfig,
   oauthServiceRef: React.MutableRefObject<OpenAIOAuthService | null>,
+  localOnly: boolean = false,
 ): void {
   if (value.startsWith('hdr:')) return
   if (value === 'cancel') {
@@ -889,7 +923,8 @@ function handleSubmit(
     return
   }
   if (value === 'back' && state.kind === 'localCatalog') {
-    setState({ kind: 'list', data: state.data })
+    if (localOnly) onCancel()
+    else setState({ kind: 'list', data: state.data })
     return
   }
   if (value.startsWith('hf:')) {
@@ -1304,24 +1339,13 @@ export function buildHfFileOptions(
 }
 
 function buildRunnerRecoveryOptions(
-  result: Extract<LlamaCppInstallResult, { ok: false }>,
-): SelectOption<'retry' | 'build' | 'path' | 'back'>[] {
-  const options: SelectOption<'retry' | 'build' | 'path' | 'back'>[] = []
-  if (result.recovery.includes('source-build')) {
-    options.push({
-      value: 'build',
-      label: 'Build Local Runner',
-      hint: 'Uses git and CMake if installed',
-    })
-  }
-  if (result.recovery.includes('runner-path')) {
-    options.push({ value: 'path', label: 'Use Existing Runner Path' })
-  }
-  if (result.recovery.includes('retry-install')) {
-    options.push({ value: 'retry', label: 'Retry Automatic Install' })
-  }
-  options.push({ value: 'back', label: 'Back To Picker' })
-  return options
+  _result: Extract<LlamaCppInstallResult, { ok: false }>,
+): SelectOption<'stop-and-retry' | 'path' | 'back'>[] {
+  return [
+    { value: 'stop-and-retry', label: 'Stop and Retry', hint: 'Stop background runners and try the install again' },
+    { value: 'path', label: 'Use Existing Runner Path' },
+    { value: 'back', label: 'Back To Picker' },
+  ]
 }
 
 function localRunnerStartFailureSubtitle(result: Extract<LlamaCppStartResult, { ok: false }>): string {
@@ -1338,8 +1362,6 @@ function localRunnerStartFailureSubtitle(result: Extract<LlamaCppStartResult, { 
       return result.message
     case 'runner-not-installed':
       return 'this machine still needs a local runner'
-    case 'untracked-server':
-      return result.message
   }
 }
 
@@ -1554,16 +1576,7 @@ async function downloadMmprojAndContinue(
     setState({ kind: 'mmprojError', data: state.data, model: state.model, message: 'projector downloaded but path was not persisted' })
     return
   }
-  const stopResult = await stopLlamaCppServer().catch(() => null)
-  if (stopResult && stopResult.ok && stopResult.reason === 'untracked-server') {
-    setState({
-      kind: 'mmprojError',
-      data: state.data,
-      model: updated,
-      message: 'Vision encoder downloaded, but a llama-server is already running and ethagent did not launch it. Quit ethagent, stop the external llama-server (taskkill /F /IM llama-server.exe on Windows, pkill llama-server on macOS or Linux), then reopen ethagent to load the projector.',
-    })
-    return
-  }
+  await stopLlamaCppServer().catch(() => null)
   const data = { ...state.data, hfModels: await loadHfPickerModels() }
   await startAndPickHfModel(updated, { kind: 'mmprojOffer', data, model: updated }, setState, onPick)
 }
@@ -1615,14 +1628,6 @@ async function installRunnerAndStart(
   onPick: (sel: ModelPickerSelection) => void,
 ): Promise<void> {
   await runRunnerSetup(state, setState, onPick, installLlamaCppRunner)
-}
-
-async function buildRunnerAndStart(
-  state: Extract<State, { kind: 'localRunnerSetup' }>,
-  setState: (s: State) => void,
-  onPick: (sel: ModelPickerSelection) => void,
-): Promise<void> {
-  await runRunnerSetup(state, setState, onPick, buildLlamaCppRunner)
 }
 
 async function runRunnerSetup(

@@ -50,7 +50,6 @@ export type LlamaCppStartFailureCode =
   | 'spawn-failed'
   | 'runner-exited'
   | 'readiness-timeout'
-  | 'untracked-server'
 
 export type LlamaCppStartResult =
   | { ok: true; alreadyRunning: boolean }
@@ -73,6 +72,9 @@ type LlamaCppStartDeps = {
   access?: typeof fs.access
   binaryPath?: string
   spawnImpl?: (command: string, args: readonly string[], options: NonNullable<Parameters<typeof spawn>[2]>) => ReturnType<typeof spawn>
+  killRogue?: (host: string) => Promise<KillRogueResult>
+  rogueDrainTimeoutMs?: number
+  rogueDrainPollMs?: number
 }
 
 export type LocalRunnerConfig = {
@@ -369,16 +371,22 @@ export async function startLlamaCppServer(args: {
   deps?: LlamaCppStartDeps
 }): Promise<LlamaCppStartResult> {
   const host = args.host ?? DEFAULT_LLAMA_HOST
-  const initialStatus = await servedModelStatus(host, args.modelAlias)
-  if (initialStatus.state === 'ready') {
-    if (args.mmprojPath) {
-      const pid = await readPidFile()
-      if (!pid) {
-        return startFailure('untracked-server', {
-          detail: 'A llama-server is already serving this alias but ethagent did not launch it, so we cannot apply the vision projector. Stop the external process and reopen ethagent.',
+  let initialStatus = await servedModelStatus(host, args.modelAlias)
+  if (initialStatus.state === 'ready' && args.mmprojPath) {
+    const pid = await readPidFile()
+    if (!pid) {
+      await (args.deps?.killRogue ?? killRogueLlamaProcesses)(host).catch(() => null)
+      const drained = await waitForHostDown(host, args.deps?.rogueDrainTimeoutMs ?? 6000, args.deps?.rogueDrainPollMs ?? 200)
+      if (!drained) {
+        return startFailure('different-model-running', {
+          servedModels: initialStatus.models,
+          detail: 'another process is holding the local model port and could not be stopped automatically',
         })
       }
+      initialStatus = await servedModelStatus(host, args.modelAlias)
     }
+  }
+  if (initialStatus.state === 'ready') {
     return { ok: true, alreadyRunning: true }
   }
   if (initialStatus.state === 'different') {
@@ -561,6 +569,17 @@ export async function stopLlamaCppServer(args: {
   return { ok: true, stopped: true }
 }
 
+async function waitForHostDown(host: string, timeoutMs: number, pollMs: number): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    const { up } = await fetchServedModels(host, 800)
+    if (!up) return true
+    await new Promise<void>(resolve => setTimeout(resolve, pollMs))
+  }
+  const { up } = await fetchServedModels(host, 800)
+  return !up
+}
+
 async function servedModelStatus(host: string, modelAlias: string): Promise<
   | { state: 'not-up'; models: string[] }
   | { state: 'ready'; models: string[] }
@@ -570,6 +589,136 @@ async function servedModelStatus(host: string, modelAlias: string): Promise<
   if (!up) return { state: 'not-up', models }
   if (models.length === 0 || models.includes(modelAlias)) return { state: 'ready', models }
   return { state: 'different', models }
+}
+
+export type KillRogueResult = { killed: number; errors: string[] }
+
+export async function killRogueLlamaProcesses(host?: string): Promise<KillRogueResult> {
+  const result: KillRogueResult = { killed: 0, errors: [] }
+  try {
+    await stopLlamaCppServer({ timeoutMs: 1500 })
+  } catch (err: unknown) {
+    result.errors.push(`tracked stop failed: ${(err as Error).message}`)
+  }
+  const platform = os.platform()
+  const portOutcome = await killProcessOnPort(platform, host ?? DEFAULT_LLAMA_HOST)
+  result.killed += portOutcome.killed
+  if (portOutcome.error) result.errors.push(portOutcome.error)
+  const targets = platform === 'win32'
+    ? ['llama-server.exe', 'llama-cli.exe']
+    : ['llama-server', 'llama-cli']
+  for (const target of targets) {
+    const outcome = await runKillCommand(platform, target)
+    result.killed += outcome.killed
+    if (outcome.error) result.errors.push(outcome.error)
+  }
+  await clearPidFile()
+  return result
+}
+
+export async function killProcessOnPort(
+  platform: NodeJS.Platform,
+  host: string,
+): Promise<{ killed: number; error?: string }> {
+  const port = extractHostPort(host)
+  if (!port) return { killed: 0, error: 'no port to scan' }
+  const pids = await listListeningPids(platform, port)
+  if (pids.length === 0) return { killed: 0 }
+  let killed = 0
+  const errors: string[] = []
+  for (const pid of pids) {
+    const outcome = await killByPid(platform, pid)
+    if (outcome.killed) killed++
+    if (outcome.error) errors.push(outcome.error)
+  }
+  return errors.length > 0 ? { killed, error: errors.join('; ') } : { killed }
+}
+
+function extractHostPort(host: string): number | null {
+  try {
+    const url = new URL(host)
+    if (url.port) return Number.parseInt(url.port, 10)
+    return url.protocol === 'https:' ? 443 : 80
+  } catch {
+    return null
+  }
+}
+
+async function listListeningPids(platform: NodeJS.Platform, port: number): Promise<number[]> {
+  if (platform === 'win32') {
+    const result = await runCommand('netstat', ['-ano', '-p', 'tcp'], 4000)
+    if (!result) return []
+    return parseNetstatPids(result.stdout, port)
+  }
+  const result = await runCommand('lsof', ['-nP', `-iTCP:${port}`, '-sTCP:LISTEN', '-t'], 4000)
+  if (!result || result.code !== 0) return []
+  return result.stdout.split(/\r?\n/).map(line => Number.parseInt(line.trim(), 10)).filter(n => Number.isInteger(n) && n > 0)
+}
+
+export function parseNetstatPids(output: string, port: number): number[] {
+  const pids: number[] = []
+  const seen = new Set<number>()
+  const portSuffix = `:${port}`
+  for (const raw of output.split(/\r?\n/)) {
+    const line = raw.trim()
+    if (!line || !line.toUpperCase().includes('LISTENING')) continue
+    const cols = line.split(/\s+/)
+    if (cols.length < 5) continue
+    const local = cols[1] ?? ''
+    if (!local.endsWith(portSuffix)) continue
+    const pid = Number.parseInt(cols[cols.length - 1] ?? '', 10)
+    if (!Number.isInteger(pid) || pid <= 0) continue
+    if (pid === process.pid) continue
+    if (seen.has(pid)) continue
+    seen.add(pid)
+    pids.push(pid)
+  }
+  return pids
+}
+
+async function killByPid(platform: NodeJS.Platform, pid: number): Promise<{ killed: boolean; error?: string }> {
+  return new Promise(resolve => {
+    const cmd = platform === 'win32' ? 'taskkill' : 'kill'
+    const args = platform === 'win32' ? ['/F', '/T', '/PID', String(pid)] : ['-9', String(pid)]
+    const child = spawn(cmd, args, { stdio: 'ignore' })
+    child.on('error', err => resolve({ killed: false, error: `${cmd} ${pid}: ${err.message}` }))
+    child.on('close', code => {
+      if (code === 0) {
+        resolve({ killed: true })
+        return
+      }
+      resolve({ killed: false, error: `${cmd} ${pid} exited ${code}` })
+    })
+  })
+}
+
+async function runKillCommand(
+  platform: NodeJS.Platform,
+  target: string,
+): Promise<{ killed: number; error?: string }> {
+  return new Promise(resolve => {
+    const cmd = platform === 'win32' ? 'taskkill' : 'pkill'
+    const args = platform === 'win32'
+      ? ['/F', '/T', '/IM', target]
+      : ['-f', target]
+    const child = spawn(cmd, args, { stdio: 'ignore' })
+    child.on('error', err => resolve({ killed: 0, error: `${cmd} ${target}: ${err.message}` }))
+    child.on('close', code => {
+      if (code === 0) {
+        resolve({ killed: 1 })
+        return
+      }
+      if (platform === 'win32' && code === 128) {
+        resolve({ killed: 0 })
+        return
+      }
+      if (platform !== 'win32' && code === 1) {
+        resolve({ killed: 0 })
+        return
+      }
+      resolve({ killed: 0, error: `${cmd} ${target} exited ${code}` })
+    })
+  })
 }
 
 function startFailure(
@@ -593,15 +742,15 @@ function startFailureMessage(code: LlamaCppStartFailureCode, servedModels: strin
     case 'model-file-missing':
       return detail ? `model file not found: ${detail}` : 'model file was not found'
     case 'different-model-running':
-      return `a different local model is already running (${servedModels.join(', ')}); stop it before switching models`
+      return servedModels.length > 0
+        ? `a different local model is already running (${servedModels.join(', ')}); stop it before switching models`
+        : detail ?? 'a different local model is already running; stop it before switching models'
     case 'spawn-failed':
       return 'local runner could not be started'
     case 'runner-exited':
       return 'local runner closed before becoming ready'
     case 'readiness-timeout':
       return 'local runner is still loading or did not answer in time'
-    case 'untracked-server':
-      return detail ?? 'a llama-server is already running and ethagent did not launch it; cannot apply the vision encoder until that process is stopped'
   }
 }
 

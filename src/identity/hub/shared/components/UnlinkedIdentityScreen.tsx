@@ -43,7 +43,7 @@ export const UnlinkedIdentityScreen: React.FC<UnlinkedIdentityScreenProps> = ({
     <Surface
       title="No Linked Agent"
       subtitle="The agent token recorded locally is not currently owned by your wallet."
-      footer={<Text color={theme.dim}>enter selects, esc back</Text>}
+      footer={<Text color={theme.dim}>enter selects · esc back</Text>}
     >
       <Box flexDirection="column">
         {transferSnapshot ? (

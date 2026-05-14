@@ -4,14 +4,25 @@ import type { EthagentIdentity } from '../../../storage/config.js'
 import {
   continuityVaultStatus,
   prepareSyncedIdentityMarkdownScaffold,
+  prepareSyncedSkillsTree,
   readContinuityFiles,
   readPublicSkillsFile,
   writeIdentityMarkdownScaffold,
   type IdentityMarkdownScaffold,
 } from '../../continuity/storage.js'
 import {
+  appendPublicSkillEntries,
+  defaultPublicSkillsProfile as basePublicSkillsProfile,
+} from '../../continuity/publicSkills.js'
+import {
+  derivePublicSkillEntries,
+  syncPublicSkillsManifest,
+} from '../../continuity/skills/publicSkillsSync.js'
+import {
   createWalletRestoreAccessChallenge,
   serializeContinuitySnapshotEnvelope,
+  type ContinuityFiles,
+  type ContinuitySkillsTree,
   type WalletChallengePurpose,
 } from '../../continuity/envelope.js'
 import {
@@ -78,6 +89,11 @@ type RebackupPreparedTransaction = {
   publicSkills: PublicSkillsMetadata
   identity: EthagentIdentity
   markdownScaffold?: IdentityMarkdownScaffold
+  publishedSources: {
+    privateFiles: ContinuityFiles
+    publicSkills: string
+    skills: ContinuitySkillsTree
+  }
 }
 
 export async function runRebackupPreflight(
@@ -224,18 +240,22 @@ async function runRebackupSigningInner(
       const continuityFiles = markdownScaffold
         ? { 'SOUL.md': markdownScaffold['SOUL.md'], 'MEMORY.md': markdownScaffold['MEMORY.md'] }
         : await readContinuityFiles(nextIdentityForFiles)
-      const publicSkillsJson = markdownScaffold
-        ? markdownScaffold['skills.json']
-        : await readPublicSkillsFile(nextIdentityForFiles)
+      const publicSkillsJson = await syncPublicSkillsManifest(nextIdentityForFiles)
       const publicSkillsPin = await addToIpfs(DEFAULT_IPFS_API_URL, publicSkillsJson, fetch, { pinataJwt: step.pinataJwt })
       assertVerifiedPin(publicSkillsPin)
+      const publicSkillEntries = await derivePublicSkillEntries(nextIdentityForFiles)
+      const augmentedPublicProfile = appendPublicSkillEntries(
+        basePublicSkillsProfile(nextIdentityForFiles),
+        publicSkillEntries,
+      )
       const agentCardPin = await addToIpfs(
         DEFAULT_IPFS_API_URL,
-        serializeAgentCard(createAgentCard(defaultPublicSkillsProfile(nextIdentityForFiles))),
+        serializeAgentCard(createAgentCard(augmentedPublicProfile)),
         fetch,
         { pinataJwt: step.pinataJwt },
       )
       assertVerifiedPin(agentCardPin)
+      const skillsTree = await prepareSyncedSkillsTree(nextIdentityForFiles)
       const envelope = createContinuityEnvelopeForSave({
         identity: nextIdentityForFiles,
         registry: step.registry,
@@ -244,6 +264,7 @@ async function runRebackupSigningInner(
         walletSignature: wallet.signature,
         state,
         files: continuityFiles,
+        skills: skillsTree,
         walletAccess,
         ...(challengePurpose ? { challengePurpose } : {}),
       })
@@ -310,6 +331,11 @@ async function runRebackupSigningInner(
             publicSkills,
             identity: { ...step.identity, state },
             ...(markdownScaffold ? { markdownScaffold } : {}),
+            publishedSources: {
+              privateFiles: continuityFiles,
+              publicSkills: publicSkillsJson,
+              skills: skillsTree,
+            },
           },
         }
       }
@@ -330,6 +356,11 @@ async function runRebackupSigningInner(
           publicSkills,
           identity: { ...step.identity, state },
           ...(markdownScaffold ? { markdownScaffold } : {}),
+          publishedSources: {
+            privateFiles: continuityFiles,
+            publicSkills: publicSkillsJson,
+            skills: skillsTree,
+          },
         },
       }
     },
@@ -359,7 +390,7 @@ async function runRebackupSigningInner(
     await writeIdentityMarkdownScaffold(nextIdentity, result.prepared.markdownScaffold)
   }
   await recordPublishedContinuitySnapshot({ identity: nextIdentity, label: 'published encrypted snapshot' }).catch(() => null)
-  await markCurrentContinuityFilesPublished(nextIdentity).catch(() => null)
+  await markCurrentContinuityFilesPublished(nextIdentity, result.prepared.publishedSources).catch(() => null)
   const resolverSyncWarning = await syncVaultOperatorsAfterOwnerSave({
     beforeIdentity: step.identity,
     afterIdentity: nextIdentity,

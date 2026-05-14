@@ -246,7 +246,7 @@ test('picker options expose grouped catalog and key management for keyed and unk
   assert.equal(optionByValue(options, 'catalog:openai').label, 'Full Catalog')
   assert.equal(optionByValue(options, 'hdr:exit').label, 'Exit')
   assert.equal(optionByValue(options, 'cancel').label, 'Close Model Picker')
-  assert.equal(optionByValue(options, 'cancel').hint, 'Return to chat without changing model')
+  assert.equal(optionByValue(options, 'cancel').hint, 'Return to chat')
   assert.equal(optionByValue(options, 'catalog:openai').role, 'utility')
   assert.equal(optionByValue(options, 'catalog:openai').indent, 4)
   assert.equal(optionByValue(options, 'key:manage:openai').role, 'utility')

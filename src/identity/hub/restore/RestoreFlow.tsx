@@ -1,8 +1,9 @@
 import React from 'react'
-import { Text } from 'ink'
+import { Box, Text } from 'ink'
 import { Surface } from '../../../ui/Surface.js'
 import { Select } from '../../../ui/Select.js'
 import { TextInput } from '../../../ui/TextInput.js'
+import { Spinner } from '../../../ui/Spinner.js'
 import { theme } from '../../../ui/theme.js'
 import { normalizeErc8004RegistryConfig } from '../../registry/erc8004.js'
 import {
@@ -18,7 +19,7 @@ import { WalletApprovalScreen } from '../shared/components/WalletApprovalScreen.
 import { BusyScreen } from '../shared/components/BusyScreen.js'
 import type { BrowserWalletReady } from '../../wallet/browserWallet.js'
 import type { EthagentConfig } from '../../../storage/config.js'
-import { restoreSignatureRequestForStep } from './index.js'
+import { restoreSignatureRequestForStep } from './auth.js'
 import type { RestoreProgress } from '../shared/effects/types.js'
 
 type RestoreStep = Exclude<Extract<Step, { kind: `restore-${string}` }>, { kind: 'restore-wallet' | 'restore-network' }>
@@ -122,11 +123,24 @@ export const RestoreFlow: React.FC<RestoreFlowProps> = ({
   }
 
   if (step.kind === 'restore-ens-input') {
+    if (step.busy) {
+      return (
+        <Surface
+          title={isSwitch ? 'Load Agent' : 'Restore Agent'}
+          subtitle="Looking up the agent onchain."
+          footer={footerHint('esc cancels')}
+        >
+          <Box marginTop={1}>
+            <Spinner label="looking up ENS name onchain..." />
+          </Box>
+        </Surface>
+      )
+    }
     return (
       <Surface
         title={isSwitch ? 'Load Agent' : 'Restore Agent'}
         subtitle="Enter the agent's ENS name to decrypt with an authorized operator wallet."
-        footer={footerHint(step.busy ? 'Looking up...' : 'enter continue · esc back')}
+        footer={footerHint('enter continue · esc back')}
       >
         <Text color={theme.dim}>The full agent subdomain, e.g. agent.example.eth.</Text>
         <TextInput
@@ -134,17 +148,35 @@ export const RestoreFlow: React.FC<RestoreFlowProps> = ({
           onSubmit={value => onEnsSubmit(value.trim())}
           onCancel={onBack}
         />
-        {step.error ? <Text color={theme.accentError}>{step.error}</Text> : null}
+        {step.error ? (
+          <Box marginTop={1} flexDirection="column">
+            <Text color={theme.accentError}>Could not resolve ENS name</Text>
+            <Text color={theme.textSubtle}>{step.error}</Text>
+          </Box>
+        ) : null}
       </Surface>
     )
   }
 
   if (step.kind === 'restore-token-id-input') {
+    if (step.busy) {
+      return (
+        <Surface
+          title={isSwitch ? 'Load Agent' : 'Restore Agent'}
+          subtitle="Looking up the agent onchain."
+          footer={footerHint('esc cancels')}
+        >
+          <Box marginTop={1}>
+            <Spinner label="looking up token onchain..." />
+          </Box>
+        </Surface>
+      )
+    }
     return (
       <Surface
         title={isSwitch ? 'Load Agent' : 'Restore Agent'}
         subtitle={`Enter the ERC-8004 token ID on ${networkLabelForRegistry(step.registry)}.`}
-        footer={footerHint(step.busy ? 'Looking up...' : 'enter continue · esc back')}
+        footer={footerHint('enter continue · esc back')}
       >
         <Text color={theme.dim}>The integer token ID assigned at mint.</Text>
         <TextInput
@@ -152,7 +184,12 @@ export const RestoreFlow: React.FC<RestoreFlowProps> = ({
           onSubmit={value => onTokenIdSubmit(value.trim())}
           onCancel={onBack}
         />
-        {step.error ? <Text color={theme.accentError}>{step.error}</Text> : null}
+        {step.error ? (
+          <Box marginTop={1} flexDirection="column">
+            <Text color={theme.accentError}>Could not resolve token</Text>
+            <Text color={theme.textSubtle}>{step.error}</Text>
+          </Box>
+        ) : null}
       </Surface>
     )
   }

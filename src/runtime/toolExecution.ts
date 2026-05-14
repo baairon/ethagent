@@ -50,8 +50,8 @@ export async function executeToolWithPermissions(
     return {
       result: {
         ok: false,
-        summary: `unknown tool ${options.name}`,
-        content: `tool '${options.name}' is not registered`,
+        summary: `Unknown tool ${options.name}`,
+        content: `Tool '${options.name}' is not registered`,
       },
     }
   }
@@ -98,6 +98,7 @@ export async function executeToolWithPermissions(
     options.permissionMode === 'plan' &&
     request.kind !== 'read' &&
     request.kind !== 'private-continuity-read' &&
+    request.kind !== 'private-skill-read' &&
     !(request.kind === 'mcp' && request.readOnly)
   ) {
     return {
@@ -111,7 +112,7 @@ export async function executeToolWithPermissions(
 
   const matchedRule = matchPermissionRule(options.getPermissionRules(), request)
   const decision: PermissionDecision =
-    modePolicy(options.permissionMode).autoAllowToolKind(request.kind)
+    modePolicy(options.permissionMode).autoAllowToolKind(tool.kind)
       ? 'allow-once'
       : matchedRule
         ? 'allow-once'

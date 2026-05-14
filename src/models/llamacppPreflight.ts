@@ -26,9 +26,6 @@ export type LlamaCppPreflightDeps = {
   timeoutMs?: number
 }
 
-const UNTRACKED_VISION_DETAIL =
-  'A llama-server is already serving this alias but ethagent did not launch it, so we cannot apply the vision projector. Stop the external process and reopen ethagent.'
-
 type ModelsProbe =
   | { up: true; models: string[] }
   | { up: false; models: [] }
@@ -68,19 +65,7 @@ export async function ensureLlamaCppRunnerReady(
       }
     }
     if (!local.mmprojPath) return { ok: true, alreadyRunning: true }
-    const stopped = await (deps.stopServer ?? stopLlamaCppServer)().catch(() => null)
-    if (stopped && stopped.ok && stopped.reason === 'untracked-server') {
-      return withPreflightMessage(
-        {
-          ok: false,
-          code: 'untracked-server',
-          message: UNTRACKED_VISION_DETAIL,
-          detail: UNTRACKED_VISION_DETAIL,
-          servedModels: stopped.servedModels,
-        },
-        local,
-      )
-    }
+    await (deps.stopServer ?? stopLlamaCppServer)().catch(() => null)
   }
 
   const result = await (deps.startServer ?? startLlamaCppServer)({

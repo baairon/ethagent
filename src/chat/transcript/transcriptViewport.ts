@@ -1,4 +1,5 @@
 import type { MessageRow } from '../MessageList.js'
+import { flattenAssistantBody } from '../MessageList.js'
 
 export type TranscriptAnchor = {
   rowId: string
@@ -9,6 +10,13 @@ export type TranscriptViewportState = {
   scrollTopLine: number
   followTail: boolean
   anchor: TranscriptAnchor | null
+}
+
+export type RowSlice<T> = {
+  row: T
+  clipStart: number
+  clipEnd: number
+  rowHeight: number
 }
 
 export function buildLineOffsets(rowHeights: number[]): number[] {
@@ -62,12 +70,12 @@ export function clampLine(line: number, maxScrollTop: number): number {
 }
 
 export type TranscriptTailSelection<T> = {
-  rows: T[]
+  rows: Array<RowSlice<T>>
   hiddenCount: number
 }
 
 export type TranscriptWindowSelection<T> = {
-  rows: T[]
+  rows: Array<RowSlice<T>>
   hiddenBefore: number
   hiddenAfter: number
   totalLines: number
@@ -94,8 +102,12 @@ export function selectTailRowsForViewport<T>(
   }
 
   const firstVisible = Math.max(0, start + 1)
+  const slice = rows.slice(firstVisible).map(row => {
+    const height = Math.max(1, estimateHeight(row))
+    return { row, clipStart: 0, clipEnd: height, rowHeight: height }
+  })
   return {
-    rows: rows.slice(firstVisible),
+    rows: slice,
     hiddenCount: firstVisible,
   }
 }
@@ -118,7 +130,7 @@ export function selectRowsForScrollOffset<T>(
   const scrollOffset = clampLine(scrollOffsetFromTail, maxScrollOffset)
   const startLine = Math.max(0, totalLines - budget - scrollOffset)
 
-  return selectRowsForLineWindow(rows, offsets, budget, startLine, totalLines, maxScrollOffset)
+  return selectRowsForLineWindow(rows, heights, offsets, budget, startLine, totalLines, maxScrollOffset)
 }
 
 export function selectRowsForScrollTop<T>(
@@ -138,7 +150,7 @@ export function selectRowsForScrollTop<T>(
   const maxScrollOffset = Math.max(0, totalLines - budget)
   const startLine = clampLine(scrollTopLine, maxScrollOffset)
 
-  return selectRowsForLineWindow(rows, offsets, budget, startLine, totalLines, maxScrollOffset)
+  return selectRowsForLineWindow(rows, heights, offsets, budget, startLine, totalLines, maxScrollOffset)
 }
 
 export function scrollTopForPageUp(
@@ -159,11 +171,12 @@ export function scrollTopForPageDown(
 
 function pageScrollDistance(viewportLines: number): number {
   const viewport = Math.max(1, Math.floor(viewportLines))
-  return Math.max(1, Math.floor(viewport / 2))
+  return Math.max(1, viewport - 2)
 }
 
 function selectRowsForLineWindow<T>(
   rows: T[],
+  heights: number[],
   offsets: number[],
   budget: number,
   startLine: number,
@@ -178,8 +191,20 @@ function selectRowsForLineWindow<T>(
     ? rows.length
     : Math.min(rows.length, findRowIndexAtLine(offsets, lastVisibleLine) + 1)
 
+  const slices: Array<RowSlice<T>> = []
+  for (let i = startIndex; i < endIndex; i += 1) {
+    const row = rows[i]
+    if (!row) continue
+    const rowTop = offsets[i] ?? 0
+    const height = heights[i] ?? 1
+    const clipStart = Math.max(0, startLine - rowTop)
+    const clipEnd = Math.min(height, endLine - rowTop)
+    if (clipEnd <= clipStart) continue
+    slices.push({ row, clipStart, clipEnd, rowHeight: height })
+  }
+
   return {
-    rows: rows.slice(startIndex, endIndex),
+    rows: slices,
     hiddenBefore: startIndex,
     hiddenAfter: rows.length - endIndex,
     totalLines,
@@ -191,13 +216,11 @@ export function estimateMessageRowHeight(row: MessageRow, columns = 80): number 
   const contentWidth = Math.max(20, columns - 8)
   switch (row.role) {
     case 'user':
-      return 1 + wrappedLineCount(row.content, contentWidth)
+      return userRowLineCount(row.content, contentWidth)
     case 'assistant':
-      return 1 + wrappedLineCount([row.content, row.liveTail ?? ''].filter(Boolean).join('\n'), contentWidth)
+      return assistantRowLineCount(row.content, row.liveTail ?? '', contentWidth, Boolean(row.streaming))
     case 'thinking':
-      return row.expanded
-        ? 3 + wrappedLineCount([row.content, row.liveTail ?? ''].filter(Boolean).join('\n'), contentWidth)
-        : 3 + wrappedLineCount(reasoningPreview(row), contentWidth)
+      return thinkingRowLineCount(row, contentWidth)
     case 'tool_call':
       return 1
     case 'note':
@@ -209,11 +232,59 @@ export function estimateMessageRowHeight(row: MessageRow, columns = 80): number 
   }
 }
 
-function reasoningPreview(row: Extract<MessageRow, { role: 'thinking' }>): string {
-  const normalized = [row.content, row.liveTail ?? ''].filter(Boolean).join('').replace(/\s+/g, ' ').trim()
-  if (!normalized) return 'thinking...'
-  if (normalized.length <= 120) return normalized
-  return `${normalized.slice(0, 117)}...`
+export function userRowLineCount(content: string, contentWidth: number): number {
+  const lines = splitLines(content)
+  return 1 + lines.reduce((sum, line) => sum + Math.max(1, Math.ceil(line.length / contentWidth)), 0)
+}
+
+export function assistantRowLineCount(content: string, liveTail: string, _contentWidth: number, streaming = false): number {
+  const fullText = liveTail ? content + liveTail : content
+  return 1 + flattenAssistantBody(fullText, streaming).length
+}
+
+export function thinkingRowLineCount(
+  row: Extract<MessageRow, { role: 'thinking' }>,
+  _contentWidth: number,
+): number {
+  const omitted = thinkingDisplayOmittedChars(row)
+  const overhead = 1 + (omitted > 0 ? 1 : 0) + 1
+  if (!row.expanded) return overhead
+  const body = thinkingDisplayBody(row)
+  const lines = splitLines(body)
+  return overhead + lines.length
+}
+
+export function thinkingDisplayBody(row: Extract<MessageRow, { role: 'thinking' }>): string {
+  const text = row.liveTail ? row.content + row.liveTail : row.content
+  return clipReasoningForDisplayText(text)
+}
+
+export function thinkingDisplayOmittedChars(row: Extract<MessageRow, { role: 'thinking' }>): number {
+  const text = row.liveTail ? row.content + row.liveTail : row.content
+  return clipReasoningForDisplayOmitted(text)
+}
+
+const MAX_RENDERED_REASONING_CHARS = 10_000
+
+function clipReasoningForDisplayText(text: string): string {
+  if (text.length <= MAX_RENDERED_REASONING_CHARS) return text
+  const rawStart = Math.max(0, text.length - MAX_RENDERED_REASONING_CHARS)
+  const newline = text.indexOf('\n', rawStart)
+  const start = newline >= 0 && newline - rawStart <= 240 ? newline + 1 : rawStart
+  return text.slice(start)
+}
+
+function clipReasoningForDisplayOmitted(text: string): number {
+  if (text.length <= MAX_RENDERED_REASONING_CHARS) return 0
+  const rawStart = Math.max(0, text.length - MAX_RENDERED_REASONING_CHARS)
+  const newline = text.indexOf('\n', rawStart)
+  return newline >= 0 && newline - rawStart <= 240 ? newline + 1 : rawStart
+}
+
+export function splitLines(text: string): string[] {
+  if (!text) return ['']
+  const normalized = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+  return normalized.split('\n')
 }
 
 function wrappedLineCount(text: string, width: number): number {

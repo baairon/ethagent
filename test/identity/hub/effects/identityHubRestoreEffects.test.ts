@@ -3,8 +3,10 @@ import assert from 'node:assert/strict'
 import { getAddress } from 'viem'
 import {
   restoreSignatureRequestForStep,
+} from '../../../../src/identity/hub/restore/auth.js'
+import {
   restoreTokenSelectionStep,
-} from '../../../../src/identity/hub/restore/index.js'
+} from '../../../../src/identity/hub/restore/discover.js'
 import { CONTINUITY_SNAPSHOT_ENVELOPE_VERSION } from '../../../../src/identity/continuity/envelope.js'
 import { candidate, registry } from './effects.fixtures.js'
 

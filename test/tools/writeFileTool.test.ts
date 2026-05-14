@@ -52,6 +52,28 @@ test('write_file overwrites existing files only with explicit overwrite', async 
   assert.equal(await fs.readFile(path.join(cwd, 'index.html'), 'utf8'), '<h1>New</h1>\n')
 })
 
+test('write_file accepts string-encoded JSON input', async () => {
+  const cwd = await fs.mkdtemp(path.join(os.tmpdir(), 'ethagent-write-'))
+
+  const outcome = await runWrite(
+    cwd,
+    JSON.stringify({ path: 'notes.txt', content: 'hello\n' }) as unknown as Record<string, unknown>,
+  )
+
+  assert.equal(outcome.result.ok, true)
+  assert.equal(await fs.readFile(path.join(cwd, 'notes.txt'), 'utf8'), 'hello\n')
+})
+
+test('write_file rejects whitespace-only path with a clear missing-field error', async () => {
+  const cwd = await fs.mkdtemp(path.join(os.tmpdir(), 'ethagent-write-'))
+
+  const outcome = await runWrite(cwd, { path: '   ', content: 'hello\n' })
+
+  assert.equal(outcome.result.ok, false)
+  assert.equal(outcome.result.summary, 'write_file rejected input')
+  assert.match(outcome.result.content, /path/i)
+})
+
 test('write_file rejects shell-command-shaped paths', async () => {
   const cwd = await fs.mkdtemp(path.join(os.tmpdir(), 'ethagent-write-'))
 

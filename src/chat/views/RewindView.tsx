@@ -142,11 +142,13 @@ export const RewindView: React.FC<RewindViewProps> = ({
     const canRestoreCode = selectedRow.entries.length > 0
 
     const actionOptions: Array<SelectOption<ConfirmOption>> = [
+      { value: 'both', role: 'section', label: 'Restore' },
       { value: 'both', prefix: '1.', label: 'Restore code and conversation', disabled: !canRestoreCode },
       { value: 'conversation', prefix: '2.', label: 'Restore conversation' },
       { value: 'code', prefix: '3.', label: 'Restore code', disabled: !canRestoreCode },
       { value: 'summarize', prefix: '4.', label: 'Summarize from here' },
-      { value: 'nevermind', prefix: '5.', label: 'Never mind' },
+      { value: 'nevermind', role: 'section', label: 'Navigation' },
+      { value: 'nevermind', prefix: '5.', label: 'Never mind', role: 'utility' },
     ]
     const defaultValue: ConfirmOption = canRestoreCode ? 'both' : 'conversation'
     const initialIndex = actionOptions.findIndex(option => option.value === defaultValue && !option.disabled)

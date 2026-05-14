@@ -49,6 +49,16 @@ export type PermissionRequest =
       range: string
     }
   | {
+      kind: 'private-skill-read'
+      path: string
+      relativePath: string
+      directoryPath: string
+      title: string
+      subtitle: string
+      skillName: string
+      mode: 'list' | 'read'
+    }
+  | {
       kind: 'private-continuity-edit'
       path: string
       relativePath: string

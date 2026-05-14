@@ -12,6 +12,7 @@ import {
   continuityAgentSnapshot,
   defaultContinuityFiles,
 } from '../../continuity/storage.js'
+import type { ContinuitySkillsTree } from '../../continuity/envelope.js'
 import type { Erc8004RegistryConfig, EthagentOperatorsPointer } from '../../registry/erc8004.js'
 import { readOwnerAddressField } from '../../identityCompat.js'
 import { readCustodyMode } from '../custody/state.js'
@@ -206,6 +207,7 @@ export function createContinuityEnvelopeForSave(args: {
   walletSignature: string
   state: Record<string, unknown>
   files: ReturnType<typeof defaultContinuityFiles>
+  skills?: ContinuitySkillsTree
   walletAccess: WalletRestoreAccessContext
   challengePurpose?: WalletChallengePurpose
 }): ContinuitySnapshotEnvelope {
@@ -259,6 +261,7 @@ export function createContinuityEnvelopeForSave(args: {
     payload: {
       agent: continuityAgentSnapshot(args.identity),
       files: args.files,
+      ...(args.skills && Object.keys(args.skills).length > 0 ? { skills: args.skills } : {}),
       transcript: [],
       state: args.state,
     },

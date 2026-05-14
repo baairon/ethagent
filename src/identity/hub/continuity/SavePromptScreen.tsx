@@ -37,6 +37,7 @@ export const SavePromptScreen: React.FC<SavePromptScreenProps> = ({ workingStatu
           options={[
             { value: 'save-now', role: 'section', label: 'Save' },
             { value: 'save-now', label: 'Save now', hint: 'Sign once and save the encrypted snapshot' },
+            { value: 'later', role: 'section', label: 'Defer' },
             { value: 'later', label: 'Not now', hint: 'Ask again on the next ethagent launch', role: 'utility' },
           ]}
           hintLayout="inline"

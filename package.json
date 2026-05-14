@@ -1,6 +1,6 @@
 {
   "name": "ethagent",
-  "version": "2.4.0",
+  "version": "3.0.0",
   "description": "A privacy-first AI agent with a portable Ethereum identity",
   "type": "module",
   "main": "bin/ethagent.js",
@@ -56,6 +56,7 @@
     "react": "^19.2.4",
     "tsx": "^4.21.0",
     "viem": "^2.48.4",
+    "wrap-ansi": "^9.0.2",
     "zod": "^3.25.76"
   },
   "devDependencies": {

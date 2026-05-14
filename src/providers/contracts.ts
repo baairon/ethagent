@@ -42,6 +42,7 @@ export type ProviderRetryStreamEvent = { type: 'retry' } & RetryEvent
 export type StreamEvent =
   | { type: 'text'; delta: string }
   | { type: 'thinking'; delta: string }
+  | { type: 'thinking_end' }
   | ProviderRetryStreamEvent
   | { type: 'tool_use_start'; id: string; name: string }
   | { type: 'tool_use_delta'; id: string; delta: string }

@@ -6,7 +6,13 @@ import {
   restoreContinuitySnapshotEnvelope,
   transferSnapshotMetadataFromEnvelope,
 } from '../../continuity/envelope.js'
-import { ensureIdentityMarkdownScaffold, localContinuitySnapshotContentHashes, writeContinuityFiles } from '../../continuity/storage.js'
+import {
+  ensureIdentityMarkdownScaffold,
+  localContinuitySnapshotContentHashes,
+  restoreSkillsTree,
+  writeContinuityFiles,
+} from '../../continuity/storage.js'
+import { syncPublicSkillsManifest } from '../../continuity/skills/publicSkillsSync.js'
 import { recordPublishedContinuitySnapshot, updatePublishedContinuitySnapshotContentHashes } from '../../continuity/snapshots.js'
 import { catFromIpfs, DEFAULT_IPFS_API_URL } from '../../storage/ipfs.js'
 import {
@@ -123,9 +129,13 @@ export async function runRecoveryRefetch(
     } : {}),
   }
   await writeContinuityFiles(nextIdentity, payload.files)
+  if (payload.skills) {
+    await restoreSkillsTree(nextIdentity, payload.skills)
+  }
   callbacks.onRestoreProgress?.({ phase: 'finishing', label: 'finalizing refreshed identity...' })
   const publicSkillsRestored = await restorePublishedPublicSkills(nextIdentity, apiUrl, candidate.publicDiscovery?.skillsCid)
   await ensureIdentityMarkdownScaffold(nextIdentity)
+  await syncPublicSkillsManifest(nextIdentity).catch(() => null)
   await recordPublishedContinuitySnapshot({ identity: nextIdentity, label: 'Refetched Latest Snapshot From Chain' }).catch(() => null)
   if (publicSkillsRestored) {
     const contentHashes = await localContinuitySnapshotContentHashes(nextIdentity)

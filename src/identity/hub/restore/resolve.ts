@@ -29,7 +29,7 @@ export async function resolveAgentEnsToCandidate(
     return { ok: false, message: `Could not reach Ethereum mainnet to resolve ${trimmed}: ${err instanceof Error ? err.message : String(err)}` }
   }
   const tokenValue = records[AGENT_RECORD_KEYS.token]
-  if (!tokenValue) return { ok: false, message: `${trimmed} has no org.ethagent.token record. Use the full agent subdomain (e.g. agent.${trimmed}).` }
+  if (!tokenValue) return { ok: false, message: `${trimmed} has no org.ethagent.token record.` }
   const tokenRef = parseAgentTokenReference(tokenValue)
   if (!tokenRef) return { ok: false, message: `${trimmed}'s org.ethagent.token record is not a valid eip155 reference.` }
   if (tokenRef.chainId !== registry.chainId) {

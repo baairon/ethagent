@@ -9,11 +9,11 @@ import { copyToClipboard } from '../../utils/clipboard.js'
 import { DEFAULT_IPFS_API_URL } from '../storage/ipfs.js'
 import { chainIdForNetwork, erc8004ConfigForSupportedChain } from '../registry/erc8004.js'
 import { shortAddress } from './shared/model/format.js'
+import { canRestoreCandidate } from './restore/discover.js'
 import {
-  canRestoreCandidate,
   resolveAgentEnsToCandidate,
   resolveAgentTokenIdToCandidate,
-} from './restore/index.js'
+} from './restore/resolve.js'
 import {
   runRegistrySubmit,
   runStorageSubmit,
@@ -85,7 +85,7 @@ export const IdentityHubRoutes: React.FC<{ controller: IdentityHubController }> 
               { value: 'ens', role: 'section', label: 'Set Up Now' },
               { value: 'ens', label: 'Set Up ENS Name', hint: 'Walks you through Root, Name, Review, and Apply' },
               { value: 'skip', role: 'section', label: 'Skip' },
-              { value: 'skip', label: 'Skip For Now', hint: 'Continue to model setup. ENS can be added from Identity Hub later.', role: 'utility' },
+              { value: 'skip', label: 'Skip For Now', hint: 'Continue to model setup; add ENS later', role: 'utility' },
             ]}
             hintLayout="inline"
             onSubmit={choice => {
@@ -142,6 +142,7 @@ export const IdentityHubRoutes: React.FC<{ controller: IdentityHubController }> 
           setStep({ kind: 'custody-model', identity, registry: reg, returnTo: { kind: 'menu' } })
         }}
         onContinuity={() => setStep({ kind: 'continuity-private' })}
+        onSkillsTree={() => setStep({ kind: 'continuity-skills-tree' })}
         onIdentityValues={() => setStep({ kind: 'details' })}
         onPrepareTransfer={openTokenTransferFlow}
         onStorage={() => setStep({ kind: 'storage-credential' })}
@@ -329,6 +330,7 @@ export const IdentityHubRoutes: React.FC<{ controller: IdentityHubController }> 
       <DetailsScreen
         identity={identity}
         config={config}
+        workingStatus={workingStatus}
         copyNotice={copyNotice}
         unlinked={reconciliation?.token === 'unlinked'}
         {...(reconciliation?.onChainOwner ? { onchainOwner: reconciliation.onChainOwner } : {})}
