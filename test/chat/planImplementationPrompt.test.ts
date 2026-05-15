@@ -35,7 +35,7 @@ test('plan approval options include one clear new-conversation choice', () => {
   )
   assert.equal(
     PLAN_APPROVAL_OPTIONS.find(option => option.value === 'continue')?.label,
-    'No, stay in Plan mode',
+    'No, stay in plan mode',
   )
 })
 
@@ -73,7 +73,7 @@ test('context limit options keep explicit send override available', () => {
   )
 })
 
-test('chat footer only shows transcript scroll shortcut when scrolling is available', () => {
+test('chat footer keeps shortcut copy compact', () => {
   assert.equal(chatFooterShortcutText(false), 'alt+p model · alt+i identity')
-  assert.equal(chatFooterShortcutText(true), 'pgup/pgdn scroll · alt+p model · alt+i identity')
+  assert.equal(chatFooterShortcutText(true), 'alt+p model · alt+i identity')
 })

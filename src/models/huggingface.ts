@@ -1,8 +1,26 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { createHash } from 'node:crypto'
-import { getConfigDir, ensureConfigDir } from '../storage/config.js'
-import { atomicWriteText } from '../storage/atomicWrite.js'
+import {
+  findLocalHfModel,
+  getLocalHfCacheDir,
+  getLocalHfModelsPath,
+  loadLocalHfModels,
+  localPathFor,
+  saveLocalHfModels,
+  uninstallLocalHfModel,
+  upsertLocalHfModel,
+} from './huggingfaceStorage.js'
+
+export {
+  findLocalHfModel,
+  getLocalHfCacheDir,
+  getLocalHfModelsPath,
+  loadLocalHfModels,
+  saveLocalHfModels,
+  uninstallLocalHfModel,
+  upsertLocalHfModel,
+} from './huggingfaceStorage.js'
 
 export type HfFileFormat = 'gguf' | 'safetensors' | 'pickle/bin' | 'unknown'
 export type HfRuntime = 'llama.cpp runnable' | 'download-only' | 'unsupported'
@@ -110,11 +128,6 @@ export type HfDownloadProgress = {
 }
 
 type FetchImpl = typeof fetch
-type UninstallDeps = {
-  unlink?: (target: string) => Promise<void>
-  rmdir?: (target: string) => Promise<void>
-}
-
 type ModelInfoResponse = {
   id?: unknown
   author?: unknown
@@ -141,70 +154,6 @@ const DEFAULT_REVISION = 'main'
 const COMMIT_RE = /^[a-f0-9]{40}$/i
 const DOWNLOAD_PROGRESS_MIN_MS = 100
 const DOWNLOAD_PROGRESS_MIN_BYTES = 16 * 1024 * 1024
-
-export function getLocalHfModelsPath(): string {
-  return path.join(getConfigDir(), 'local-models.json')
-}
-
-export function getLocalHfCacheDir(): string {
-  return path.join(getConfigDir(), 'models', 'huggingface')
-}
-
-export async function loadLocalHfModels(): Promise<LocalHfModel[]> {
-  try {
-    const raw = await fs.readFile(getLocalHfModelsPath(), 'utf8')
-    const parsed = JSON.parse(raw) as unknown
-    if (!Array.isArray(parsed)) return []
-    return parsed.filter(isLocalHfModel)
-  } catch (err: unknown) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return []
-    return []
-  }
-}
-
-export async function saveLocalHfModels(models: LocalHfModel[]): Promise<void> {
-  await ensureConfigDir()
-  await atomicWriteText(getLocalHfModelsPath(), JSON.stringify(models, null, 2) + '\n')
-}
-
-export async function upsertLocalHfModel(model: LocalHfModel): Promise<void> {
-  const current = await loadLocalHfModels()
-  const next = [
-    model,
-    ...current.filter(existing => existing.id !== model.id),
-  ]
-  await saveLocalHfModels(next)
-}
-
-export async function findLocalHfModel(id: string): Promise<LocalHfModel | null> {
-  const models = await loadLocalHfModels()
-  return models.find(model => model.id === id) ?? null
-}
-
-export async function uninstallLocalHfModel(
-  id: string,
-  deps: UninstallDeps = {},
-): Promise<LocalHfModel | null> {
-  const models = await loadLocalHfModels()
-  const model = models.find(item => item.id === id)
-  if (!model) return null
-
-  const cacheRoot = path.resolve(getLocalHfCacheDir())
-  const modelPath = path.resolve(model.localPath)
-  const partialPath = path.resolve(`${model.localPath}.partial`)
-  if (!isPathInside(cacheRoot, modelPath) || !isPathInside(cacheRoot, partialPath)) {
-    throw new Error('Refusing to uninstall a local model outside EthAgent model cache')
-  }
-
-  const unlink = deps.unlink ?? ((target: string) => fs.unlink(target))
-  const rmdir = deps.rmdir ?? ((target: string) => fs.rmdir(target))
-  await unlinkIfPresent(modelPath, unlink)
-  await unlinkIfPresent(partialPath, unlink)
-  await cleanupEmptyParents(path.dirname(modelPath), cacheRoot, rmdir)
-
-  await saveLocalHfModels(models.filter(item => item.id !== id))
-  return model
-}
 
 export function parseHuggingFaceRef(input: string): HuggingFaceRef {
   const trimmed = input.trim()
@@ -675,55 +624,6 @@ export function quantizationFromFilename(filename: string): string | undefined {
   return match?.[1]
 }
 
-function localPathFor(repoId: string, revision: string, filename: string): string {
-  const repoParts = repoId.split('/').map(safePathPart)
-  const fileParts = filename.split('/').map(safePathPart)
-  return path.join(getLocalHfCacheDir(), ...repoParts, safePathPart(revision), ...fileParts)
-}
-
-async function unlinkIfPresent(
-  target: string,
-  unlink: (target: string) => Promise<void>,
-): Promise<void> {
-  try {
-    await unlink(target)
-  } catch (err: unknown) {
-    const code = (err as NodeJS.ErrnoException).code
-    if (code === 'ENOENT') return
-    if (code === 'EBUSY' || code === 'EPERM' || code === 'EACCES') {
-      throw new Error('That model file is currently in use. Stop the local runner and try uninstall again.')
-    }
-    throw err
-  }
-}
-
-async function cleanupEmptyParents(
-  startDir: string,
-  cacheRoot: string,
-  rmdir: (target: string) => Promise<void>,
-): Promise<void> {
-  let current = path.resolve(startDir)
-  while (isPathInside(cacheRoot, current) && current !== cacheRoot) {
-    try {
-      await rmdir(current)
-    } catch (err: unknown) {
-      const code = (err as NodeJS.ErrnoException).code
-      if (code === 'ENOENT') {
-        current = path.dirname(current)
-        continue
-      }
-      if (code === 'ENOTEMPTY' || code === 'EEXIST' || code === 'EPERM') return
-      throw err
-    }
-    current = path.dirname(current)
-  }
-}
-
-function isPathInside(root: string, target: string): boolean {
-  const relative = path.relative(root, target)
-  return relative.length > 0 && !relative.startsWith('..') && !path.isAbsolute(relative)
-}
-
 function resolveUrl(repoId: string, revision: string, filename: string): string {
   return `${HF_BASE_URL}/${encodeRepoPath(repoId)}/resolve/${encodeURIComponent(revision)}/${encodePath(filename)}?download=true`
 }
@@ -734,11 +634,6 @@ function encodeRepoPath(repoId: string): string {
 
 function encodePath(value: string): string {
   return value.split('/').map(part => encodeURIComponent(part)).join('/')
-}
-
-function safePathPart(value: string): string {
-  const cleaned = value.replace(/[^a-zA-Z0-9._-]/g, '_').replace(/^\.+$/, '_')
-  return cleaned || '_'
 }
 
 function parseSibling(value: unknown): HuggingFaceSibling[] {
@@ -814,16 +709,4 @@ function sizeClassFor(sizeBytes: number): HfSizeClass {
   if (gb < 8) return 'small'
   if (gb < 24) return 'medium'
   return 'large'
-}
-
-function isLocalHfModel(value: unknown): value is LocalHfModel {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
-  const item = value as Partial<LocalHfModel>
-  return item.provider === 'llamacpp'
-    && typeof item.id === 'string'
-    && typeof item.repoId === 'string'
-    && typeof item.filename === 'string'
-    && typeof item.displayName === 'string'
-    && typeof item.localPath === 'string'
-    && item.status === 'ready'
 }

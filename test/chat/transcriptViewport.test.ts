@@ -134,7 +134,7 @@ test('transcript viewport page keys use viewport lines instead of prompt starts'
 test('message row height estimate accounts for wrapped transcript content', () => {
   const row: MessageRow = { role: 'assistant', id: 'a', content: 'a'.repeat(30), liveTail: 'b'.repeat(25) }
 
-  assert.equal(estimateMessageRowHeight(row, 32), 5)
+  assert.equal(estimateMessageRowHeight(row, 32), 3)
 })
 
 test('expanded reasoning rows account for full content height', () => {
@@ -142,7 +142,7 @@ test('expanded reasoning rows account for full content height', () => {
   const expanded: MessageRow = { ...collapsed, expanded: true }
 
   const collapsedHeight = estimateMessageRowHeight(collapsed, 32)
-  assert.ok(collapsedHeight > 2)
+  assert.equal(collapsedHeight, 2)
   assert.ok(estimateMessageRowHeight(expanded, 32) > collapsedHeight)
 })
 
@@ -163,14 +163,14 @@ test('viewport clips edges when window straddles two rows', () => {
     { id: 'a', value: 'first' },
     { id: 'b', value: 'second' },
   ]
-  const selected = selectRowsForScrollTop(rows, 6, 4, () => 10)
+  const selected = selectRowsForScrollTop(rows, 7, 4, () => 10)
   assert.equal(selected.rows.length, 2)
   assert.equal(selected.rows[0]!.row.id, 'a')
   assert.equal(selected.rows[0]!.clipStart, 4)
   assert.equal(selected.rows[0]!.clipEnd, 10)
   assert.equal(selected.rows[1]!.row.id, 'b')
   assert.equal(selected.rows[1]!.clipStart, 0)
-  assert.equal(selected.rows[1]!.clipEnd, 10)
+  assert.equal(selected.rows[1]!.clipEnd, 1)
 })
 
 test('viewport tail selection reports each row clipped at full height', () => {

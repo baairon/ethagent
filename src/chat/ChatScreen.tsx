@@ -1,6 +1,4 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import os from 'node:os'
-import path from 'node:path'
 import { Box, Text, useApp } from 'ink'
 import type { EthagentConfig } from '../storage/config.js'
 import type { Provider, Message } from '../providers/contracts.js'
@@ -55,7 +53,6 @@ import type {
   PermissionRequest,
   SessionPermissionRule,
 } from '../tools/contracts.js'
-import { splitFileChangeResult } from '../tools/fileDiff.js'
 import {
   buildBaseMessages,
   sessionMessagesToRows,
@@ -74,12 +71,26 @@ import {
   restoreConversationState,
 } from './chatSessionState.js'
 import { runStreamingTurn } from './chatTurnOrchestrator.js'
-import { ensureLlamaCppRunnerReady } from '../models/llamacppPreflight.js'
 import type { PlanApprovalAction } from './views/PlanApprovalView.js'
 import type { ContextLimitAction } from './views/ContextLimitView.js'
 import type { ContinuityEditReviewAction, ContinuityEditReviewState } from './views/ContinuityEditReviewView.js'
 import { openFileInEditor } from '../identity/continuity/editor.js'
 import { EMPTY_MCP_SNAPSHOT, McpManager, type McpSnapshot } from '../mcp/manager.js'
+import { compressHome, ensureLocalProviderReady } from './chatEnvironment.js'
+import {
+  buildPlanImplementationPrompt,
+  buildPlanTransferSeedMessages,
+  chatFooterShortcutText,
+  normalizeHandoffSummary,
+} from './planImplementation.js'
+import { privateContinuityEditReviewFromToolResult } from './continuityEditReview.js'
+
+export {
+  buildPlanImplementationPrompt,
+  buildPlanTransferSeedMessages,
+  chatFooterShortcutText,
+} from './planImplementation.js'
+export { privateContinuityEditReviewFromToolResult } from './continuityEditReview.js'
 
 type ChatScreenProps = {
   config: EthagentConfig
@@ -114,19 +125,6 @@ const nowIso = (): string => new Date().toISOString()
 const STREAM_FLUSH_MS = 120
 const CONTEXT_CONFIRM_PERCENT = 90
 const MAX_PROMPT_HISTORY = 500
-const MAX_HANDOFF_SUMMARY_CHARS = 12_000
-
-function compressHome(cwd: string): string {
-  const home = os.homedir()
-  if (cwd === home) return '~'
-  if (cwd.startsWith(home + path.sep)) return '~' + cwd.slice(home.length).replace(/\\/g, '/')
-  return cwd.replace(/\\/g, '/')
-}
-
-async function ensureLocalProviderReady(config: EthagentConfig): Promise<{ ok: true } | { ok: false; message: string }> {
-  if (config.provider === 'llamacpp') return ensureLlamaCppRunnerReady(config)
-  return { ok: true }
-}
 
 export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, onReplaceConfig, updateNotice }) => {
   useRegisterKeybindingContext('Chat')
@@ -1640,58 +1638,9 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
   )
 }
 
-export function chatFooterShortcutText(canScrollTranscript: boolean): string {
-  return 'alt+p model · alt+i identity'
-}
-
 function formatContextLabel(usage: ContextUsage): string {
   if (!Number.isFinite(usage.usedTokens) || usage.usedTokens <= 0) return 'Estimated context: empty'
   return `Estimated context: ${usage.percent}% used`
-}
-
-export function buildPlanImplementationPrompt(plan: string): string {
-  return [
-    'Implement the approved plan below.',
-    '',
-    'Use native ethagent tools directly. Do not translate tool names into shell commands.',
-    'For workspace inspection, call list_directory and read_file directly.',
-    'For file creation or edits, call edit_file directly.',
-    'Use run_bash only for an actual shell command that cannot be performed by a narrower native tool, such as starting a local server after files exist.',
-    'Ignore any plan wording that says to execute file work as a Bash script or directly in the terminal; the native tools above are authoritative.',
-    'Read the relevant files before editing, make the required changes, and verify the result when possible.',
-    '',
-    plan,
-  ].join('\n')
-}
-
-export function buildPlanTransferSeedMessages(args: {
-  sourceSessionId: string
-  summary: string
-  plan: string
-  createdAt: string
-}): SessionMessage[] {
-  return [
-    {
-      role: 'user',
-      synthetic: true,
-      content: [
-        `Planning handoff from ${args.sourceSessionId.slice(0, 8)}:`,
-        '',
-        args.summary.trim(),
-      ].join('\n'),
-      createdAt: args.createdAt,
-    },
-    {
-      role: 'user',
-      synthetic: true,
-      content: [
-        'Approved plan to implement:',
-        '',
-        args.plan.trim(),
-      ].join('\n'),
-      createdAt: args.createdAt,
-    },
-  ]
 }
 
 function appendPromptHistoryEntry(history: string[], value: string): string[] {
@@ -1699,54 +1648,4 @@ function appendPromptHistoryEntry(history: string[], value: string): string[] {
   if (!prompt) return history
   const next = history[history.length - 1] === prompt ? history : [...history, prompt]
   return next.length > MAX_PROMPT_HISTORY ? next.slice(-MAX_PROMPT_HISTORY) : next
-}
-
-function normalizeHandoffSummary(summary: string): string {
-  const trimmed = summary.trim()
-  if (trimmed.length <= MAX_HANDOFF_SUMMARY_CHARS) return trimmed
-  return [
-    trimmed.slice(0, MAX_HANDOFF_SUMMARY_CHARS - 96).trimEnd(),
-    '',
-    '[handoff truncated to keep the resumed conversation responsive]',
-  ].join('\n')
-}
-
-export function privateContinuityEditReviewFromToolResult(
-  name: string,
-  input: Record<string, unknown>,
-  result: { ok: boolean; summary: string; content: string },
-): ContinuityEditReviewState | null {
-  if (name !== 'propose_private_continuity_edit' || !result.ok) return null
-  const file = normalizePrivateContinuityFile(input.file)
-  if (!file) return null
-  const parsed = splitFileChangeResult(result.content)
-  const filePath = extractReviewFilePath(parsed.content)
-  if (!filePath) return null
-  return {
-    file,
-    filePath,
-    summary: result.summary,
-    ...(parsed.diff ? { diff: parsed.diff } : {}),
-  }
-}
-
-function normalizePrivateContinuityFile(value: unknown): ContinuityEditReviewState['file'] | null {
-  if (typeof value !== 'string') return null
-  if (/^soul\.md$/i.test(value.trim())) return 'SOUL.md'
-  if (/^memory\.md$/i.test(value.trim())) return 'MEMORY.md'
-  return null
-}
-
-function extractReviewFilePath(content: string): string | null {
-  for (const line of content.split(/\r?\n/)) {
-    const review = line.match(/^(?:[-*]\s+)?review file:\s*(.+)$/i)
-    if (review?.[1]?.trim()) return cleanReviewFilePath(review[1])
-    const updated = line.match(/^(?:[-*]\s+)?updated local private continuity file\s+(.+)$/i)
-    if (updated?.[1]?.trim()) return cleanReviewFilePath(updated[1])
-  }
-  return null
-}
-
-function cleanReviewFilePath(value: string): string {
-  return value.trim().replace(/^`+|`+$/g, '').trim()
 }

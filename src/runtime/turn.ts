@@ -1,165 +1,49 @@
-import type { Message, Provider, ProviderRetryStreamEvent, StreamEvent } from '../providers/contracts.js'
-import type { ToolResult } from '../tools/contracts.js'
-import { getTool } from '../tools/registry.js'
 import {
-  looksLikeToolStateClaim,
   unsupportedToolStateClaims,
   type ToolEvidence,
 } from './toolClaimGuards.js'
+import { parseLocalModelTextToolUses } from './textToolParser.js'
+import { runProviderTurn } from './providerTurn.js'
+import {
+  MAX_CONTINUATION_NUDGES,
+  MAX_TOOL_USES_PER_TURN,
+  REASONING_ONLY_NUDGE_TEXT,
+  TOOL_BUDGET_NUDGE_TEXT,
+  TOOL_DELEGATION_NUDGE_TEXT,
+  TOOL_PROTOCOL_FAKE_NUDGE_TEXT,
+  TOOL_STATE_CLAIM_REPAIR_NUDGE_TEXT,
+  looksLikeFakeToolProtocolText,
+  looksLikeToolDelegationText,
+  nextNudge,
+  nextToolResultRepairNudge,
+} from './turnNudges.js'
+import type {
+  PendingToolUse,
+  RuntimeTurnParams,
+  TurnEvent,
+  TurnStopReason,
+} from './turnTypes.js'
 
-type ProviderTurnEvent =
-  | { type: 'text'; delta: string }
-  | { type: 'thinking'; delta: string }
-  | { type: 'thinking_end' }
-  | ProviderRetryStreamEvent
-  | { type: 'tool_use_start'; id: string; name: string }
-  | { type: 'tool_use_delta'; id: string; delta: string }
-  | { type: 'tool_use_stop'; id: string; name: string; input: Record<string, unknown> }
-  | { type: 'done'; stopReason?: TurnStopReason }
-  | { type: 'error'; message: string }
-  | { type: 'cancelled' }
-
-type TurnStopReason = 'end_turn' | 'tool_use' | 'max_tokens' | 'stop_sequence' | 'unknown'
-
-async function* runProviderTurn(
-  provider: Provider,
-  messages: Message[],
-  signal: AbortSignal,
-): AsyncIterable<ProviderTurnEvent> {
-  if (signal.aborted) {
-    yield { type: 'cancelled' }
-    return
-  }
-  for await (const ev of provider.complete(messages, signal)) {
-    if (signal.aborted) {
-      yield { type: 'cancelled' }
-      return
-    }
-    yield normalize(ev)
-    if (ev.type === 'done' || ev.type === 'error') return
-  }
-  if (signal.aborted) {
-    yield { type: 'cancelled' }
-  }
-}
-
-function normalize(event: StreamEvent): ProviderTurnEvent {
-  switch (event.type) {
-    case 'text': return { type: 'text', delta: event.delta }
-    case 'thinking': return { type: 'thinking', delta: event.delta }
-    case 'thinking_end': return { type: 'thinking_end' }
-    case 'retry': return event
-    case 'tool_use_start': return event
-    case 'tool_use_delta': return event
-    case 'tool_use_stop': return event
-    case 'done': return { type: 'done', stopReason: event.stopReason }
-    case 'error': return { type: 'error', message: event.message }
-  }
-}
-
-export const MAX_CONTINUATION_NUDGES = 3
-export const MAX_TOOL_USES_PER_TURN = 25
-
-export type ContinuationNudgeReason =
-  | 'continuation'
-  | 'tool_capability'
-  | 'tool_state_claim'
-  | 'tool_protocol_fake'
-  | 'tool_delegation'
-  | 'tool_budget'
-  | 'private_continuity_tool'
-  | 'private_continuity_tool_repair'
-  | 'write_file_repair'
-  | 'reasoning_only'
-
-const CONTINUATION_NUDGE_TEXT =
-  'Continue with the task. Use the appropriate tools to proceed.'
-
-const TOOL_CAPABILITY_NUDGE_TEXT =
-  'You do have access to the provided tools in this environment. Continue by making the appropriate tool call; do not ask the user to run commands or paste command output.'
-
-const TOOL_STATE_CLAIM_NUDGE_TEXT =
-  'Do not claim that files, directories, or workspace state changed unless you have executed the appropriate tool. Call the tool now.'
-
-const TOOL_PROTOCOL_FAKE_NUDGE_TEXT =
-  'The previous response printed tool names or a tool menu instead of calling a tool. Tool names are not text output. Make exactly one native tool call now.'
-
-const TOOL_DELEGATION_NUDGE_TEXT =
-  'Do not ask the user to run native tools. You have access to the tools in this environment. Make exactly one native tool call now.'
-
-const TOOL_BUDGET_NUDGE_TEXT =
-  'You have reached the tool-call budget for this turn. Do not call any more tools. Produce your final answer now using only what you already know from earlier tool results.'
-
-const PRIVATE_CONTINUITY_NUDGE_TEXT =
-  'SOUL.md and MEMORY.md are existing private identity-vault scaffold files. Do not search workspace folders, read plans/, create files, or overwrite them. If exact private text is needed for a surgical removal or targeted replacement, call read_private_continuity_file with {"file":"MEMORY.md"} or {"file":"SOUL.md"}. If the user wants private continuity changed, call propose_private_continuity_edit. For memory/preferences use {"file":"MEMORY.md","appendToSection":"Durable User Preferences","appendText":"- User preference or memory note."}. For persona use {"file":"SOUL.md","appendToSection":"Persona","appendText":"- Persona or standing behavior note."}.'
-
-const PRIVATE_CONTINUITY_REPAIR_NUDGE_TEXT =
-  'The previous propose_private_continuity_edit call had invalid or missing input. Retry the same native tool now with complete arguments. Do not answer in prose and do not search for markdown files. For memory/preferences use {"file":"MEMORY.md","appendToSection":"Durable User Preferences","appendText":"- User preference or memory note."}. For persona use {"file":"SOUL.md","appendToSection":"Persona","appendText":"- Persona or standing behavior note."}.'
-
-const WRITE_FILE_REPAIR_NUDGE_TEXT =
-  'The previous write_file call was rejected because the arguments were missing or malformed. Retry the same native tool now with a JSON object (not a JSON string) shaped exactly like {"path":"relative/path.ext","content":"...complete file contents..."}. Both fields are required and must be non-empty. Do not answer in prose.'
-
-const REASONING_ONLY_NUDGE_TEXT =
-  'You produced private reasoning but no user-visible answer. Answer the user now in visible text. Do not continue only with reasoning.'
-
-export type TurnEvent =
-  | { type: 'iteration_start'; index: number }
-  | { type: 'text'; delta: string }
-  | { type: 'thinking'; delta: string }
-  | { type: 'thinking_end' }
-  | ProviderRetryStreamEvent
-  | { type: 'tool_use_start'; id: string; name: string }
-  | { type: 'tool_use_delta'; id: string; delta: string }
-  | {
-      type: 'tool_use_stop'
-      id: string
-      name: string
-      input: Record<string, unknown>
-    }
-  | { type: 'assistant_message_committed'; text: string }
-  | {
-      type: 'tool_executed'
-      id: string
-      name: string
-      input: Record<string, unknown>
-      result: ToolResult
-      cwd: string
-    }
-  | { type: 'continuation_nudge'; attempt: number; reason: ContinuationNudgeReason }
-  | { type: 'local_tool_recovery' }
-  | { type: 'error'; message: string; discardAssistant?: boolean }
-  | { type: 'cancelled' }
-  | { type: 'done'; finishedNormally: boolean; stopReason?: TurnStopReason }
-
-export type PendingToolUse = {
-  id: string
-  name: string
-  input: Record<string, unknown>
-}
-
-export type ExecutedToolUse = {
-  id: string
-  name: string
-  input: Record<string, unknown>
-  result: ToolResult
-  cwd: string
-}
-
-export type ToolBatchRunner = (
-  pendingToolUses: PendingToolUse[],
-) => Promise<{ cancelled: boolean; completedTools: ExecutedToolUse[] }>
-
-export type RebuildMessages = () => Message[] | Promise<Message[]>
-
-export type RuntimeTurnParams = {
-  provider: Provider
-  signal: AbortSignal
-  initialMessages: Message[]
-  rebuildMessages: RebuildMessages
-  runToolBatch: ToolBatchRunner
-  maxContinuationNudges?: number
-}
-
+export { parseLocalModelTextToolUse, parseLocalModelTextToolUses } from './textToolParser.js'
+export {
+  MAX_CONTINUATION_NUDGES,
+  MAX_TOOL_USES_PER_TURN,
+  looksLikeContinuationIntent,
+  looksLikeFakeToolProtocolText,
+  looksLikePrivateContinuityWorkspaceCreationIntent,
+  looksLikeToolCapabilityConfusion,
+  looksLikeToolDelegationText,
+  looksLikeToolStateClaimWithoutTool,
+} from './turnNudges.js'
+export type {
+  ContinuationNudgeReason,
+  ExecutedToolUse,
+  PendingToolUse,
+  RebuildMessages,
+  RuntimeTurnParams,
+  ToolBatchRunner,
+  TurnEvent,
+} from './turnTypes.js'
 export async function* runRuntimeTurn(
   params: RuntimeTurnParams,
 ): AsyncGenerator<TurnEvent, void, void> {
@@ -333,9 +217,7 @@ export async function* runRuntimeTurn(
             {
               role: 'user',
               content:
-                'The previous assistant response claimed workspace state without executing a tool. '
-                + 'Treat that claim as unreliable. '
-                + TOOL_STATE_CLAIM_NUDGE_TEXT,
+                TOOL_STATE_CLAIM_REPAIR_NUDGE_TEXT,
             },
           ]
           continue
@@ -484,342 +366,4 @@ function doneEvent(finishedNormally: boolean, stopReason?: TurnStopReason): Extr
     return { type: 'done', finishedNormally, stopReason }
   }
   return { type: 'done', finishedNormally }
-}
-
-type RepairNudge = {
-  text: string
-  reason: ContinuationNudgeReason
-  failureMessage: string
-}
-
-function nextToolResultRepairNudge(
-  provider: Pick<Provider, 'id' | 'supportsTools'>,
-  completedTools: ExecutedToolUse[],
-): RepairNudge | null {
-  if (!provider.supportsTools) return null
-  const failedPrivateEdit = completedTools.some(completed =>
-    completed.name === 'propose_private_continuity_edit'
-    && !completed.result.ok
-    && completed.result.summary === 'propose_private_continuity_edit rejected input',
-  )
-  if (failedPrivateEdit) {
-    return {
-      text: PRIVATE_CONTINUITY_REPAIR_NUDGE_TEXT,
-      reason: 'private_continuity_tool_repair',
-      failureMessage: 'Model called propose_private_continuity_edit with invalid input after corrective nudges',
-    }
-  }
-
-  const failedWriteFile = completedTools.some(completed =>
-    completed.name === 'write_file'
-    && !completed.result.ok
-    && completed.result.summary === 'write_file rejected input',
-  )
-  if (failedWriteFile) {
-    return {
-      text: WRITE_FILE_REPAIR_NUDGE_TEXT,
-      reason: 'write_file_repair',
-      failureMessage: 'Model called write_file with invalid input after corrective nudges',
-    }
-  }
-
-  const failedWorkspacePrivateRead = completedTools.some(completed =>
-    completed.name === 'read_file'
-    && !completed.result.ok
-    && /read_private_continuity_file/.test(completed.result.content),
-  )
-  if (failedWorkspacePrivateRead) {
-    return {
-      text: 'The previous read_file call targeted private identity continuity markdown. Retry now with read_private_continuity_file and complete input such as {"file":"MEMORY.md"} or {"file":"SOUL.md"}. Do not search workspace folders.',
-      reason: 'private_continuity_tool_repair',
-      failureMessage: 'Model kept reading private continuity files via read_file after corrective nudges',
-    }
-  }
-  return null
-}
-
-export function parseLocalModelTextToolUse(
-  provider: Pick<Provider, 'id'>,
-  assistantText: string,
-  iterationIndex = 0,
-): PendingToolUse | null {
-  const parsed = parseLocalModelTextToolUses(provider, assistantText, iterationIndex)
-  return parsed.length === 1 ? parsed[0]! : null
-}
-
-export function parseLocalModelTextToolUses(
-  provider: Pick<Provider, 'id'>,
-  assistantText: string,
-  iterationIndex = 0,
-): PendingToolUse[] {
-  if (provider.id !== 'llamacpp') return []
-
-  const calls = extractTextToolCalls(assistantText)
-  if (calls.length === 0) return []
-
-  return calls.map((call, index) => ({
-    id: calls.length === 1 ? `local-text-tool-${iterationIndex}` : `local-text-tool-${iterationIndex}-${index}`,
-    name: call.name,
-    input: call.input,
-  }))
-}
-
-function extractTextToolCalls(text: string): Array<{ name: string; input: Record<string, unknown> }> {
-  const payloads = extractToolPayloadCandidates(text)
-  const calls = payloads.flatMap(parseTextToolPayloads)
-  return calls.filter(call => typeof call.name === 'string' && isRecord(call.input) && Boolean(getTool(call.name)))
-}
-
-function extractToolPayloadCandidates(text: string): string[] {
-  const trimmed = text.trim()
-  if (!trimmed) return []
-
-  const exact = normalizeToolPayloadCandidate(trimmed)
-  if (exact.startsWith('{') && exact.endsWith('}')) return [exact]
-  if (exact.startsWith('[') && exact.endsWith(']')) return [exact]
-
-  const fencedOnlyMatch = trimmed.match(/^```[^\r\n]*\r?\n([\s\S]*?)\r?\n```$/i)
-  if (fencedOnlyMatch) return [normalizeToolPayloadCandidate(fencedOnlyMatch[1]!)]
-
-  const embedded = [
-    ...[...trimmed.matchAll(/<tool_call>\s*([\s\S]*?)\s*<\/tool_call>/gi)].map(match => match[1]!),
-    ...[...trimmed.matchAll(/```[^\r\n]*\r?\n([\s\S]*?)\r?\n```/g)].map(match => match[1]!),
-    ...extractStandaloneJsonPayloads(trimmed),
-  ].map(normalizeToolPayloadCandidate)
-
-  return [...new Set(embedded)]
-}
-
-function extractStandaloneJsonPayloads(text: string): string[] {
-  const lines = text.split(/\r?\n/)
-  const out: string[] = []
-
-  for (let i = 0; i < lines.length; i += 1) {
-    const line = lines[i] ?? ''
-    const first = normalizeToolPayloadCandidate(line)
-    if (!first.startsWith('{') && !first.startsWith('[')) continue
-
-    let candidate = line
-    for (let j = i; j < lines.length; j += 1) {
-      if (j > i) candidate += `\n${lines[j] ?? ''}`
-      const normalized = normalizeToolPayloadCandidate(candidate)
-      if (canParseJson(normalized)) {
-        out.push(normalized)
-        i = j
-        break
-      }
-      if (candidate.length > 20_000) break
-    }
-  }
-
-  return out
-}
-
-function canParseJson(value: string): boolean {
-  try {
-    JSON.parse(value)
-    return true
-  } catch {
-    return false
-  }
-}
-
-function normalizeToolPayloadCandidate(candidate: string): string {
-  let normalized = candidate
-    .trim()
-    .split(/\r?\n/)
-    .map(line => line.replace(/^\s*\d+\s+(?=[{\[<"])/, ''))
-    .join('\n')
-    .trim()
-
-  const toolCallMatch = normalized.match(/^<tool_call>\s*([\s\S]*?)\s*<\/tool_call>$/i)
-  if (toolCallMatch) normalized = toolCallMatch[1]!.trim()
-  return normalized
-}
-
-function parseTextToolPayloads(payload: string): Array<{ name: string; input: Record<string, unknown> }> {
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(payload)
-  } catch {
-    return []
-  }
-
-  return normalizeParsedToolPayloads(parsed)
-}
-
-function normalizeParsedToolPayloads(value: unknown): Array<{ name: string; input: Record<string, unknown> }> {
-  if (Array.isArray(value)) {
-    return value.flatMap(normalizeParsedToolPayloads)
-  }
-  if (!isRecord(value)) return []
-
-  const toolCalls = value.tool_calls
-  if (Array.isArray(toolCalls)) {
-    return toolCalls.flatMap(normalizeParsedToolPayloads)
-  }
-
-  const fn = value.function
-  if (isRecord(fn)) {
-    const call = normalizeNameAndInput(fn.name, fn.arguments)
-    return call ? [call] : []
-  }
-
-  const name = value.name ?? value.tool ?? value.tool_name ?? value.function_name
-  const rawInput = value.arguments ?? value.input ?? value.parameters ?? value.args ?? {}
-  const call = normalizeNameAndInput(name, rawInput)
-  return call ? [call] : []
-}
-
-function normalizeNameAndInput(
-  name: unknown,
-  rawInput: unknown,
-): { name: string; input: Record<string, unknown> } | null {
-  if (typeof name !== 'string') return null
-  const input = parseToolInput(rawInput)
-  if (!input) return null
-  return { name, input }
-}
-
-function parseToolInput(rawInput: unknown): Record<string, unknown> | null {
-  if (isRecord(rawInput)) return rawInput
-  if (typeof rawInput !== 'string') return null
-  try {
-    const parsed = JSON.parse(rawInput)
-    return isRecord(parsed) ? parsed : null
-  } catch {
-    return null
-  }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
-function nextNudge(
-  provider: Pick<Provider, 'supportsTools'>,
-  assistantText: string,
-): { text: string; reason: ContinuationNudgeReason; keepAssistantContext: boolean } | null {
-  if (provider.supportsTools && looksLikePrivateContinuityWorkspaceCreationIntent(assistantText)) {
-    return {
-      text: PRIVATE_CONTINUITY_NUDGE_TEXT,
-      reason: 'private_continuity_tool',
-      keepAssistantContext: false,
-    }
-  }
-  if (provider.supportsTools && looksLikeToolCapabilityConfusion(assistantText)) {
-    return {
-      text: TOOL_CAPABILITY_NUDGE_TEXT,
-      reason: 'tool_capability',
-      keepAssistantContext: false,
-    }
-  }
-  if (looksLikeContinuationIntent(assistantText)) {
-    return {
-      text: CONTINUATION_NUDGE_TEXT,
-      reason: 'continuation',
-      keepAssistantContext: true,
-    }
-  }
-  return null
-}
-
-export function looksLikePrivateContinuityWorkspaceCreationIntent(text: string): boolean {
-  const lower = text.toLowerCase()
-  if (!/\b(soul|memory)\.md\b/.test(lower)) return false
-  return [
-    /\b(create|write|make|generate|scaffold|overwrite|replace|locate|find|search|read|check|inspect)\b.{0,100}\b(soul|memory)\.md\b/,
-    /\b(soul|memory)\.md\b.{0,100}\b(create|write|make|generate|scaffold|overwrite|replace|locate|find|search|read|check|inspect)\b/,
-    /\bplans?[\\/][^\s]*\b(soul|memory)\b/,
-  ].some(pattern => pattern.test(lower))
-}
-
-export function looksLikeToolCapabilityConfusion(text: string): boolean {
-  const lower = text.toLowerCase()
-  const limitation =
-    /\b(i (do not|don't|cannot|can't) (have|access|run|execute|inspect|read|list|use)|no direct access|unable to|not able to|currently operating under|limitations and restrictions)\b/
-  const toolTask =
-    /\b(run|execute|shell command|command output|local machine|terminal|files?|directories|workspace|paste|share the contents)\b/
-  return limitation.test(lower) && toolTask.test(lower)
-}
-
-export function looksLikeToolStateClaimWithoutTool(text: string): boolean {
-  return looksLikeToolStateClaim(text)
-}
-
-export function looksLikeFakeToolProtocolText(text: string): boolean {
-  const lower = text.toLowerCase()
-  if (!lower.trim()) return false
-
-  const toolNames = new Set(
-    [...lower.matchAll(/\b(change_directory|edit_file|propose_private_continuity_edit|read_private_continuity_file|list_directory|read_file|run_bash|write_file|delete_file)\b/g)]
-      .map(match => match[1]),
-  )
-  if (toolNames.size < 2) return false
-
-  const codeBlock = /```|code\s*(?:-|:)?\s*block/.test(lower)
-  const toolMenu = /\b(available tools|tool functions|functions are|tools are|native tools)\b/.test(lower)
-  const actionIntent = /\b(let'?s|let me|i'?ll|i will|first|next)\b.{0,80}\b(list|read|inspect|execute|run|change|edit|write)\b/.test(lower)
-  const commaSeparatedTools = /(?:change_directory|edit_file|propose_private_continuity_edit|read_private_continuity_file|list_directory|read_file|run_bash|write_file|delete_file)(?:\s*,\s*|\s+){1,}/.test(lower)
-
-  return (codeBlock || toolMenu || actionIntent) && commaSeparatedTools
-}
-
-export function looksLikeToolDelegationText(text: string): boolean {
-  const lower = text.toLowerCase()
-  if (!lower.trim()) return false
-
-  const toolName = '(?:change_directory|edit_file|propose_private_continuity_edit|read_private_continuity_file|list_directory|read_file|run_bash|write_file|delete_file)'
-  if (!new RegExp(`\\b${toolName}\\b`).test(lower)) return false
-
-  const directToolRef = `(?:\`?${toolName}\`?|the\\s+\`?${toolName}\`?\\s+tool)`
-  const action = '(?:run|execute|call|use|invoke)'
-  const askPrefix = "(?:please|kindly|can you|could you|would you|you can|you should|you need to|you'll need to|try to|go ahead and)"
-  const selfPrefix = "(?:i'll|i will|let me|let's|we should|we need to|before proceeding|first|next|now)"
-
-  const askUser = new RegExp(`\\b${askPrefix}\\b.{0,100}\\b${action}\\b.{0,50}${directToolRef}`).test(lower)
-  const selfIntent = new RegExp(`\\b${selfPrefix}\\b.{0,100}\\b${action}\\b.{0,50}${directToolRef}`).test(lower)
-  const commandForm = new RegExp(`\\b${action}\\s+${directToolRef}\\b`).test(lower)
-    && /\b(please|before proceeding|first|next|now|to proceed)\b/.test(lower)
-  const asksForOutput = new RegExp(`${directToolRef}.{0,120}\\b(output|result|files?|directory structure|working directory)\\b`).test(lower)
-    && /\b(please|you|run|paste|share|provide)\b/.test(lower)
-
-  return askUser || selfIntent || commandForm || asksForOutput
-}
-
-export function looksLikeContinuationIntent(text: string): boolean {
-  const lower = text.toLowerCase()
-
-  const completionMarkers =
-    /\b(done|finished|completed|complete|summary|that's all|that is all|all set|hope this helps|let me know if)\b/
-  if (completionMarkers.test(lower)) return false
-
-  const actionVerbs =
-    '(do|create|write|edit|update|fix|implement|add|run|check|make|build|set up|go|proceed|begin)'
-
-  const shortMessage = lower.length < 80
-
-  const patterns: RegExp[] = [
-    new RegExp(
-      `\\bso now (i|let me|we) (need to|have to|should|must|will) ${actionVerbs}\\b`,
-    ),
-    new RegExp(`\\bnow i('ll| will) ${actionVerbs}\\b`),
-    new RegExp(
-      `\\blet me (go ahead and |now )?${actionVerbs}\\b`,
-    ),
-    new RegExp(`\\btime to ${actionVerbs}\\b`),
-  ]
-
-  if (shortMessage) {
-    patterns.push(
-      new RegExp(
-        `\\bi('ll| will| need to| have to| must) (now )?${actionVerbs}\\b`,
-      ),
-      new RegExp(
-        `\\bnext,?\\s+(i('ll| will)|let me|i need to) ${actionVerbs}\\b`,
-      ),
-    )
-  }
-
-  return patterns.some(re => re.test(lower))
 }

@@ -156,15 +156,15 @@ test('reasoning rows render raw markdown markers without assistant markdown styl
     }),
   )
 
-  assert.match(output, /\u2022 Thinkingâ€¦/)
+  assert.match(output, /\u2022 Thinking\u2026/)
   assert.match(output, /alt\+t collapse/)
   assert.match(output, /## Reasoning/)
   assert.match(output, /\*\*markers\*\*/)
-  assert.doesNotMatch(output, /â–Œ/)
+  assert.doesNotMatch(output, /\u258c/)
   assert.doesNotMatch(output, /reasoning/)
   assert.doesNotMatch(output, /01 ## Reasoning/)
-  assert.doesNotMatch(output, /[â•­â•®â•°â•¯â”‚]/)
-  assert.doesNotMatch(output, /â”€{4,}/)
+  assert.doesNotMatch(output, /[\u256d\u256e\u2570\u256f\u2502]/)
+  assert.doesNotMatch(output, /\u2500{4,}/)
 })
 
 test('collapsed reasoning rows render as a compact thinking label', () => {
@@ -181,7 +181,7 @@ test('collapsed reasoning rows render as a compact thinking label', () => {
 
   assert.match(output, /\u2022 Thinking/)
   assert.match(output, /alt\+t inspect/)
-  assert.doesNotMatch(output, /â–Œ/)
+  assert.doesNotMatch(output, /\u258c/)
   assert.doesNotMatch(output, /internal preview should stay hidden/)
   assert.doesNotMatch(output, /reasoning/)
 })
@@ -200,11 +200,11 @@ test('assistant code blocks render as compact labeled blocks without panel borde
   assert.match(output, /\u2022 Here:/)
   assert.match(output, /\u2022 python/)
   assert.match(output, /print\("hello world!"\)/)
-  assert.doesNotMatch(output, /â–Œ/)
+  assert.doesNotMatch(output, /\u258c/)
   assert.doesNotMatch(output, /block/)
   assert.doesNotMatch(output, /01 print\("hello world!"\)/)
-  assert.doesNotMatch(output, /[â•­â•®â•°â•¯â”‚]/)
-  assert.doesNotMatch(output, /â”€{4,}/)
+  assert.doesNotMatch(output, /[\u256d\u256e\u2570\u256f\u2502]/)
+  assert.doesNotMatch(output, /\u2500{4,}/)
 })
 
 test('reasoning sanitizer keeps readable reasoning text intact', () => {
@@ -428,7 +428,7 @@ test('spinner renders elapsed time', () => {
   )
 
   assert.match(output, /Working/)
-  assert.match(output, /1:05|1:06/)
+  assert.match(output, /1min 5s|1min 6s/)
 })
 
 test('spinner sentence-cases provided label while keeping hint lowercase', () => {

@@ -11,12 +11,12 @@ import {
   errorSlot,
   getLastWalletError,
   initializeViewElements,
-  serializeWalletError,
   setState,
   showPreparedMessage,
   statusHint,
   statusText,
 } from './view.js'
+import { serializeWalletError } from './errorView.js'
 import {
   buildTxParams,
   clearCurrentWalletMethod,

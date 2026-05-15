@@ -26,6 +26,7 @@ import {
 import { setKey } from '../storage/secrets.js'
 import { IdentityHub, type IdentityHubResult } from '../identity/hub/IdentityHub.js'
 import { FirstRunTimeline, firstRunStageNumber, type FirstRunStepKind } from './FirstRunTimeline.js'
+import { configFromModelPickerSelection, formatGB } from './firstRunConfig.js'
 
 type Step =
   | { kind: 'detecting' }
@@ -566,29 +567,5 @@ export const FirstRun: React.FC<FirstRunProps> = ({ onComplete, onCancel }) => {
   }
 
   return null
-}
-
-function configFromModelPickerSelection(selection: ModelPickerSelection, base: EthagentConfig): EthagentConfig {
-  if (selection.kind === 'llamacpp') {
-    return {
-      ...base,
-      provider: 'llamacpp',
-      model: selection.model,
-      baseUrl: defaultBaseUrlFor('llamacpp'),
-      localMmprojPath: selection.mmprojPath,
-    }
-  }
-  return {
-    ...base,
-    provider: selection.provider,
-    model: selection.model,
-    baseUrl: undefined,
-    localMmprojPath: undefined,
-  }
-}
-
-function formatGB(bytes: number): string {
-  const gb = bytes / (1024 * 1024 * 1024)
-  return gb < 10 ? `${gb.toFixed(1)}GB` : `${Math.round(gb)}GB`
 }
 

@@ -163,11 +163,16 @@ cd ethagent && npm install
 npm start
 ```
 
+The published CLI is source-distributed: `bin/ethagent.js` launches `src/cli/main.tsx` through `tsx`. `npm run build` is therefore a validation build; it checks the shipped TypeScript without producing a separate `dist/` directory.
+
+Repository structure and refactoring rules are documented in `ARCHITECTURE.md` and `CONTRIBUTING.md`. Stable facades keep public import paths intact while focused sibling modules hold private implementation details.
+
 | Command | What it does |
 | --- | --- |
 | `npm start` | Run from source. |
+| `npm run build` | Validate the shipped TypeScript source package. |
 | `npm test` | Test suite. |
-| `npm run typecheck` | Types. |
+| `npm run typecheck` | Run the same TypeScript check directly. |
 | `npm run contracts:test` | Foundry tests. |
 
 Foundry is only needed for `contracts/` changes.

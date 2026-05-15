@@ -4,6 +4,43 @@ import path from 'node:path'
 import { atomicWriteText } from '../storage/atomicWrite.js'
 import { ensureConfigDir, getConfigDir } from '../storage/config.js'
 import os from 'node:os'
+import {
+  buildFailure,
+  formatInstallFailure,
+  humanInstallError,
+  installFailureDetail,
+  installerProgressLabel,
+  summarizeInstallOutput,
+} from './llamacppOutput.js'
+import {
+  getLocalRunnerConfigPath,
+  loadLocalRunnerConfig,
+  saveLocalRunnerConfig,
+  setLlamaCppServerPath,
+  type LocalRunnerConfig,
+} from './llamacppConfig.js'
+import { runCommand } from './llamacppCommands.js'
+import {
+  detectLlamaCppServerBinary,
+  discoverLlamaCppCliPaths,
+  discoverLlamaCppServerPaths,
+  findAndPersistLlamaCppServer,
+} from './llamacppDiscovery.js'
+
+export { humanInstallError, summarizeInstallOutput } from './llamacppOutput.js'
+export {
+  getLocalRunnerConfigPath,
+  loadLocalRunnerConfig,
+  saveLocalRunnerConfig,
+  setLlamaCppServerPath,
+} from './llamacppConfig.js'
+export {
+  detectLlamaCppServerBinary,
+  discoverLlamaCppServerPaths,
+  llamaCppSearchRoots,
+  llamaCppServerCandidates,
+} from './llamacppDiscovery.js'
+export type { LocalRunnerConfig } from './llamacppConfig.js'
 
 export const DEFAULT_LLAMA_HOST = process.env.LLAMACPP_HOST ?? 'http://localhost:8080'
 
@@ -13,12 +50,6 @@ export type LlamaCppStatus = {
   version: string | null
   serverUp: boolean
   servedModels: string[]
-}
-
-type RunResult = {
-  code: number
-  stdout: string
-  stderr: string
 }
 
 type RunInstallResult = { ok: true } | { ok: false; message: string; detail?: string }
@@ -77,47 +108,6 @@ type LlamaCppStartDeps = {
   rogueDrainPollMs?: number
 }
 
-export type LocalRunnerConfig = {
-  llamaServerPath?: string
-}
-
-function runCommand(cmd: string, args: string[], timeoutMs = 2000): Promise<RunResult | null> {
-  return new Promise(resolve => {
-    let settled = false
-    let child: ReturnType<typeof spawn>
-    try {
-      child = spawn(cmd, args, { windowsHide: true })
-    } catch {
-      resolve(null)
-      return
-    }
-
-    let stdout = ''
-    let stderr = ''
-    const timer = setTimeout(() => {
-      if (settled) return
-      settled = true
-      try { child.kill() } catch { void 0 }
-      resolve(null)
-    }, timeoutMs)
-
-    child.stdout?.on('data', chunk => { stdout += chunk.toString() })
-    child.stderr?.on('data', chunk => { stderr += chunk.toString() })
-    child.on('error', () => {
-      if (settled) return
-      settled = true
-      clearTimeout(timer)
-      resolve(null)
-    })
-    child.on('close', code => {
-      if (settled) return
-      settled = true
-      clearTimeout(timer)
-      resolve({ code: code ?? -1, stdout, stderr })
-    })
-  })
-}
-
 function runInstallCommand(
   plan: LlamaCppInstallPlan,
   timeoutMs: number,
@@ -166,85 +156,6 @@ async function fetchWithTimeout(url: string, timeoutMs: number): Promise<Respons
   } finally {
     clearTimeout(timer)
   }
-}
-
-export function getLocalRunnerConfigPath(): string {
-  return path.join(getConfigDir(), 'local-runner.json')
-}
-
-export async function loadLocalRunnerConfig(): Promise<LocalRunnerConfig> {
-  try {
-    const raw = await fs.readFile(getLocalRunnerConfigPath(), 'utf8')
-    const parsed = JSON.parse(raw) as unknown
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
-    const value = (parsed as { llamaServerPath?: unknown }).llamaServerPath
-    return typeof value === 'string' && value.trim() ? { llamaServerPath: value.trim() } : {}
-  } catch (err: unknown) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return {}
-    return {}
-  }
-}
-
-export async function saveLocalRunnerConfig(config: LocalRunnerConfig): Promise<void> {
-  await ensureConfigDir()
-  await atomicWriteText(getLocalRunnerConfigPath(), JSON.stringify(config, null, 2) + '\n')
-}
-
-export async function setLlamaCppServerPath(serverPath: string): Promise<void> {
-  await saveLocalRunnerConfig({ llamaServerPath: serverPath.trim() })
-}
-
-export async function detectLlamaCppServerBinary(extraCandidates: string[] = []): Promise<{ path: string | null; version: string | null }> {
-  const config = await loadLocalRunnerConfig()
-  const candidates = [
-    ...llamaCppServerCandidates(process.env, process.platform, config.llamaServerPath),
-    ...extraCandidates,
-  ]
-  for (const candidate of candidates) {
-    const result = await runCommand(candidate, ['--version'])
-    if (!result) continue
-    const output = `${result.stdout}\n${result.stderr}`.trim()
-    if (result.code === 0 || output.length > 0) {
-      return { path: candidate, version: firstLine(output) || 'installed' }
-    }
-  }
-  return { path: null, version: null }
-}
-
-export function llamaCppServerCandidates(
-  env: NodeJS.ProcessEnv = process.env,
-  platform: NodeJS.Platform = process.platform,
-  configuredPath?: string,
-): string[] {
-  const candidates: string[] = []
-  appendCandidate(candidates, configuredPath)
-  appendCandidate(candidates, env.LLAMA_SERVER_PATH)
-  appendCandidate(candidates, env.LLAMACPP_SERVER_PATH)
-  appendCandidate(candidates, 'llama-server')
-  appendCandidate(candidates, 'llama-server.exe')
-
-  if (platform === 'win32') {
-    appendCandidate(candidates, env.LOCALAPPDATA ? path.join(env.LOCALAPPDATA, 'Programs', 'llama.cpp', 'llama-server.exe') : undefined)
-    appendCandidate(candidates, env.LOCALAPPDATA ? path.join(env.LOCALAPPDATA, 'llama.cpp', 'llama-server.exe') : undefined)
-    appendCandidate(candidates, env.LOCALAPPDATA ? path.join(env.LOCALAPPDATA, 'Microsoft', 'WindowsApps', 'llama-server.exe') : undefined)
-    appendCandidate(candidates, env.ProgramFiles ? path.join(env.ProgramFiles, 'llama.cpp', 'llama-server.exe') : undefined)
-    appendCandidate(candidates, env['ProgramFiles(x86)'] ? path.join(env['ProgramFiles(x86)'], 'llama.cpp', 'llama-server.exe') : undefined)
-    appendCandidate(candidates, env.USERPROFILE ? path.join(env.USERPROFILE, 'scoop', 'shims', 'llama-server.exe') : undefined)
-    appendCandidate(candidates, env.USERPROFILE ? path.join(env.USERPROFILE, 'scoop', 'apps', 'llama.cpp', 'current', 'llama-server.exe') : undefined)
-  } else if (platform === 'darwin') {
-    appendCandidate(candidates, '/opt/homebrew/bin/llama-server')
-    appendCandidate(candidates, '/usr/local/bin/llama-server')
-    appendCandidate(candidates, '/opt/local/bin/llama-server')
-    appendCandidate(candidates, env.HOME ? path.join(env.HOME, '.nix-profile', 'bin', 'llama-server') : undefined)
-    appendCandidate(candidates, env.HOME ? path.join(env.HOME, '.local', 'bin', 'llama-server') : undefined)
-  } else {
-    appendCandidate(candidates, '/usr/local/bin/llama-server')
-    appendCandidate(candidates, '/usr/bin/llama-server')
-    appendCandidate(candidates, env.HOME ? path.join(env.HOME, '.nix-profile', 'bin', 'llama-server') : undefined)
-    appendCandidate(candidates, env.HOME ? path.join(env.HOME, '.local', 'bin', 'llama-server') : undefined)
-  }
-
-  return candidates
 }
 
 export function llamaCppInstallPlans(platform: NodeJS.Platform = process.platform): LlamaCppInstallPlan[] {
@@ -766,183 +677,6 @@ function createStartupCapture(child: ReturnType<typeof spawn>): () => string {
 
 function startupDetail(output: string, fallback: string): string {
   return output ? `${fallback}\n${output}` : fallback
-}
-
-function firstLine(text: string): string {
-  return text.split(/\r?\n/).map(line => line.trim()).find(Boolean) ?? ''
-}
-
-function appendCandidate(candidates: string[], candidate: string | undefined): void {
-  if (!candidate || candidates.includes(candidate)) return
-  candidates.push(candidate)
-}
-
-export function llamaCppSearchRoots(
-  env: NodeJS.ProcessEnv = process.env,
-  platform: NodeJS.Platform = process.platform,
-): string[] {
-  const roots: string[] = []
-  if (platform === 'win32') {
-    appendCandidate(roots, env.LOCALAPPDATA ? path.join(env.LOCALAPPDATA, 'Microsoft', 'WinGet', 'Packages') : undefined)
-    appendCandidate(roots, env.LOCALAPPDATA ? path.join(env.LOCALAPPDATA, 'Microsoft', 'WindowsApps') : undefined)
-    appendCandidate(roots, env.LOCALAPPDATA ? path.join(env.LOCALAPPDATA, 'Programs', 'llama.cpp') : undefined)
-    appendCandidate(roots, env.LOCALAPPDATA ? path.join(env.LOCALAPPDATA, 'llama.cpp') : undefined)
-    appendCandidate(roots, env.ProgramFiles ? path.join(env.ProgramFiles, 'llama.cpp') : undefined)
-    appendCandidate(roots, env.ProgramFiles ? path.join(env.ProgramFiles, 'WindowsApps') : undefined)
-    appendCandidate(roots, env.USERPROFILE ? path.join(env.USERPROFILE, 'scoop', 'apps', 'llama.cpp') : undefined)
-    appendCandidate(roots, env.USERPROFILE ? path.join(env.USERPROFILE, 'scoop', 'shims') : undefined)
-    appendCandidate(roots, path.join(getConfigDir(), 'runners', 'llama.cpp', 'build'))
-    appendCandidate(roots, path.join(getConfigDir(), 'runners', 'llama.cpp', 'build', 'bin'))
-    return roots
-  }
-
-  appendCandidate(roots, '/opt/homebrew/bin')
-  appendCandidate(roots, '/usr/local/bin')
-  appendCandidate(roots, '/opt/local/bin')
-  appendCandidate(roots, '/usr/bin')
-  appendCandidate(roots, env.HOME ? path.join(env.HOME, '.nix-profile', 'bin') : undefined)
-  appendCandidate(roots, env.HOME ? path.join(env.HOME, '.local', 'bin') : undefined)
-  appendCandidate(roots, path.join(getConfigDir(), 'runners', 'llama.cpp', 'build'))
-  appendCandidate(roots, path.join(getConfigDir(), 'runners', 'llama.cpp', 'build', 'bin'))
-  return roots
-}
-
-export async function discoverLlamaCppServerPaths(
-  env: NodeJS.ProcessEnv = process.env,
-  platform: NodeJS.Platform = process.platform,
-): Promise<string[]> {
-  return discoverExecutablePaths(platform === 'win32' ? ['llama-server.exe', 'llama-server'] : ['llama-server'], env, platform)
-}
-
-async function discoverLlamaCppCliPaths(
-  env: NodeJS.ProcessEnv = process.env,
-  platform: NodeJS.Platform = process.platform,
-): Promise<string[]> {
-  return discoverExecutablePaths(platform === 'win32' ? ['llama-cli.exe', 'llama-cli'] : ['llama-cli'], env, platform)
-}
-
-async function discoverExecutablePaths(
-  names: string[],
-  env: NodeJS.ProcessEnv,
-  platform: NodeJS.Platform,
-): Promise<string[]> {
-  const found: string[] = []
-  const lowered = new Set(names.map(name => name.toLowerCase()))
-  for (const root of llamaCppSearchRoots(env, platform)) {
-    await walkForExecutable(root, lowered, found, 0, 5)
-    if (found.length >= 20) break
-  }
-  return found
-}
-
-async function walkForExecutable(
-  dir: string,
-  names: Set<string>,
-  found: string[],
-  depth: number,
-  maxDepth: number,
-): Promise<void> {
-  if (depth > maxDepth || found.length >= 20) return
-  let entries: Array<import('node:fs').Dirent>
-  try {
-    entries = await fs.readdir(dir, { withFileTypes: true })
-  } catch {
-    return
-  }
-
-  for (const entry of entries) {
-    if (found.length >= 20) return
-    const fullPath = path.join(dir, entry.name)
-    const lowerName = entry.name.toLowerCase()
-    if ((entry.isFile() || entry.isSymbolicLink()) && names.has(lowerName)) {
-      appendCandidate(found, fullPath)
-      continue
-    }
-    if (entry.isDirectory() && shouldDescendRunnerDir(entry.name, depth)) {
-      await walkForExecutable(fullPath, names, found, depth + 1, maxDepth)
-    }
-  }
-}
-
-function shouldDescendRunnerDir(name: string, depth: number): boolean {
-  const lower = name.toLowerCase()
-  if (/(llama|ggml|bin|build|release|debug|current|package|windowsapps|x64|arm64)/.test(lower)) return true
-  return depth > 0 && lower.length <= 24
-}
-
-async function findAndPersistLlamaCppServer(
-  platform: NodeJS.Platform = process.platform,
-): Promise<{ path: string | null; version: string | null }> {
-  const direct = await detectLlamaCppServerBinary()
-  if (direct.path) return direct
-  const discovered = await discoverLlamaCppServerPaths(process.env, platform)
-  const found = await detectLlamaCppServerBinary(discovered)
-  if (found.path) {
-    await setLlamaCppServerPath(found.path).catch(() => {})
-  }
-  return found
-}
-
-export function summarizeInstallOutput(output: string): string | undefined {
-  const lines = output
-    .split(/\r?\n/)
-    .map(cleanInstallLine)
-    .filter(Boolean)
-    .filter(line => !/^[\-\\|/_.=\s]+$/.test(line))
-    .filter(line => !/^\d+(\.\d+)?\s*(B|KB|MB|GB)\s*\/\s*\d+/i.test(line))
-  const unique = [...new Set(lines)]
-  return unique.slice(-6).join('\n') || undefined
-}
-
-export function humanInstallError(plan: LlamaCppInstallPlan, code: number | null): string {
-  if (plan.command === 'winget') return 'Windows could not install the local runner automatically.'
-  if (plan.command === 'brew') return 'Homebrew could not install the local runner automatically.'
-  if (plan.command === 'nix') return 'Nix could not install the local runner automatically.'
-  if (plan.command === 'port') return 'MacPorts could not install the local runner automatically.'
-  if (plan.command === 'git') return 'ethagent could not download the local runner source.'
-  if (plan.command === 'cmake') return 'ethagent could not build the local runner.'
-  return code === null
-    ? `${plan.label} did not complete.`
-    : `${plan.label} failed with exit code ${code}.`
-}
-
-function installFailureDetail(code: number | null, output: string): string | undefined {
-  const details = [
-    code === null ? undefined : `exit code ${code}`,
-    summarizeInstallOutput(output),
-  ].filter((item): item is string => Boolean(item))
-  return details.join('\n') || undefined
-}
-
-function cleanInstallLine(line: string): string {
-  return line
-    .replace(/\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g, '')
-    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-}
-
-function installerProgressLabel(plan: LlamaCppInstallPlan): string {
-  if (plan.command === 'winget') return 'installing with Windows package manager...'
-  if (plan.command === 'brew') return 'installing with Homebrew...'
-  if (plan.command === 'nix') return 'installing with Nix...'
-  if (plan.command === 'port') return 'installing with MacPorts...'
-  return `installing with ${plan.label}...`
-}
-
-function formatInstallFailure(label: string, result: RunInstallResult): string {
-  if (result.ok) return label
-  return [label, result.message, result.detail].filter(Boolean).join(': ')
-}
-
-function buildFailure(result: RunInstallResult): LlamaCppInstallResult {
-  return {
-    ok: false,
-    code: 'build-failed',
-    message: 'ethagent could not build the local runner.',
-    detail: result.ok ? undefined : [result.message, result.detail].filter(Boolean).join('\n'),
-    recovery: ['runner-path', 'retry-install', 'back'],
-  }
 }
 
 function sourceBuildServerCandidates(buildDir: string, platform: NodeJS.Platform): string[] {

@@ -1,6 +1,6 @@
 import type { PendingToolUse } from './turn.js'
 import { unsupportedToolStateClaims, type ToolEvidence } from './toolClaimGuards.js'
-export { parseLocalModelTextToolUses as extractLocalTextToolUses } from './turn.js'
+export { parseLocalModelTextToolUses as extractLocalTextToolUses } from './textToolParser.js'
 
 export type ToolIntent = {
   name: string

@@ -1,7 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
 import { transformSync } from 'esbuild'
 import {
   __testWalletPage,
@@ -9,50 +8,15 @@ import {
   requestBrowserWalletAccount,
   requestBrowserWalletSignature,
 } from '../../../src/identity/wallet/browserWallet.js'
-
-const WALLET_PAGE_SOURCE_FILES = [
-  join('src', 'identity', 'wallet', 'page', 'types.ts'),
-  join('src', 'identity', 'wallet', 'page', 'html.ts'),
-  join('src', 'identity', 'wallet', 'page', 'constants.ts'),
-  join('src', 'identity', 'wallet', 'page', 'styles', 'base.ts'),
-  join('src', 'identity', 'wallet', 'page', 'styles', 'components.ts'),
-  join('src', 'identity', 'wallet', 'page', 'styles', 'responsive.ts'),
-  join('src', 'identity', 'wallet', 'page', 'styles', 'index.ts'),
-  join('src', 'identity', 'wallet', 'page', 'markup.ts'),
-  join('src', 'identity', 'wallet', 'page', 'grainient.ts'),
-  join('src', 'identity', 'wallet', 'page', 'state.ts'),
-  join('src', 'identity', 'wallet', 'page', 'copy.ts'),
-  join('src', 'identity', 'wallet', 'page', 'walletProvider.ts'),
-  join('src', 'identity', 'wallet', 'page', 'view.ts'),
-  join('src', 'identity', 'wallet', 'page', 'controller.ts'),
-  join('src', 'identity', 'wallet', 'page.tsx'),
-] as const
+import { loadWalletPageRawSource, stripWalletModuleSyntax } from '../../../src/identity/wallet/browserWallet/walletPageSource.js'
 
 function readWalletPageSource(): string {
-  const source = WALLET_PAGE_SOURCE_FILES.map(file => readFileSync(file, 'utf8')).join('\n')
+  const source = loadWalletPageRawSource()
   const bundled = transformSync(stripWalletModuleSyntax(source), {
     loader: 'ts',
     target: 'es2020',
   }).code
   return source + '\n' + bundled
-}
-
-function stripWalletModuleSyntax(source: string): string {
-  const out: string[] = []
-  let skippingImport = false
-  for (const line of source.split(/\r?\n/)) {
-    const trimmed = line.trim()
-    if (skippingImport) {
-      if (/\bfrom\s+['"][^'"]+['"]/.test(trimmed) || trimmed.endsWith(';')) skippingImport = false
-      continue
-    }
-    if (trimmed.startsWith('import ')) {
-      if (!/\bfrom\s+['"][^'"]+['"]/.test(trimmed) && !trimmed.endsWith(';')) skippingImport = true
-      continue
-    }
-    out.push(line.replace(/^export\s+(?=(async\s+function|const|let|function|interface|type|class)\b)/, ''))
-  }
-  return out.join('\n')
 }
 
 test('browser wallet bridge exposes a clean localhost wallet URL', async () => {

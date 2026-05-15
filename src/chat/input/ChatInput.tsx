@@ -1,5 +1,3 @@
-import fs from 'node:fs/promises'
-import path from 'node:path'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Box, Text, useStdout } from 'ink'
 import { theme } from '../../ui/theme.js'
@@ -20,11 +18,6 @@ import {
   type FileMentionToken,
 } from './chatInputState.js'
 import {
-  getVisibleVisualLineWindow,
-  getVisualLineIndex,
-  getVisualLines,
-} from './textCursor.js'
-import {
   countPastedTextLineBreaks,
   expandPastedTextRefs,
   formatPastedTextRef,
@@ -39,6 +32,16 @@ import {
   pruneImageRefs,
   type ImageRef,
 } from './imageRefs.js'
+import { inputWrapWidth, renderWithCursor } from './inputRendering.js'
+import {
+  isFallbackPasteInput,
+  isSoftBreak,
+  listFileMentionSuggestions,
+  summarizeQueuedMessage,
+  type FileMentionSuggestion,
+} from './chatInputHelpers.js'
+
+export { inputWrapWidth, renderWithCursor } from './inputRendering.js'
 
 type PromptInputProps = {
   onSubmit: (value: string) => void
@@ -64,11 +67,6 @@ const PASTE_FLUSH_LIMIT = 4096
 const MIN_INPUT_VIEWPORT_LINES = 3
 const PROMPT_FOOTER_LINES = 5
 const MAX_INLINE_PASTE_LINES = 2
-const STACK_HORIZONTAL_PADDING = 2
-const INPUT_BORDER_WIDTH = 2
-const INPUT_HORIZONTAL_PADDING = 4
-const PROMPT_PREFIX_WIDTH = 2
-
 export const ChatInput: React.FC<PromptInputProps> = ({
   onSubmit,
   history,
@@ -626,136 +624,4 @@ export const ChatInput: React.FC<PromptInputProps> = ({
       ) : null}
     </Box>
   )
-}
-
-function isSoftBreak(key: { return: boolean; meta?: boolean; shift?: boolean }): boolean {
-  return key.return && Boolean(key.meta || key.shift)
-}
-
-type RenderedVisualLine = {
-  visualLineIndex: number
-  node: React.ReactNode
-}
-
-type RenderedInputViewport = {
-  lines: RenderedVisualLine[]
-  hiddenAbove: number
-  hiddenBelow: number
-  visibleLineCount: number
-}
-
-export function renderWithCursor(
-  value: string,
-  cursor: number,
-  showCursor: boolean,
-  wrapWidth: number,
-  maxVisibleLines: number,
-): RenderedInputViewport {
-  const lines = getVisualLines(value, wrapWidth)
-  const cursorLine = getVisualLineIndex(lines, cursor)
-  const window = getVisibleVisualLineWindow(lines.length, cursorLine, maxVisibleLines)
-  const visibleLines = lines.slice(window.start, window.end)
-
-  if (!showCursor) {
-    return {
-      lines: visibleLines.map((line, i) => ({
-        visualLineIndex: window.start + i,
-        node: (
-          <Text color={theme.text} wrap="wrap">
-            {value.slice(line.start, line.end) || ' '}
-          </Text>
-        ),
-      })),
-      hiddenAbove: window.start,
-      hiddenBelow: lines.length - window.end,
-      visibleLineCount: Math.max(1, visibleLines.length),
-    }
-  }
-
-  return {
-    lines: visibleLines.map((line, i) => {
-      const visualLineIndex = window.start + i
-      const text = value.slice(line.start, line.end)
-      if (visualLineIndex !== cursorLine) {
-        return {
-          visualLineIndex,
-          node: <Text color={theme.text} wrap="wrap">{text || ' '}</Text>,
-        }
-      }
-      const column = Math.max(0, Math.min(cursor - line.start, text.length))
-      const before = text.slice(0, column)
-      const atChar = text[column] ?? ' '
-      const after = text.slice(column + 1)
-      return {
-        visualLineIndex,
-        node: (
-          <Text color={theme.text} wrap="wrap">
-            {before}
-            <Text backgroundColor={theme.accentPeriwinkle} color="#0c0c1f">{atChar}</Text>
-            {after}
-          </Text>
-        ),
-      }
-    }),
-    hiddenAbove: window.start,
-    hiddenBelow: lines.length - window.end,
-    visibleLineCount: Math.max(1, visibleLines.length),
-  }
-}
-
-export function inputWrapWidth(columns: number): number {
-  const fixedChromeWidth =
-    STACK_HORIZONTAL_PADDING
-    + INPUT_BORDER_WIDTH
-    + INPUT_HORIZONTAL_PADDING
-    + PROMPT_PREFIX_WIDTH
-  return Math.max(1, Math.floor(columns) - fixedChromeWidth)
-}
-
-function isFallbackPasteInput(input: string): boolean {
-  if (!input) return false
-  return input.length > LARGE_PASTE_THRESHOLD
-    || countPastedTextLineBreaks(normalizePastedText(input)) > MAX_INLINE_PASTE_LINES
-}
-
-function summarizeQueuedMessage(text: string): string {
-  const normalized = text.replace(/\s+/g, ' ').trim()
-  if (!normalized) return ''
-  if (normalized.length <= 72) return normalized
-  return `${normalized.slice(0, 69)}...`
-}
-
-type FileMentionSuggestion = {
-  path: string
-  hint: string
-}
-
-async function listFileMentionSuggestions(
-  cwd: string,
-  mention: FileMentionToken,
-): Promise<FileMentionSuggestion[]> {
-  const query = mention.query.replace(/\\/g, '/')
-  const lastSlash = query.lastIndexOf('/')
-  const queryDir = lastSlash >= 0 ? query.slice(0, lastSlash + 1) : ''
-  const basenameQuery = lastSlash >= 0 ? query.slice(lastSlash + 1).toLowerCase() : query.toLowerCase()
-  const baseDir = path.resolve(cwd, queryDir || '.')
-
-  let entries: Array<{ name: string; isFile: () => boolean }>
-  try {
-    entries = await fs.readdir(baseDir, { withFileTypes: true })
-  } catch {
-    return []
-  }
-
-  return entries
-    .filter(entry => entry.isFile() && entry.name.toLowerCase().startsWith(basenameQuery))
-    .sort((left, right) => left.name.localeCompare(right.name))
-    .slice(0, 32)
-    .map(entry => {
-      const relative = (queryDir + entry.name).replace(/\\/g, '/')
-      return {
-        path: relative,
-        hint: path.extname(entry.name).slice(1) || 'file',
-      }
-    })
 }

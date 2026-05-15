@@ -383,7 +383,7 @@ test('stopLlamaCppServer reports untracked-server when alias is served but no pi
   })
 })
 
-test('startLlamaCppServer reports untracked-server when mmprojPath is set but no pid file exists', async () => {
+test('startLlamaCppServer reports a held port when mmprojPath is set but the server cannot be drained', async () => {
   await withTempEthagentHome(async () => {
     const originalFetch = globalThis.fetch
     globalThis.fetch = (async () => modelsResponse(['wanted-model'])) as typeof fetch
@@ -396,7 +396,7 @@ test('startLlamaCppServer reports untracked-server when mmprojPath is set but no
       })
       assert.equal(result.ok, false)
       if (result.ok) return
-      assert.equal(result.code, 'untracked-server')
+      assert.equal(result.code, 'different-model-running')
     } finally {
       globalThis.fetch = originalFetch
     }

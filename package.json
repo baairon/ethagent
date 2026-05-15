@@ -1,6 +1,6 @@
 {
   "name": "ethagent",
-  "version": "3.0.2",
+  "version": "3.1.0",
   "description": "A privacy-first AI agent with a portable Ethereum identity",
   "type": "module",
   "main": "bin/ethagent.js",
@@ -15,8 +15,10 @@
   ],
   "scripts": {
     "start": "node bin/ethagent.js",
+    "build": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
     "test": "node test/run-tests.mjs",
+    "prepack": "npm run build",
     "contracts:build": "cd contracts && forge build",
     "contracts:test": "cd contracts && forge test -vv",
     "contracts:fmt": "cd contracts && forge fmt"

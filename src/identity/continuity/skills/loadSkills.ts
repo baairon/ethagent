@@ -6,6 +6,16 @@ import { ensureContinuityVault } from '../storage/files.js'
 import { continuityVaultRef } from '../storage/paths.js'
 import { parseSkillFile } from './frontmatter.js'
 import { defaultSkillScaffold } from './scaffold.js'
+import {
+  isReservedWindowsSegment,
+  isValidFilenameSegment,
+  isValidSegment,
+  isValidSkillEntryKey,
+  isValidSkillFilePath,
+  isWithin,
+  MAX_FOLDER_DEPTH,
+  SKILL_FILE_NAME,
+} from './skillPaths.js'
 import type {
   ContinuitySkillsTree,
   Skill,
@@ -13,18 +23,9 @@ import type {
   SkillVisibility,
 } from './types.js'
 
-const SKILL_FILE_NAME = 'SKILL.md'
-const SEGMENT_RE = /^[A-Za-z0-9._-]+$/
-const FILE_EXT_RE = /\.[A-Za-z0-9]+$/
-const RESERVED_WINDOWS_SEGMENTS = new Set([
-  'con', 'prn', 'aux', 'nul',
-  'com1', 'com2', 'com3', 'com4', 'com5', 'com6', 'com7', 'com8', 'com9',
-  'lpt1', 'lpt2', 'lpt3', 'lpt4', 'lpt5', 'lpt6', 'lpt7', 'lpt8', 'lpt9',
-])
 const MAX_SKILL_ENTRIES = 200
 const MAX_SKILL_FILE_BYTES = 256 * 1024
 const MAX_TREE_FILES = 500
-const MAX_FOLDER_DEPTH = 4
 
 type IdentityKey = Pick<EthagentIdentity, 'chainId' | 'identityRegistryAddress' | 'agentId' | 'address'>
 
@@ -133,13 +134,6 @@ async function walkSkillFileStats(root: string): Promise<SkillFileStat[]> {
     }
   }
   return out
-}
-
-function isValidSegment(name: string): boolean {
-  if (!name) return false
-  if (name.startsWith('.')) return false
-  if (RESERVED_WINDOWS_SEGMENTS.has(name.toLowerCase())) return false
-  return SEGMENT_RE.test(name)
 }
 
 export async function readSkill(identity: EthagentIdentity, name: string): Promise<Skill> {
@@ -444,7 +438,7 @@ async function walkFolderFiles(
   for (const ent of dirents) {
     if (ent.isSymbolicLink()) continue
     if (ent.name.startsWith('.')) continue
-    if (RESERVED_WINDOWS_SEGMENTS.has(ent.name.toLowerCase())) continue
+    if (isReservedWindowsSegment(ent.name)) continue
     if (ent.isDirectory()) {
       if (!isValidSegment(ent.name)) continue
       const nextPrefix = relativePrefix ? `${relativePrefix}/${ent.name}` : ent.name
@@ -463,14 +457,6 @@ async function walkFolderFiles(
       mtimeMs: stat.mtimeMs,
     })
   }
-}
-
-function isValidFilenameSegment(name: string): boolean {
-  if (!name) return false
-  if (name.startsWith('.')) return false
-  if (RESERVED_WINDOWS_SEGMENTS.has(name.toLowerCase())) return false
-  if (!SEGMENT_RE.test(name)) return false
-  return FILE_EXT_RE.test(name)
 }
 
 async function statOrNull(file: string): Promise<import('node:fs').Stats | null> {
@@ -563,47 +549,4 @@ async function loadSkillBody(entry: SkillIndexEntry): Promise<Skill> {
   return { ...entry, body: parsed.body }
 }
 
-export function isValidSkillEntryKey(rel: string): boolean {
-  if (!rel || rel.length > 256) return false
-  if (rel.includes('\0')) return false
-  if (rel.startsWith('/') || rel.startsWith('\\')) return false
-  if (/^[a-zA-Z]:/.test(rel)) return false
-  const segments = rel.split('/')
-  if (segments.length !== 2) return false
-  const [name, filename] = segments
-  if (!name || !filename) return false
-  if (filename !== SKILL_FILE_NAME) return false
-  if (!isValidSegment(name)) return false
-  return true
-}
-
-export function isValidSkillFilePath(rel: string): boolean {
-  if (!rel || rel.length > 256) return false
-  if (rel.includes('\0')) return false
-  if (rel.startsWith('/') || rel.startsWith('\\')) return false
-  if (/^[a-zA-Z]:/.test(rel)) return false
-  const segments = rel.split('/')
-  if (segments.length < 2) return false
-  if (segments.length > MAX_FOLDER_DEPTH + 2) return false
-  const [first, ...rest] = segments
-  if (!first || !isValidSegment(first)) return false
-  for (let i = 0; i < rest.length; i++) {
-    const seg = rest[i]
-    if (!seg) return false
-    if (i === rest.length - 1) {
-      if (seg === SKILL_FILE_NAME) continue
-      if (!isValidFilenameSegment(seg)) return false
-    } else {
-      if (!isValidSegment(seg)) return false
-    }
-  }
-  return true
-}
-
-function isWithin(root: string, target: string): boolean {
-  const rootResolved = path.resolve(root)
-  const targetResolved = path.resolve(target)
-  if (targetResolved === rootResolved) return true
-  const prefix = rootResolved.endsWith(path.sep) ? rootResolved : rootResolved + path.sep
-  return targetResolved.startsWith(prefix)
-}
+export { isValidSkillEntryKey, isValidSkillFilePath } from './skillPaths.js'

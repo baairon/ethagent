@@ -41,7 +41,7 @@ test('resolveModelSelection switches to a local Hugging Face model with the defa
   assert.equal(result.config.provider, 'llamacpp')
   assert.equal(result.config.model, 'org/model#model.Q4_K_M.gguf')
   assert.equal(result.config.baseUrl, 'http://localhost:8080/v1')
-  assert.match(result.notice, /Local Hugging Face model ready/i)
+  assert.match(result.notice, /llama\.cpp ready/i)
 })
 
 test('resolveModelSelection preserves an explicit cloud model when provider is unchanged', () => {

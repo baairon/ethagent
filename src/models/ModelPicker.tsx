@@ -9,12 +9,8 @@ import { theme } from '../ui/theme.js'
 import {
   DEFAULT_LLAMA_HOST,
   detectLlamaCpp,
-  installLlamaCppRunner,
   killRogueLlamaProcesses,
-  setLlamaCppServerPath,
-  startLlamaCppServer,
   stopLlamaCppServer,
-  type LlamaCppInstallProgress,
   type LlamaCppInstallResult,
   type LlamaCppStartResult,
 } from './llamacpp.js'
@@ -31,23 +27,13 @@ import { hasOpenAIOAuthCredentials, rmOpenAIOAuthCredentials } from '../auth/ope
 import { openExternalUrl } from '../utils/openExternal.js'
 import { defaultModelFor, type EthagentConfig, type ProviderId } from '../storage/config.js'
 import { clearModelCatalogCache, discoverProviderModels, isOpenAIOAuthAllowedModel, OPENAI_OAUTH_DEFAULT_MODEL, type ModelCatalogResult } from './catalog.js'
-import { contextWindowInfo } from '../runtime/compaction.js'
 import {
-  addMmprojToInstalledModel,
-  backfillMmprojForModels,
   createHfDownloadPlan,
-  downloadHfModel,
-  fetchHuggingFaceRepoInfo,
   findLocalHfModel,
   ggufFiles,
   loadLocalHfModels,
   localModelId,
-  modelFromPlan,
-  parseHuggingFaceRef,
-  uninstallLocalHfModel,
   type HfCredibility,
-  type HfDownloadPlan,
-  type HfDownloadProgress,
   type HfRisk,
   type HuggingFaceRepoInfo,
   type HuggingFaceSibling,
@@ -69,57 +55,75 @@ import {
 } from './modelPickerOptions.js'
 import { formatLocalHfModelDisplayName, formatModelDisplayName } from './modelDisplay.js'
 import { fetchUncensoredGgufCatalog, type UncensoredCatalogEntry } from './uncensoredCatalog.js'
+import type {
+  LoadedModelPickerData as LoadedData,
+  LocalUninstallTarget,
+  ModelPickerProps,
+  ModelPickerSelection,
+  ModelPickerState as State,
+} from './modelPickerTypes.js'
+import {
+  ElapsedSpinner,
+  contextFitLabel,
+  contextFitSubtitle,
+  credibilityLabel,
+  fitColor,
+  fitLabel,
+  formatBytes,
+  formatSignals,
+  friendlyFileName,
+  friendlyReasons,
+  isCloudProvider,
+  modelMetadataSubtext,
+  providerKeyPlaceholder,
+  riskColor,
+  runnerPathPlaceholder,
+  safetyLabel,
+} from './modelPickerDisplay.js'
+import {
+  buildCatalogOptions,
+  buildHfFileOptions,
+  buildRunnerRecoveryOptions,
+  configForProvider,
+  localModelOptionIndex,
+  localOrCloudOptionIndex,
+  parseCloudValue,
+  parseFullCatalogValue,
+  parseKeyValue,
+  pickFallbackSelection,
+} from './modelPickerViewHelpers.js'
+import { openLocalCatalog, reviewCatalogModel } from './modelPickerCatalogFlow.js'
+import { loadHfPickerModels, probeLlamaCpp } from './modelPickerData.js'
+import {
+  chooseInstalledHfModelForRepo,
+  downloadMmprojAndContinue,
+  findInstalledHfModelForInput,
+  inspectHfInput,
+  reviewHfFile,
+  startHfDownload,
+} from './modelPickerHfFlow.js'
+import {
+  installRunnerAndStart,
+  localRunnerStartFailureSubtitle,
+  runRunnerSetup,
+  saveRunnerPathAndStart,
+  startAndPickHfModel,
+} from './modelPickerLocalRunnerFlow.js'
+import {
+  isCurrentLocalUninstallTarget,
+  localUninstallBoundaryCopy,
+  localUninstallTargets,
+  uninstallLocalModel,
+} from './modelPickerUninstallFlow.js'
+import {
+  deleteKey,
+  signOutOAuth,
+  startOpenAIOAuthFlow,
+  submitKey,
+} from './modelPickerCredentials.js'
 
-export type ModelPickerSelection =
-  | { kind: 'llamacpp'; model: string; mmprojPath?: string }
-  | { kind: 'cloud'; provider: CloudProviderId; model: string; keyJustSet: boolean }
-
-type ModelPickerProps = {
-  currentConfig: EthagentConfig
-  currentProvider: ProviderId
-  currentModel: string
-  contextFit?: ModelPickerContextFit | null
-  featuredHfRepo?: string
-  localOnly?: boolean
-  onPick: (selection: ModelPickerSelection) => void
-  onCancel: () => void
-}
-
-type LoadedData = ModelPickerOptionsData
-type LocalUninstallTarget = { kind: 'hf'; id: string; displayName: string; sizeBytes: number }
-
-type State =
-  | { kind: 'loading' }
-  | { kind: 'list'; data: LoadedData }
-  | { kind: 'localCatalogLoading'; data: LoadedData }
-  | { kind: 'localCatalog'; data: LoadedData; catalog: UncensoredCatalogEntry[] }
-  | { kind: 'localCatalogError'; data: LoadedData; message: string }
-  | { kind: 'catalog'; provider: CloudProviderId; data: LoadedData }
-  | { kind: 'keyEntry'; provider: CloudProviderId; action: 'set' | 'edit'; data: LoadedData; submitting: boolean; error?: string }
-  | { kind: 'keyManage'; provider: CloudProviderId; data: LoadedData; submitting: boolean; error?: string }
-  | { kind: 'oauthManage'; data: LoadedData; submitting: boolean; error?: string }
-  | { kind: 'oauthLogin'; data: LoadedData; phase: 'waiting' | 'exchanging' | 'error'; url?: string; message?: string }
-  | { kind: 'hfInput'; data: LoadedData; error?: string }
-  | { kind: 'hfLoading'; data: LoadedData; input: string }
-  | { kind: 'hfFilePick'; data: LoadedData; input: string; repo: HuggingFaceRepoInfo; files: HuggingFaceSibling[] }
-  | { kind: 'hfReview'; data: LoadedData; plan: HfDownloadPlan }
-  | { kind: 'hfDownloading'; data: LoadedData; plan: HfDownloadPlan; progress: HfDownloadProgress }
-  | { kind: 'hfDone'; data: LoadedData; model: LocalHfModel; alreadyInstalled?: boolean }
-  | { kind: 'hfError'; data: LoadedData; message: string; input?: string }
-  | { kind: 'localUninstallPick'; data: LoadedData }
-  | { kind: 'localUninstallConfirm'; data: LoadedData; target: LocalUninstallTarget }
-  | { kind: 'localUninstalling'; data: LoadedData; target: LocalUninstallTarget }
-  | { kind: 'localUninstallDone'; data: LoadedData; modelName: string }
-  | { kind: 'localUninstallError'; data: LoadedData; target: LocalUninstallTarget; message: string }
-  | { kind: 'localRunnerSetup'; data: LoadedData; model: LocalHfModel }
-  | { kind: 'localRunnerInstalling'; data: LoadedData; model: LocalHfModel; startedAt: number; progress: LlamaCppInstallProgress }
-  | { kind: 'localRunnerInstallFail'; data: LoadedData; model: LocalHfModel; result: Extract<LlamaCppInstallResult, { ok: false }> }
-  | { kind: 'localRunnerPathEntry'; data: LoadedData; model: LocalHfModel; submitting: boolean; error?: string }
-  | { kind: 'localRunnerStarting'; data: LoadedData; model: LocalHfModel; startedAt: number }
-  | { kind: 'localRunnerStartFail'; data: LoadedData; model: LocalHfModel; result: Extract<LlamaCppStartResult, { ok: false }> }
-  | { kind: 'mmprojOffer'; data: LoadedData; model: LocalHfModel }
-  | { kind: 'mmprojDownloading'; data: LoadedData; model: LocalHfModel; progress: HfDownloadProgress }
-  | { kind: 'mmprojError'; data: LoadedData; model: LocalHfModel; message: string }
+export type { ModelPickerSelection } from './modelPickerTypes.js'
+export { chooseInstalledHfModelForRepo } from './modelPickerHfFlow.js'
 
 export const ModelPicker: React.FC<ModelPickerProps> = ({
   currentConfig,
@@ -1002,828 +1006,4 @@ function handleSubmit(
   }
 }
 
-async function openLocalCatalog(
-  data: LoadedData,
-  setState: (s: State) => void,
-): Promise<void> {
-  setState({ kind: 'localCatalogLoading', data })
-  try {
-    const installedModels = await loadLocalHfModels()
-    const catalog = await fetchUncensoredGgufCatalog({
-      machineSpec: data.machineSpec,
-      installedModels,
-    })
-    setState({
-      kind: 'localCatalog',
-      data: { ...data, hfModels: await loadHfPickerModels() },
-      catalog,
-    })
-  } catch (err: unknown) {
-    setState({ kind: 'localCatalogError', data, message: (err as Error).message })
-  }
-}
-
-async function reviewCatalogModel(
-  state: Extract<State, { kind: 'localCatalog' }>,
-  entry: UncensoredCatalogEntry,
-  setState: (s: State) => void,
-): Promise<void> {
-  const files = ggufFiles(entry.repo)
-  const installed = chooseInstalledHfModelForRepo(
-    await loadLocalHfModels(),
-    entry.repo,
-    files,
-    entry.file.filename,
-    state.data.machineSpec,
-  )
-  if (installed) {
-    setState({
-      kind: 'hfDone',
-      data: { ...state.data, hfModels: await loadHfPickerModels() },
-      model: installed,
-      alreadyInstalled: true,
-    })
-    return
-  }
-  try {
-    const plan = await createHfDownloadPlan(entry.repo.repoId, entry.file.filename)
-    setState({ kind: 'hfReview', data: state.data, plan })
-  } catch (err: unknown) {
-    setState({ kind: 'hfError', data: state.data, message: (err as Error).message, input: entry.repo.repoId })
-  }
-}
-
-function buildCatalogOptions(
-  provider: CloudProviderId,
-  catalog: ModelCatalogResult | undefined,
-  currentProvider: ProviderId,
-  currentModel: string,
-  contextFit?: ModelPickerContextFit | null,
-): SelectOption<string>[] {
-  if (!catalog || catalog.entries.length === 0) {
-    return [{
-      value: `hdr:catalog-empty:${provider}`,
-      label: 'No Models Found',
-      disabled: true,
-      role: 'notice',
-      prefix: 'note',
-    }]
-  }
-  const sourceById = new Map(catalog.entries.map(entry => [entry.id, entry.source]))
-  return orderModelsForContextFit(provider, catalog.entries.map(entry => entry.id), contextFit).map(id => {
-    const active = currentProvider === provider && currentModel === id
-    const suffix = sourceById.get(id) === 'fallback' ? '  fallback' : ''
-    const displayName = formatModelDisplayName(provider, id, { maxLength: 64 })
-    return {
-      value: `full:${provider}:${id}`,
-      label: contextFitLabel(provider, id, `${displayName}${active ? '  *' : ''}${suffix}`, contextFit),
-      role: 'option',
-    }
-  })
-}
-
-function parseCloudValue(value: string): { provider: CloudProviderId; model: string } | null {
-  if (!value.startsWith('c:')) return null
-  const rest = value.slice(2)
-  const sep = rest.indexOf(':')
-  if (sep === -1) return null
-  const provider = rest.slice(0, sep)
-  const model = rest.slice(sep + 1)
-  if (!isCloudProvider(provider) || !model) return null
-  return { provider, model }
-}
-
-function localModelOptionIndex(
-  options: SelectOption<string>[],
-  currentProvider: ProviderId,
-  currentModel: string,
-): number {
-  return options.findIndex(opt => {
-    if (opt.disabled) return false
-    if (opt.value.startsWith('hf:')) return opt.value.slice(3) === currentModel && currentProvider === 'llamacpp'
-    if (opt.value.startsWith('uc:')) return opt.value.slice(3) === currentModel && currentProvider === 'llamacpp'
-    return false
-  })
-}
-
-function localOrCloudOptionIndex(
-  options: SelectOption<string>[],
-  currentProvider: ProviderId,
-  currentModel: string,
-): number {
-  return options.findIndex(opt => {
-    if (opt.disabled) return false
-    if (opt.value.startsWith('hf:')) return opt.value.slice(3) === currentModel && currentProvider === 'llamacpp'
-    if (opt.value.startsWith('uc:')) return opt.value.slice(3) === currentModel && currentProvider === 'llamacpp'
-    const cloud = parseCloudValue(opt.value)
-    return cloud?.provider === currentProvider && cloud.model === currentModel
-  })
-}
-
-function parseFullCatalogValue(value: string): { provider: CloudProviderId; model: string } | null {
-  if (!value.startsWith('full:')) return null
-  const rest = value.slice(5)
-  const sep = rest.indexOf(':')
-  if (sep === -1) return null
-  const provider = rest.slice(0, sep)
-  const model = rest.slice(sep + 1)
-  if (!isCloudProvider(provider) || !model) return null
-  return { provider, model }
-}
-
-function parseKeyValue(value: string): { action: 'set' | 'edit' | 'manage'; provider: CloudProviderId } | null {
-  if (!value.startsWith('key:')) return null
-  const parts = value.split(':')
-  if (parts.length !== 3) return null
-  const action = parts[1]
-  const provider = parts[2]
-  if (action !== 'set' && action !== 'edit' && action !== 'manage') return null
-  if (!isCloudProvider(provider)) return null
-  return { action, provider }
-}
-
-async function submitKey(
-  state: Extract<State, { kind: 'keyEntry' }>,
-  value: string,
-  currentConfig: EthagentConfig,
-  setState: (s: State) => void,
-): Promise<void> {
-  const trimmed = value.trim()
-  if (!trimmed) {
-    setState({ ...state, error: 'key cannot be empty' })
-    return
-  }
-  setState({ ...state, submitting: true, error: undefined })
-  try {
-    await setKey(state.provider, trimmed)
-    const data = await refreshProviderKeyState(state.data, currentConfig, state.provider)
-    setState({ kind: 'list', data })
-  } catch (err: unknown) {
-    setState({ ...state, submitting: false, error: (err as Error).message })
-  }
-}
-
-async function startOpenAIOAuthFlow(
-  data: LoadedData,
-  currentConfig: EthagentConfig,
-  setState: (s: State) => void,
-  serviceRef: React.MutableRefObject<OpenAIOAuthService | null>,
-  onPick: (sel: ModelPickerSelection) => void,
-): Promise<void> {
-  serviceRef.current?.cleanup()
-  const service = new OpenAIOAuthService()
-  serviceRef.current = service
-  setState({ kind: 'oauthLogin', data, phase: 'waiting' })
-  try {
-    const result = await service.start(authUrl => {
-      openExternalUrl(authUrl)
-      setState({ kind: 'oauthLogin', data, phase: 'waiting', url: authUrl })
-    })
-    if (serviceRef.current !== service) return
-    setState({ kind: 'oauthLogin', data, phase: 'exchanging' })
-    if (result.kind === 'apikey') {
-      if (typeof result.apiKey !== 'string' || result.apiKey.length === 0) {
-        throw new Error(`OAuth result was apikey kind but apiKey is ${typeof result.apiKey}; refusing to store.`)
-      }
-      try {
-        await setKey('openai', result.apiKey)
-      } catch (err) {
-        throw new Error(`Storing the OpenAI API key failed: ${err instanceof Error ? err.message : String(err)}`)
-      }
-    }
-    let refreshed: LoadedData
-    try {
-      refreshed = await refreshProviderKeyState(data, currentConfig, 'openai')
-    } catch (err) {
-      throw new Error(`Refreshing the OpenAI provider state failed: ${err instanceof Error ? err.message : String(err)}`)
-    }
-    if (serviceRef.current !== service) return
-    serviceRef.current = null
-    if (result.kind === 'oauth-only' && !isOpenAIOAuthAllowedModel(currentConfig.model)) {
-      onPick({ kind: 'cloud', provider: 'openai', model: OPENAI_OAUTH_DEFAULT_MODEL, keyJustSet: true })
-      return
-    }
-    setState({ kind: 'list', data: refreshed })
-  } catch (err: unknown) {
-    if (serviceRef.current !== service) return
-    serviceRef.current = null
-    const message = err instanceof Error ? err.message : String(err)
-    if (message === 'OpenAI sign-in was cancelled.') {
-      setState({ kind: 'list', data })
-      return
-    }
-    setState({ kind: 'oauthLogin', data, phase: 'error', message })
-  }
-}
-
-async function deleteKey(
-  state: Extract<State, { kind: 'keyManage' }>,
-  currentConfig: EthagentConfig,
-  setState: (s: State) => void,
-  onPick: (sel: ModelPickerSelection) => void,
-  currentProvider: ProviderId,
-): Promise<void> {
-  setState({ ...state, submitting: true, error: undefined })
-  try {
-    await rmKey(state.provider)
-    if (state.provider === 'openai') await rmOpenAIOAuthCredentials()
-    const data = await refreshProviderKeyState(state.data, currentConfig, state.provider)
-    if (currentProvider === state.provider) {
-      const fallback = pickFallbackSelection(data, state.provider)
-      if (fallback) {
-        onPick(fallback)
-        return
-      }
-    }
-    setState({ kind: 'list', data })
-  } catch (err: unknown) {
-    setState({ ...state, submitting: false, error: (err as Error).message })
-  }
-}
-
-async function signOutOAuth(
-  state: Extract<State, { kind: 'oauthManage' }>,
-  currentConfig: EthagentConfig,
-  setState: (s: State) => void,
-  onPick: (sel: ModelPickerSelection) => void,
-  currentProvider: ProviderId,
-): Promise<void> {
-  setState({ ...state, submitting: true, error: undefined })
-  try {
-    await rmKey('openai')
-    await rmOpenAIOAuthCredentials()
-    const data = await refreshProviderKeyState(state.data, currentConfig, 'openai')
-    if (currentProvider === 'openai') {
-      const fallback = pickFallbackSelection(data, 'openai')
-      if (fallback) {
-        onPick(fallback)
-        return
-      }
-    }
-    setState({ kind: 'list', data })
-  } catch (err: unknown) {
-    setState({ ...state, submitting: false, error: (err as Error).message })
-  }
-}
-
-function pickFallbackSelection(data: LoadedData, removed: ProviderId): ModelPickerSelection | null {
-  for (const provider of MODEL_PICKER_CLOUD_PROVIDERS) {
-    if (provider === removed) continue
-    if (data.cloudKeys[provider] !== true) continue
-    const catalogModel = data.cloudCatalogs[provider]?.entries[0]?.id
-    const model = catalogModel ?? defaultModelFor(provider)
-    return { kind: 'cloud', provider, model, keyJustSet: false }
-  }
-  if (data.hfModels.length > 0) {
-    return { kind: 'llamacpp', model: data.hfModels[0]!.id }
-  }
-  return null
-}
-
-async function refreshProviderKeyState(
-  data: LoadedData,
-  currentConfig: EthagentConfig,
-  provider: CloudProviderId,
-): Promise<LoadedData> {
-  clearModelCatalogCache()
-  const apiKeySet = await hasKey(provider)
-  const oauthSet = provider === 'openai' ? await hasOpenAIOAuthCredentials() : false
-  const keySet = apiKeySet || oauthSet
-  const cloudKeys = { ...data.cloudKeys, [provider]: keySet }
-  const cloudCredentialKinds: Partial<Record<ProviderId, CloudCredentialKind>> = { ...(data.cloudCredentialKinds ?? {}) }
-  if (oauthSet) cloudCredentialKinds[provider] = 'oauth'
-  else if (apiKeySet) cloudCredentialKinds[provider] = 'apikey'
-  else delete cloudCredentialKinds[provider]
-  const cloudCatalogs = { ...data.cloudCatalogs }
-  if (keySet) {
-    cloudCatalogs[provider] = await discoverProviderModels(configForProvider(currentConfig, provider))
-  } else {
-    delete cloudCatalogs[provider]
-  }
-  return { ...data, cloudKeys, cloudCatalogs, cloudCredentialKinds }
-}
-
-function configForProvider(config: EthagentConfig, provider: CloudProviderId): EthagentConfig {
-  return {
-    ...config,
-    provider,
-    model: config.provider === provider ? config.model : defaultModelFor(provider),
-    baseUrl: provider === 'openai' && config.provider === 'openai' ? config.baseUrl : undefined,
-  }
-}
-
-export function buildHfFileOptions(
-  repo: HuggingFaceRepoInfo,
-  files: HuggingFaceSibling[],
-  spec: SpecSnapshot | undefined,
-  installedModelIds: string[] = [],
-): SelectOption<string>[] {
-  const ordered = spec
-    ? orderGgufFilesForSpec(repo, files, spec)
-    : files.map(file => ({ file, fit: 'unknown' as GgufMachineFit, score: 0, budgetBytes: 0 }))
-  const recommended = spec ? ordered[0]?.file.filename : undefined
-  const installed = new Set(installedModelIds)
-  return ordered.map(item => {
-    const size = item.file.sizeBytes ? formatBytes(item.file.sizeBytes) : ''
-    const indicators = [
-      item.file.filename === recommended ? 'Recommended' : '',
-      installed.has(localModelId(repo.repoId, item.file.filename)) ? 'Installed' : '',
-    ]
-    return {
-      value: item.file.filename,
-      label: item.file.filename,
-      subtext: modelMetadataSubtext(size, indicators),
-      role: 'option' as const,
-    }
-  })
-}
-
-function buildRunnerRecoveryOptions(
-  _result: Extract<LlamaCppInstallResult, { ok: false }>,
-): SelectOption<'stop-and-retry' | 'path' | 'back'>[] {
-  return [
-    { value: 'stop-and-retry', label: 'Stop and Retry', hint: 'Stop background runners and try the install again' },
-    { value: 'path', label: 'Use Existing Runner Path' },
-    { value: 'back', label: 'Back To Picker' },
-  ]
-}
-
-function localRunnerStartFailureSubtitle(result: Extract<LlamaCppStartResult, { ok: false }>): string {
-  switch (result.code) {
-    case 'readiness-timeout':
-      return 'the local runner is still loading or did not answer in time'
-    case 'runner-exited':
-      return 'the local runner closed before becoming ready'
-    case 'spawn-failed':
-      return 'the local runner could not be started'
-    case 'different-model-running':
-      return result.message
-    case 'model-file-missing':
-      return result.message
-    case 'runner-not-installed':
-      return 'this machine still needs a local runner'
-  }
-}
-
-async function findInstalledHfModelForInput(input: string): Promise<LocalHfModel | null> {
-  const ref = parseHuggingFaceRef(input)
-  const installed = await loadLocalHfModels()
-  return installed.find(model =>
-    model.status === 'ready'
-    && model.repoId === ref.repoId
-    && (!ref.filename || model.filename === ref.filename)
-  ) ?? null
-}
-
-export function chooseInstalledHfModelForRepo(
-  installed: LocalHfModel[],
-  repo: HuggingFaceRepoInfo,
-  files: HuggingFaceSibling[],
-  requestedFilename: string | undefined,
-  spec: SpecSnapshot | undefined,
-): LocalHfModel | null {
-  const compatibleFiles = new Set(files.map(file => file.filename))
-  const candidates = installed.filter(model =>
-    model.status === 'ready'
-    && model.repoId === repo.repoId
-    && compatibleFiles.has(model.filename)
-    && (!requestedFilename || model.filename === requestedFilename)
-  )
-  if (requestedFilename || candidates.length <= 1) return candidates[0] ?? null
-
-  const orderedFiles = spec
-    ? orderGgufFilesForSpec(repo, files, spec).map(item => item.file.filename)
-    : files.map(file => file.filename)
-  for (const filename of orderedFiles) {
-    const match = candidates.find(model => model.filename === filename)
-    if (match) return match
-  }
-  return candidates[0] ?? null
-}
-
-async function inspectHfInput(
-  state: Extract<State, { kind: 'hfInput' }>,
-  value: string,
-  setState: (s: State) => void,
-): Promise<void> {
-  const input = value.trim()
-  if (!input) {
-    setState({ ...state, error: 'paste a model link or repo id' })
-    return
-  }
-  setState({ kind: 'hfLoading', data: state.data, input })
-  try {
-    const ref = parseHuggingFaceRef(input)
-    const repo = await fetchHuggingFaceRepoInfo(ref)
-    const files = ggufFiles(repo)
-    if (files.length === 0) {
-      setState({
-        kind: 'hfInput',
-        data: state.data,
-        error: 'no compatible local model files found; paste a different model link',
-      })
-      return
-    }
-    const installed = chooseInstalledHfModelForRepo(
-      await loadLocalHfModels(),
-      repo,
-      files,
-      ref.filename,
-      state.data.machineSpec,
-    )
-    if (installed) {
-      setState({
-        kind: 'hfDone',
-        data: { ...state.data, hfModels: await loadHfPickerModels() },
-        model: installed,
-        alreadyInstalled: true,
-      })
-      return
-    }
-    const recommendedFilename = state.data.machineSpec
-      ? recommendGgufFile(repo, files, state.data.machineSpec)?.file.filename
-      : files[0]?.filename
-    if (ref.filename || files.length === 1) {
-      const plan = await createHfDownloadPlan(input, ref.filename ?? recommendedFilename)
-      setState({ kind: 'hfReview', data: state.data, plan })
-      return
-    }
-    setState({ kind: 'hfFilePick', data: state.data, input, repo, files })
-  } catch (err: unknown) {
-    setState({ kind: 'hfInput', data: state.data, error: (err as Error).message })
-  }
-}
-
-async function reviewHfFile(
-  state: Extract<State, { kind: 'hfFilePick' }>,
-  filename: string,
-  setState: (s: State) => void,
-): Promise<void> {
-  setState({ kind: 'hfLoading', data: state.data, input: state.input })
-  try {
-    const installed = chooseInstalledHfModelForRepo(
-      await loadLocalHfModels(),
-      state.repo,
-      state.files,
-      filename,
-      state.data.machineSpec,
-    )
-    if (installed) {
-      setState({
-        kind: 'hfDone',
-        data: { ...state.data, hfModels: await loadHfPickerModels() },
-        model: installed,
-        alreadyInstalled: true,
-      })
-      return
-    }
-    const plan = await createHfDownloadPlan(state.input, filename)
-    setState({ kind: 'hfReview', data: state.data, plan })
-  } catch (err: unknown) {
-    setState({ kind: 'hfError', data: state.data, message: (err as Error).message, input: state.input })
-  }
-}
-
-async function startHfDownload(
-  state: Extract<State, { kind: 'hfReview' }>,
-  setState: (s: State) => void,
-  abortRef: React.MutableRefObject<AbortController | null>,
-  onPick: (sel: ModelPickerSelection) => void,
-): Promise<void> {
-  const controller = new AbortController()
-  abortRef.current = controller
-  setState({ kind: 'hfDownloading', data: state.data, plan: state.plan, progress: { status: 'starting', completed: 0, total: state.plan.sizeBytes } })
-  try {
-    for await (const progress of downloadHfModel(state.plan, controller.signal)) {
-      if (controller.signal.aborted) return
-      setState({ kind: 'hfDownloading', data: state.data, plan: state.plan, progress })
-    }
-    const model = await findLocalHfModel(`${state.plan.repoId}#${state.plan.filename}`)
-      ?? modelFromPlan(state.plan, undefined, 'ready')
-    const data = {
-      ...state.data,
-      hfModels: await loadHfPickerModels(),
-    }
-    await startAndPickHfModel(model, { kind: 'hfDone', data, model }, setState, onPick)
-  } catch (err: unknown) {
-    if (controller.signal.aborted) return
-    setState({ kind: 'hfError', data: state.data, message: (err as Error).message, input: state.plan.repoId })
-  } finally {
-    abortRef.current = null
-  }
-}
-
-function localUninstallTargets(data: LoadedData): LocalUninstallTarget[] {
-  return data.hfModels.map(model => ({
-    kind: 'hf' as const,
-    id: model.id,
-    displayName: formatLocalHfModelDisplayName(model.id, {
-      displayName: model.displayName,
-      maxLength: 64,
-    }),
-    sizeBytes: model.sizeBytes,
-  }))
-}
-
-function isCurrentLocalUninstallTarget(
-  target: LocalUninstallTarget,
-  currentProvider: ProviderId,
-  currentModel: string,
-): boolean {
-  return target.kind === 'hf' && currentProvider === 'llamacpp' && target.id === currentModel
-}
-
-function localUninstallBoundaryCopy(_target: LocalUninstallTarget): string {
-  return 'This removes only the downloaded GGUF file and metadata from this machine.'
-}
-
-async function uninstallLocalModel(
-  state: Extract<State, { kind: 'localUninstallConfirm' }>,
-  setState: (s: State) => void,
-): Promise<void> {
-  setState({ kind: 'localUninstalling', data: state.data, target: state.target })
-  const modelName = state.target.displayName
-  try {
-    await uninstallLocalHfModel(state.target.id)
-    const data = await refreshLocalModelData(state.data)
-    setState({ kind: 'localUninstallDone', data, modelName })
-  } catch (err: unknown) {
-    setState({
-      kind: 'localUninstallError',
-      data: state.data,
-      target: state.target,
-      message: (err as Error).message,
-    })
-  }
-}
-
-async function downloadMmprojAndContinue(
-  state: Extract<State, { kind: 'mmprojOffer' }>,
-  setState: (s: State) => void,
-  onPick: (sel: ModelPickerSelection) => void,
-): Promise<void> {
-  setState({ kind: 'mmprojDownloading', data: state.data, model: state.model, progress: { status: 'starting' } })
-  try {
-    for await (const progress of addMmprojToInstalledModel(state.model.id)) {
-      setState({ kind: 'mmprojDownloading', data: state.data, model: state.model, progress })
-    }
-  } catch (err: unknown) {
-    setState({ kind: 'mmprojError', data: state.data, model: state.model, message: (err as Error).message })
-    return
-  }
-  const updated = await findLocalHfModel(state.model.id)
-  if (!updated || !updated.mmprojPath) {
-    setState({ kind: 'mmprojError', data: state.data, model: state.model, message: 'projector downloaded but path was not persisted' })
-    return
-  }
-  await stopLlamaCppServer().catch(() => null)
-  const data = { ...state.data, hfModels: await loadHfPickerModels() }
-  await startAndPickHfModel(updated, { kind: 'mmprojOffer', data, model: updated }, setState, onPick)
-}
-
-async function refreshLocalModelData(data: LoadedData): Promise<LoadedData> {
-  const hfModels = await loadHfPickerModels()
-  return {
-    ...data,
-    hfModels,
-  }
-}
-
-async function startAndPickHfModel(
-  model: LocalHfModel,
-  state: Extract<State, { kind: 'list' | 'localCatalog' | 'hfDone' | 'mmprojOffer' | 'mmprojError' }>,
-  setState: (s: State) => void,
-  onPick: (sel: ModelPickerSelection) => void,
-): Promise<void> {
-  if (model.risk === 'high') {
-    setState({ kind: 'hfError', data: state.data, message: 'blocked high-risk model; choose a model from a more credible source' })
-    return
-  }
-  if (model.mmprojAvailable && !model.mmprojPath && state.kind !== 'mmprojOffer' && state.kind !== 'mmprojError') {
-    setState({ kind: 'mmprojOffer', data: state.data, model })
-    return
-  }
-  setState({ kind: 'localRunnerStarting', data: state.data, model, startedAt: Date.now() })
-  const result = await startLlamaCppServer({
-    modelPath: model.localPath,
-    modelAlias: model.id,
-    mmprojPath: model.mmprojPath,
-  })
-  const llamaCpp = await probeLlamaCpp()
-  const data = { ...state.data, llamaCpp }
-  if (!result.ok) {
-    if (result.code === 'runner-not-installed') {
-      setState({ kind: 'localRunnerSetup', data, model })
-      return
-    }
-    setState({ kind: 'localRunnerStartFail', data, model, result })
-    return
-  }
-  onPick({ kind: 'llamacpp', model: model.id, mmprojPath: model.mmprojPath })
-}
-
-async function installRunnerAndStart(
-  state: Extract<State, { kind: 'localRunnerSetup' }>,
-  setState: (s: State) => void,
-  onPick: (sel: ModelPickerSelection) => void,
-): Promise<void> {
-  await runRunnerSetup(state, setState, onPick, installLlamaCppRunner)
-}
-
-async function runRunnerSetup(
-  state: Extract<State, { kind: 'localRunnerSetup' }>,
-  setState: (s: State) => void,
-  onPick: (sel: ModelPickerSelection) => void,
-  setup: (onProgress?: (progress: LlamaCppInstallProgress) => void) => Promise<LlamaCppInstallResult>,
-): Promise<void> {
-  const startedAt = Date.now()
-  const initialProgress: LlamaCppInstallProgress = {
-    phase: 'checking',
-    label: 'preparing local runner...',
-    progress: 0.04,
-  }
-  const updateProgress = (progress: LlamaCppInstallProgress): void => {
-    setState({ kind: 'localRunnerInstalling', data: state.data, model: state.model, startedAt, progress })
-  }
-
-  setState({ kind: 'localRunnerInstalling', data: state.data, model: state.model, startedAt, progress: initialProgress })
-  const result = await setup(updateProgress)
-  if (!result.ok) {
-    setState({ kind: 'localRunnerInstallFail', data: state.data, model: state.model, result })
-    return
-  }
-  await startAndPickHfModel(state.model, { kind: 'hfDone', data: state.data, model: state.model }, setState, onPick)
-}
-
-async function saveRunnerPathAndStart(
-  state: Extract<State, { kind: 'localRunnerPathEntry' }>,
-  value: string,
-  setState: (s: State) => void,
-  onPick: (sel: ModelPickerSelection) => void,
-): Promise<void> {
-  const runnerPath = value.trim().replace(/^"|"$/g, '')
-  if (!runnerPath) {
-    setState({ ...state, error: 'paste the full path to llama-server' })
-    return
-  }
-  setState({ ...state, submitting: true, error: undefined })
-  try {
-    await setLlamaCppServerPath(runnerPath)
-    await startAndPickHfModel(state.model, { kind: 'hfDone', data: state.data, model: state.model }, setState, onPick)
-  } catch (err: unknown) {
-    setState({ ...state, submitting: false, error: (err as Error).message })
-  }
-}
-
-function contextFitSubtitle(contextFit: ModelPickerContextFit): string {
-  const threshold = contextFit.thresholdPercent ?? 90
-  return `pending prompt needs ~${formatTokens(contextFit.usedTokens)} tokens; choose a model under ${threshold}% or use /compact.`
-}
-
-function contextFitLabel(
-  provider: ProviderId,
-  model: string,
-  baseLabel: string,
-  contextFit?: ModelPickerContextFit | null,
-): string {
-  if (!contextFit) return baseLabel
-  const info = contextWindowInfo(provider, model)
-  const percent = info.tokens > 0 ? Math.round((contextFit.usedTokens / info.tokens) * 100) : 0
-  return `${baseLabel}  ${formatContextWindow(info.tokens)} ctx ${percent}%`
-}
-
-function formatTokens(count: number): string {
-  if (count < 1000) return String(count)
-  if (count < 10_000) return `${(count / 1000).toFixed(1)}k`
-  return `${Math.round(count / 1000)}k`
-}
-
-function formatContextWindow(tokens: number): string {
-  if (tokens >= 1_000_000) {
-    const millions = tokens / 1_000_000
-    return Number.isInteger(millions) ? `${millions}m` : `${millions.toFixed(1)}m`
-  }
-  if (tokens >= 1000) return `${Math.round(tokens / 1000)}k`
-  return String(tokens)
-}
-
-async function loadHfPickerModels(): Promise<ModelPickerOptionsData['hfModels']> {
-  const installed = await loadLocalHfModels()
-  const backfilled = await backfillMmprojForModels(installed)
-  return backfilled.map(model => ({
-    id: model.id,
-    displayName: model.displayName,
-    sizeBytes: model.sizeBytes,
-    quantization: model.quantization,
-    risk: model.risk,
-    task: model.task,
-    status: model.status,
-    mmprojPath: model.mmprojPath,
-    mmprojAvailable: model.mmprojAvailable,
-    mmprojSizeBytes: model.mmprojSizeBytes,
-  }))
-}
-
-async function probeLlamaCpp(): Promise<ModelPickerOptionsData['llamaCpp']> {
-  try {
-    const status = await detectLlamaCpp()
-    return {
-      binaryPresent: status.binaryPresent,
-      serverUp: status.serverUp,
-    }
-  } catch (err: unknown) {
-    return { binaryPresent: false, serverUp: false, error: (err as Error).message }
-  }
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes <= 0) return 'size unknown'
-  const gb = bytes / 1e9
-  if (gb >= 1) return `${gb.toFixed(1)} GB`
-  return `${Math.round(bytes / 1e6)} MB`
-}
-
-function modelMetadataSubtext(size: string, indicators: string[]): string | undefined {
-  return [size, ...indicators].filter(Boolean).join(' · ') || undefined
-}
-
-function riskColor(risk: string): string {
-  if (risk === 'high') return theme.accentError
-  if (risk === 'medium') return theme.dim
-  return theme.accentPeriwinkle
-}
-
-function fitColor(fit: GgufMachineFit): string {
-  if (fit === 'too-large') return theme.accentError
-  if (fit === 'tight') return theme.accentPeriwinkle
-  return theme.dim
-}
-
-function fitLabel(fit: GgufMachineFit, recommended: boolean): string {
-  if (recommended && fit !== 'too-large') return 'Recommended for this machine'
-  if (recommended) return 'Best match found; may be too large'
-  return fileFitHint(fit)
-}
-
-function fileFitHint(fit: GgufMachineFit): string {
-  switch (fit) {
-    case 'fits': return 'Fits this machine'
-    case 'tight': return 'May be slow or tight on memory'
-    case 'too-large': return 'Likely too large for this machine'
-    case 'unknown': return 'machine fit unknown'
-  }
-}
-
-function formatSignals(downloads: number | undefined, likes: number | undefined): string {
-  const d = downloads == null ? 'downloads unknown' : `${downloads} downloads`
-  const l = likes == null ? 'likes unknown' : `${likes} likes`
-  return `${d}, ${l}`
-}
-
-function friendlyFileName(filename: string): string {
-  return filename.split('/').pop() ?? filename
-}
-
-function safetyLabel(risk: HfRisk): string {
-  if (risk === 'low') return 'reviewed'
-  if (risk === 'medium') return 'needs review'
-  return 'blocked'
-}
-
-function credibilityLabel(credibility: HfCredibility): string {
-  if (credibility === 'established') return 'established'
-  if (credibility === 'normal') return 'some signals'
-  return 'limited signals'
-}
-
-function friendlyReasons(reasons: string[]): string[] {
-  return reasons.map(reason => {
-    if (reason.includes('compatible local model file')) return 'compatible local model file'
-    if (reason.includes('selected file is not compatible')) return 'file is not compatible with local chat'
-    if (reason.includes('revision is mutable')) return 'model link may point to changing files'
-    if (reason.includes('license is missing')) return 'license is missing'
-    if (reason.includes('limited public usage signals')) return 'source has limited public usage'
-    if (reason.includes('pickle/bin')) return 'repo also contains risky model file formats'
-    return reason
-  })
-}
-
-function providerKeyPlaceholder(provider: ProviderId): string {
-  if (provider === 'openai') return 'sk-...'
-  if (provider === 'anthropic') return 'sk-ant-...'
-  if (provider === 'gemini') return 'AIza...'
-  return ''
-}
-
-function runnerPathPlaceholder(): string {
-  if (process.platform === 'win32') return 'C:\\path\\to\\llama-server.exe'
-  return '/path/to/llama-server'
-}
-
-function isCloudProvider(value: string | undefined): value is CloudProviderId {
-  return value === 'openai' || value === 'anthropic' || value === 'gemini'
-}
-
-const ElapsedSpinner: React.FC<{ startedAt: number; label: string }> = ({ startedAt, label }) => {
-  return <Spinner label={label} startedAt={startedAt} />
-}
+export { buildHfFileOptions } from './modelPickerViewHelpers.js'

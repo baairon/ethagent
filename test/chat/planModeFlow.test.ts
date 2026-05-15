@@ -84,9 +84,9 @@ test('mode policy keeps plan, default, and accept-edits distinct', () => {
   assert.equal(acceptEdits.autoAllowToolKind('bash'), false)
 })
 
-test('session mode labels are sentence-cased for the footer', () => {
-  assert.equal(sessionModeLabel('plan'), 'Plan mode')
-  assert.equal(sessionModeLabel('accept-edits'), 'Accept edits on')
+test('session mode labels match the footer copy', () => {
+  assert.equal(sessionModeLabel('plan'), 'plan mode')
+  assert.equal(sessionModeLabel('accept-edits'), 'accept edits on')
   assert.equal(sessionModeLabel('chat'), '')
 })
 

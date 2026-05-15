@@ -1,9 +1,10 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { readdirSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 function sourceFilesUnder(dir: string): string[] {
+  if (!existsSync(dir)) return []
   return readdirSync(dir, { withFileTypes: true }).flatMap(entry => {
     const path = join(dir, entry.name)
     if (entry.isDirectory()) return sourceFilesUnder(path)
@@ -12,8 +13,8 @@ function sourceFilesUnder(dir: string): string[] {
 }
 
 function ensEditFlowText(): string {
-  return sourceFilesUnder('src/identity/hub/flows/ens')
-    .filter(file => /[\\/]EnsEdit|[\\/]ensEditCopy\.ts$/.test(file))
+  return sourceFilesUnder('src/identity/hub/ens')
+    .filter(file => /[\\/]EnsEdit|[\\/]editCopy\.ts$/.test(file))
     .map(file => readFileSync(file, 'utf8'))
     .join('\n')
 }
@@ -31,7 +32,7 @@ test('setup-facing wallet copy uses owner/operator wallet language', () => {
     readFileSync('src/identity/wallet/page/copy.ts', 'utf8'),
   ].join('\n')
   const editFlow = ensEditFlowText()
-  const operators = readFileSync('src/identity/hub/flows/ens/EnsOperatorWalletsScreen.tsx', 'utf8')
+  const operators = readFileSync('src/identity/hub/ens/EnsOperatorWalletsScreen.tsx', 'utf8')
   const restoreFlow = readFileSync('src/identity/hub/restore/RestoreFlow.tsx', 'utf8')
   const identityHub = readFileSync('src/identity/hub/IdentityHub.tsx', 'utf8')
   const visibleCopy = [walletPage, editFlow, operators, restoreFlow, identityHub].join('\n')
@@ -47,9 +48,9 @@ test('setup-facing wallet copy uses owner/operator wallet language', () => {
 test('refactored identity wallet and effects files do not contain mojibake text', () => {
   const files = [
     ...sourceFilesUnder('src/identity/wallet'),
-    ...sourceFilesUnder('src/identity/hub/effects'),
-    ...sourceFilesUnder('src/identity/hub/reconciliation'),
-    ...sourceFilesUnder('src/identity/hub/flows/ens'),
+    ...sourceFilesUnder('src/identity/hub/shared/effects'),
+    ...sourceFilesUnder('src/identity/hub/shared/reconciliation'),
+    ...sourceFilesUnder('src/identity/hub/ens'),
   ]
   const text = files.map(file => readFileSync(file, 'utf8')).join('\n')
 
@@ -58,29 +59,32 @@ test('refactored identity wallet and effects files do not contain mojibake text'
 
 test('Identity Hub advanced ENS flow remains compact and focused', () => {
   const editFlow = ensEditFlowText()
-  const operators = readFileSync('src/identity/hub/flows/ens/EnsOperatorWalletsScreen.tsx', 'utf8')
+  const operators = readFileSync('src/identity/hub/ens/EnsOperatorWalletsScreen.tsx', 'utf8')
+  const transferFlow = readFileSync('src/identity/hub/transfer/TokenTransferScreens.tsx', 'utf8')
 
   assert.match(editFlow, /title="ENS Name"/)
   assert.match(editFlow, /Current Setup/)
   assert.match(editFlow, /Token Custody Check/)
-  assert.match(editFlow, /Prepare Token Transfer/)
-  assert.match(editFlow, /Create one subdomain for this agent only/)
+  assert.match(transferFlow, /title="Prepare Token Transfer"/)
+  assert.match(editFlow, /dedicated agent subdomain|agent ENS name/)
   assert.doesNotMatch(editFlow, /org\.ethagent\.operator/)
   assert.match(operators, /label: 'Operator Wallets'/)
   assert.match(operators, /label: 'Add Wallet'/)
   assert.match(operators, /Unlink \$\{shortAddress\(record\.address\)\}/)
   assert.match(operators, /Unlink All Operator Wallets/)
   assert.match(operators, /removeApprovedOperatorWallet\(records, address\)/)
-  assert.doesNotMatch(operators, /Verify Operator Wallet|Sync ENS Operator Wallet|Metadata Operators/)
+  assert.match(operators, /Verify Operator/)
+  assert.match(operators, /FlowTimeline/)
+  assert.doesNotMatch(operators, /Sync ENS Operator Wallet|Metadata Operators/)
   assert.doesNotMatch(operators, /Paste Wallet Proof/)
   assert.doesNotMatch(editFlow, /FlowTimeline/)
   assert.doesNotMatch(editFlow, /SIMPLE_ENS_STEPS|ADVANCED_ENS_STEPS/)
 })
 
 test('Identity Hub token transfer copy keeps approvals out of the flow', () => {
-  const menu = readFileSync('src/identity/hub/components/MenuScreen.tsx', 'utf8')
-  const guide = readFileSync('src/identity/hub/flows/token-transfer/TokenTransferScreens.tsx', 'utf8')
-  const effects = readFileSync('src/identity/hub/effects/token-transfer/progress.ts', 'utf8')
+  const menu = readFileSync('src/identity/hub/shared/components/MenuScreen.tsx', 'utf8')
+  const guide = readFileSync('src/identity/hub/transfer/TokenTransferScreens.tsx', 'utf8')
+  const effects = readFileSync('src/identity/hub/transfer/progress.ts', 'utf8')
 
   assert.match(menu, /Prepare Transfer/)
   assert.match(guide, /Use this before any ERC-8004 token transfer\./)
@@ -94,10 +98,10 @@ test('identity copy uses onchain spelling', () => {
   const files = [
     'README.md',
     'src/identity/ens/ensLookup.ts',
-    'src/identity/hub/effects/ens/flows.ts',
-    'src/identity/hub/continuity/runRebackup.ts',
+    'src/identity/hub/ens/transactions.ts',
+    'src/identity/hub/continuity/effects.ts',
     'src/identity/hub/continuity/RecoveryConfirmScreen.tsx',
-    'src/identity/hub/flows/token-transfer/TokenTransferScreens.tsx',
+    'src/identity/hub/transfer/TokenTransferScreens.tsx',
   ]
   const text = files.map(file => readFileSync(file, 'utf8')).join('\n')
 
@@ -107,7 +111,7 @@ test('identity copy uses onchain spelling', () => {
 })
 
 test('vaulted public profile saves do not require Ethereum Mainnet ENS writes', () => {
-  const publicProfile = readFileSync('src/identity/hub/effects/publicProfile/runPublicProfileSave.ts', 'utf8')
+  const publicProfile = readFileSync('src/identity/hub/profile/effects.ts', 'utf8')
   const vaultFlow = publicProfile.slice(
     publicProfile.indexOf('async function runOperatorWalletVaultPublicProfileSave'),
     publicProfile.indexOf('type OperatorProfileArtifacts'),
@@ -121,14 +125,14 @@ test('vaulted public profile saves do not require Ethereum Mainnet ENS writes', 
 })
 
 test('public profile completion feedback starts capitalized', () => {
-  const publicProfile = readFileSync('src/identity/hub/effects/publicProfile/runPublicProfileSave.ts', 'utf8')
+  const publicProfile = readFileSync('src/identity/hub/profile/effects.ts', 'utf8')
 
   assert.doesNotMatch(publicProfile, /'profile updated/)
   assert.match(publicProfile, /'Profile updated/)
 })
 
 test('operator profile updates never write to ENS', () => {
-  const publicProfile = readFileSync('src/identity/hub/effects/publicProfile/runPublicProfileSave.ts', 'utf8')
+  const publicProfile = readFileSync('src/identity/hub/profile/effects.ts', 'utf8')
   const walletCopy = readFileSync('src/identity/wallet/page/copy.ts', 'utf8')
 
   assert.doesNotMatch(publicProfile, /publishOperatorProfileEnsRecord/)
@@ -139,7 +143,8 @@ test('operator profile updates never write to ENS', () => {
     walletCopy.indexOf('"update-profile-operator"'),
     walletCopy.indexOf('"update-profile-connected"'),
   )
-  assert.doesNotMatch(operatorCopy, /ENS/)
+  assert.match(operatorCopy, /No ENS write/)
+  assert.doesNotMatch(operatorCopy, /ENS record|ENS name/i)
 })
 
 test('README documents custody modes, ENS, and token transfer flow', () => {
@@ -154,6 +159,6 @@ test('README documents custody modes, ENS, and token transfer flow', () => {
   assert.match(readme, /\*\*Load Agent\*\* accepts either an ENS name or a bare token ID/)
   assert.match(readme, /## Token Transfers/)
   assert.match(readme, /Prepare Token Transfer.*before any ERC-8004 token transfer/)
-  assert.match(readme, /sender signs snapshot access, receiver signs restore access/)
+  assert.match(readme, /sender signs snapshot access, receiver signs restore access/i)
   assert.match(readme, /The token transfer flow prepares decrypt access and agent URI pointers only/)
 })

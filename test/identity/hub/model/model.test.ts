@@ -165,8 +165,8 @@ test('identity hub local change status distinguishes clean and changed files', (
     },
     publishedContentHashes: published,
   })
-  assert.equal(changed.detail, 'Detected: SOUL.md, skills.json')
-  assert.deepEqual(changed.files, ['SOUL.md', 'skills.json'])
+  assert.equal(changed.detail, 'Detected: SOUL.md, Skills')
+  assert.deepEqual(changed.files, ['SOUL.md', 'Skills'])
   assert.equal(changed.tone, 'warn')
   assert.equal(changed.hasLocalChanges, true)
 })
@@ -225,20 +225,20 @@ test('networkLabel and networkSubtitle return human-readable strings for every c
   }
 })
 
-test('identityValuesCopyHint only mentions ENS after an ENS name is linked', () => {
+test('identityValuesCopyHint uses compact pointer copy', () => {
   assert.equal(identityValuesCopyHint({
     address: '0x000000000000000000000000000000000000dEaD',
     agentId: '45744',
     createdAt: new Date(0).toISOString(),
     state: {},
-  }), 'Copy token and token URI pointers')
+  }), 'Copy token and pointers')
 
   assert.equal(identityValuesCopyHint({
     address: '0x000000000000000000000000000000000000dEaD',
     agentId: '45744',
     createdAt: new Date(0).toISOString(),
     state: { ensName: 'agent.example.eth' },
-  }), 'Copy token, ENS, and token URI pointers')
+  }), 'Copy token and pointers')
 })
 
 test('chainSummaryRow prefers identity.chainId, falls back to selectedNetwork', () => {

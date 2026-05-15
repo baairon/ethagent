@@ -120,7 +120,7 @@ test('identity continuity sync updates and removes generated icon references in 
     const updated = JSON.parse((await syncIdentityMarkdownScaffold(updatedIcon))['skills.json'])
 
     assert.equal(updated.imageUrl, 'https://example.com/new-icon.png')
-    assert.equal(updated.skills[0].id, 'custom')
+    assert.equal(updated.skills[0].id, 'software-engineering')
 
     const removedIcon: EthagentIdentity = {
       ...identity,
@@ -129,7 +129,7 @@ test('identity continuity sync updates and removes generated icon references in 
     const removed = JSON.parse((await syncIdentityMarkdownScaffold(removedIcon))['skills.json'])
 
     assert.equal(Object.hasOwn(removed, 'imageUrl'), false)
-    assert.equal(removed.skills[0].id, 'custom')
+    assert.equal(removed.skills[0].id, 'software-engineering')
   })
 })
 
@@ -285,7 +285,10 @@ test('working tree status compares local markdown to published snapshot hashes',
 
     assert.equal((await continuityWorkingTreeStatus(publishedIdentity, published)).publishState, 'published')
 
-    await writePublicSkillsFile(publishedIdentity, '{"schema":"ethagent.public-skills.v1","name":"Changed Skills"}')
+    await writeContinuityFiles(publishedIdentity, {
+      'SOUL.md': '# Soul\nchanged soul\n',
+      'MEMORY.md': '# Memory\nprivate memory\n',
+    })
     const changed = await continuityWorkingTreeStatus(publishedIdentity, published)
     assert.equal(changed.publishState, 'local-changes')
     assert.equal(changed.localChangedAfterBackup, true)
@@ -373,7 +376,10 @@ test('published snapshot hashes can be refreshed after refetch restores public s
     await recordPublishedContinuitySnapshot({ identity: restoredIdentity })
     const [stalePublished] = await listPublishedContinuitySnapshots(restoredIdentity)
 
-    await writePublicSkillsFile(restoredIdentity, '{"schema":"ethagent.public-skills.v1","name":"Restored Skills"}')
+    await writeContinuityFiles(restoredIdentity, {
+      'SOUL.md': '# Soul\nrestored soul\n',
+      'MEMORY.md': '# Memory\nprivate memory\n',
+    })
     const staleStatus = await continuityWorkingTreeStatus(restoredIdentity, stalePublished)
     assert.equal(staleStatus.publishState, 'local-changes')
 

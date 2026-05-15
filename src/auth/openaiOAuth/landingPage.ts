@@ -1,22 +1,13 @@
 import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { transformSync } from 'esbuild'
 import { WALLET_CSS } from '../../identity/wallet/page/styles/index.js'
 import { glyphs } from '../../identity/wallet/page/html.js'
+import { walletPageSourceFile } from '../../identity/wallet/browserWallet/walletPageSource.js'
 import { escapeHtml } from './shared.js'
 
 export type LandingTone = 'success' | 'error' | 'cancelled'
 
-const GRAINIENT_SOURCE_FILE = join(
-  dirname(fileURLToPath(import.meta.url)),
-  '..',
-  '..',
-  'identity',
-  'wallet',
-  'page',
-  'grainient.ts',
-)
+const GRAINIENT_SOURCE_FILE = walletPageSourceFile('page/grainient.ts')
 
 const COMPILED_GRAINIENT = compileGrainientModule()
 

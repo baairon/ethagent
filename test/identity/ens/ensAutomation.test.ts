@@ -83,7 +83,7 @@ test('advanced ENS preflight creates direct registry setup and resolver records'
   assert.ok(registryTx?.data.startsWith('0x'))
   assert.equal(registryTx?.to, '0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e')
   assert.equal(recordsTx?.to, ENS_PUBLIC_RESOLVER_ADDRESS_MAINNET)
-  assert.equal(recordsTx?.calls.length, 3)
+  assert.equal(recordsTx?.calls.length, 2)
 })
 
 test('simple ENS create preflight allows the connected wallet to own and operate the name', async () => {

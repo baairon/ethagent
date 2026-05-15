@@ -67,7 +67,7 @@ test('/pull is no longer exposed after removing Ollama support', async () => {
   assert.equal(result?.kind, 'note')
   if (result?.kind !== 'note') return
   assert.equal(result.variant, 'error')
-  assert.match(result.text, /unknown command: \/pull/)
+  assert.match(result.text, /unknown command: \/pull/i)
 })
 
 test('/help lists the identity shortcut in the shortcuts footer', async () => {

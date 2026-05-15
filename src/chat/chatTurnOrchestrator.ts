@@ -1,5 +1,3 @@
-import fs from 'node:fs/promises'
-import path from 'node:path'
 import type { Message, Provider } from '../providers/contracts.js'
 import { directToolUsesForUserText } from '../runtime/toolIntent.js'
 import { toPermissionMode, type SessionMode } from '../runtime/sessionMode.js'
@@ -18,6 +16,11 @@ import {
   type TurnCheckpoint,
 } from './chatScreenUtils.js'
 import { collapseImagePathsToRefs, userTextToContentBlocks } from '../utils/images.js'
+import { buildFileMentionContextMessages } from './chatTurnContext.js'
+import {
+  finalizeStreamingRowsById,
+  updateStreamingRows,
+} from './chatTurnRows.js'
 
 type MutableRef<T> = { current: T }
 
@@ -473,106 +476,6 @@ async function handleEvent(ev: TurnEvent, ctx: EventHandlerContext): Promise<voi
   }
 }
 
-function updateStreamingRows(
-  rows: MessageRow[],
-  assistantId: string | null,
-  thinkingRowId: string | null,
-  assistantText: string | null,
-  thinkingText: string | null,
-): MessageRow[] {
-  let next: MessageRow[] | null = null
-  if (assistantId && assistantText !== null) {
-    const index = findRowIndexById(rows, assistantId)
-    const row = rows[index]
-    if (row?.role === 'assistant') {
-      next = next ?? rows.slice()
-      next[index] = { ...row, content: assistantText, liveTail: '' }
-    }
-  }
-  const source = next ?? rows
-  if (thinkingRowId && thinkingText !== null) {
-    const index = findRowIndexById(source, thinkingRowId)
-    const row = source[index]
-    if (row?.role === 'thinking') {
-      next = next ?? rows.slice()
-      next[index] = { ...row, content: thinkingText, liveTail: '' }
-    }
-  }
-  return next ?? rows
-}
-
-function finalizeStreamingRowsById(
-  rows: MessageRow[],
-  assistantId: string | null,
-  thinkingRowId: string | null,
-  assistantText: string,
-  thinkingText: string,
-): MessageRow[] {
-  let next: MessageRow[] | null = null
-  if (assistantId) {
-    const index = findRowIndexById(rows, assistantId)
-    const row = rows[index]
-    if (row?.role === 'assistant') {
-      next = next ?? rows.slice()
-      next[index] = { ...row, content: assistantText || row.content, liveTail: undefined, streaming: false }
-    }
-  }
-  const source = next ?? rows
-  if (thinkingRowId) {
-    const index = findRowIndexById(source, thinkingRowId)
-    const row = source[index]
-    if (row?.role === 'thinking') {
-      next = next ?? rows.slice()
-      next[index] = { ...row, content: thinkingText || row.content, liveTail: undefined, streaming: false, showCursor: false }
-    }
-  }
-  return next ?? rows
-}
-
-function findRowIndexById(rows: MessageRow[], id: string): number {
-  for (let index = rows.length - 1; index >= 0; index -= 1) {
-    if (rows[index]?.id === id) return index
-  }
-  return -1
-}
-
-async function buildFileMentionContextMessages(
-  userText: string,
-  cwd: string,
-): Promise<Message[]> {
-  const mentions = extractFileMentions(userText)
-  if (mentions.length === 0) return []
-
-  const lines: string[] = []
-  for (const mention of mentions) {
-    const resolved = path.resolve(cwd, mention)
-    const rel = path.relative(cwd, resolved)
-    if (rel.startsWith('..') || path.isAbsolute(rel)) {
-      lines.push(
-        `@${mention} -> outside current workspace; do not use unless the user changes directory or names an allowed path.`,
-      )
-      continue
-    }
-    try {
-      const stats = await fs.stat(resolved)
-      lines.push(`@${mention} -> ${mention} (${stats.isDirectory() ? 'directory' : 'file'})`)
-    } catch {
-      lines.push(`@${mention} -> unresolved`)
-    }
-  }
-
-  return [
-    {
-      role: 'user',
-      content: [
-        'Resolved file mentions for this request:',
-        ...lines,
-        'Treat these mentions as authoritative filenames from the user request. Read referenced context files when needed, and edit only the file requested by the user or the target file you have inspected.',
-      ].join('\n'),
-    },
-  ]
-}
-
 const PRIVATE_SKILLS_INDEX_BUDGET = 2048
 
 export async function buildSkillsIndexMessage(
@@ -662,16 +565,6 @@ export async function buildIdentityContinuityContextMessages(
       ].join('\n'),
     }]
   }
-}
-
-function extractFileMentions(text: string): string[] {
-  const mentions = new Set<string>()
-  for (const match of text.matchAll(/@([^\s]+)/g)) {
-    const raw = match[1]?.replace(/[),.;:!?]+$/g, '')
-    if (!raw || raw.length === 0) continue
-    mentions.add(raw.replace(/\\/g, '/'))
-  }
-  return [...mentions]
 }
 
 function buildWorkingMessages(
