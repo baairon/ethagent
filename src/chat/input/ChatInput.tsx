@@ -324,8 +324,6 @@ export const ChatInput: React.FC<PromptInputProps> = ({
   const maxVisibleInputLines = Math.max(MIN_INPUT_VIEWPORT_LINES, Math.floor(rows / 2) - PROMPT_FOOTER_LINES)
 
   useAppInput((input, key, event) => {
-    if (disabled) return
-
     const pastePending = pasteTimerRef.current !== null
     if (event.isPasted || pastePending || isFallbackPasteInput(input)) {
       if (input) enqueuePasteChunk(input)

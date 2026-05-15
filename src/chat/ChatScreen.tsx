@@ -1586,7 +1586,6 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
           modelPickerContextFit={modelPickerContextFit}
           permissionRequest={permissionRequest}
           history={history}
-          busy={busy}
           streaming={streaming}
           streamingStartedAt={streamingStartedAt}
           activity={null}

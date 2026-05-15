@@ -53,7 +53,6 @@ type ChatBottomPaneProps = {
   modelPickerContextFit: ModelPickerContextFit | null
   permissionRequest: PermissionRequest | null
   history: string[]
-  busy: boolean
   streaming: boolean
   streamingStartedAt: number | null
   activity: BottomPaneActivity
@@ -100,7 +99,6 @@ export function ChatBottomPane({
   modelPickerContextFit,
   permissionRequest,
   history,
-  busy,
   streaming,
   streamingStartedAt,
   activity,
@@ -265,7 +263,6 @@ export function ChatBottomPane({
       <ChatInput
         onSubmit={handleSubmit}
         history={history}
-        disabled={busy}
         placeholderHints={placeholderHints}
         queuedMessages={queuedInputs}
         slashSuggestions={slashSuggestions}
