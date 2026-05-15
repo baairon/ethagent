@@ -24,6 +24,8 @@ import {
   withEthagentPointers,
 } from '../../../src/identity/registry/erc8004.js'
 
+const OWNER = getAddress('0x000000000000000000000000000000000000C01d')
+
 test('cidFromUri accepts standard IPFS agent URIs', () => {
   assert.equal(cidFromUri('ipfs://bafy-agent'), 'bafy-agent')
   assert.equal(cidFromUri('ipfs://ipfs/bafy-agent'), 'bafy-agent')
@@ -58,10 +60,14 @@ test('withEthagentBackupPointer preserves registration fields', () => {
       createdAt: new Date(0).toISOString(),
       agentAddress: '0x000000000000000000000000000000000000dEaD',
     },
+    undefined,
+    undefined,
+    OWNER,
   )
 
   assert.equal(updated.name, 'agent')
   assert.equal((updated['x-ethagent'] as { backup: { cid: string } }).backup.cid, 'bafy-backup')
+  assert.equal((updated['x-ethagent'] as { agentAddress: string }).agentAddress, OWNER)
 })
 
 test('ethagent backup pointer preserves dual-wallet transfer snapshot metadata', () => {
@@ -83,6 +89,7 @@ test('ethagent backup pointer preserves dual-wallet transfer snapshot metadata',
           createdAt: new Date(0).toISOString(),
         },
       },
+      ownerAddress: OWNER,
     },
   )
   const ext = updated['x-ethagent'] as { backup: { transferSnapshot: { senderAddress: string; receiverAddress: string; receiverHandle: string; slotCount: number } } }
@@ -113,6 +120,7 @@ test('ethagent backup pointer removes legacy transfer handoff metadata on republ
         envelopeVersion: 'ethagent-continuity-snapshot-v1',
         createdAt: new Date(1).toISOString(),
       },
+      ownerAddress: OWNER,
     },
   )
   const ext = updated['x-ethagent'] as { backup?: { cid: string }; transfer?: unknown; handoff?: unknown }
@@ -120,6 +128,20 @@ test('ethagent backup pointer removes legacy transfer handoff metadata on republ
   assert.equal(ext.backup?.cid, 'bafy-backup')
   assert.equal(ext.transfer, undefined)
   assert.equal(ext.handoff, undefined)
+})
+
+test('ethagent metadata helpers require explicit owner address', () => {
+  // @ts-expect-error ownerAddress is intentionally required to prevent stale x402 wallets.
+  const compileCheck = () => withEthagentPointers(null, { backup: { cid: 'bafy-backup' } })
+  void compileCheck
+  assert.throws(
+    () => withEthagentPointers(null, { backup: { cid: 'bafy-backup' } } as any),
+    /requires ownerAddress/,
+  )
+  assert.throws(
+    () => (withEthagentBackupPointer as any)(null, { cid: 'bafy-backup' }, undefined, undefined),
+    /requires ownerAddress/,
+  )
 })
 
 test('ethagent public discovery pointers are written to registration metadata and services', () => {
@@ -140,19 +162,22 @@ test('ethagent public discovery pointers are written to registration metadata an
       identityRegistryAddress: '0x8004A169FB4a3325136EB29fA0ceB6D2e539a432',
       agentId: '7',
     },
+    OWNER,
   )
   const pointer = parseEthagentPublicDiscoveryPointer(updated)
   const ext = updated['x-ethagent'] as {
     publicSkills: { cid: string; format: string }
     agentCard: { cid: string; format: string }
   }
-  const services = updated.services as Array<{ type: string; name?: string; endpoint: string; url: string }>
+  const services = updated.services as Array<{ type?: string; name?: string; endpoint: string; url?: string }>
   const registrations = updated.registrations as Array<{ agentId: number; agentRegistry: string }>
 
   assert.equal(pointer?.skillsCid, 'bafy-skills')
   assert.equal(pointer?.agentCardCid, 'bafy-card')
   assert.equal(ext.publicSkills.format, 'application/json')
   assert.equal(ext.agentCard.format, 'application/json')
+  assert.ok(services.some(service => service.name === 'agentWallet' && service.endpoint === `eip155:8453:${OWNER}`))
+  assert.equal(services.filter(service => service.name === 'agentWallet').length, 1)
   assert.ok(services.some(service => service.type === 'a2a' && service.endpoint === 'ipfs://bafy-card' && service.url === 'ipfs://bafy-card'))
   assert.ok(services.some(service => service.type === 'A2A-skills' && service.name === 'public-skills' && service.endpoint === 'ipfs://bafy-skills' && service.url === 'ipfs://bafy-skills'))
   assert.ok(services.every(service => typeof service.endpoint === 'string' && service.endpoint.length > 0))
@@ -180,6 +205,7 @@ test('ethagent operators pointer is written and parsed from ERC-8004 metadata', 
           { address: '0x0000000000000000000000000000000000000B22' },
         ],
       },
+      ownerAddress: OWNER,
     },
   )
   const parsed = parseEthagentOperatorsPointer(updated)
@@ -207,6 +233,7 @@ test('ethagent operators pointer ignores legacy signature field on read', () => 
           { address: '0x0000000000000000000000000000000000000A11' },
         ],
       },
+      ownerAddress: OWNER,
     },
   )
   const ext = updated['x-ethagent'] as { operators: { approvedOperatorWallets: Array<Record<string, unknown>> } }
@@ -260,6 +287,7 @@ test('registration metadata preserves legacy string agent IDs when they are not 
       identityRegistryAddress: '0x8004A169FB4a3325136EB29fA0ceB6D2e539a432',
       agentId: '9007199254740993',
     },
+    OWNER,
   )
   const registrations = updated.registrations as Array<{ agentId: string; agentRegistry: string }>
 
@@ -292,12 +320,16 @@ test('registration metadata replaces managed history with current state on repub
     {
       type: 'https://eips.ethereum.org/EIPS/eip-8004#registration-v1',
       name: 'agent',
-      services: [{ type: 'website', name: 'docs', endpoint: 'https://example.com', url: 'https://example.com' }],
+      services: [
+        { type: 'website', name: 'docs', endpoint: 'https://example.com', url: 'https://example.com' },
+        { name: 'agentWallet', endpoint: 'eip155:8453:0x000000000000000000000000000000000000bEEF' },
+      ],
       registrations: [{ agentId: '1', agentRegistry: 'eip155:1:0x1111111111111111111111111111111111111111' }],
     },
     { cid: 'bafy-1', envelopeVersion: 'ethagent-continuity-snapshot-v1', createdAt: new Date(0).toISOString() },
     { skillsCid: 'bafy-skills-1', agentCardCid: 'bafy-card-1', updatedAt: new Date(0).toISOString() },
     { chainId: 8453, identityRegistryAddress: '0x8004A169FB4a3325136EB29fA0ceB6D2e539a432', agentId: '7' },
+    OWNER,
   )
   const second = withEthagentBackupPointer(
     first,
@@ -309,14 +341,18 @@ test('registration metadata replaces managed history with current state on repub
     },
     { skillsCid: 'bafy-skills-2', agentCardCid: 'bafy-card-2', updatedAt: new Date(1).toISOString() },
     { chainId: 8453, identityRegistryAddress: '0x8004A169FB4a3325136EB29fA0ceB6D2e539a432', agentId: '8' },
+    OWNER,
   )
   const ext = second['x-ethagent'] as { backup: { cid: string; pastBackups?: unknown } }
-  const services = second.services as Array<{ type: string; name?: string; endpoint: string }>
+  const services = second.services as Array<{ type?: string; name?: string; endpoint: string }>
   const registrations = second.registrations as Array<{ agentId: number; agentRegistry: string }>
 
   assert.equal(ext.backup.cid, 'bafy-2')
   assert.equal(ext.backup.pastBackups, undefined)
   assert.ok(services.some(service => service.type === 'website' && service.endpoint === 'https://example.com'))
+  assert.equal(services.filter(service => service.name === 'agentWallet').length, 1)
+  assert.ok(services.some(service => service.name === 'agentWallet' && service.endpoint === `eip155:8453:${OWNER}`))
+  assert.equal(services.some(service => service.endpoint === 'eip155:8453:0x000000000000000000000000000000000000bEEF'), false)
   assert.equal(services.some(service => service.endpoint === 'ipfs://bafy-card-1'), false)
   assert.equal(services.some(service => service.endpoint === 'ipfs://bafy-skills-1'), false)
   assert.ok(services.some(service => service.type === 'a2a' && service.name === 'agent-card' && service.endpoint === 'ipfs://bafy-card-2'))
