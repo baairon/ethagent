@@ -6,6 +6,10 @@ import { dirname, join } from 'node:path'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const cli = join(__dirname, '..', 'src', 'cli', 'main.tsx')
 
+if (process.platform === 'win32') {
+  try { execFileSync('cmd', ['/c', 'chcp', '65001'], { stdio: 'ignore' }) } catch {}
+}
+
 try {
   const tsxPath = import.meta.resolve('tsx/esm')
   execFileSync('node', ['--import', tsxPath, cli, ...process.argv.slice(2)], { stdio: 'inherit' })

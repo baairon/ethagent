@@ -293,7 +293,8 @@ const COMMANDS: CommandSpec[] = [
       const text = assistant[index] ?? ''
       const label = offset === 1 ? 'Latest reply' : `Reply #${offset} back`
       const segments = parseSegments(text)
-      if (segments.length <= 1) {
+      const hasCode = segments.some(segment => segment.kind === 'code')
+      if (!hasCode) {
         const result = await copyToClipboard(text)
         if (!result.ok) {
           return { kind: 'note', variant: 'error', text: `Copy failed: ${result.error}` }

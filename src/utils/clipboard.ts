@@ -96,7 +96,7 @@ async function tryReadNative(): Promise<ReadResult> {
     return readFrom('pbpaste', [], 'pbpaste')
   }
   if (process.platform === 'win32') {
-    return readFrom('powershell', ['-NoProfile', '-Command', 'Get-Clipboard -Raw'], 'powershell Get-Clipboard')
+    return readFrom('powershell', ['-NoProfile', '-Command', '[Console]::OutputEncoding=[Text.Encoding]::UTF8; Get-Clipboard -Raw'], 'powershell Get-Clipboard')
   }
   if (process.env['WAYLAND_DISPLAY']) {
     const wl = await probe('wl-paste', ['--version'])
