@@ -11,7 +11,7 @@ import type { SkillIndexEntry } from './types.js'
 
 export async function derivePublicSkillEntries(identity: EthagentIdentity): Promise<SkillIndexEntry[]> {
   const entries = await listSkills(identity)
-  return entries.filter(entry => entry.visibility === 'public' || entry.visibility === 'discoverable')
+  return entries.filter(entry => entry.visibility === 'public')
 }
 
 export async function renderPublicSkillsJsonForIdentity(identity: EthagentIdentity): Promise<string> {

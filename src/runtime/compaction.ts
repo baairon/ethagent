@@ -1,6 +1,7 @@
 import type { Message, Provider } from '../providers/contracts.js'
 import { approximateTokens, messageTextContent } from '../utils/messages.js'
 import type { SessionMessage } from '../storage/sessions.js'
+import { getCachedLlamaCppContextSize } from '../models/llamacpp.js'
 
 const COMPACT_SYSTEM = `Create a continuation handoff for this coding-agent conversation.
 Keep it concise but complete. Preserve the current goal, user constraints, key decisions, relevant files, tool results, pending tasks, and known failures. Do not claim unverified work was completed. No preamble.`
@@ -17,8 +18,7 @@ const CLOUD_MESSAGE_CHAR_LIMIT = 2_000
 export type CompactionStage =
   | 'preparing transcript'
   | 'compressing long context'
-  | 'summarizing with local model'
-  | 'summarizing with provider'
+  | 'summarizing transcript'
 
 export type CompactTranscriptOptions = {
   signal?: AbortSignal
@@ -60,6 +60,12 @@ export function contextWindow(model: string): number {
 export function contextWindowInfo(provider: string, model: string): ContextWindowInfo {
   const lower = model.toLowerCase()
   const providerLower = provider.toLowerCase()
+  if (providerLower === 'llamacpp') {
+    const cached = getCachedLlamaCppContextSize()
+    if (cached) {
+      return { tokens: cached, confidence: 'exact', source: 'llama.cpp /props' }
+    }
+  }
   if (lower.startsWith('qwen3:4b') || lower.startsWith('qwen3:30b') || lower.startsWith('qwen3:235b')) {
     return { tokens: 256_000, confidence: 'inferred', source: 'qwen3 long-context tag' }
   }
@@ -138,7 +144,7 @@ export async function compactTranscript(
   const signal = options.signal ?? controller!.signal
   let summary = ''
   const local = isLocalProviderId(provider.id)
-  options.onStage?.(local ? 'summarizing with local model' : 'summarizing with provider')
+  options.onStage?.('summarizing transcript')
   try {
     for await (const ev of provider.complete(prompt, signal, {
       maxTokens: options.maxOutputTokens ?? (local ? LOCAL_COMPACTION_OUTPUT_TOKENS : CLOUD_COMPACTION_OUTPUT_TOKENS),
@@ -168,7 +174,7 @@ export function buildCompactionSource(
   const nonSystem = transcript.filter(m => m.role !== 'system')
   const local = isLocalProviderId(providerId)
   const tokenBudget = options.maxInputTokens ?? (local ? LOCAL_COMPACTION_INPUT_TOKENS : CLOUD_COMPACTION_INPUT_TOKENS)
-  const charBudget = Math.max(1_000, tokenBudget * 4)
+  const charBudget = Math.max(1_000, tokenBudget * 3)
   const recentMessageCount = local ? LOCAL_RECENT_MESSAGE_COUNT : CLOUD_RECENT_MESSAGE_COUNT
   const messageCharLimit = local ? LOCAL_MESSAGE_CHAR_LIMIT : CLOUD_MESSAGE_CHAR_LIMIT
   const rawTokenEstimate = approximateTokens(nonSystem)
@@ -385,5 +391,5 @@ function limitCompactionText(text: string, charBudget: number): string {
 }
 
 function approximateTextTokens(text: string): number {
-  return Math.ceil(text.length / 4)
+  return Math.ceil(text.length / 3)
 }

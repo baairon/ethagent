@@ -44,7 +44,9 @@ import {
   shouldConfirmContextUsage,
   type ContextUsage,
 } from '../runtime/compaction.js'
-import { saveConfig } from '../storage/config.js'
+import { fetchLlamaCppContextSize, onLlamaCppContextSizeChange, setCachedLlamaCppContextSize } from '../models/llamacpp.js'
+import { llamaCppServerHostFromBaseUrl } from '../models/llamacppPreflight.js'
+import { localProviderBaseUrlFor, saveConfig } from '../storage/config.js'
 import { getCwd as getRuntimeCwd, setCwd as setRuntimeCwd, syncCwdFromProcess } from '../runtime/cwd.js'
 import { executeToolWithPermissions } from '../runtime/toolExecution.js'
 import { nextSessionMode, sessionModeLabel, type PermissionMode, type SessionMode } from '../runtime/sessionMode.js'
@@ -309,7 +311,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
       {
         role: 'progress',
         id: progressRowId,
-        title: kind === 'plan' ? 'summarizing plan context' : 'compacting conversation',
+        title: kind === 'plan' ? 'summarizing plan context' : 'Compacting conversation',
         progress: 0,
         status: state.stage,
         suffix: 'esc to cancel',
@@ -448,6 +450,22 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
     },
     [],
   )
+
+  useEffect(() => {
+    if (config.provider !== 'llamacpp') return
+    const host = llamaCppServerHostFromBaseUrl(localProviderBaseUrlFor('llamacpp', config.baseUrl))
+    void fetchLlamaCppContextSize(host)
+    const unsubscribe = onLlamaCppContextSizeChange(() => {
+      refreshVisibleStats(
+        sessionMessagesRef.current,
+        providerRef.current.supportsTools,
+        cwdRef.current,
+        configRef.current,
+        modeRef.current,
+      )
+    })
+    return unsubscribe
+  }, [config.provider, config.baseUrl, refreshVisibleStats])
 
   const warnIfContextPressure = useCallback(
     (usage: ContextUsage, configForUsage: EthagentConfig) => {
@@ -879,6 +897,11 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
           }
           pendingPlanRef.current = planCandidate
           setPendingPlan(planCandidate)
+        },
+        onContextExceeded: ({ contextLimit }) => {
+          setCachedLlamaCppContextSize(contextLimit)
+          pushNote('Context full. Compacting transcript. Re-send your message once compaction finishes.', 'dim')
+          void runCompaction()
         },
         pendingAssistantTextRef,
         pendingThinkingTextRef,

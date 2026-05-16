@@ -1,4 +1,4 @@
-export type SkillVisibility = 'private' | 'public' | 'discoverable'
+export type SkillVisibility = 'private' | 'public'
 
 export type SkillFrontmatter = {
   name?: string

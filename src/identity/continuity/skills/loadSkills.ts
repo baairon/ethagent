@@ -215,8 +215,11 @@ export async function loadSkillsTree(identity: EthagentIdentity): Promise<Contin
       const rel = `${skillEnt.name}/${file.relativePath}`
       if (!isValidSkillFilePath(rel)) continue
       if (file.sizeBytes > MAX_SKILL_FILE_BYTES) continue
-      const content = await fs.readFile(file.absolutePath, 'utf8').catch(() => null)
-      if (content === null) continue
+      const rawContent = await fs.readFile(file.absolutePath, 'utf8').catch(() => null)
+      if (rawContent === null) continue
+      const content = file.relativePath === SKILL_FILE_NAME
+        ? await ensureSkillVisibilityWritten(file.absolutePath, rawContent)
+        : rawContent
       tree[rel] = content
       totalFiles++
     }
@@ -359,7 +362,12 @@ export async function migrateLegacySkillFiles(skillsRoot: string): Promise<void>
     return
   }
   for (const topEnt of topDirents) {
-    if (!topEnt.isDirectory() || topEnt.isSymbolicLink()) continue
+    if (topEnt.isSymbolicLink()) continue
+    if (topEnt.isFile() && /\.md$/i.test(topEnt.name)) {
+      await adoptBareSkillFile(skillsRoot, topEnt.name)
+      continue
+    }
+    if (!topEnt.isDirectory()) continue
     if (!isValidSegment(topEnt.name)) continue
     const topDir = path.join(skillsRoot, topEnt.name)
     let children: import('node:fs').Dirent[]
@@ -400,6 +408,39 @@ export async function migrateLegacySkillFiles(skillsRoot: string): Promise<void>
       }
     }
     await removeIfEmpty(topDir)
+  }
+}
+
+async function adoptBareSkillFile(skillsRoot: string, fileName: string): Promise<void> {
+  const sourcePath = path.join(skillsRoot, fileName)
+  let baseName: string
+  if (/^SKILL\.md$/i.test(fileName)) {
+    let parsedName: string | undefined
+    try {
+      const raw = await fs.readFile(sourcePath, 'utf8')
+      const parsed = parseSkillFile(raw)
+      const fmName = parsed.frontmatter.name?.trim()
+      if (fmName && isValidSegment(fmName)) parsedName = fmName
+    } catch {
+    }
+    baseName = parsedName ?? 'imported-skill'
+  } else {
+    const slug = fileName.replace(/\.md$/i, '')
+    if (!isValidSegment(slug)) return
+    baseName = slug
+  }
+  let target: string
+  try {
+    target = await chooseFlatTarget(skillsRoot, baseName)
+  } catch {
+    return
+  }
+  const targetDir = path.join(skillsRoot, target)
+  const targetFile = path.join(targetDir, SKILL_FILE_NAME)
+  try {
+    await fs.mkdir(targetDir, { recursive: true, mode: 0o700 })
+    await fs.rename(sourcePath, targetFile)
+  } catch {
   }
 }
 
@@ -476,6 +517,32 @@ async function pathExists(file: string): Promise<boolean> {
   }
 }
 
+const DEFAULT_PASTED_VISIBILITY: SkillVisibility = 'public'
+const LEGACY_DISCOVERABLE_RE = /^\s*visibility\s*:\s*['"]?discoverable['"]?\s*$/im
+
+async function ensureSkillVisibilityWritten(skillFile: string, raw: string): Promise<string> {
+  let parsed: { frontmatter: import('./types.js').SkillFrontmatter; body: string }
+  try {
+    parsed = parseSkillFile(raw)
+  } catch {
+    return raw
+  }
+  let target: SkillVisibility | null = null
+  if (LEGACY_DISCOVERABLE_RE.test(raw)) {
+    target = 'private'
+  } else if (parsed.frontmatter.visibility === undefined) {
+    target = DEFAULT_PASTED_VISIBILITY
+  }
+  if (target === null) return raw
+  const next = rewriteVisibility(raw, target)
+  if (next === raw) return raw
+  try {
+    await atomicWriteText(skillFile, next, { mode: 0o600 })
+  } catch {
+  }
+  return next
+}
+
 async function collectSkillEntries(root: string): Promise<SkillIndexEntry[]> {
   const out: SkillIndexEntry[] = []
   let topDirents: import('node:fs').Dirent[]
@@ -493,7 +560,8 @@ async function collectSkillEntries(root: string): Promise<SkillIndexEntry[]> {
       const stat = await fs.stat(skillFile)
       if (!stat.isFile()) continue
       if (stat.size > MAX_SKILL_FILE_BYTES) continue
-      const raw = await fs.readFile(skillFile, 'utf8')
+      const rawInitial = await fs.readFile(skillFile, 'utf8')
+      const raw = await ensureSkillVisibilityWritten(skillFile, rawInitial)
       const parsed = parseSkillFile(raw)
       const relativePath = `${skillEnt.name}/${SKILL_FILE_NAME}`
       out.push(buildIndexEntry({
@@ -519,7 +587,7 @@ function buildIndexEntry(args: {
   const derivedName = folder || segments.join('/')
   const fm = args.parsed.frontmatter
   const description = pickDescription(fm.description, args.parsed.body)
-  const visibility: SkillVisibility = fm.visibility ?? 'discoverable'
+  const visibility: SkillVisibility = fm.visibility ?? DEFAULT_PASTED_VISIBILITY
   return {
     name: derivedName,
     ...(fm.name ? { displayName: fm.name } : {}),

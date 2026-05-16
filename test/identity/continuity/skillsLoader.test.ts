@@ -179,6 +179,130 @@ test('listSkillFiles collisions in migration get -2 suffix', async () => {
   })
 })
 
+test('listSkills adopts a bare <slug>.md dropped at the skills/ root into <slug>/SKILL.md', async () => {
+  await withHome(async () => {
+    await ensureContinuityVault(identity)
+    invalidateSkillsCache(identity)
+    const ref = continuityVaultRef(identity)
+    await fs.writeFile(
+      path.join(ref.skillsDir, 'video-downloader.md'),
+      '---\ndescription: dropped bare\nvisibility: public\n---\n\nbody\n',
+      { mode: 0o600 },
+    )
+
+    const entries = await listSkills(identity)
+    assert.equal(entries.length, 1)
+    assert.equal(entries[0]?.name, 'video-downloader')
+    assert.equal(entries[0]?.relativePath, 'video-downloader/SKILL.md')
+
+    await fs.access(path.join(ref.skillsDir, 'video-downloader', 'SKILL.md'))
+    await assert.rejects(fs.access(path.join(ref.skillsDir, 'video-downloader.md')))
+  })
+})
+
+test('listSkills adopts a bare SKILL.md at the skills/ root using frontmatter name when present', async () => {
+  await withHome(async () => {
+    await ensureContinuityVault(identity)
+    invalidateSkillsCache(identity)
+    const ref = continuityVaultRef(identity)
+    await fs.writeFile(
+      path.join(ref.skillsDir, 'SKILL.md'),
+      '---\nname: outline\ndescription: dropped skill\nvisibility: public\n---\n\nbody\n',
+      { mode: 0o600 },
+    )
+
+    const entries = await listSkills(identity)
+    assert.equal(entries.length, 1)
+    assert.equal(entries[0]?.name, 'outline')
+    await fs.access(path.join(ref.skillsDir, 'outline', 'SKILL.md'))
+    await assert.rejects(fs.access(path.join(ref.skillsDir, 'SKILL.md')))
+  })
+})
+
+test('listSkills adopts a bare nameless SKILL.md at the skills/ root under imported-skill', async () => {
+  await withHome(async () => {
+    await ensureContinuityVault(identity)
+    invalidateSkillsCache(identity)
+    const ref = continuityVaultRef(identity)
+    await fs.writeFile(
+      path.join(ref.skillsDir, 'SKILL.md'),
+      '---\ndescription: nameless drop\n---\n\nbody\n',
+      { mode: 0o600 },
+    )
+
+    const entries = await listSkills(identity)
+    assert.equal(entries.length, 1)
+    assert.equal(entries[0]?.name, 'imported-skill')
+    await fs.access(path.join(ref.skillsDir, 'imported-skill', 'SKILL.md'))
+  })
+})
+
+test('listSkills auto-writes visibility: public to a SKILL.md that lacks a visibility field', async () => {
+  await withHome(async () => {
+    await ensureContinuityVault(identity)
+    invalidateSkillsCache(identity)
+    const ref = continuityVaultRef(identity)
+    const skillDir = path.join(ref.skillsDir, 'fresh')
+    await fs.mkdir(skillDir, { recursive: true, mode: 0o700 })
+    const skillFile = path.join(skillDir, 'SKILL.md')
+    await fs.writeFile(
+      skillFile,
+      '---\nname: fresh\ndescription: no visibility line\n---\n\nbody\n',
+      { mode: 0o600 },
+    )
+
+    const entries = await listSkills(identity)
+    assert.equal(entries.length, 1)
+    assert.equal(entries[0]?.visibility, 'public')
+
+    const onDisk = await fs.readFile(skillFile, 'utf8')
+    assert.match(onDisk, /visibility:\s*public/)
+  })
+})
+
+test('listSkills migrates legacy visibility: discoverable to private on scan', async () => {
+  await withHome(async () => {
+    await ensureContinuityVault(identity)
+    invalidateSkillsCache(identity)
+    const ref = continuityVaultRef(identity)
+    const skillDir = path.join(ref.skillsDir, 'legacy')
+    await fs.mkdir(skillDir, { recursive: true, mode: 0o700 })
+    const skillFile = path.join(skillDir, 'SKILL.md')
+    await fs.writeFile(
+      skillFile,
+      '---\nname: legacy\ndescription: pre-collapse\nvisibility: discoverable\n---\n\nbody\n',
+      { mode: 0o600 },
+    )
+
+    const entries = await listSkills(identity)
+    assert.equal(entries.length, 1)
+    assert.equal(entries[0]?.visibility, 'private')
+
+    const onDisk = await fs.readFile(skillFile, 'utf8')
+    assert.match(onDisk, /visibility:\s*private/)
+    assert.doesNotMatch(onDisk, /visibility:\s*discoverable/)
+  })
+})
+
+test('listSkills leaves an explicit visibility untouched on scan', async () => {
+  await withHome(async () => {
+    await ensureContinuityVault(identity)
+    invalidateSkillsCache(identity)
+    const ref = continuityVaultRef(identity)
+    const skillDir = path.join(ref.skillsDir, 'pinned')
+    await fs.mkdir(skillDir, { recursive: true, mode: 0o700 })
+    const skillFile = path.join(skillDir, 'SKILL.md')
+    const original = '---\nname: pinned\ndescription: pinned vis\nvisibility: public\n---\n\nbody\n'
+    await fs.writeFile(skillFile, original, { mode: 0o600 })
+
+    const entries = await listSkills(identity)
+    assert.equal(entries[0]?.visibility, 'public')
+
+    const onDisk = await fs.readFile(skillFile, 'utf8')
+    assert.equal(onDisk, original)
+  })
+})
+
 async function withHome(fn: (home: string) => Promise<void>): Promise<void> {
   const prevHome = process.env.HOME
   const prevUserProfile = process.env.USERPROFILE

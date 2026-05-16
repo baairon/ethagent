@@ -103,7 +103,7 @@ export function appendPublicSkillEntries(
   const appended: PublicSkill[] = []
   const usedIds = new Set(baselineIds)
   for (const entry of entries) {
-    if (entry.visibility !== 'public' && entry.visibility !== 'discoverable') continue
+    if (entry.visibility !== 'public') continue
     const id = uniqueSkillId(entry.name, usedIds)
     usedIds.add(id)
     appended.push({

@@ -1,4 +1,5 @@
 import {
+  fetchLlamaCppContextSize,
   startLlamaCppServer,
   stopLlamaCppServer,
   type LlamaCppStartFailureCode,
@@ -64,7 +65,10 @@ export async function ensureLlamaCppRunnerReady(
         servedModels: probe.models,
       }
     }
-    if (!local.mmprojPath) return { ok: true, alreadyRunning: true }
+    if (!local.mmprojPath) {
+      void fetchLlamaCppContextSize(llamaCppServerHostFromBaseUrl(baseUrl))
+      return { ok: true, alreadyRunning: true }
+    }
     await (deps.stopServer ?? stopLlamaCppServer)().catch(() => null)
   }
 

@@ -22,7 +22,7 @@ export const NewSkillVisibilityScreen: React.FC<NewSkillVisibilityScreenProps> =
 }) => (
   <Surface
     title={`Visibility · ${name}`}
-    subtitle="Discoverable is the default. You can change it later from Change Visibility."
+    subtitle="Public is the default. You can change it later from Change Visibility."
     footer={footer}
   >
     {error && (
@@ -34,8 +34,7 @@ export const NewSkillVisibilityScreen: React.FC<NewSkillVisibilityScreenProps> =
       <Select<SkillVisibility | 'back'>
         options={[
           { value: 'private', label: 'Private', hint: 'Local-only. Not in skills.json.' },
-          { value: 'discoverable', label: 'Discoverable', hint: 'Default. Indexed in skills.json with description.' },
-          { value: 'public', label: 'Public', hint: 'Indexed in skills.json and Agent Card.' },
+          { value: 'public', label: 'Public', hint: 'Default. Indexed in skills.json and Agent Card.' },
           { value: 'back', role: 'section', label: 'Navigation' },
           { value: 'back', label: 'Back', hint: 'Return to the name step', role: 'utility' },
         ]}

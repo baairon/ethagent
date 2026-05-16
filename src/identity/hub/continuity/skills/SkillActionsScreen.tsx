@@ -74,7 +74,6 @@ export const SkillActionsScreen: React.FC<SkillActionsScreenProps> = ({
 
   options.push({ value: noop, role: 'section', label: 'Visibility' })
   options.push(visibilityOption('private', visibility))
-  options.push(visibilityOption('discoverable', visibility))
   options.push(visibilityOption('public', visibility))
 
   options.push({ value: noop, role: 'section', label: 'Manage' })
@@ -83,6 +82,7 @@ export const SkillActionsScreen: React.FC<SkillActionsScreenProps> = ({
     label: 'Delete',
     hint: 'Remove this skill folder and its supporting files',
   })
+  options.push({ value: noop, role: 'section', label: 'Return' })
   options.push({
     value: { kind: 'back' },
     label: 'Back',
@@ -141,8 +141,7 @@ function visibilityOption(level: SkillVisibility, current?: SkillVisibility): Se
 
 function visibilityHint(level: SkillVisibility): string {
   if (level === 'private') return 'Local-only. Not in skills.json.'
-  if (level === 'discoverable') return 'Default. Indexed with description.'
-  return 'Indexed with description and Agent Card link.'
+  return 'Default. Indexed with description and Agent Card link.'
 }
 
 function capitalize(value: string): string {

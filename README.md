@@ -67,10 +67,10 @@ Each agent's continuity directory holds a small set of files. Private files are 
 | --- | --- | --- |
 | `SOUL.md` | Private | Soul, boundaries, standing instructions, and identity framing. |
 | `MEMORY.md` | Private | Durable preferences, project context, decisions, and operating notes. |
-| `skills/` | Mixed | Skill folders. Each skill is private, discoverable, or public; new skills default to discoverable. |
+| `skills/` | Private | Skill folders. The SKILL.md body never leaves your machine. The visibility flag only controls whether the skill's name and description get indexed in `skills.json`. New skills default to public. |
 | `skills.json` | Public | Machine-readable capabilities derived from public skills. |
 
-`SOUL.md`, `MEMORY.md`, and each `SKILL.md` are plain Markdown you edit through the Identity Hub under Continuity. Skills carry extra metadata: the frontmatter at the top of each `SKILL.md` (name, description, when_to_use, visibility, tags) tells the agent when to load it. Visibility is `private` (local-only, never shared), `discoverable` (indexed in `skills.json` so other agents can find it), or `public` (indexed and surfaced on the Agent Card).
+`SOUL.md`, `MEMORY.md`, and each `SKILL.md` are plain Markdown you edit through the Identity Hub under Continuity. Skills carry extra metadata: the frontmatter at the top of each `SKILL.md` (name, description, when_to_use, visibility, tags) tells the agent when to load it. The skill body itself is always local; the `visibility` flag is `private` (name and description stay local too) or `public` (name and description get indexed in `skills.json` and surfaced on the Agent Card — the body still stays local). Older skills that used `discoverable` are migrated to `private` on first read.
 
 - **Save Snapshot Now** encrypts the private files, pins them to IPFS, and rotates the onchain pointer to the new CID.
 - **Refetch Latest** reads the pointer back, signs the decrypt challenge with your wallet, and overwrites local files from the snapshot.

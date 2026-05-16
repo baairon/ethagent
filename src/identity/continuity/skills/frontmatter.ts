@@ -14,7 +14,8 @@ const SUPPORTED_KEYS = new Set([
   'visibility',
 ])
 
-const VISIBILITY_VALUES: SkillVisibility[] = ['private', 'public', 'discoverable']
+const VISIBILITY_VALUES: SkillVisibility[] = ['private', 'public']
+const LEGACY_VISIBILITY_TO_PRIVATE = new Set(['discoverable'])
 
 export type ParsedSkillFile = {
   frontmatter: SkillFrontmatter
@@ -104,6 +105,8 @@ function assignKey(out: SkillFrontmatter, key: keyof SkillFrontmatter, rawValue:
     const literal = parseScalar(stripped).toLowerCase()
     if ((VISIBILITY_VALUES as string[]).includes(literal)) {
       out.visibility = literal as SkillVisibility
+    } else if (LEGACY_VISIBILITY_TO_PRIVATE.has(literal)) {
+      out.visibility = 'private'
     }
     return
   }

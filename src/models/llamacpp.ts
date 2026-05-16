@@ -256,12 +256,68 @@ async function fetchServedModels(host: string = DEFAULT_LLAMA_HOST, timeoutMs = 
   }
 }
 
+let cachedLlamaCppContextSize: number | null = null
+const llamaCppContextSizeListeners = new Set<(size: number) => void>()
+
+export async function fetchLlamaCppContextSize(
+  host: string = DEFAULT_LLAMA_HOST,
+  timeoutMs = 1500,
+): Promise<number | null> {
+  const response = await fetchWithTimeout(`${host.replace(/\/+$/, '')}/props`, timeoutMs)
+  if (!response || !response.ok) return null
+  try {
+    const data = await response.json() as {
+      n_ctx?: unknown
+      default_generation_settings?: { n_ctx?: unknown }
+    }
+    const raw = typeof data.n_ctx === 'number'
+      ? data.n_ctx
+      : typeof data.default_generation_settings?.n_ctx === 'number'
+        ? data.default_generation_settings.n_ctx
+        : null
+    if (typeof raw === 'number' && raw > 0) {
+      const changed = cachedLlamaCppContextSize !== raw
+      cachedLlamaCppContextSize = raw
+      if (changed) {
+        for (const listener of llamaCppContextSizeListeners) {
+          try { listener(raw) } catch { void 0 }
+        }
+      }
+      return raw
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
+export function getCachedLlamaCppContextSize(): number | null {
+  return cachedLlamaCppContextSize
+}
+
+export function setCachedLlamaCppContextSize(size: number): void {
+  if (!(size > 0)) return
+  const changed = cachedLlamaCppContextSize !== size
+  cachedLlamaCppContextSize = size
+  if (changed) {
+    for (const listener of llamaCppContextSizeListeners) {
+      try { listener(size) } catch { void 0 }
+    }
+  }
+}
+
+export function onLlamaCppContextSizeChange(listener: (size: number) => void): () => void {
+  llamaCppContextSizeListeners.add(listener)
+  return () => { llamaCppContextSizeListeners.delete(listener) }
+}
+
 export async function detectLlamaCpp(host: string = DEFAULT_LLAMA_HOST): Promise<LlamaCppStatus> {
   const [binary, serverUp] = await Promise.all([
     detectLlamaCppServerBinary(),
     isLlamaCppServerUp(host),
   ])
   const servedModels = serverUp ? await listServedModels(host) : []
+  if (serverUp) void fetchLlamaCppContextSize(host)
   return {
     binaryPresent: binary.path !== null,
     binaryPath: binary.path,
@@ -298,6 +354,7 @@ export async function startLlamaCppServer(args: {
     }
   }
   if (initialStatus.state === 'ready') {
+    void fetchLlamaCppContextSize(host)
     return { ok: true, alreadyRunning: true }
   }
   if (initialStatus.state === 'different') {
@@ -377,7 +434,10 @@ export async function startLlamaCppServer(args: {
     pollMs: args.pollMs ?? 500,
     childFailure: () => childFailure,
   })
-  if (ready.ok) return { ok: true, alreadyRunning: false }
+  if (ready.ok) {
+    void fetchLlamaCppContextSize(host)
+    return { ok: true, alreadyRunning: false }
+  }
   if (ready.code === 'readiness-timeout') {
     return startFailure('readiness-timeout', { detail: capture() })
   }

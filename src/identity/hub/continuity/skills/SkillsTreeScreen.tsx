@@ -73,7 +73,7 @@ export const SkillsTreeScreen: React.FC<SkillsTreeScreenProps> = ({
     }
   }, [identity, editorOpened])
 
-  const subtitle = notice ?? 'Open a skill, create one, or remove one.'
+  const subtitle = notice ?? 'Select a skill to open, change visibility, or delete.'
   const isLoading = tree === null
   const skills = tree?.skills ?? []
   const supportingCounts = tree?.supportingCounts ?? {}
@@ -145,6 +145,7 @@ function buildOptions(
       const supportCount = supportingCounts[skill.name] ?? 0
       const meta = [capitalize(skill.visibility)]
       if (supportCount > 0) meta.push(`${supportCount + 1} files`)
+      meta.push('enter for actions')
       rows.push({
         value: { kind: 'skill', relativePath: skill.relativePath },
         label: `${branch}${skill.name}/SKILL.md`,

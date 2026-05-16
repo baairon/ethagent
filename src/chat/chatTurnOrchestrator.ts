@@ -56,6 +56,7 @@ export type TurnOrchestratorContext = {
   applySessionRule: (rule?: SessionPermissionRule, persistRule?: boolean) => Promise<void>
   preflightProvider?: () => Promise<{ ok: true } | { ok: false; message: string }>
   onPlanReady?: (plan: string) => void
+  onContextExceeded?: (info: { contextLimit: number }) => void
   pendingAssistantTextRef: MutableRef<string | null>
   pendingThinkingTextRef: MutableRef<string | null>
   streamFlushTimerRef: MutableRef<ReturnType<typeof setTimeout> | null>
@@ -89,6 +90,7 @@ export async function runStreamingTurn(
     applySessionRule,
     preflightProvider,
     onPlanReady,
+    onContextExceeded,
     pendingAssistantTextRef,
     pendingThinkingTextRef,
     streamFlushTimerRef,
@@ -311,6 +313,7 @@ export async function runStreamingTurn(
         nowIso,
         mode,
         onPlanReady,
+        onContextExceeded,
         turnId: activeCheckpoint.turnId,
         model: getConfig().model,
         onFinishedNormally: () => { finishedNormally = true },
@@ -356,6 +359,7 @@ type EventHandlerContext = {
   nowIso: () => string
   mode: SessionMode
   onPlanReady?: (plan: string) => void
+  onContextExceeded?: (info: { contextLimit: number }) => void
   turnId: string
   model: string
   onFinishedNormally: () => void
@@ -363,6 +367,13 @@ type EventHandlerContext = {
 
 function isCancelledEvent(ev: TurnEvent): boolean {
   return ev.type === 'cancelled'
+}
+
+export function parseContextExceededLimit(message: string): number | null {
+  const match = /exceeds the available context size \((\d+)\s*tokens?\)/i.exec(message)
+  if (!match) return null
+  const limit = Number.parseInt(match[1]!, 10)
+  return Number.isFinite(limit) && limit > 0 ? limit : null
 }
 
 async function handleEvent(ev: TurnEvent, ctx: EventHandlerContext): Promise<void> {
@@ -453,6 +464,12 @@ async function handleEvent(ev: TurnEvent, ctx: EventHandlerContext): Promise<voi
       return
     }
     case 'error': {
+      const contextLimit = parseContextExceededLimit(ev.message)
+      if (contextLimit !== null && ctx.onContextExceeded) {
+        ctx.discardStreamingRows()
+        ctx.onContextExceeded({ contextLimit })
+        return
+      }
       ctx.pushNote(ev.message, 'error')
       if (ev.discardAssistant) {
         ctx.discardStreamingRows()

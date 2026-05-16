@@ -33,5 +33,5 @@ export function blocksToText(blocks: MessageContentBlock[]): string {
 export function approximateTokens(messages: Message[]): number {
   let chars = 0
   for (const m of messages) chars += messageTextContent(m).length
-  return Math.ceil(chars / 4)
+  return Math.ceil(chars / 3)
 }

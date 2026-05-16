@@ -404,17 +404,17 @@ test('indeterminate progress rows render as spinner activity', () => {
       slices: rowsToFullSlices([{
         role: 'progress',
         id: 'compact-1',
-        title: 'compacting conversation',
+        title: 'Compacting conversation',
         progress: 0,
-        status: 'summarizing with local model',
+        status: 'summarizing transcript',
         suffix: 'esc to cancel',
         indeterminate: true,
       }]),
     }),
   )
 
-  assert.match(output, /compacting conversation/)
-  assert.match(output, /Summarizing with local model/)
+  assert.match(output, /Compacting conversation/)
+  assert.match(output, /Summarizing transcript/)
   assert.match(output, /esc to cancel/)
   assert.doesNotMatch(output, /0%/)
 })

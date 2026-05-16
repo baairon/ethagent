@@ -50,7 +50,7 @@ test('createSkillFile writes a Claude-style flat folder with the rich scaffold',
     assert.match(body, /# Instructions/)
     assert.match(body, /# Examples/)
     assert.match(body, /# Notes/)
-    assert.match(body, /visibility: discoverable/)
+    assert.match(body, /visibility: public/)
 
     const tree = await listSkillsTree(identity)
     assert.equal(tree.skills.length, 1)
@@ -156,6 +156,48 @@ test('loadSkillsTree round-trips both SKILL.md and supporting files', async () =
   })
 })
 
+test('loadSkillsTree rewrites legacy visibility: discoverable to private on snapshot load (restore round-trip)', async () => {
+  await withHome(async () => {
+    await ensureContinuityVault(identity)
+    invalidateSkillsCache(identity)
+    await materializeSkillsTree(identity, {
+      'legacy-snap/SKILL.md': '---\nname: legacy-snap\ndescription: from old envelope\nvisibility: discoverable\n---\n\nbody\n',
+    })
+    const ref = continuityVaultRef(identity)
+    const skillFile = path.join(ref.skillsDir, 'legacy-snap', 'SKILL.md')
+
+    const tree = await loadSkillsTree(identity)
+    assert.match(tree['legacy-snap/SKILL.md'] ?? '', /visibility:\s*private/)
+    assert.doesNotMatch(tree['legacy-snap/SKILL.md'] ?? '', /visibility:\s*discoverable/)
+
+    const onDisk = await fs.readFile(skillFile, 'utf8')
+    assert.match(onDisk, /visibility:\s*private/)
+    assert.doesNotMatch(onDisk, /visibility:\s*discoverable/)
+  })
+})
+
+test('loadSkillsTree writes visibility: public to any SKILL.md missing it on snapshot load', async () => {
+  await withHome(async () => {
+    await ensureContinuityVault(identity)
+    invalidateSkillsCache(identity)
+    const ref = continuityVaultRef(identity)
+    const skillDir = path.join(ref.skillsDir, 'pasted')
+    await fs.mkdir(skillDir, { recursive: true, mode: 0o700 })
+    const skillFile = path.join(skillDir, 'SKILL.md')
+    await fs.writeFile(
+      skillFile,
+      '---\nname: pasted\ndescription: snapshot path\n---\n\nbody\n',
+      { mode: 0o600 },
+    )
+
+    const tree = await loadSkillsTree(identity)
+    assert.match(tree['pasted/SKILL.md'] ?? '', /visibility:\s*public/)
+
+    const onDisk = await fs.readFile(skillFile, 'utf8')
+    assert.match(onDisk, /visibility:\s*public/)
+  })
+})
+
 test('normalizeContinuitySkills upgrades legacy <category>/<name>.md envelope keys to flat shape', async () => {
   const { normalizeContinuitySkills } = await import('../../../src/identity/continuity/envelope.js')
   const upgraded = normalizeContinuitySkills({
@@ -203,17 +245,17 @@ test('setSkillVisibility flips frontmatter and preserves body', async () => {
     const file = path.join(ref.skillsDir, 'obit', 'SKILL.md')
 
     const before = await fs.readFile(file, 'utf8')
-    assert.match(before, /visibility: discoverable/)
+    assert.match(before, /visibility: public/)
+
+    await setSkillVisibility(identity, 'obit/SKILL.md', 'private')
+    const afterPrivate = await fs.readFile(file, 'utf8')
+    assert.match(afterPrivate, /visibility: private/)
+    assert.match(afterPrivate, /# Overview/)
+    assert.doesNotMatch(afterPrivate, /visibility: public/)
 
     await setSkillVisibility(identity, 'obit/SKILL.md', 'public')
     const afterPublic = await fs.readFile(file, 'utf8')
     assert.match(afterPublic, /visibility: public/)
-    assert.match(afterPublic, /# Overview/)
-    assert.doesNotMatch(afterPublic, /visibility: discoverable/)
-
-    await setSkillVisibility(identity, 'obit/SKILL.md', 'discoverable')
-    const afterDiscoverable = await fs.readFile(file, 'utf8')
-    assert.match(afterDiscoverable, /visibility: discoverable/)
   })
 })
 
@@ -234,12 +276,12 @@ test('setSkillVisibility adds visibility line when missing', async () => {
   })
 })
 
-test('createSkillFile defaults to visibility: discoverable when no visibility is passed', async () => {
+test('createSkillFile defaults to visibility: public when no visibility is passed', async () => {
   await withHome(async () => {
     await ensureContinuityVault(identity)
     const created = await createSkillFile(identity, { name: 'default-vis' })
     const body = await fs.readFile(created.absolutePath, 'utf8')
-    assert.match(body, /visibility: discoverable/)
+    assert.match(body, /visibility: public/)
   })
 })
 
@@ -249,7 +291,6 @@ test('createSkillFile honors explicit visibility: public', async () => {
     const created = await createSkillFile(identity, { name: 'public-skill', visibility: 'public' })
     const body = await fs.readFile(created.absolutePath, 'utf8')
     assert.match(body, /visibility: public/)
-    assert.doesNotMatch(body, /visibility: discoverable/)
   })
 })
 
@@ -259,7 +300,7 @@ test('createSkillFile honors explicit visibility: private', async () => {
     const created = await createSkillFile(identity, { name: 'private-skill', visibility: 'private' })
     const body = await fs.readFile(created.absolutePath, 'utf8')
     assert.match(body, /visibility: private/)
-    assert.doesNotMatch(body, /visibility: discoverable/)
+    assert.doesNotMatch(body, /visibility: public/)
   })
 })
 
