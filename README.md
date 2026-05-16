@@ -70,7 +70,7 @@ Each agent's continuity directory holds a small set of files. Private files are 
 | `skills/` | Private | Skill folders. The SKILL.md body never leaves your machine. The visibility flag only controls whether the skill's name and description get indexed in `skills.json`. New skills default to public. |
 | `skills.json` | Public | Machine-readable capabilities derived from public skills. |
 
-`SOUL.md`, `MEMORY.md`, and each `SKILL.md` are plain Markdown you edit through the Identity Hub under Continuity. Skills carry extra metadata: the frontmatter at the top of each `SKILL.md` (name, description, when_to_use, visibility, tags) tells the agent when to load it. The skill body itself is always local; the `visibility` flag is `private` (name and description stay local too) or `public` (name and description get indexed in `skills.json` and surfaced on the Agent Card — the body still stays local). Older skills that used `discoverable` are migrated to `private` on first read.
+`SOUL.md`, `MEMORY.md`, and each `SKILL.md` are plain Markdown you edit through the Identity Hub under Continuity. Skill frontmatter (name, description, when_to_use, visibility, tags) tells the agent when to load it. The body stays local; `visibility: public` indexes the name and description in `skills.json` and the Agent Card.
 
 - **Save Snapshot Now** encrypts the private files, pins them to IPFS, and rotates the onchain pointer to the new CID.
 - **Refetch Latest** reads the pointer back, signs the decrypt challenge with your wallet, and overwrites local files from the snapshot.
