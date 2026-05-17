@@ -155,7 +155,7 @@ test('README documents custody modes, ENS, and token transfer flow', () => {
   assert.match(readme, /never receive token approval or transfer rights/)
   assert.match(readme, /Subdomains live under a parent name you control, never on root `\.eth` names directly/)
   assert.match(readme, /token ID \+ network/)
-  assert.match(readme, /\*\*Switch Agent\*\* accepts either an ENS name or a bare token ID/)
+  assert.match(readme, /\*\*Switch Agent\*\* accepts an ENS name or an ERC-8004 token ID/)
   assert.match(readme, /## Token Transfers/)
   assert.match(readme, /Prepare Token Transfer.*before any ERC-8004 token transfer/)
   assert.match(readme, /sender signs snapshot access, receiver signs restore access/i)
