@@ -34,7 +34,6 @@ type EnsFlowProps = {
   onWalletReady: (session: BrowserWalletReady | null) => void
   onTriggerRebackup: (backStep: Step, profileUpdates?: ProfileUpdates) => void
   onTriggerPublicProfileSave: (backStep: Step, profileUpdates: ProfileUpdates) => void
-  onWithdrawTokenForEns: (step: Step) => void
 }
 
 export function isEnsStep(step: Step): step is IdentityHubEnsStep {
@@ -59,7 +58,6 @@ export const EnsFlow: React.FC<EnsFlowProps> = ({
   onWalletReady,
   onTriggerRebackup,
   onTriggerPublicProfileSave,
-  onWithdrawTokenForEns,
 }) => {
   if (step.kind === 'manage-ens-operators') {
     return (
@@ -81,7 +79,6 @@ export const EnsFlow: React.FC<EnsFlowProps> = ({
       <EditProfileFlow
         step={step}
         reconciliation={reconciliation}
-        onWithdrawToken={() => onWithdrawTokenForEns(step)}
         onNameSubmit={name => {
           if (step.kind !== 'edit-profile-name') return
           onSetStep({

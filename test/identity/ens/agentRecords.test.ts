@@ -23,6 +23,15 @@ test('buildEnsip25Key matches the spec example for mainnet', () => {
   assert.equal(key, ensip25KeyForAgent42)
 })
 
+test('buildEnsip25Key encodes the registry chainId for Base, not mainnet', () => {
+  const key = buildEnsip25Key({
+    chainId: 8453,
+    identityRegistryAddress: registry,
+    agentId: 45744n,
+  })
+  assert.equal(key, 'agent-registration[0x00010000022105148004a169fb4a3325136eb29fa0ceb6d2e539a432][45744]')
+})
+
 test('buildEnsip25Key rejects agentIds containing brackets', () => {
   assert.throws(() => buildEnsip25Key({
     chainId: 1,

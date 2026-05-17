@@ -64,7 +64,6 @@ test('Identity Hub advanced ENS flow remains compact and focused', () => {
 
   assert.match(editFlow, /title="ENS Name"/)
   assert.match(editFlow, /Current Setup/)
-  assert.match(editFlow, /Token Custody Check/)
   assert.match(transferFlow, /title="Prepare Token Transfer"/)
   assert.match(editFlow, /dedicated agent subdomain|agent ENS name/)
   assert.doesNotMatch(editFlow, /org\.ethagent\.operator/)

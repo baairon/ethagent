@@ -2,6 +2,7 @@ import React from 'react'
 import { getAddress, type Address } from 'viem'
 import type { BrowserWalletReady } from '../../wallet/browserWallet.js'
 import {
+  AGENT_TOKEN_RECORD_KEY,
   buildAgentEnsRecords,
   buildEnsip25Key,
   diffRecords,
@@ -19,6 +20,7 @@ import {
   preflightEnsRoot,
   preflightEnsSetup,
 } from '../../ens/ensAutomation.js'
+import { SUPPORTED_ERC8004_CHAINS } from '../../registry/erc8004.js'
 import {
   readCustodyMode,
   readIdentityStateString,
@@ -50,7 +52,6 @@ export const EnsEditFlow: React.FC<EnsEditProps> = ({
   onEnsRecordsUpdate,
   onEnsSetup,
   onManageOperatorWalletAccess,
-  onWithdrawToken,
   initialView,
   onBack,
 }) => {
@@ -68,7 +69,7 @@ export const EnsEditFlow: React.FC<EnsEditProps> = ({
 
   const [discovery, setDiscovery] = React.useState<DiscoveryState>({ status: 'idle' })
   const [phase, setPhase] = React.useState<EnsPhase>(() => {
-    if (initialView === 'advanced' && !hasAdvancedSetup) return { kind: 'advanced-transfer-check' }
+    if (initialView === 'advanced' && !hasAdvancedSetup) return { kind: 'pick-parent', mode: 'advanced' }
     return { kind: 'mode-select' }
   })
   const [validationError, setValidationError] = React.useState<string | null>(null)
@@ -138,11 +139,14 @@ export const EnsEditFlow: React.FC<EnsEditProps> = ({
     try {
       const validation = await validateAgentEnsLink(fullName, ownerAddress)
       const readKeys = identity.agentId
-        ? [buildEnsip25Key({
-            chainId: registry.chainId,
-            identityRegistryAddress: registry.identityRegistryAddress,
-            agentId: identity.agentId,
-          })]
+        ? [
+            ...SUPPORTED_ERC8004_CHAINS.map(chain => buildEnsip25Key({
+              chainId: chain.chainId,
+              identityRegistryAddress: registry.identityRegistryAddress,
+              agentId: identity.agentId!,
+            })),
+            AGENT_TOKEN_RECORD_KEY,
+          ]
         : []
       const currentText = validation.ok && readKeys.length > 0
         ? await readEthagentTextRecords(fullName, readKeys)
@@ -260,11 +264,14 @@ export const EnsEditFlow: React.FC<EnsEditProps> = ({
     setValidationError(null)
     setPhase({ kind: 'unlink-loading', fullName })
     const readKeys = identity.agentId
-      ? [buildEnsip25Key({
-          chainId: registry.chainId,
-          identityRegistryAddress: registry.identityRegistryAddress,
-          agentId: identity.agentId,
-        })]
+      ? [
+          ...SUPPORTED_ERC8004_CHAINS.map(chain => buildEnsip25Key({
+            chainId: chain.chainId,
+            identityRegistryAddress: registry.identityRegistryAddress,
+            agentId: identity.agentId!,
+          })),
+          AGENT_TOKEN_RECORD_KEY,
+        ]
       : []
     readEthagentTextRecords(fullName, readKeys)
       .then(currentText => {
@@ -321,7 +328,6 @@ export const EnsEditFlow: React.FC<EnsEditProps> = ({
     runAdvancedSubdomainCheck,
     onEnsSetup,
     onEnsLink,
-    onWithdrawToken,
   })
   if (advancedScreen) return advancedScreen
 

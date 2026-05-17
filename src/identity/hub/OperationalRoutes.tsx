@@ -281,7 +281,6 @@ export const IdentityHubOperationalRoutes: React.FC<IdentityHubOperationalRoutes
         onWalletReady={setWalletSession}
         onTriggerRebackup={triggerRebackup}
         onTriggerPublicProfileSave={triggerPublicProfileSave}
-        onWithdrawTokenForEns={currentStep => custodyFlow.beginWithdrawToken(currentStep, currentStep, 'ens')}
       />
     )
   }

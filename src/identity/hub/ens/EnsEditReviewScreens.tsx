@@ -21,9 +21,9 @@ import {
 import { ensValidationReasonText } from './state.js'
 import { shortAddress } from '../shared/model/format.js'
 import {
+  abbreviateHexBlobs,
   manualReasonTitle,
   modeSwitchHeading,
-  setupSwitchNotice,
 } from './editCopy.js'
 import {
   EnsSetupRow,
@@ -112,7 +112,6 @@ export const EnsSetupReviewScreen: React.FC<EnsSetupReviewScreenProps> = ({
   type Action = 'begin' | 'back'
   const isSimple = setup.mode === 'simple'
   const signerLabel = isSimple ? 'Connected wallet' : 'Owner wallet'
-  const switchNotice = setupSwitchNotice(currentEnsName, currentMode, setup.fullName, setup.mode)
   const createLabel = setup.registryAction === 'create-subdomain'
     ? 'Create Subdomain'
     : setup.registryAction === 'create-wrapped-subdomain'
@@ -138,7 +137,6 @@ export const EnsSetupReviewScreen: React.FC<EnsSetupReviewScreenProps> = ({
       ) : null}
       <Box flexDirection="column">
         <Text color={theme.dim}>{modeSwitchHeading(currentEnsName, currentMode, setup.fullName, setup.mode)}</Text>
-        {switchNotice ? <Text color={theme.dim}>{switchNotice}</Text> : null}
         <EnsSetupRow label="ENS name" value={setup.fullName} />
         <EnsSetupRow label="Parent root" value={setup.rootName} />
         <EnsSetupRow label="Subdomain label" value={setup.label} />
@@ -270,8 +268,8 @@ export const UnlinkEnsReviewScreen: React.FC<UnlinkEnsReviewScreenProps> = ({
             <Text color={theme.textSubtle}>Will be cleared:</Text>
             {changedDiffs.map(diff => (
               <Text key={diff.key}>
-                <Text color={theme.dim}>{`  ${diff.key}  `}</Text>
-                <Text color={theme.accentPeriwinkle}>{diff.current}</Text>
+                <Text color={theme.dim}>{`  ${abbreviateHexBlobs(diff.key)}  `}</Text>
+                <Text color={theme.accentPeriwinkle}>{abbreviateHexBlobs(diff.current)}</Text>
               </Text>
             ))}
           </Box>
@@ -342,7 +340,6 @@ export const ReviewScreen: React.FC<ReviewScreenProps> = ({
   const changedDiffs = recordsDiff.filter(d => d.changed)
   const hasRecordChanges = changedDiffs.length > 0
   const reviewSubtitle = 'Review Ethereum Mainnet ENS address and text records before saving this ENS link. No token approval is requested.'
-  const switchNotice = setupSwitchNotice(currentEnsName, currentMode, fullName, mode)
 
   if (!validation.ok) {
     const reason = ensValidationReasonText(validation.reason)
@@ -396,7 +393,7 @@ export const ReviewScreen: React.FC<ReviewScreenProps> = ({
 
   const options: Array<SelectOption<ReviewAction>> = [
     { value: 'continue', role: 'section', label: modeSwitchHeading(currentEnsName, currentMode, fullName, mode) },
-    { value: 'continue', label: 'Continue Setup', hint: hasRecordChanges ? `Ethereum Mainnet: sign ${changedDiffs.length} ENS record value${changedDiffs.length === 1 ? '' : 's'}; ${registryNetworkLabel}: save token URI` : `ENS records already match; ${registryNetworkLabel}: save token URI` },
+    { value: 'continue', label: 'Continue Setup', hint: hasRecordChanges ? `Ethereum Mainnet: sign ${changedDiffs.length} record${changedDiffs.length === 1 ? '' : 's'}; ${registryNetworkLabel}: save token URI` : `Records match; ${registryNetworkLabel}: save token URI` },
     { value: 'change', label: 'Pick A Different Name', hint: 'Return to the name picker' },
     { value: 'back', role: 'section', label: 'Navigation' },
     { value: 'back', label: 'Back', hint: 'Return to Identity Hub', role: 'utility' },
@@ -414,13 +411,12 @@ export const ReviewScreen: React.FC<ReviewScreenProps> = ({
             <Box marginBottom={1} flexDirection="column">
               <Text color={theme.dim}>Current: <Text color={currentEnsName ? theme.text : theme.dim}>{currentEnsName || 'None'}</Text></Text>
               <Text color={theme.dim}>Next: <Text color={theme.text}>{fullName}</Text></Text>
-              {switchNotice ? <Text color={theme.dim}>{switchNotice}</Text> : null}
             </Box>
             )
           : null}
         {recordsDiff.map(diff => (
           <Text key={diff.key}>
-            <Text color={theme.dim}>{`- ${diff.key}: `}</Text>
+            <Text color={theme.dim}>{`- ${abbreviateHexBlobs(diff.key)}: `}</Text>
             {diff.changed
               ? (
                 <>

@@ -26,7 +26,6 @@ type EditProfileFlowProps = {
   onEnsRecordsUpdate: (fullName: string, records: AgentEnsRecords, options: EnsLinkOptions, clearRecords?: boolean, currentRecords?: AgentEnsRecordState) => void
   onEnsSetup: (setup: EnsSetupPlan) => void
   onManageOperatorWalletAccess: () => void
-  onWithdrawToken: () => void
   onBack: () => void
   onMenu: () => void
 }
@@ -49,7 +48,6 @@ export const EditProfileFlow: React.FC<EditProfileFlowProps> = ({
   onEnsRecordsUpdate,
   onEnsSetup,
   onManageOperatorWalletAccess,
-  onWithdrawToken,
   onBack,
   onMenu,
 }) => {
@@ -101,7 +99,6 @@ export const EditProfileFlow: React.FC<EditProfileFlowProps> = ({
         onEnsRecordsUpdate={onEnsRecordsUpdate}
         onEnsSetup={onEnsSetup}
         onManageOperatorWalletAccess={onManageOperatorWalletAccess}
-        onWithdrawToken={onWithdrawToken}
         initialView={step.initialView}
         onBack={onBack}
       />

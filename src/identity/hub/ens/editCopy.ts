@@ -3,6 +3,12 @@ import type { AgentEnsRecords, AgentRecordDiff } from '../../ens/agentRecords.js
 import type { EnsRegistryAction, EnsSetupBlockedPlan } from '../../ens/ensAutomation.js'
 import type { CustodyMode } from '../custody/state.js'
 
+export function abbreviateHexBlobs(input: string): string {
+  return input.replace(/0x([0-9a-fA-F]{20,})/g, (_match, hex) => {
+    return `0x${hex.slice(0, 8)}...${hex.slice(-8)}`
+  })
+}
+
 export type EnsLinkOptions = {
   mode: 'simple' | 'advanced'
   ownerAddress?: Address
@@ -44,18 +50,6 @@ export function modeSwitchHeading(
   if (modeChanged) return 'Prepare ENS Setup Switch'
   if (currentEnsName !== nextEnsName) return 'Prepare ENS Name Switch'
   return 'Automation'
-}
-
-export function setupSwitchNotice(
-  currentEnsName: string,
-  currentMode: CustodyMode | undefined,
-  nextEnsName: string,
-  nextMode: 'simple' | 'advanced',
-): string | null {
-  if (!currentEnsName && !currentMode) return null
-  const currentTopology = currentMode === 'advanced' ? 'advanced' : currentMode === 'simple' ? 'simple' : undefined
-  if (currentEnsName === nextEnsName && currentTopology === nextMode) return null
-  return 'This replaces the saved ENS setup directly. Reset is only for clearing the current link.'
 }
 
 export function advancedSubdomainStatusText(action: EnsRegistryAction): string {

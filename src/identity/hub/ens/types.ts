@@ -31,7 +31,6 @@ export type SimpleEnsPhase =
   | { kind: 'review'; fullName: string; validation: EnsValidation; recordsDiff: AgentRecordDiff[]; currentRecords: AgentEnsRecordState; nextRecords: AgentEnsRecords; mode: 'simple' | 'advanced'; ownerAddress?: Address; operatorWallet?: Address }
 
 export type AdvancedEnsPhase =
-  | { kind: 'advanced-transfer-check' }
   | { kind: 'advanced-root-check'; rootName: string }
   | { kind: 'advanced-subdomain'; rootName: string; label?: string; error?: string }
   | { kind: 'advanced-subdomain-check'; rootName: string; label: string }
@@ -71,7 +70,6 @@ export type EnsEditProps = {
   onEnsRecordsUpdate: (fullName: string, records: AgentEnsRecords, options: EnsLinkOptions, clearRecords?: boolean, currentRecords?: AgentEnsRecordState) => void
   onEnsSetup: (setup: EnsSetupPlan) => void
   onManageOperatorWalletAccess: () => void
-  onWithdrawToken: () => void
   initialView?: 'advanced'
   onBack: () => void
 }

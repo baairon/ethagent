@@ -20,9 +20,11 @@ import type { EnsEditProps } from './types.js'
 
 export const footerHint = (hint: string) => <Text color={theme.dim}>{hint}</Text>
 
+import { abbreviateHexBlobs } from './editCopy.js'
+
 export const renderRecordValue = (value: string) =>
   value
-    ? <Text color={theme.accentPeriwinkle}>{value}</Text>
+    ? <Text color={theme.accentPeriwinkle}>{abbreviateHexBlobs(value)}</Text>
     : <Text color={theme.dim}>Unset</Text>
 
 export function rootErrorMessage(

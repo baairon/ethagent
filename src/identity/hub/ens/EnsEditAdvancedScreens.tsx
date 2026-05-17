@@ -46,7 +46,6 @@ type AdvancedScreenProps = {
   runAdvancedSubdomainCheck: (rootName: string, label: string) => void
   onEnsSetup: EnsEditProps['onEnsSetup']
   onEnsLink: EnsEditProps['onEnsLink']
-  onWithdrawToken: () => void
 }
 
 export function renderAdvancedEnsPhase({
@@ -65,82 +64,7 @@ export function renderAdvancedEnsPhase({
   runAdvancedSubdomainCheck,
   onEnsSetup,
   onEnsLink,
-  onWithdrawToken,
 }: AdvancedScreenProps): React.ReactNode | null {
-  if (phase.kind === 'advanced-transfer-check') {
-    type TransferCheckAction = 'continue' | 'withdraw' | 'back'
-    const custody = reconciliation.custody
-    const tokenInVault = custody === 'advanced' || custody === 'mid-flow-uri-pending'
-    const tokenInOwnerWallet = custody === 'simple' || custody === 'withdrawn'
-    const probePending = custody === 'unknown' && reconciliation.rpc !== 'failing'
-    const probeFailed = reconciliation.rpc === 'failing'
-
-    const options: Array<{ value: TransferCheckAction; role?: 'section' | 'utility'; label: string; hint?: string }> = []
-    options.push({ value: 'continue', role: 'section', label: 'Setup' })
-    if (tokenInOwnerWallet) {
-      options.push({
-        value: 'continue',
-        label: 'Continue ENS Setup',
-        hint: 'Owner wallet holds this token onchain.',
-      })
-    } else if (tokenInVault) {
-      options.push({
-        value: 'withdraw',
-        label: 'Withdraw Token',
-        hint: 'Pull token out to sign ENS records. Redeposit to the Vault any time after.',
-      })
-    } else if (probePending) {
-      options.push({
-        value: 'continue',
-        label: 'Checking onchain state…',
-        hint: 'Try again in a moment.',
-      })
-    } else if (probeFailed) {
-      options.push({
-        value: 'continue',
-        label: 'Onchain check unavailable',
-        hint: 'RPC unreachable. Resolve connectivity, then retry.',
-      })
-    } else {
-      options.push({
-        value: 'continue',
-        label: 'Token Owner Unknown',
-        hint: 'Try again in a moment.',
-      })
-    }
-    options.push({ value: 'back', role: 'section', label: 'Navigation' })
-    options.push({ value: 'back', label: 'Back', hint: 'Return to setup type', role: 'utility' })
-
-    return (
-      <Surface
-        title="Token Custody Check"
-        subtitle="ENS setup continues only after the owner wallet holds this token onchain."
-        footer={footerHint('enter select · esc back')}
-      >
-        <Box marginTop={1}>
-          <Select<TransferCheckAction>
-            options={options}
-            hintLayout="inline"
-            onSubmit={choice => {
-              if (choice === 'withdraw') {
-                onWithdrawToken()
-                return
-              }
-              if (choice === 'continue' && tokenInOwnerWallet) {
-                runDiscovery('advanced')
-                return
-              }
-              if (choice === 'back') {
-                return setPhase({ kind: 'mode-select' })
-              }
-            }}
-            onCancel={() => setPhase({ kind: 'mode-select' })}
-          />
-        </Box>
-      </Surface>
-    )
-  }
-
   if (phase.kind === 'advanced-root-check') {
     return (
       <Surface

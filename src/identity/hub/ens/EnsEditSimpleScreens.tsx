@@ -135,7 +135,7 @@ export function renderSimpleEnsPhase({
           ]
         : []),
       { value: 'open-ens-domains' as DomainAction, role: 'section' as const, label: 'No Parent Name?' },
-      { value: 'open-ens-domains' as DomainAction, label: 'Register .eth Name', hint: 'Open the ENS app in your browser; come back when this wallet owns one' },
+      { value: 'open-ens-domains' as DomainAction, label: 'Register .eth Name', hint: 'Opens ENS app; return once this wallet owns one' },
       ...(noOwnedNames || discovery.status === 'ok'
         ? [{ value: 'retry' as DomainAction, label: 'Scan Again', hint: 'Re-run root .eth name discovery for this wallet' }]
         : []),
@@ -356,7 +356,7 @@ export function renderSimpleEnsPhase({
           onEnsLink(phase.fullName, linkOptions)
         }}
         onCheckAgain={() => { void runValidation(phase.fullName, phase.mode, phase.ownerAddress, phase.operatorWallet) }}
-        onChange={() => setPhase(phase.mode === 'advanced' ? { kind: 'advanced-transfer-check' } : { kind: 'pick-parent' })}
+        onChange={() => setPhase({ kind: 'pick-parent', mode: phase.mode })}
         onCreate={phase.mode === 'simple' && !phase.validation.ok && phase.validation.reason === 'no-owner'
           ? () => runSimpleCreatePreflight(phase.fullName)
           : undefined}

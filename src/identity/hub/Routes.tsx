@@ -83,7 +83,7 @@ export const IdentityHubRoutes: React.FC<{ controller: IdentityHubController }> 
           <Select<'ens' | 'skip'>
             options={[
               { value: 'ens', role: 'section', label: 'Set Up Now' },
-              { value: 'ens', label: 'Set Up ENS Name', hint: 'Walks you through Root, Name, Review, and Apply' },
+              { value: 'ens', label: 'Set Up ENS Name', hint: 'Root → Name → Review → Apply' },
               { value: 'skip', role: 'section', label: 'Skip' },
               { value: 'skip', label: 'Skip For Now', hint: 'Continue to model setup; add ENS later', role: 'utility' },
             ]}

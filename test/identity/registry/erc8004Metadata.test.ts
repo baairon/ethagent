@@ -257,6 +257,55 @@ test('ethagent operators pointer is written and parsed from ERC-8004 metadata', 
   assert.equal(ext.operators.approvedOperatorWallets.length, 2)
 })
 
+test('ENSIP-25 + ERC-8004 round-trip: ENS key chain matches metadata registration chain', () => {
+  const ensName = 'agent.example.eth'
+  const baseChainId = 8453
+  const agentId = '45744'
+  const ensKey = `agent-registration[0x00010000022105148004a169fb4a3325136eb29fa0ceb6d2e539a432][${agentId}]`
+
+  const updated = withEthagentPointers(
+    { type: 'https://eips.ethereum.org/EIPS/eip-8004#registration-v1', name: 'agent' },
+    {
+      backup: {
+        cid: 'bafy-snapshot',
+        envelopeVersion: 'ethagent-continuity-snapshot-v1',
+        createdAt: new Date(0).toISOString(),
+      },
+      publicDiscovery: { agentCardCid: 'bafy-card', updatedAt: new Date(0).toISOString() },
+      registration: {
+        chainId: baseChainId,
+        identityRegistryAddress: '0x8004A169FB4a3325136EB29fA0ceB6D2e539a432',
+        agentId,
+      },
+      operators: {
+        ownerAddress: OWNER,
+        approvedOperatorWallets: [],
+        ensName,
+      },
+      ensName,
+      ownerAddress: OWNER,
+    },
+  )
+
+  const parsedOps = parseEthagentOperatorsPointer(updated)
+  const registrations = updated.registrations as Array<{ agentId: number | string; agentRegistry: string }>
+  const services = updated.services as Array<{ name?: string; endpoint?: string; version?: string }>
+
+  assert.equal(parsedOps?.ensName, ensName, 'metadata must name the ENS back')
+  assert.ok(ensKey.includes(`][${agentId}]`), 'ENSIP-25 key carries the same agentId')
+  assert.ok(ensKey.includes('00010000022105'), 'ENSIP-25 key encodes Base chainId (0x2105 = 8453)')
+  assert.equal(
+    registrations[0]?.agentRegistry,
+    `eip155:${baseChainId}:0x8004A169FB4a3325136EB29fA0ceB6D2e539a432`,
+    'metadata registrations[] points to the same (chain, registry)',
+  )
+  assert.equal(String(registrations[0]?.agentId), agentId, 'metadata registrations[] carries the same agentId')
+  assert.ok(
+    services.some(s => s.name === 'ENS' && s.endpoint === ensName && s.version === 'v1'),
+    'ENS service entry must appear in services[] for ENSIP-25 round-trip discovery',
+  )
+})
+
 test('ethagent operators pointer ignores legacy signature field on read', () => {
   const updated = withEthagentPointers(
     { type: 'https://eips.ethereum.org/EIPS/eip-8004#registration-v1', name: 'agent' },

@@ -82,11 +82,11 @@ export function renderEnsMaintenancePhase({
     const linkHint = multiNeedsCustodySetup
       ? 'Set Advanced custody first via Custody Mode'
       : isAdvanced
-        ? 'Walks you through Root, Name, Review, and Apply'
-        : 'Walks you through Root, Name, Review, and Apply'
+        ? 'Root → Name → Review → Apply'
+        : 'Root → Name → Review → Apply'
     const options: Array<{ value: EnsAction; role?: 'section' | 'utility'; label: string; hint?: string; disabled?: boolean }> = []
     if (currentEnsName) {
-      options.push({ value: 'unlink', label: 'Unlink Name', hint: 'Removes this name from the token. Set up a different name afterward by linking again.' })
+      options.push({ value: 'unlink', label: 'Unlink Name', hint: 'Removes the name from the token. Link a different one anytime.' })
     } else {
       options.push({
         value: 'link',
@@ -116,10 +116,6 @@ export function renderEnsMaintenancePhase({
               }
               if (choice === 'link') {
                 if (multiNeedsCustodySetup) return
-                if (isAdvanced && savedOwnerAddress) {
-                  setPhase({ kind: 'advanced-transfer-check' })
-                  return
-                }
                 runDiscovery()
                 return
               }

@@ -53,7 +53,7 @@ The Identity Hub manages everything portable about the agent:
 - **Custody Mode** switches between Simple and Advanced by depositing the token into its Vault or unwrapping it back out.
 - **Prepare Transfer** stages a dual-wallet snapshot so the receiver can restore the agent after the token moves externally.
 - **Refetch Latest** pulls the most recent published snapshot back to local files.
-- **Switch Agent** accepts either an ENS name or a bare token ID, and loads any agent owned by or linked to the connected wallet.
+- **Switch Agent** accepts an ENS name or an ERC-8004 token ID on any supported chain, and loads any agent owned by or linked to the connected wallet.
 
 The menu surfaces drift automatically. Token ownership, vault state, ENS record alignment, and pending URI rotations are checked against the live chain when the menu opens.
 
