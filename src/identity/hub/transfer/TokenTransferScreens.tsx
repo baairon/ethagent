@@ -192,7 +192,7 @@ export const TokenTransferReadyScreen: React.FC<TokenTransferReadyScreenProps> =
       <Box marginTop={1} flexDirection="column">
         <Text color={theme.textSubtle}>Use this process for every ERC-8004 token transfer.</Text>
         <Text color={theme.textSubtle}>Both sender and receiver signatures can decrypt this snapshot.</Text>
-        <Text color={theme.textSubtle}>After transfer, use Load Agent with the receiver wallet.</Text>
+        <Text color={theme.textSubtle}>After transfer, use Switch Agent with the receiver wallet.</Text>
         <Text color={theme.textSubtle}>{APPROVAL_GUARDRAIL}</Text>
       </Box>
       <Box marginTop={1}>

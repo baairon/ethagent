@@ -9,4 +9,4 @@ dist/
 # Keep this scoped to the repository root so nested docs remain trackable.
 /SOUL.md
 /MEMORY.md
-/skills.json
+/agent-card.json

@@ -5,10 +5,11 @@ import {
   createErc8004PublicClient,
   supportedErc8004ChainForId,
 } from '../../registry/erc8004.js'
-import { encodeSetEthagentTextRecords } from '../../ens/ensLookup.js'
-import { encodeEnsRecordsTransaction, encodeEnsRegistryTransaction, type EnsSetupPlan } from '../../ens/ensAutomation.js'
-import type { AgentEnsRecordState, AgentEnsRecords } from '../../ens/agentRecords.js'
-import { changedRecords } from '../../ens/agentRecords.js'
+import { encodeSetEnsip25TextRecord, readEthagentTextRecords } from '../../ens/ensLookup.js'
+import { encodeEnsRecordsTransaction, encodeEnsRegistryTransaction, readAddressRecord, type EnsSetupPlan } from '../../ens/ensAutomation.js'
+import type { AgentEnsRecordState, AgentEnsRecords, AgentRecordDiff } from '../../ens/agentRecords.js'
+import { changedRecords, clearedRecords, diffRecords } from '../../ens/agentRecords.js'
+import { namehash, getAddress } from 'viem'
 import { sendBrowserWalletTransaction, type BrowserWalletSession, type WalletPurpose } from '../../wallet/browserWallet.js'
 import type { EffectCallbacks } from '../shared/effects/types.js'
 function chainLabel(chainId: number): string {
@@ -32,17 +33,29 @@ export async function runUpdateEnsRecords(args: {
   session?: BrowserWalletSession
   flowId?: string
   flowStep?: number
-}): Promise<{ txHash: string }> {
+}): Promise<{ txHash: string } | { skipped: true }> {
+  const publicClient = args.publicClient ?? createMainnetEnsPublicClient()
+  const queryKeys = Array.from(new Set([
+    ...Object.keys(args.records ?? {}),
+    ...Object.keys(args.currentRecords ?? {}),
+  ]))
+  let freshCurrent: AgentEnsRecordState = args.currentRecords ?? {}
+  if (queryKeys.length > 0) {
+    try {
+      freshCurrent = await readEthagentTextRecords(args.fullName, queryKeys, { publicClient })
+    } catch {
+      freshCurrent = args.currentRecords ?? {}
+    }
+  }
   const next = ensRecordWritesForUpdate({
     records: args.records,
-    currentRecords: args.currentRecords,
+    currentRecords: freshCurrent,
     clearRecords: args.clearRecords,
   })
   if (Object.keys(next).length === 0) {
-    throw new Error('No ENS records to update')
+    return { skipped: true }
   }
-  const publicClient = args.publicClient ?? createMainnetEnsPublicClient()
-  const encoded = await encodeSetEthagentTextRecords(args.fullName, next, { publicClient })
+  const encoded = await encodeSetEnsip25TextRecord(args.fullName, next, { publicClient })
   await preflightEnsRecordTransaction({
     fullName: args.fullName,
     account: args.ownerAddress,
@@ -83,10 +96,11 @@ export function ensRecordWritesForUpdate(args: {
   currentRecords?: AgentEnsRecordState
   clearRecords?: boolean
 }): Record<string, string> {
+  const current = args.currentRecords ?? {}
   if (args.clearRecords) {
-    return changedRecords(args.currentRecords ?? {}, { token: '' })
+    return changedRecords(current, clearedRecords(current))
   }
-  return changedRecords(args.currentRecords ?? { token: '' }, args.records)
+  return changedRecords(current, args.records)
 }
 
 export async function runEnsSetupRegistryTransaction(args: {
@@ -148,13 +162,14 @@ export async function runEnsSetupRecordsTransaction(args: {
   flowId?: string
   flowStep?: number
 }): Promise<{ txHash: string } | null> {
-  const encoded = encodeEnsRecordsTransaction(args.setup)
-  if (!encoded) return null
   const publicClient = args.publicClient ?? createMainnetEnsPublicClient()
-  const purpose: WalletPurpose = args.setup.mode === 'simple' ? 'set-simple-ens-records' : 'set-agent-ens-records'
+  const freshSetup = await refreshEnsSetupAgainstChain(args.setup, publicClient)
+  const encoded = encodeEnsRecordsTransaction(freshSetup)
+  if (!encoded) return null
+  const purpose: WalletPurpose = freshSetup.mode === 'simple' ? 'set-simple-ens-records' : 'set-agent-ens-records'
   await preflightEnsRecordTransaction({
-    fullName: args.setup.fullName,
-    account: args.setup.ownerAddress,
+    fullName: freshSetup.fullName,
+    account: freshSetup.ownerAddress,
     to: encoded.to,
     data: encoded.data,
     publicClient,
@@ -164,7 +179,7 @@ export async function runEnsSetupRecordsTransaction(args: {
   if (args.session) {
     const result = await args.session.sendTransaction({
       chainId: 1,
-      expectedAccount: args.setup.ownerAddress,
+      expectedAccount: freshSetup.ownerAddress,
       to: encoded.to,
       data: encoded.data,
       purpose,
@@ -176,7 +191,7 @@ export async function runEnsSetupRecordsTransaction(args: {
   }
   const result = await sendBrowserWalletTransaction({
     chainId: 1,
-    expectedAccount: args.setup.ownerAddress,
+    expectedAccount: freshSetup.ownerAddress,
     to: encoded.to,
     data: encoded.data,
     purpose,
@@ -185,6 +200,40 @@ export async function runEnsSetupRecordsTransaction(args: {
   })
   args.callbacks.onWalletReady(null)
   return { txHash: result.txHash }
+}
+
+async function refreshEnsSetupAgainstChain(setup: EnsSetupPlan, publicClient: PublicClient): Promise<EnsSetupPlan> {
+  if (setup.registryAction !== 'none' && !setup.recordDiffs.length && !setup.addressRecord.changed) {
+    return setup
+  }
+  const node = namehash(setup.fullName)
+  const keys = Array.from(new Set(setup.recordDiffs.map(diff => diff.key)))
+  let freshCurrent: AgentEnsRecordState = setup.currentRecords
+  if (keys.length > 0) {
+    try {
+      freshCurrent = await readEthagentTextRecords(setup.fullName, keys, { publicClient })
+    } catch {
+      freshCurrent = setup.currentRecords
+    }
+  }
+  let freshAddress = setup.addressRecord.current
+  try {
+    freshAddress = await readAddressRecord(publicClient, setup.resolverAddress, node)
+  } catch {
+    freshAddress = setup.addressRecord.current
+  }
+  const addressChanged = !freshAddress || getAddress(freshAddress).toLowerCase() !== getAddress(setup.addressRecord.next).toLowerCase()
+  const recordDiffs: AgentRecordDiff[] = diffRecords(freshCurrent, setup.nextRecords)
+  return {
+    ...setup,
+    currentRecords: freshCurrent,
+    recordDiffs,
+    addressRecord: {
+      current: freshAddress,
+      next: setup.addressRecord.next,
+      changed: addressChanged,
+    },
+  }
 }
 
 export function createMainnetEnsPublicClient(): PublicClient {

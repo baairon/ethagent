@@ -124,7 +124,7 @@ export const MenuScreen: React.FC<MenuScreenProps> = ({
         { value: 'prepare-transfer', label: 'Prepare Transfer', hint: prepareTransferHint, disabled: flags?.prepareTransferDisabled ?? false },
         { value: 'identity-values', role: 'section', label: 'Token' },
         { value: 'identity-values', label: 'Token Values', hint: tokenValuesHint },
-        { value: 'load', label: 'Load Agent', hint: 'Refresh or load another agent' },
+        { value: 'load', label: 'Switch Agent', hint: 'Switch agent or wallet' },
         { value: 'create', label: 'New Agent', hint: 'Mint another agent' },
         { value: 'storage', label: 'IPFS Storage', hint: 'Publishing credentials' },
         { value: 'cancel', role: 'section', label: 'Exit' },
@@ -198,7 +198,7 @@ function renderReconciliationBanner(r: AgentReconciliation, identity: EthagentId
         <>
           <Text color={theme.accentError} bold>Agent Unlinked</Text>
           <Text color={theme.textSubtle}>{tokenLabel} was transferred. Local SOUL.md, MEMORY.md, and skills remain. Back them up before this directory is reused.</Text>
-          <Text color={theme.textSubtle}>Use Load Agent or New Agent to re-enable disabled actions.</Text>
+          <Text color={theme.textSubtle}>Use Switch Agent or New Agent to re-enable disabled actions.</Text>
         </>
       )
     }
@@ -207,7 +207,7 @@ function renderReconciliationBanner(r: AgentReconciliation, identity: EthagentId
         <Text color={theme.accentError} bold>Agent Unlinked</Text>
         <Text color={theme.textSubtle}>{tokenLabel} left without Prepare Transfer. Back up local SOUL.md, MEMORY.md, and skills before loading another agent.</Text>
         <Text color={theme.textSubtle}>For continuity handoff: ask the new holder to return the token, then run Prepare Transfer before re-sending.</Text>
-        <Text color={theme.textSubtle}>Use Load Agent or New Agent to re-enable disabled actions.</Text>
+        <Text color={theme.textSubtle}>Use Switch Agent or New Agent to re-enable disabled actions.</Text>
       </>
     )
   }

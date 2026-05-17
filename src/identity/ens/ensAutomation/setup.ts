@@ -1,6 +1,8 @@
 import { getAddress, namehash, type Address } from 'viem'
 import {
+  AGENT_TOKEN_RECORD_KEY,
   buildAgentEnsRecords,
+  buildEnsip25Key,
   diffRecords,
 } from '../agentRecords.js'
 import { normalizeEthDomain, splitSubdomainName } from '../ensLookup.js'
@@ -12,7 +14,6 @@ import {
 import {
   createEnsAutomationClient,
   isZero,
-  normalizeAgentRecords,
   readAddressRecord,
   readOwner,
   readResolver,
@@ -225,26 +226,19 @@ export async function preflightEnsSetup(args: EnsSetupPreflightArgs): Promise<En
   }
 
   const currentAddress = isZero(childResolver) ? null : await readAddressRecord(client, resolverAddress, fullNode)
-  const currentRecords = normalizeAgentRecords(isZero(childResolver) ? {} : await readTextRecords(client, resolverAddress, fullNode))
+  const ensip25Key = buildEnsip25Key({
+    chainId: args.registry.chainId,
+    identityRegistryAddress: args.registry.identityRegistryAddress,
+    agentId: String(args.agentId),
+  })
+  const currentRecords = isZero(childResolver)
+    ? {}
+    : await readTextRecords(client, resolverAddress, fullNode, [ensip25Key, AGENT_TOKEN_RECORD_KEY])
   const nextRecords = buildAgentEnsRecords({
     chainId: args.registry.chainId,
     identityRegistryAddress: args.registry.identityRegistryAddress,
     agentId: String(args.agentId),
   })
-  if (currentRecords.token && nextRecords.token && currentRecords.token !== nextRecords.token) {
-    return manual(args, {
-      rootName,
-      label,
-      fullName,
-      operatorAddress,
-      ownerAddress,
-      resolverAddress,
-      reason: 'token-record-collision',
-      detail: `${fullName} already points to another ERC-8004 token`,
-      currentRecords,
-      nextRecords,
-    })
-  }
 
   const recordDiffs = diffRecords(currentRecords, nextRecords)
   const addressChanged = !currentAddress || !sameAddress(currentAddress, ownerAddress)

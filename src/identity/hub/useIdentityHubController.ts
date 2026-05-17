@@ -240,9 +240,14 @@ export function useIdentityHubController({
       handleStepError(new Error('no agent registry configured for this identity'), backStep)
       return
     }
+    const isAdvanced = readCustodyMode(identity.state as Record<string, unknown> | undefined) === 'advanced'
     const vaultAddress = options?.useVault === false
       ? undefined
-      : options?.vaultAddress ?? resolveVaultAddress(identity, config?.erc8004?.operatorVaults)
+      : options?.vaultAddress != null
+        ? options.vaultAddress
+        : isAdvanced
+          ? resolveVaultAddress(identity, config?.erc8004?.operatorVaults)
+          : undefined
     ;(async () => {
       const role: 'token-holder' | 'vault-level-owner' = vaultAddress ? 'vault-level-owner' : 'token-holder'
       const allowed = await guardOwnership(identity, registry, role, backStep)
@@ -260,8 +265,12 @@ export function useIdentityHubController({
       return
     }
     ;(async () => {
-      const vaultAddress = resolveVaultAddress(identity, config?.erc8004?.operatorVaults)
-      const allowed = await guardOwnership(identity, registry, 'vault-level-owner', backStep)
+      const isAdvanced = readCustodyMode(identity.state as Record<string, unknown> | undefined) === 'advanced'
+      const vaultAddress = isAdvanced
+        ? resolveVaultAddress(identity, config?.erc8004?.operatorVaults)
+        : undefined
+      const role: 'token-holder' | 'vault-level-owner' = vaultAddress ? 'vault-level-owner' : 'token-holder'
+      const allowed = await guardOwnership(identity, registry, role, backStep)
       if (!allowed) return
       runPublicProfilePreflight(identity, registry, callbacks, profileUpdates, backStep, vaultAddress)
         .catch((err: unknown) => handleStepError(err, backStep))

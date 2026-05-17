@@ -74,16 +74,14 @@ export function identitySummaryRows(
   const tokenValue = identity?.agentId ? `#${identity.agentId}` : 'not created'
   const chain = chainSummaryRow(config, identity)
   const stateValue = backup?.cid ? shortCid(backup.cid) : 'not saved yet'
-  const skillsValue = identity?.publicSkills?.cid ? shortCid(identity.publicSkills.cid) : 'not saved'
-  const cardValue = identity?.publicSkills?.agentCardCid ? shortCid(identity.publicSkills.agentCardCid) : 'not saved'
+  const cardValue = identity?.agentCard?.cid ? shortCid(identity.agentCard.cid) : 'not saved'
   const iconValue = typeof identity?.state?.imageUrl === 'string' && identity.state.imageUrl.trim() ? 'attached' : 'not attached'
   return [
     { label: 'owner wallet', value: ownerValue, tone: identity ? 'ok' : 'dim' },
     { label: 'token', value: tokenValue, tone: identity?.agentId ? 'ok' : 'dim' },
     { label: 'network', value: chain.value, tone: chain.tone },
     { label: 'state', value: stateValue, tone: backup ? 'ok' : 'dim' },
-    { label: 'skills', value: skillsValue, tone: identity?.publicSkills?.cid ? 'ok' : 'dim' },
-    { label: 'card', value: cardValue, tone: identity?.publicSkills?.agentCardCid ? 'ok' : 'dim' },
+    { label: 'card', value: cardValue, tone: identity?.agentCard?.cid ? 'ok' : 'dim' },
     { label: 'icon', value: iconValue, tone: iconValue === 'attached' ? 'ok' : 'dim' },
   ]
 }

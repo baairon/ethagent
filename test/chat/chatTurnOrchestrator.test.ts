@@ -5,7 +5,7 @@ import os from 'node:os'
 import path from 'node:path'
 import type { Message, Provider, StreamEvent } from '../../src/providers/contracts.js'
 import type { EthagentConfig, EthagentIdentity } from '../../src/storage/config.js'
-import { writeContinuityFiles, writePublicSkillsFile } from '../../src/identity/continuity/storage.js'
+import { writeContinuityFiles, writeAgentCardFile } from '../../src/identity/continuity/storage.js'
 import type { SessionMessage } from '../../src/storage/sessions.js'
 import { toggleLatestReasoningRow, type MessageRow } from '../../src/chat/MessageList.js'
 import { privateContinuityEditReviewFromToolResult } from '../../src/chat/ChatScreen.js'
@@ -61,7 +61,7 @@ test('private continuity edit review helper preserves saved diff for the TUI pop
   assert.equal(review?.diff, '--- SOUL.md\n+++ SOUL.md\n@@ -4 +4,2 @@\n - Existing persona\n+- New standing behavior')
 })
 
-test('identity continuity context auto-loads SOUL and MEMORY but never skills.json', async () => {
+test('identity continuity context auto-loads SOUL and MEMORY but never agent-card.json', async () => {
   await withHome(async () => {
     const identity: EthagentIdentity = {
       source: 'erc8004',
@@ -77,7 +77,7 @@ test('identity continuity context auto-loads SOUL and MEMORY but never skills.js
       'SOUL.md': '# Soul\nprivate persona\n',
       'MEMORY.md': '# Memory\nprivate preference\n',
     })
-    await writePublicSkillsFile(identity, '# Skills\npublic discovery\n')
+    await writeAgentCardFile(identity, '# Skills\npublic discovery\n')
 
     const messages = await buildIdentityContinuityContextMessages({
       version: 1,
@@ -99,7 +99,7 @@ test('identity continuity context auto-loads SOUL and MEMORY but never skills.js
     assert.match(content, /private persona/)
     assert.match(content, /<MEMORY\.md visibility="private">/)
     assert.match(content, /private preference/)
-    assert.equal(content.includes('skills.json'), false)
+    assert.equal(content.includes('agent-card.json'), false)
     assert.equal(content.includes('public discovery'), false)
     assert.equal(content.includes('tokenURI'), false)
   })
@@ -121,7 +121,7 @@ test('runStreamingTurn places identity continuity before conversation history', 
       'SOUL.md': '# Soul\nactive persona marker\n',
       'MEMORY.md': '# Memory\ndurable memory marker\n',
     })
-    await writePublicSkillsFile(identity, '# Skills\npublic skills marker\n')
+    await writeAgentCardFile(identity, '# Skills\npublic skills marker\n')
 
     const sessionMessages: SessionMessage[] = [{
       role: 'assistant',

@@ -14,7 +14,7 @@ test('base system prompt does not auto-load continuity markdown files', () => {
 
   assert.equal(prompt.includes('SOUL.md'), false)
   assert.equal(prompt.includes('MEMORY.md'), false)
-  assert.equal(prompt.includes('skills.json'), false)
+  assert.equal(prompt.includes('agent-card.json'), false)
 })
 
 test('identity-linked prompt routes private continuity through scaffold edits', () => {
@@ -79,9 +79,8 @@ test('base messages do not include continuity config or public skills metadata a
         ipfsApiUrl: 'https://uploads.pinata.cloud/v3/files',
         status: 'pinned',
       },
-      publicSkills: {
-        cid: 'bafy-public-skills',
-        agentCardCid: 'bafy-agent-card',
+      agentCard: {
+        cid: 'bafy-agent-card',
         status: 'pinned',
       },
     },
@@ -91,6 +90,5 @@ test('base messages do not include continuity config or public skills metadata a
   assert.equal(serialized.includes('private-memory-marker'), false)
   assert.equal(serialized.includes('private-soul-marker'), false)
   assert.equal(serialized.includes('bafy-private-snapshot'), false)
-  assert.equal(serialized.includes('bafy-public-skills'), false)
   assert.equal(serialized.includes('bafy-agent-card'), false)
 })

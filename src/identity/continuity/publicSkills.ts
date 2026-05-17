@@ -68,29 +68,7 @@ export function defaultPublicSkillsProfile(identity: EthagentIdentity): PublicSk
     version: '1.0.0',
     ...(agentWallet ? { agentWallet } : {}),
     ...(imageUrl ? { imageUrl } : {}),
-    skills: [
-      {
-        id: 'software-engineering',
-        name: 'Software engineering',
-        description: 'Read code, plan implementations, debug failures, refactor safely, and run focused tests.',
-        inputModes: ['text/markdown'],
-        outputModes: ['text/markdown'],
-      },
-      {
-        id: 'workspace-tools',
-        name: 'Workspace tools',
-        description: 'Use permissioned local file, shell, clipboard, and MCP tools for project work.',
-        inputModes: ['text/markdown'],
-        outputModes: ['text/markdown', 'application/json'],
-      },
-      {
-        id: 'ethereum-identity',
-        name: 'Ethereum identity',
-        description: 'Represent a portable ERC-8004 agent identity controlled by the owner wallet.',
-        inputModes: ['text/markdown'],
-        outputModes: ['text/markdown', 'application/json'],
-      },
-    ],
+    skills: [],
   }
 }
 
@@ -129,61 +107,6 @@ function uniqueSkillId(base: string, used: Set<string>): string {
   return `${slug}-${i}`
 }
 
-export function renderPublicSkillsJson(profile: PublicSkillsProfile): string {
-  const inputModes = unique(profile.skills.flatMap(skill => skill.inputModes))
-  const outputModes = unique(profile.skills.flatMap(skill => skill.outputModes))
-  const summary = {
-    schema: 'ethagent.public-skills.v1',
-    producer: ETHAGENT_PRODUCER,
-    ...(profile.agentWallet ? { agent_wallet: profile.agentWallet } : {}),
-    visibility: 'public',
-    name: profile.name,
-    description: profile.description,
-    version: profile.version,
-    ...(profile.imageUrl ? { imageUrl: profile.imageUrl } : {}),
-    inputModes,
-    outputModes,
-    boundary: 'Public discovery only. This is not executable code, private memory, or a skill installation manifest.',
-    capabilities: {
-      softwareEngineering: true,
-      workspaceTools: 'permissioned',
-      mcp: true,
-      streaming: true,
-      ethereumIdentity: 'ERC-8004',
-      encryptedContinuity: true,
-    },
-    delegation: {
-      bestFor: [
-        'code reading',
-        'implementation planning',
-        'debugging',
-        'refactors',
-        'tests',
-        'workspace automation',
-      ],
-      requiresApprovalFor: [
-        'workspace edits',
-        'shell commands',
-        'private continuity changes',
-      ],
-    },
-    privacy: {
-      publicOnly: true,
-      includesPrivateMemory: false,
-      includesExecutableCode: false,
-      includesSecrets: false,
-    },
-    skills: profile.skills.map(skill => ({
-      id: skill.id,
-      name: skill.name,
-      description: skill.description,
-      inputModes: skill.inputModes,
-      outputModes: skill.outputModes,
-    })),
-  }
-  return `${JSON.stringify(summary, null, 2)}\n`
-}
-
 export function createAgentCard(profile: PublicSkillsProfile, url?: string): AgentCard {
   const inputModes = unique(profile.skills.flatMap(skill => skill.inputModes))
   const outputModes = unique(profile.skills.flatMap(skill => skill.outputModes))
@@ -192,7 +115,7 @@ export function createAgentCard(profile: PublicSkillsProfile, url?: string): Age
     description: profile.description,
     version: profile.version,
     ...(profile.agentWallet ? { agent_wallet: profile.agentWallet } : {}),
-    protocolVersion: '0.2.6',
+    protocolVersion: '0.3.0',
     ...(url ? { url } : {}),
     ...(profile.imageUrl ? { image: profile.imageUrl } : {}),
     defaultInputModes: inputModes.length ? inputModes : ['text/markdown'],

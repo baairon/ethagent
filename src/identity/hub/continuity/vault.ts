@@ -4,7 +4,6 @@ import {
   prepareSyncedIdentityMarkdownScaffold,
   prepareSyncedSkillsTree,
   readContinuityFiles,
-  readPublicSkillsFile,
   writeIdentityMarkdownScaffold,
   type IdentityMarkdownScaffold,
 } from '../../continuity/storage.js'
@@ -16,14 +15,7 @@ import {
   type WalletChallengePurpose,
 } from '../../continuity/envelope.js'
 import {
-  appendPublicSkillEntries,
-  createAgentCard,
-  defaultPublicSkillsProfile,
-  serializeAgentCard,
-} from '../../continuity/publicSkills.js'
-import {
-  derivePublicSkillEntries,
-  syncPublicSkillsManifest,
+  syncAgentCardManifest,
 } from '../../continuity/skills/publicSkillsSync.js'
 import { recordPublishedContinuitySnapshot } from '../../continuity/snapshots.js'
 import { addToIpfs, DEFAULT_IPFS_API_URL } from '../../storage/ipfs.js'
@@ -60,7 +52,7 @@ import {
 import { markCurrentContinuityFilesPublished } from '../shared/effects/sync.js'
 
 type BackupMetadata = NonNullable<EthagentIdentity['backup']>
-type PublicSkillsMetadata = NonNullable<EthagentIdentity['publicSkills']>
+type AgentCardMetadata = NonNullable<EthagentIdentity['agentCard']>
 
 type VaultPublishPrepared = {
   nextIdentity: EthagentIdentity
@@ -68,7 +60,7 @@ type VaultPublishPrepared = {
   completionMessage: string
   publishedSources: {
     privateFiles: ContinuityFiles
-    publicSkills: string
+    agentCard: string
     skills: ContinuitySkillsTree
   }
 }
@@ -142,20 +134,8 @@ export async function runOperatorWalletRebackup(args: {
   const continuityFiles = markdownScaffold
     ? { 'SOUL.md': markdownScaffold['SOUL.md'], 'MEMORY.md': markdownScaffold['MEMORY.md'] }
     : await readContinuityFiles(nextIdentityForFiles)
-  const publicSkillsJson = await syncPublicSkillsManifest(nextIdentityForFiles)
-  const publicSkillsPin = await addToIpfs(DEFAULT_IPFS_API_URL, publicSkillsJson, fetch, { pinataJwt: step.pinataJwt })
-  assertVerifiedPin(publicSkillsPin)
-  const publicSkillEntries = await derivePublicSkillEntries(nextIdentityForFiles)
-  const augmentedPublicProfile = appendPublicSkillEntries(
-    defaultPublicSkillsProfile(nextIdentityForFiles),
-    publicSkillEntries,
-  )
-  const agentCardPin = await addToIpfs(
-    DEFAULT_IPFS_API_URL,
-    serializeAgentCard(createAgentCard(augmentedPublicProfile)),
-    fetch,
-    { pinataJwt: step.pinataJwt },
-  )
+  const agentCardJson = await syncAgentCardManifest(nextIdentityForFiles)
+  const agentCardPin = await addToIpfs(DEFAULT_IPFS_API_URL, agentCardJson, fetch, { pinataJwt: step.pinataJwt })
   assertVerifiedPin(agentCardPin)
   const skillsTree = await prepareSyncedSkillsTree(nextIdentityForFiles)
   const envelope = createContinuityEnvelopeForSave({
@@ -185,9 +165,8 @@ export async function runOperatorWalletRebackup(args: {
     identityRegistryAddress: step.registry.identityRegistryAddress,
     agentId: sourceAgentId,
   }
-  const publicSkills: PublicSkillsMetadata = {
-    cid: publicSkillsPin.cid,
-    agentCardCid: agentCardPin.cid,
+  const agentCard: AgentCardMetadata = {
+    cid: agentCardPin.cid,
     updatedAt: envelope.createdAt,
     status: 'pinned',
   }
@@ -196,7 +175,7 @@ export async function runOperatorWalletRebackup(args: {
     ...step.identity,
     state,
     backup,
-    publicSkills,
+    agentCard,
   }
 
   if (markdownScaffold) {
@@ -205,7 +184,7 @@ export async function runOperatorWalletRebackup(args: {
   await recordPublishedContinuitySnapshot({ identity: nextIdentity, label: 'local operator-wallet snapshot' }).catch(() => null)
   await markCurrentContinuityFilesPublished(nextIdentity, {
     privateFiles: continuityFiles,
-    publicSkills: publicSkillsJson,
+    agentCard: agentCardJson,
     skills: skillsTree,
   }).catch(() => null)
   const completionMessage = nextEnsName !== undefined && nextEnsName !== ((step.identity.state as Record<string, unknown> | undefined)?.ensName as string | undefined)
@@ -284,20 +263,8 @@ async function runOperatorWalletVaultPublish(args: {
       const continuityFiles = markdownScaffold
         ? { 'SOUL.md': markdownScaffold['SOUL.md'], 'MEMORY.md': markdownScaffold['MEMORY.md'] }
         : await readContinuityFiles(nextIdentityForFiles)
-      const publicSkillsJson = await syncPublicSkillsManifest(nextIdentityForFiles)
-      const publicSkillsPin = await addToIpfs(DEFAULT_IPFS_API_URL, publicSkillsJson, fetch, { pinataJwt: step.pinataJwt })
-      assertVerifiedPin(publicSkillsPin)
-      const publicSkillEntries = await derivePublicSkillEntries(nextIdentityForFiles)
-      const augmentedPublicProfile = appendPublicSkillEntries(
-        defaultPublicSkillsProfile(nextIdentityForFiles),
-        publicSkillEntries,
-      )
-      const agentCardPin = await addToIpfs(
-        DEFAULT_IPFS_API_URL,
-        serializeAgentCard(createAgentCard(augmentedPublicProfile)),
-        fetch,
-        { pinataJwt: step.pinataJwt },
-      )
+      const agentCardJson = await syncAgentCardManifest(nextIdentityForFiles)
+      const agentCardPin = await addToIpfs(DEFAULT_IPFS_API_URL, agentCardJson, fetch, { pinataJwt: step.pinataJwt })
       assertVerifiedPin(agentCardPin)
       const skillsTree = await prepareSyncedSkillsTree(nextIdentityForFiles)
       const envelope = createContinuityEnvelopeForSave({
@@ -315,9 +282,8 @@ async function runOperatorWalletVaultPublish(args: {
       const statePin = await addToIpfs(DEFAULT_IPFS_API_URL, serializeContinuitySnapshotEnvelope(envelope), fetch, { pinataJwt: step.pinataJwt })
       assertVerifiedPin(statePin)
 
-      const publicSkills: PublicSkillsMetadata = {
-        cid: publicSkillsPin.cid,
-        agentCardCid: agentCardPin.cid,
+      const agentCard: AgentCardMetadata = {
+        cid: agentCardPin.cid,
         updatedAt: envelope.createdAt,
         status: 'pinned',
       }
@@ -329,7 +295,7 @@ async function runOperatorWalletVaultPublish(args: {
         ...(uploadedImageUri ? { image: uploadedImageUri } : {}),
       }, {
         backup: { cid: statePin.cid, envelopeVersion: envelope.envelopeVersion, createdAt: envelope.createdAt },
-        publicDiscovery: { skillsCid: publicSkills.cid, agentCardCid: publicSkills.agentCardCid, updatedAt: publicSkills.updatedAt },
+        publicDiscovery: { agentCardCid: agentCard.cid, updatedAt: agentCard.updatedAt },
         registration: { chainId: step.registry.chainId, identityRegistryAddress: step.registry.identityRegistryAddress, agentId: sourceAgentId },
         ensName: nextEnsName,
         operators: operatorsPointerFromState(state, nextEnsName),
@@ -365,7 +331,7 @@ async function runOperatorWalletVaultPublish(args: {
         ...step.identity,
         state,
         backup,
-        publicSkills,
+        agentCard,
         agentUri,
         metadataCid,
       }
@@ -383,7 +349,7 @@ async function runOperatorWalletVaultPublish(args: {
           completionMessage,
           publishedSources: {
             privateFiles: continuityFiles,
-            publicSkills: publicSkillsJson,
+            agentCard: agentCardJson,
             skills: skillsTree,
           },
         },

@@ -51,9 +51,8 @@ const IdentitySchema = z.object({
       createdAt: z.string(),
     })).optional(),
   }).optional(),
-  publicSkills: z.object({
+  agentCard: z.object({
     cid: z.string().min(1).optional(),
-    agentCardCid: z.string().min(1).optional(),
     updatedAt: z.string().optional(),
     status: z.enum(['pinned', 'failed', 'unknown']).optional(),
   }).optional(),

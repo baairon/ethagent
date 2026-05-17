@@ -7,16 +7,16 @@ export type ContinuityVaultRef = {
   dir: string
   soulPath: string
   memoryPath: string
-  publicSkillsPath: string
+  agentCardPath: string
   skillsDir: string
 }
 
 export type IdentityMarkdownScaffold = ContinuityFiles & {
-  'skills.json': string
+  'agent-card.json': string
 }
 
-export type ContinuitySnapshotFile = PrivateContinuityFile | 'skills.json' | 'private-skills'
-export type ContinuitySnapshotContentHashes = Partial<Record<ContinuitySnapshotFile, string>> & Record<PrivateContinuityFile | 'skills.json', string>
+export type ContinuitySnapshotFile = PrivateContinuityFile | 'agent-card.json' | 'private-skills'
+export type ContinuitySnapshotContentHashes = Partial<Record<ContinuitySnapshotFile, string>> & Record<PrivateContinuityFile | 'agent-card.json', string>
 export type ContinuityPublishState = 'not-restored' | 'not-published' | 'verify-needed' | 'local-changes' | 'published'
 export type ContinuityWorkingTreeStatus = {
   ready: boolean

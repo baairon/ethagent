@@ -62,16 +62,15 @@ function parseTransferSnapshotMetadata(input: Record<string, unknown> | null): T
 export function parseEthagentPublicDiscoveryPointer(registration: Record<string, unknown> | null): EthagentPublicDiscoveryPointer | null {
   if (!registration) return null
   const ext = objectField(registration, 'x-ethagent') ?? objectField(registration, 'ethagent')
-  const publicSkills = ext ? objectField(ext, 'publicSkills') : null
   const agentCard = ext ? objectField(ext, 'agentCard') : null
-  const skillsCid = publicSkills ? stringField(publicSkills, 'cid') : undefined
-  const agentCardCid = agentCard ? stringField(agentCard, 'cid') : undefined
-  const updatedAt = (publicSkills ? stringField(publicSkills, 'updatedAt') : undefined)
-    ?? (agentCard ? stringField(agentCard, 'updatedAt') : undefined)
-  if (!skillsCid && !agentCardCid) return null
+  const legacyPublicSkills = ext ? objectField(ext, 'publicSkills') : null
+  const agentCardCid = (agentCard ? stringField(agentCard, 'cid') : undefined)
+    ?? (legacyPublicSkills ? stringField(legacyPublicSkills, 'cid') : undefined)
+  const updatedAt = (agentCard ? stringField(agentCard, 'updatedAt') : undefined)
+    ?? (legacyPublicSkills ? stringField(legacyPublicSkills, 'updatedAt') : undefined)
+  if (!agentCardCid) return null
   return {
-    ...(skillsCid ? { skillsCid } : {}),
-    ...(agentCardCid ? { agentCardCid } : {}),
+    agentCardCid,
     ...(updatedAt ? { updatedAt } : {}),
   }
 }
@@ -166,7 +165,6 @@ function serializeOperatorsPointer(pointer: EthagentOperatorsPointer): Record<st
   return {
     approvedOperatorWallets: pointer.approvedOperatorWallets.map(record => ({
       address: getAddress(record.address),
-      ...(record.challenge ? { challenge: record.challenge } : {}),
       ...(record.verifiedAt ? { verifiedAt: record.verifiedAt } : {}),
       ...(record.restoreAccessKey ? { restoreAccessKey: serializeRestoreAccessKey(record.restoreAccessKey) } : {}),
     })),
@@ -229,13 +227,6 @@ export function withEthagentPointers(
         ...(backup.transferSnapshot ? { transferSnapshot: serializeTransferSnapshotMetadata(backup.transferSnapshot) } : {}),
       },
     } : {}),
-    ...(publicDiscovery?.skillsCid ? {
-      publicSkills: {
-        cid: publicDiscovery.skillsCid,
-        format: 'application/json',
-        ...(updatedAt ? { updatedAt } : {}),
-      },
-    } : {}),
     ...(publicDiscovery?.agentCardCid ? {
       agentCard: {
         cid: publicDiscovery.agentCardCid,
@@ -285,17 +276,9 @@ function withEthagentServices(
   if (publicDiscovery?.agentCardCid) {
     const endpoint = `ipfs://${publicDiscovery.agentCardCid}`
     pushUniqueService(services, {
-      type: 'a2a',
+      type: 'A2A',
       name: 'agent-card',
-      endpoint,
-      url: endpoint,
-    })
-  }
-  if (publicDiscovery?.skillsCid) {
-    const endpoint = `ipfs://${publicDiscovery.skillsCid}`
-    pushUniqueService(services, {
-      type: 'A2A-skills',
-      name: 'public-skills',
+      version: '0.3.0',
       endpoint,
       url: endpoint,
     })
@@ -322,7 +305,7 @@ function isEthagentManagedService(item: unknown): boolean {
   const name = obj.name
   if (name === 'agentWallet') return true
   if (name === 'ENS') return true
-  if (type === 'a2a' && (name === undefined || name === 'agent-card')) return true
+  if ((type === 'A2A' || type === 'a2a') && (name === undefined || name === 'agent-card')) return true
   return (type === 'A2A-skills' || type === 'ipfs') && name === 'public-skills'
 }
 

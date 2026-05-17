@@ -6,15 +6,9 @@ import {
   type WalletChallengePurpose,
 } from '../../continuity/envelope.js'
 import {
-  prepareSyncedPublicSkillsJson,
-  writePublicSkillsFile,
+  writeAgentCardFile,
 } from '../../continuity/storage.js'
-import {
-  createAgentCard,
-  defaultPublicSkillsProfile,
-  serializeAgentCard,
-} from '../../continuity/publicSkills.js'
-import { syncPublicSkillsManifest } from '../../continuity/skills/publicSkillsSync.js'
+import { syncAgentCardManifest } from '../../continuity/skills/publicSkillsSync.js'
 import { recordPublishedContinuitySnapshot } from '../../continuity/snapshots.js'
 import { addToIpfs, DEFAULT_IPFS_API_URL, isPinataUploadUrl } from '../../storage/ipfs.js'
 import {
@@ -63,15 +57,15 @@ import {
   prepareOperatorProfileArtifacts,
 } from './operatorSave.js'
 
-type PublicSkillsMetadata = NonNullable<EthagentIdentity['publicSkills']>
+type AgentCardMetadata = NonNullable<EthagentIdentity['agentCard']>
 
 type PublicProfilePreparedTransaction = {
   ownerAddress: Address
   agentUri: string
   metadataCid: string
-  publicSkills: PublicSkillsMetadata
+  agentCard: AgentCardMetadata
   identity: EthagentIdentity
-  publicSkillsJson: string
+  agentCardJson: string
 }
 
 export async function runPublicProfilePreflight(
@@ -151,20 +145,12 @@ async function runPublicProfileSigningInner(
         includeLastBackedUpAt: false,
       })
       const nextIdentityForFiles: EthagentIdentity = { ...step.identity, state }
-      const publicSkillsJson = await syncPublicSkillsManifest(nextIdentityForFiles)
-      const publicSkillsPin = await addToIpfs(DEFAULT_IPFS_API_URL, publicSkillsJson, fetch, { pinataJwt: step.pinataJwt })
-      assertVerifiedPin(publicSkillsPin)
-      const agentCardPin = await addToIpfs(
-        DEFAULT_IPFS_API_URL,
-        serializeAgentCard(createAgentCard(defaultPublicSkillsProfile(nextIdentityForFiles))),
-        fetch,
-        { pinataJwt: step.pinataJwt },
-      )
+      const agentCardJson = await syncAgentCardManifest(nextIdentityForFiles)
+      const agentCardPin = await addToIpfs(DEFAULT_IPFS_API_URL, agentCardJson, fetch, { pinataJwt: step.pinataJwt })
       assertVerifiedPin(agentCardPin)
       const updatedAt = new Date().toISOString()
-      const publicSkills: PublicSkillsMetadata = {
-        cid: publicSkillsPin.cid,
-        agentCardCid: agentCardPin.cid,
+      const agentCard: AgentCardMetadata = {
+        cid: agentCardPin.cid,
         updatedAt,
         status: 'pinned',
       }
@@ -181,8 +167,7 @@ async function runPublicProfileSigningInner(
       }, {
         backup: existingBackup,
         publicDiscovery: {
-          skillsCid: publicSkills.cid,
-          agentCardCid: publicSkills.agentCardCid,
+          agentCardCid: agentCard.cid,
           updatedAt,
         },
         registration: {
@@ -212,9 +197,9 @@ async function runPublicProfileSigningInner(
           ownerAddress: snapshotOwner,
           agentUri,
           metadataCid,
-          publicSkills,
+          agentCard,
           identity: { ...step.identity, state },
-          publicSkillsJson,
+          agentCardJson,
         },
       }
     },
@@ -231,9 +216,9 @@ async function runPublicProfileSigningInner(
     identityRegistryAddress: step.registry.identityRegistryAddress,
     agentUri: result.prepared.agentUri,
     metadataCid: result.prepared.metadataCid,
-    publicSkills: result.prepared.publicSkills,
+    agentCard: result.prepared.agentCard,
   }
-  await writePublicSkillsFile(nextIdentity, result.prepared.publicSkillsJson)
+  await writeAgentCardFile(nextIdentity, result.prepared.agentCardJson)
   await markCurrentContinuityFilesPublished(nextIdentity)
   const resolverSyncWarning = await syncVaultOperatorsAfterOwnerSave({
     beforeIdentity: step.identity,
@@ -345,7 +330,7 @@ async function runOperatorWalletVaultPublicProfileSave(args: {
         ? { ...prepared.nextIdentity.backup, txHash: vaultTx.txHash }
         : prepared.nextIdentity.backup,
     }
-    await writePublicSkillsFile(nextIdentity, prepared.publicSkillsJson)
+    await writeAgentCardFile(nextIdentity, prepared.agentCardJson)
     await markCurrentContinuityFilesPublished(nextIdentity).catch(() => null)
     await recordPublishedContinuitySnapshot({
       identity: nextIdentity,

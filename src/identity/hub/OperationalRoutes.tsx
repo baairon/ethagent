@@ -9,6 +9,7 @@ import {
   runPublicProfileStorageSubmit,
 } from './profile/effects.js'
 import { resolveVaultAddress } from './custody/transactions.js'
+import { readCustodyMode } from './custody/state.js'
 import { WalletApprovalScreen } from './shared/components/WalletApprovalScreen.js'
 import { RebackupStorageScreen } from './continuity/RebackupStorageScreen.js'
 import { BusyScreen } from './shared/components/BusyScreen.js'
@@ -321,12 +322,14 @@ export const IdentityHubOperationalRoutes: React.FC<IdentityHubOperationalRoutes
 
   if (step.kind === 'rebackup-signing') {
     const approval = rebackupWalletApprovalView(step.identity, step.profileUpdates)
+    const vaultRouted = Boolean(step.vaultAddress)
+      && readCustodyMode(step.identity.state as Record<string, unknown> | undefined) === 'advanced'
     return (
       <WalletApprovalScreen
         title={approval.title}
         subtitle={custodyFlow.renderRebackupSubtitle(
           approval.subtitle,
-          Boolean(step.vaultAddress),
+          vaultRouted,
         )}
         walletSession={walletSession}
         label={approval.label}

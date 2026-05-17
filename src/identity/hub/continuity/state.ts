@@ -27,7 +27,7 @@ export function changedContinuitySnapshotFiles(
   const result: string[] = []
   if (changed('SOUL.md')) result.push('SOUL.md')
   if (changed('MEMORY.md')) result.push('MEMORY.md')
-  if (changed('skills.json') || changed('private-skills')) result.push('Skills')
+  if (changed('agent-card.json') || changed('private-skills')) result.push('Skills')
   return result
 }
 

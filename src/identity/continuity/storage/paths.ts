@@ -8,7 +8,7 @@ export function continuityVaultRef(identity: Pick<EthagentIdentity, 'chainId' | 
     dir,
     soulPath: path.join(dir, 'SOUL.md'),
     memoryPath: path.join(dir, 'MEMORY.md'),
-    publicSkillsPath: path.join(dir, 'skills.json'),
+    agentCardPath: path.join(dir, 'agent-card.json'),
     skillsDir: path.join(dir, 'skills'),
   }
 }

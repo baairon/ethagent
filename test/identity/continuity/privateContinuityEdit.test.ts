@@ -222,7 +222,7 @@ test('approved private continuity append builds on an existing scaffold section'
   await withHome(async () => {
     await writeContinuityFiles(identity, {
       'SOUL.md': '# Soul\n\n## Persona\n\n- Existing persona\n',
-      'MEMORY.md': '# Memory\n\n## Durable User Preferences\n\n- Existing preference\n\n## Boundaries\n\n- Keep public capabilities in skills.json.\n',
+      'MEMORY.md': '# Memory\n\n## Durable User Preferences\n\n- Existing preference\n\n## Boundaries\n\n- Keep public capabilities in the Agent Card.\n',
     })
 
     const outcome = await executeToolWithPermissions({
@@ -253,7 +253,7 @@ test('approved private continuity append builds on an existing scaffold section'
         '',
         '## Boundaries',
         '',
-        '- Keep public capabilities in skills.json.',
+        '- Keep public capabilities in the Agent Card.',
       ].join('\n') + '\n',
     })
   })

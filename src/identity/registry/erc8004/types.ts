@@ -21,7 +21,6 @@ export type EthagentBackupPointer = {
 }
 
 export type EthagentPublicDiscoveryPointer = {
-  skillsCid?: string
   agentCardCid?: string
   updatedAt?: string
 }

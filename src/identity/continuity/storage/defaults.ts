@@ -1,6 +1,6 @@
 import type { EthagentIdentity } from '../../../storage/config.js'
 import type { ContinuityAgentSnapshot, ContinuityFiles } from '../envelope.js'
-import { defaultPublicSkillsProfile, renderPublicSkillsJson } from '../publicSkills.js'
+import { createAgentCard, defaultPublicSkillsProfile, serializeAgentCard } from '../publicSkills.js'
 import { renderPrivateIdentityBlock } from './markdown.js'
 
 export function continuityAgentSnapshot(identity: EthagentIdentity): ContinuityAgentSnapshot {
@@ -87,6 +87,6 @@ export function defaultContinuityFiles(identity: EthagentIdentity, _now = new Da
   }
 }
 
-export function defaultPublicSkillsJson(identity: EthagentIdentity): string {
-  return renderPublicSkillsJson(defaultPublicSkillsProfile(identity))
+export function defaultAgentCardJson(identity: EthagentIdentity): string {
+  return serializeAgentCard(createAgentCard(defaultPublicSkillsProfile(identity)))
 }

@@ -5,8 +5,8 @@ A privacy-first AI agent with a portable Ethereum identity.
 Switch providers or machines and the AI agent you customized stays behind. `ethagent` ties the agent to a wallet you own, so its soul, memory, and skills follow you across providers, machines, and models.
 
 - **Portable.** The ERC-8004 token is the agent's durable identity. Use the ENS name as a readable handle, or the token ID plus chain as the permanent reference, to restore the same agent anywhere.
-- **Private.** Soul and memory are encrypted before they are pinned to IPFS. The wallet signature used to unlock them stays local and never submits a transaction, spends funds, or grants token approval.
-- **Public.** The agent URI points to plain JSON for the Agent Card and public skills, so other agents can discover capabilities through ERC-8004 and IPFS.
+- **Private.** Soul, memory, and skills are encrypted before they are pinned to IPFS. The wallet signature used to unlock them stays local and never submits a transaction, spends funds, or grants token approval.
+- **Public.** The agent URI points to a public metadata payload on IPFS that includes the Agent Card, so other agents can discover the agent's capabilities through ERC-8004.
 
 <details>
 <summary><strong>Glossary</strong> (click to expand)</summary>
@@ -16,9 +16,9 @@ Switch providers or machines and the AI agent you customized stays behind. `etha
 | Owner Wallet | Holds and controls the ERC-8004 agent token. Signs custody changes and, in Simple custody, every URI rotation. |
 | Operator Wallet | Additional wallet authorized to rotate the onchain URI on behalf of the owner. Used in Advanced custody. Never receives token approval. |
 | Vault | Immutable per-agent custody contract used in Advanced custody. Holds at most one ERC-8004 token. |
-| Snapshot | Encrypted bundle of SOUL.md, MEMORY.md, and session state. Pinned to IPFS; decrypts only against the owner wallet's signature. |
-| Agent URI | IPFS URI stored in the ERC-8004 `tokenURI`. Resolves to the agent's published metadata. |
-| Agent Card | Public JSON describing the agent: name, description, capabilities, and skills. Other agents fetch it for discovery. |
+| Snapshot | Encrypted bundle of SOUL.md, MEMORY.md, the skills/ tree, and session state. Pinned to IPFS; decrypts only against the owner wallet's signature. |
+| Agent URI | IPFS URI stored in the ERC-8004 `tokenURI`. Resolves to a public metadata payload that references the Agent Card. |
+| Agent Card | Public JSON describing the agent: name, description, capabilities, and skills. Pinned on IPFS and linked from the agent URI; other agents fetch it for discovery. |
 
 </details>
 
@@ -48,12 +48,12 @@ Once running:
 
 The Identity Hub manages everything portable about the agent:
 
-- **Public Profile** edits name, description, icon, and the Agent Card.
+- **Public Profile** edits name, description, and icon: what other agents see in the Agent Card.
 - **ENS Name** links the agent to a subdomain under a parent name the owner wallet controls.
 - **Custody Mode** switches between Simple and Advanced by depositing the token into its Vault or unwrapping it back out.
-- **Prepare Transfer** stages a dual-wallet snapshot before sending the token externally.
+- **Prepare Transfer** stages a dual-wallet snapshot so the receiver can restore the agent after the token moves externally.
 - **Refetch Latest** pulls the most recent published snapshot back to local files.
-- **Load Agent** accepts either an ENS name or a bare token ID, and loads any agent owned by or linked to the connected wallet.
+- **Switch Agent** accepts either an ENS name or a bare token ID, and loads any agent owned by or linked to the connected wallet.
 
 The menu surfaces drift automatically. Token ownership, vault state, ENS record alignment, and pending URI rotations are checked against the live chain when the menu opens.
 
@@ -61,16 +61,15 @@ Every agent has a continuity directory at `~/.ethagent/continuity`.
 
 ## Continuity
 
-Each agent's continuity directory holds a small set of files. Private files are encrypted before they ever reach IPFS; public files are plain JSON so other agents can discover what the agent does.
+Each agent's continuity directory holds a small set of private files. They are encrypted before they ever reach IPFS.
 
 | File | Visibility | Purpose |
 | --- | --- | --- |
 | `SOUL.md` | Private | Soul, boundaries, standing instructions, and identity framing. |
 | `MEMORY.md` | Private | Durable preferences, project context, decisions, and operating notes. |
-| `skills/` | Private | Skill folders. The SKILL.md body never leaves your machine. The visibility flag only controls whether the skill's name and description get indexed in `skills.json`. New skills default to public. |
-| `skills.json` | Public | Machine-readable capabilities derived from public skills. |
+| `skills/` | Private | Skill folders. The SKILL.md body never leaves your machine. The visibility flag only controls whether the skill's name and description get listed in the Agent Card. New skills default to public. |
 
-`SOUL.md`, `MEMORY.md`, and each `SKILL.md` are plain Markdown you edit through the Identity Hub under Continuity. Skill frontmatter (name, description, when_to_use, visibility, tags) tells the agent when to load it. The body stays local; `visibility: public` indexes the name and description in `skills.json` and the Agent Card.
+`SOUL.md`, `MEMORY.md`, and each `SKILL.md` are plain Markdown you edit through the Identity Hub under Continuity. Skill frontmatter (name, description, when_to_use, visibility, tags) tells the agent when to load it. The body stays local; `visibility: public` lists the name and description in the Agent Card.
 
 - **Save Snapshot Now** encrypts the private files, pins them to IPFS, and rotates the onchain pointer to the new CID.
 - **Refetch Latest** reads the pointer back, signs the decrypt challenge with your wallet, and overwrites local files from the snapshot.
@@ -103,7 +102,7 @@ Save the token ID + network somewhere safe. ENS records can be cleared and rebui
 - Sender signs snapshot access, receiver signs restore access.
 - Sender publishes the snapshot pointer to the agent URI.
 - The actual transfer happens externally afterwards, in whichever wallet UI you prefer.
-- Once the token has moved, the receiver opens **Load Agent** with the receiving wallet and restores the same agent from the published snapshot.
+- Once the token has moved, the receiver opens **Switch Agent** with the receiving wallet and restores the same agent from the published snapshot.
 
 The token transfer flow prepares decrypt access and agent URI pointers only. It does not initiate the transfer and does not request approval over the token.
 
@@ -136,8 +135,8 @@ Vision support is available on:
 
 ## Privacy
 
-- **Public:** token ownership, the agent URI payload, public discovery files, and IPFS CIDs.
-- **Private:** plaintext `SOUL.md`, plaintext `MEMORY.md`, sessions, prompt history, API keys, local permissions, and the wallet signatures used for decryption.
+- **Public:** token ownership, the agent URI, the Agent Card it references, and IPFS CIDs.
+- **Private:** plaintext `SOUL.md`, plaintext `MEMORY.md`, the local skills/ tree, sessions, prompt history, API keys, local permissions, and the wallet signatures used for decryption.
 - Snapshots use a wallet signature as unlock material. The signature does not submit a transaction, spend funds, or grant token approval.
 - The transfer flow writes a snapshot pointer and stops; it never approves or moves the token.
 - `ethagent reset` deletes local ethagent data from the current machine while preserving installed local model assets. It does not burn or transfer tokens, remove public IPFS content, or mutate the onchain agent URI. Run **Save Snapshot Now** before resetting if local edits should become the recoverable state.
@@ -150,7 +149,7 @@ Vision support is available on:
 | Model | Cloud provider or local GGUF runner. |
 | Identity | ERC-8004 token owned by the wallet. |
 | Continuity | Private files encrypted before IPFS pinning. |
-| Discovery | Public `skills.json`, Agent Card, services, and the current agent URI payload. |
+| Discovery | The agent URI and the Agent Card it points to. |
 | Recovery | Refetch the current agent URI, decrypt the latest snapshot, and restore local files. |
 
 The ERC-8004 token is the durable handle. The machine, model, and local session all change around it.

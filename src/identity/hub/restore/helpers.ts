@@ -6,7 +6,7 @@ import {
 } from '../../continuity/envelope.js'
 import { catFromIpfs } from '../../storage/ipfs.js'
 import type { Erc8004AgentCandidate } from '../../registry/erc8004.js'
-import { writePublicSkillsFile } from '../../continuity/storage.js'
+import { writeAgentCardFile } from '../../continuity/storage.js'
 import { normalizeApprovedOperatorWallets } from '../shared/operatorWallets.js'
 
 export type BackupMetadata = NonNullable<EthagentIdentity['backup']>
@@ -75,7 +75,7 @@ export function operatorStateFromCandidate(candidate: Erc8004AgentCandidate): Re
   }
 }
 
-export async function restorePublishedPublicSkills(
+export async function restorePublishedAgentCard(
   identity: EthagentIdentity,
   apiUrl: string,
   cid: string | undefined,
@@ -83,7 +83,7 @@ export async function restorePublishedPublicSkills(
   if (!cid) return false
   try {
     const raw = await catFromIpfs(apiUrl, cid)
-    await writePublicSkillsFile(identity, new TextDecoder().decode(raw))
+    await writeAgentCardFile(identity, new TextDecoder().decode(raw))
     return true
   } catch {
     return false

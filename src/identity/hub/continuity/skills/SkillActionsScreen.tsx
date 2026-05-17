@@ -140,8 +140,8 @@ function visibilityOption(level: SkillVisibility, current?: SkillVisibility): Se
 }
 
 function visibilityHint(level: SkillVisibility): string {
-  if (level === 'private') return 'Local-only. Not in skills.json.'
-  return 'Default. Indexed with description and Agent Card link.'
+  if (level === 'private') return 'Local-only. Not in the Agent Card.'
+  return 'Default. Listed in the Agent Card.'
 }
 
 function capitalize(value: string): string {

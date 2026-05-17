@@ -17,15 +17,15 @@ export {
 export { continuityAgentSnapshot, defaultContinuityFiles } from './storage/defaults.js'
 export {
   ensureIdentityMarkdownScaffold,
-  ensurePublicSkillsFile,
+  ensureAgentCardFile,
   prepareSyncedIdentityMarkdownScaffold,
   prepareSyncedSkillsTree,
-  prepareSyncedPublicSkillsJson,
-  readPublicSkillsFile,
+  prepareSyncedAgentCardJson,
+  readAgentCardFile,
   restoreSkillsTree,
   syncIdentityMarkdownScaffold,
   writeIdentityMarkdownScaffold,
-  writePublicSkillsFile,
+  writeAgentCardFile,
 } from './storage/scaffold.js'
 export {
   continuityVaultStatus,

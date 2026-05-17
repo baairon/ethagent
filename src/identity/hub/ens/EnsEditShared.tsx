@@ -5,10 +5,6 @@ import { Surface } from '../../../ui/Surface.js'
 import { TextInput } from '../../../ui/TextInput.js'
 import { theme } from '../../../ui/theme.js'
 import {
-  formatRecordValue,
-  type AgentEnsRecordState,
-} from '../../ens/agentRecords.js'
-import {
   isEthDomain,
   sanitizeSubdomainPrefix,
 } from '../../ens/ensLookup.js'
@@ -24,9 +20,9 @@ import type { EnsEditProps } from './types.js'
 
 export const footerHint = (hint: string) => <Text color={theme.dim}>{hint}</Text>
 
-export const renderRecordValue = (field: keyof AgentEnsRecordState, value: string) =>
+export const renderRecordValue = (value: string) =>
   value
-    ? <Text color={theme.accentPeriwinkle}>{formatRecordValue(field, value)}</Text>
+    ? <Text color={theme.accentPeriwinkle}>{value}</Text>
     : <Text color={theme.dim}>Unset</Text>
 
 export function rootErrorMessage(

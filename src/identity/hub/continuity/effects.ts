@@ -6,17 +6,11 @@ import {
   prepareSyncedIdentityMarkdownScaffold,
   prepareSyncedSkillsTree,
   readContinuityFiles,
-  readPublicSkillsFile,
   writeIdentityMarkdownScaffold,
   type IdentityMarkdownScaffold,
 } from '../../continuity/storage.js'
 import {
-  appendPublicSkillEntries,
-  defaultPublicSkillsProfile as basePublicSkillsProfile,
-} from '../../continuity/publicSkills.js'
-import {
-  derivePublicSkillEntries,
-  syncPublicSkillsManifest,
+  syncAgentCardManifest,
 } from '../../continuity/skills/publicSkillsSync.js'
 import {
   createWalletRestoreAccessChallenge,
@@ -25,12 +19,8 @@ import {
   type ContinuitySkillsTree,
   type WalletChallengePurpose,
 } from '../../continuity/envelope.js'
-import {
-  createAgentCard,
-  defaultPublicSkillsProfile,
-  serializeAgentCard,
-} from '../../continuity/publicSkills.js'
 import { recordPublishedContinuitySnapshot } from '../../continuity/snapshots.js'
+import { readCustodyMode } from '../custody/state.js'
 import { addToIpfs, DEFAULT_IPFS_API_URL, isPinataUploadUrl } from '../../storage/ipfs.js'
 import {
   createErc8004PublicClient,
@@ -83,19 +73,19 @@ import {
 } from './completion.js'
 
 type BackupMetadata = NonNullable<EthagentIdentity['backup']>
-type PublicSkillsMetadata = NonNullable<EthagentIdentity['publicSkills']>
+type AgentCardMetadata = NonNullable<EthagentIdentity['agentCard']>
 
 type RebackupPreparedTransaction = {
   ownerAddress: Address
   agentUri: string
   metadataCid: string
   backup: BackupMetadata
-  publicSkills: PublicSkillsMetadata
+  agentCard: AgentCardMetadata
   identity: EthagentIdentity
   markdownScaffold?: IdentityMarkdownScaffold
   publishedSources: {
     privateFiles: ContinuityFiles
-    publicSkills: string
+    agentCard: string
     skills: ContinuitySkillsTree
   }
 }
@@ -197,8 +187,9 @@ async function runRebackupSigningInner(
     return
   }
   const snapshotOwner = ownerAddressForSnapshotSave(step.identity, step.profileUpdates)
+  const isAdvanced = readCustodyMode(step.identity.state as Record<string, unknown> | undefined) === 'advanced'
   const purpose: WalletPurpose = step.walletPurpose
-    ?? (step.vaultAddress ? 'rotate-agent-uri-vault-owner' : rebackupWalletPurpose(step.identity, step.profileUpdates))
+    ?? (step.vaultAddress && isAdvanced ? 'rotate-agent-uri-vault-owner' : rebackupWalletPurpose(step.identity, step.profileUpdates))
   const challengePurpose: WalletChallengePurpose = 'restore-owner'
   const walletAccess = walletRestoreAccessContext(step.identity, step.registry, step.profileUpdates, snapshotOwner)
   if (!walletAccess) throw new Error('Cannot back up: missing wallet restore access context')
@@ -244,20 +235,8 @@ async function runRebackupSigningInner(
       const continuityFiles = markdownScaffold
         ? { 'SOUL.md': markdownScaffold['SOUL.md'], 'MEMORY.md': markdownScaffold['MEMORY.md'] }
         : await readContinuityFiles(nextIdentityForFiles)
-      const publicSkillsJson = await syncPublicSkillsManifest(nextIdentityForFiles)
-      const publicSkillsPin = await addToIpfs(DEFAULT_IPFS_API_URL, publicSkillsJson, fetch, { pinataJwt: step.pinataJwt })
-      assertVerifiedPin(publicSkillsPin)
-      const publicSkillEntries = await derivePublicSkillEntries(nextIdentityForFiles)
-      const augmentedPublicProfile = appendPublicSkillEntries(
-        basePublicSkillsProfile(nextIdentityForFiles),
-        publicSkillEntries,
-      )
-      const agentCardPin = await addToIpfs(
-        DEFAULT_IPFS_API_URL,
-        serializeAgentCard(createAgentCard(augmentedPublicProfile)),
-        fetch,
-        { pinataJwt: step.pinataJwt },
-      )
+      const agentCardJson = await syncAgentCardManifest(nextIdentityForFiles)
+      const agentCardPin = await addToIpfs(DEFAULT_IPFS_API_URL, agentCardJson, fetch, { pinataJwt: step.pinataJwt })
       assertVerifiedPin(agentCardPin)
       const skillsTree = await prepareSyncedSkillsTree(nextIdentityForFiles)
       const envelope = createContinuityEnvelopeForSave({
@@ -287,9 +266,8 @@ async function runRebackupSigningInner(
         identityRegistryAddress: step.registry.identityRegistryAddress,
         agentId: sourceAgentId,
       }
-      const publicSkills: PublicSkillsMetadata = {
-        cid: publicSkillsPin.cid,
-        agentCardCid: agentCardPin.cid,
+      const agentCard: AgentCardMetadata = {
+        cid: agentCardPin.cid,
         updatedAt: envelope.createdAt,
         status: 'pinned',
       }
@@ -300,7 +278,7 @@ async function runRebackupSigningInner(
         ...(uploadedImageUri ? { image: uploadedImageUri } : {}),
       }, {
         backup: { cid, envelopeVersion: envelope.envelopeVersion, createdAt: envelope.createdAt },
-        publicDiscovery: { skillsCid: publicSkills.cid, agentCardCid: publicSkills.agentCardCid, updatedAt: publicSkills.updatedAt },
+        publicDiscovery: { agentCardCid: agentCard.cid, updatedAt: agentCard.updatedAt },
         registration: { chainId: step.registry.chainId, identityRegistryAddress: step.registry.identityRegistryAddress, agentId: sourceAgentId },
         ensName: nextEnsName,
         operators: operatorsPointerFromState(state, nextEnsName),
@@ -332,12 +310,12 @@ async function runRebackupSigningInner(
             agentUri,
             metadataCid,
             backup: { ...backup, metadataCid, agentUri },
-            publicSkills,
+            agentCard,
             identity: { ...step.identity, state },
             ...(markdownScaffold ? { markdownScaffold } : {}),
             publishedSources: {
               privateFiles: continuityFiles,
-              publicSkills: publicSkillsJson,
+              agentCard: agentCardJson,
               skills: skillsTree,
             },
           },
@@ -357,12 +335,12 @@ async function runRebackupSigningInner(
           agentUri,
           metadataCid,
           backup: { ...backup, metadataCid, agentUri },
-          publicSkills,
+          agentCard,
           identity: { ...step.identity, state },
           ...(markdownScaffold ? { markdownScaffold } : {}),
           publishedSources: {
             privateFiles: continuityFiles,
-            publicSkills: publicSkillsJson,
+            agentCard: agentCardJson,
             skills: skillsTree,
           },
         },
@@ -388,7 +366,7 @@ async function runRebackupSigningInner(
     agentUri: result.prepared.agentUri,
     metadataCid: result.prepared.metadataCid,
     backup: { ...result.prepared.backup, txHash: result.txHash },
-    publicSkills: result.prepared.publicSkills,
+    agentCard: result.prepared.agentCard,
   }
   if (result.prepared.markdownScaffold) {
     await writeIdentityMarkdownScaffold(nextIdentity, result.prepared.markdownScaffold)

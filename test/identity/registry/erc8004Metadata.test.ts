@@ -153,7 +153,6 @@ test('ethagent public discovery pointers are written to registration metadata an
       createdAt: new Date(0).toISOString(),
     },
     {
-      skillsCid: 'bafy-skills',
       agentCardCid: 'bafy-card',
       updatedAt: new Date(0).toISOString(),
     },
@@ -166,26 +165,62 @@ test('ethagent public discovery pointers are written to registration metadata an
   )
   const pointer = parseEthagentPublicDiscoveryPointer(updated)
   const ext = updated['x-ethagent'] as {
-    publicSkills: { cid: string; format: string }
     agentCard: { cid: string; format: string }
+    publicSkills?: unknown
   }
-  const services = updated.services as Array<{ type?: string; name?: string; endpoint: string; url?: string }>
+  const services = updated.services as Array<{ type?: string; name?: string; endpoint: string; url?: string; version?: string }>
   const registrations = updated.registrations as Array<{ agentId: number; agentRegistry: string }>
 
-  assert.equal(pointer?.skillsCid, 'bafy-skills')
   assert.equal(pointer?.agentCardCid, 'bafy-card')
-  assert.equal(ext.publicSkills.format, 'application/json')
   assert.equal(ext.agentCard.format, 'application/json')
+  assert.equal(ext.publicSkills, undefined)
   assert.ok(services.some(service => service.name === 'agentWallet' && service.endpoint === `eip155:8453:${OWNER}`))
   assert.equal(services.filter(service => service.name === 'agentWallet').length, 1)
-  assert.ok(services.some(service => service.type === 'a2a' && service.endpoint === 'ipfs://bafy-card' && service.url === 'ipfs://bafy-card'))
-  assert.ok(services.some(service => service.type === 'A2A-skills' && service.name === 'public-skills' && service.endpoint === 'ipfs://bafy-skills' && service.url === 'ipfs://bafy-skills'))
+  assert.ok(services.some(service =>
+    service.type === 'A2A'
+    && service.name === 'agent-card'
+    && service.version === '0.3.0'
+    && service.endpoint === 'ipfs://bafy-card'
+    && service.url === 'ipfs://bafy-card',
+  ))
+  assert.equal(services.some(service => service.name === 'public-skills'), false)
   assert.ok(services.every(service => typeof service.endpoint === 'string' && service.endpoint.length > 0))
   assert.equal(registrations.length, 1)
   assert.equal(registrations[0]?.agentId, 7)
   assert.equal(registrations[0]?.agentRegistry, 'eip155:8453:0x8004A169FB4a3325136EB29fA0ceB6D2e539a432')
   assert.equal(JSON.stringify(updated).includes('SOUL.md'), false)
   assert.equal(JSON.stringify(updated).includes('MEMORY.md'), false)
+})
+
+test('parseEthagentPublicDiscoveryPointer falls back to legacy publicSkills.cid when agentCard is absent', () => {
+  const legacy = parseEthagentPublicDiscoveryPointer({
+    name: 'agent',
+    'x-ethagent': {
+      publicSkills: { cid: 'bafy-legacy-skills', updatedAt: '2026-04-21T00:00:00.000Z' },
+    },
+  })
+  assert.equal(legacy?.agentCardCid, 'bafy-legacy-skills')
+  assert.equal(legacy?.updatedAt, '2026-04-21T00:00:00.000Z')
+
+  const newShape = parseEthagentPublicDiscoveryPointer({
+    name: 'agent',
+    'x-ethagent': {
+      agentCard: { cid: 'bafy-card', updatedAt: '2026-04-21T00:00:00.000Z' },
+    },
+  })
+  assert.equal(newShape?.agentCardCid, 'bafy-card')
+
+  const both = parseEthagentPublicDiscoveryPointer({
+    name: 'agent',
+    'x-ethagent': {
+      publicSkills: { cid: 'bafy-legacy-skills' },
+      agentCard: { cid: 'bafy-card-new' },
+    },
+  })
+  assert.equal(both?.agentCardCid, 'bafy-card-new', 'agentCard takes precedence over legacy publicSkills')
+
+  const neither = parseEthagentPublicDiscoveryPointer({ name: 'agent', 'x-ethagent': {} })
+  assert.equal(neither, null)
 })
 
 test('ethagent operators pointer is written and parsed from ERC-8004 metadata', () => {
@@ -327,7 +362,7 @@ test('registration metadata replaces managed history with current state on repub
       registrations: [{ agentId: '1', agentRegistry: 'eip155:1:0x1111111111111111111111111111111111111111' }],
     },
     { cid: 'bafy-1', envelopeVersion: 'ethagent-continuity-snapshot-v1', createdAt: new Date(0).toISOString() },
-    { skillsCid: 'bafy-skills-1', agentCardCid: 'bafy-card-1', updatedAt: new Date(0).toISOString() },
+    { agentCardCid: 'bafy-card-1', updatedAt: new Date(0).toISOString() },
     { chainId: 8453, identityRegistryAddress: '0x8004A169FB4a3325136EB29fA0ceB6D2e539a432', agentId: '7' },
     OWNER,
   )
@@ -339,7 +374,7 @@ test('registration metadata replaces managed history with current state on repub
       createdAt: new Date(1).toISOString(),
       pastBackups: [{ cid: 'bafy-1', createdAt: new Date(0).toISOString() }],
     },
-    { skillsCid: 'bafy-skills-2', agentCardCid: 'bafy-card-2', updatedAt: new Date(1).toISOString() },
+    { agentCardCid: 'bafy-card-2', updatedAt: new Date(1).toISOString() },
     { chainId: 8453, identityRegistryAddress: '0x8004A169FB4a3325136EB29fA0ceB6D2e539a432', agentId: '8' },
     OWNER,
   )
@@ -354,9 +389,8 @@ test('registration metadata replaces managed history with current state on repub
   assert.ok(services.some(service => service.name === 'agentWallet' && service.endpoint === `eip155:8453:${OWNER}`))
   assert.equal(services.some(service => service.endpoint === 'eip155:8453:0x000000000000000000000000000000000000bEEF'), false)
   assert.equal(services.some(service => service.endpoint === 'ipfs://bafy-card-1'), false)
-  assert.equal(services.some(service => service.endpoint === 'ipfs://bafy-skills-1'), false)
-  assert.ok(services.some(service => service.type === 'a2a' && service.name === 'agent-card' && service.endpoint === 'ipfs://bafy-card-2'))
-  assert.ok(services.some(service => service.type === 'A2A-skills' && service.name === 'public-skills' && service.endpoint === 'ipfs://bafy-skills-2'))
+  assert.equal(services.some(service => service.name === 'public-skills'), false)
+  assert.ok(services.some(service => service.type === 'A2A' && service.name === 'agent-card' && service.endpoint === 'ipfs://bafy-card-2'))
   assert.equal(registrations.length, 1)
   assert.equal(registrations[0]?.agentId, 8)
   assert.equal(registrations[0]?.agentRegistry, 'eip155:8453:0x8004A169FB4a3325136EB29fA0ceB6D2e539a432')

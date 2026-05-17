@@ -10,12 +10,12 @@ import {
   defaultContinuityFiles,
   ensureContinuityFiles,
   ensureIdentityMarkdownScaffold,
-  ensurePublicSkillsFile,
-  readPublicSkillsFile,
+  ensureAgentCardFile,
+  readAgentCardFile,
   readContinuityFiles,
   syncIdentityMarkdownScaffold,
   writeIdentityMarkdownScaffold,
-  writePublicSkillsFile,
+  writeAgentCardFile,
   writeContinuityFiles,
 } from '../../../src/identity/continuity/storage.js'
 import {
@@ -60,18 +60,18 @@ test('continuity storage creates private default SOUL and MEMORY files in a cont
   })
 })
 
-test('identity scaffold creates SOUL, MEMORY, and skills.json files for a linked agent', async () => {
+test('identity scaffold creates SOUL, MEMORY, and agent-card.json files for a linked agent', async () => {
   await withHome(async () => {
     const files = await ensureIdentityMarkdownScaffold(identity)
     const ref = continuityVaultRef(identity)
 
     assert.match(files['SOUL.md'], /^# SOUL\.md/)
     assert.match(files['MEMORY.md'], /^# MEMORY\.md/)
-    assert.match(files['skills.json'], /ethagent\.public-skills\.v1/)
-    assert.match(files['skills.json'], /Public discovery only/)
+    assert.match(files['agent-card.json'], /"protocolVersion": "0\.3\.0"/)
+    assert.match(files['agent-card.json'], /"producer"/)
     await fs.access(ref.soulPath)
     await fs.access(ref.memoryPath)
-    await fs.access(ref.publicSkillsPath)
+    await fs.access(ref.agentCardPath)
     assert.equal((await continuityVaultStatus(identity)).ready, true)
   })
 })
@@ -83,7 +83,7 @@ test('identity continuity sync updates generated profile blocks without overwrit
       'SOUL.md': `${scaffold['SOUL.md']}\n## Owner Notes\n- keep soul note\n`,
       'MEMORY.md': `${scaffold['MEMORY.md']}\n## Owner Notes\n- keep memory note\n`,
     })
-    await writePublicSkillsFile(identity, `${scaffold['skills.json']}\n## Owner Notes\n- keep public note\n`)
+    await writeAgentCardFile(identity, `${scaffold['agent-card.json']}\n## Owner Notes\n- keep public note\n`)
 
     const renamed: EthagentIdentity = {
       ...identity,
@@ -98,18 +98,18 @@ test('identity continuity sync updates generated profile blocks without overwrit
     assert.match(synced['MEMORY.md'], /^# MEMORY\.md/)
     assert.doesNotMatch(synced['MEMORY.md'], /Agent name: renamed agent/)
     assert.match(synced['MEMORY.md'], /keep memory note/)
-    assert.match(synced['skills.json'], /"name": "renamed agent"/)
-    assert.match(synced['skills.json'], /"description": "new public description"/)
+    assert.match(synced['agent-card.json'], /"name": "renamed agent"/)
+    assert.match(synced['agent-card.json'], /"description": "new public description"/)
   })
 })
 
-test('identity continuity sync updates and removes generated icon references in skills.json', async () => {
+test('identity continuity sync updates and removes generated icon references in agent-card.json', async () => {
   await withHome(async () => {
-    await writePublicSkillsFile(identity, JSON.stringify({
-      schema: 'ethagent.public-skills.v1',
+    await writeAgentCardFile(identity, JSON.stringify({
+      protocolVersion: '0.3.0',
       name: 'old agent',
       description: 'old description',
-      imageUrl: 'ipfs://old-icon.png',
+      image: 'ipfs://old-icon.png',
       skills: [{ id: 'custom', name: 'Custom', description: 'Keep custom skills', inputModes: ['text/plain'], outputModes: ['text/plain'] }],
     }, null, 2))
 
@@ -117,19 +117,19 @@ test('identity continuity sync updates and removes generated icon references in 
       ...identity,
       state: { ...identity.state, imageUrl: 'https://example.com/new-icon.png' },
     }
-    const updated = JSON.parse((await syncIdentityMarkdownScaffold(updatedIcon))['skills.json'])
+    const updated = JSON.parse((await syncIdentityMarkdownScaffold(updatedIcon))['agent-card.json'])
 
-    assert.equal(updated.imageUrl, 'https://example.com/new-icon.png')
-    assert.equal(updated.skills[0].id, 'software-engineering')
+    assert.equal(updated.image, 'https://example.com/new-icon.png')
+    assert.deepEqual(updated.skills, [])
 
     const removedIcon: EthagentIdentity = {
       ...identity,
       state: { ...identity.state },
     }
-    const removed = JSON.parse((await syncIdentityMarkdownScaffold(removedIcon))['skills.json'])
+    const removed = JSON.parse((await syncIdentityMarkdownScaffold(removedIcon))['agent-card.json'])
 
-    assert.equal(Object.hasOwn(removed, 'imageUrl'), false)
-    assert.equal(removed.skills[0].id, 'software-engineering')
+    assert.equal(Object.hasOwn(removed, 'image'), false)
+    assert.deepEqual(removed.skills, [])
   })
 })
 
@@ -138,14 +138,14 @@ test('identity continuity scaffold writes the exact prepared mint scaffold', asy
     await writeIdentityMarkdownScaffold(identity, {
       'SOUL.md': '# Prepared Soul\nminted soul\n',
       'MEMORY.md': '# Prepared Memory\nminted memory\n',
-      'skills.json': '{\n  "schema": "ethagent.public-skills.v1",\n  "name": "minted skills"\n}\n',
+      'agent-card.json': '{\n  "protocolVersion": "0.3.0",\n  "name": "minted card"\n}\n',
     })
 
     assert.deepEqual(await readContinuityFiles(identity), {
       'SOUL.md': '# Prepared Soul\nminted soul\n',
       'MEMORY.md': '# Prepared Memory\nminted memory\n',
     })
-    assert.equal(await readPublicSkillsFile(identity), '{\n  "schema": "ethagent.public-skills.v1",\n  "name": "minted skills"\n}\n')
+    assert.equal(await readAgentCardFile(identity), '{\n  "protocolVersion": "0.3.0",\n  "name": "minted card"\n}\n')
   })
 })
 
@@ -165,29 +165,29 @@ test('continuity storage writes local private working files without a lock/delet
   })
 })
 
-test('public skills file hydrates from a published fallback without overwriting local edits', async () => {
+test('agent card file hydrates from a published fallback without overwriting local edits', async () => {
   await withHome(async () => {
     let fallbackReads = 0
-    const first = await ensurePublicSkillsFile(identity, {
+    const first = await ensureAgentCardFile(identity, {
       fallback: async () => {
         fallbackReads += 1
-        return '# Published Skills\npublic profile\n'
+        return '# Published Card\npublic profile\n'
       },
     })
 
-    assert.equal(first, '# Published Skills\npublic profile\n')
+    assert.equal(first, '# Published Card\npublic profile\n')
     assert.equal(fallbackReads, 1)
 
-    await writePublicSkillsFile(identity, '{"schema":"ethagent.public-skills.v1","name":"Local Skills"}')
-    const second = await ensurePublicSkillsFile(identity, {
+    await writeAgentCardFile(identity, '{"protocolVersion":"0.3.0","name":"Local Card"}')
+    const second = await ensureAgentCardFile(identity, {
       fallback: async () => {
         fallbackReads += 1
         return '# Should Not Load\n'
       },
     })
 
-    assert.equal(second, '{"schema":"ethagent.public-skills.v1","name":"Local Skills"}\n')
-    assert.equal(await readPublicSkillsFile(identity), '{"schema":"ethagent.public-skills.v1","name":"Local Skills"}\n')
+    assert.equal(second, '{"protocolVersion":"0.3.0","name":"Local Card"}\n')
+    assert.equal(await readAgentCardFile(identity), '{"protocolVersion":"0.3.0","name":"Local Card"}\n')
     assert.equal(fallbackReads, 1)
   })
 })
@@ -199,7 +199,7 @@ test('private continuity history restore restores the full markdown checkpoint',
       'SOUL.md': '# Old Soul\nprivate soul\n',
       'MEMORY.md': '# Old Memory\nprivate memory\n',
     })
-    await writePublicSkillsFile(identity, '{"schema":"ethagent.public-skills.v1","name":"Old Skills"}')
+    await writeAgentCardFile(identity, '{"protocolVersion":"0.3.0","name":"Old Card"}')
 
     const snapshot = await recordPrivateContinuityHistorySnapshot({
       identity,
@@ -208,7 +208,7 @@ test('private continuity history restore restores the full markdown checkpoint',
       existedBefore: true,
       previousContent: '# Old Memory\nprivate memory\n',
       previousFiles: await readContinuityFiles(identity),
-      previousPublicSkills: await readPublicSkillsFile(identity),
+      previousAgentCard: await readAgentCardFile(identity),
       changeSummary: 'append private memory',
       createdAt: '2026-04-21T00:00:00.000Z',
     })
@@ -217,7 +217,7 @@ test('private continuity history restore restores the full markdown checkpoint',
       'SOUL.md': '# New Soul\nchanged soul\n',
       'MEMORY.md': '# New Memory\nchanged memory\n',
     })
-    await writePublicSkillsFile(identity, '{"schema":"ethagent.public-skills.v1","name":"New Skills"}')
+    await writeAgentCardFile(identity, '{"protocolVersion":"0.3.0","name":"New Card"}')
 
     await restorePrivateContinuityHistorySnapshot(identity, snapshot.id)
 
@@ -225,11 +225,11 @@ test('private continuity history restore restores the full markdown checkpoint',
       'SOUL.md': '# Old Soul\nprivate soul\n',
       'MEMORY.md': '# Old Memory\nprivate memory\n',
     })
-    assert.equal(await readPublicSkillsFile(identity), '{"schema":"ethagent.public-skills.v1","name":"Old Skills"}\n')
+    assert.equal(await readAgentCardFile(identity), '{"protocolVersion":"0.3.0","name":"Old Card"}\n')
   })
 })
 
-test('published snapshot list enriches current entries with public skills metadata', async () => {
+test('published snapshot list enriches current entries with agent card metadata', async () => {
   await withHome(async () => {
     const publishedIdentity: EthagentIdentity = {
       ...identity,
@@ -245,16 +245,14 @@ test('published snapshot list enriches current entries with public skills metada
 
     const list = await listPublishedContinuitySnapshots({
       ...publishedIdentity,
-      publicSkills: {
-        cid: 'bafyskills',
-        agentCardCid: 'bafycard',
+      agentCard: {
+        cid: 'bafycard',
         status: 'pinned',
       },
     })
 
     assert.equal(list.length, 1)
     assert.equal(list[0]!.cid, 'bafybackup')
-    assert.equal(list[0]!.publicSkillsCid, 'bafyskills')
     assert.equal(list[0]!.agentCardCid, 'bafycard')
   })
 })
@@ -270,15 +268,15 @@ test('working tree status compares local markdown to published snapshot hashes',
         ipfsApiUrl: 'https://ipfs.example',
         status: 'pinned',
       },
-      publicSkills: {
-        cid: 'bafyskills',
+      agentCard: {
+        cid: 'bafycard',
         status: 'pinned',
       },
     }
     await writeIdentityMarkdownScaffold(publishedIdentity, {
       'SOUL.md': '# Soul\nprivate soul\n',
       'MEMORY.md': '# Memory\nprivate memory\n',
-      'skills.json': '{"schema":"ethagent.public-skills.v1","name":"Skills"}',
+      'agent-card.json': '{"protocolVersion":"0.3.0","name":"Card"}',
     })
     await recordPublishedContinuitySnapshot({ identity: publishedIdentity })
     const [published] = await listPublishedContinuitySnapshots(publishedIdentity)
@@ -329,30 +327,28 @@ test('published snapshot hashes can be backfilled after verification', async () 
     await writeIdentityMarkdownScaffold(legacyIdentity, {
       'SOUL.md': '# Soul\nprivate soul\n',
       'MEMORY.md': '# Memory\nprivate memory\n',
-      'skills.json': '{"schema":"ethagent.public-skills.v1","name":"Skills"}',
+      'agent-card.json': '{"protocolVersion":"0.3.0","name":"Card"}',
     })
     const current = await continuityWorkingTreeStatus(legacyIdentity)
     assert.ok(current.localContentHashes)
 
     const refreshedIdentity: EthagentIdentity = {
       ...legacyIdentity,
-      publicSkills: {
-        cid: 'bafyrefreshedskills',
-        agentCardCid: 'bafyrefreshedcard',
+      agentCard: {
+        cid: 'bafyrefreshedcard',
         status: 'pinned',
       },
     }
     await updatePublishedContinuitySnapshotContentHashes(refreshedIdentity, 'bafybackup', current.localContentHashes)
     const [published] = await listPublishedContinuitySnapshots(refreshedIdentity)
 
-    assert.equal(published?.contentHashes?.['skills.json'], current.localContentHashes['skills.json'])
-    assert.equal(published?.publicSkillsCid, 'bafyrefreshedskills')
+    assert.equal(published?.contentHashes?.['agent-card.json'], current.localContentHashes['agent-card.json'])
     assert.equal(published?.agentCardCid, 'bafyrefreshedcard')
     assert.equal((await continuityWorkingTreeStatus(legacyIdentity, published)).publishState, 'published')
   })
 })
 
-test('published snapshot hashes can be refreshed after refetch restores public skills', async () => {
+test('published snapshot hashes can be refreshed after refetch restores agent card', async () => {
   await withHome(async () => {
     const restoredIdentity: EthagentIdentity = {
       ...identity,
@@ -363,15 +359,15 @@ test('published snapshot hashes can be refreshed after refetch restores public s
         ipfsApiUrl: 'https://ipfs.example',
         status: 'restored',
       },
-      publicSkills: {
-        cid: 'bafyskills',
+      agentCard: {
+        cid: 'bafycard',
         status: 'pinned',
       },
     }
     await writeIdentityMarkdownScaffold(restoredIdentity, {
       'SOUL.md': '# Soul\nprivate soul\n',
       'MEMORY.md': '# Memory\nprivate memory\n',
-      'skills.json': '{"schema":"ethagent.public-skills.v1","name":"Old Skills"}',
+      'agent-card.json': '{"protocolVersion":"0.3.0","name":"Old Card"}',
     })
     await recordPublishedContinuitySnapshot({ identity: restoredIdentity })
     const [stalePublished] = await listPublishedContinuitySnapshots(restoredIdentity)

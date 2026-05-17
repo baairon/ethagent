@@ -17,7 +17,6 @@ type PublishedContinuitySnapshot = {
   metadataCid?: string
   agentUri?: string
   txHash?: string
-  publicSkillsCid?: string
   agentCardCid?: string
   contentHashes?: ContinuitySnapshotContentHashes
   label: string
@@ -55,8 +54,7 @@ export async function recordPublishedContinuitySnapshot(
     ...(backup.metadataCid ? { metadataCid: backup.metadataCid } : {}),
     ...(backup.agentUri ? { agentUri: backup.agentUri } : {}),
     ...(backup.txHash ? { txHash: backup.txHash } : {}),
-    ...(input.identity.publicSkills?.cid ? { publicSkillsCid: input.identity.publicSkills.cid } : {}),
-    ...(input.identity.publicSkills?.agentCardCid ? { agentCardCid: input.identity.publicSkills.agentCardCid } : {}),
+    ...(input.identity.agentCard?.cid ? { agentCardCid: input.identity.agentCard.cid } : {}),
     ...(contentHashes ? { contentHashes } : {}),
     label: input.label ?? 'published encrypted snapshot',
     identity: {
@@ -129,7 +127,6 @@ function enrichPublishedSnapshot(
     ...(snapshot.metadataCid ? {} : current.metadataCid ? { metadataCid: current.metadataCid } : {}),
     ...(snapshot.agentUri ? {} : current.agentUri ? { agentUri: current.agentUri } : {}),
     ...(snapshot.txHash ? {} : current.txHash ? { txHash: current.txHash } : {}),
-    ...(snapshot.publicSkillsCid ? {} : current.publicSkillsCid ? { publicSkillsCid: current.publicSkillsCid } : {}),
     ...(snapshot.agentCardCid ? {} : current.agentCardCid ? { agentCardCid: current.agentCardCid } : {}),
     ...(snapshot.contentHashes ? {} : current.contentHashes ? { contentHashes: current.contentHashes } : {}),
   }
@@ -141,8 +138,7 @@ function refreshPublishedSnapshotSidecars(
 ): PublishedContinuitySnapshot {
   return {
     ...snapshot,
-    ...(identity.publicSkills?.cid ? { publicSkillsCid: identity.publicSkills.cid } : {}),
-    ...(identity.publicSkills?.agentCardCid ? { agentCardCid: identity.publicSkills.agentCardCid } : {}),
+    ...(identity.agentCard?.cid ? { agentCardCid: identity.agentCard.cid } : {}),
   }
 }
 
@@ -180,8 +176,7 @@ function currentPublishedSnapshot(identity: EthagentIdentity): PublishedContinui
     ...(backup.metadataCid ? { metadataCid: backup.metadataCid } : {}),
     ...(backup.agentUri ? { agentUri: backup.agentUri } : {}),
     ...(backup.txHash ? { txHash: backup.txHash } : {}),
-    ...(identity.publicSkills?.cid ? { publicSkillsCid: identity.publicSkills.cid } : {}),
-    ...(identity.publicSkills?.agentCardCid ? { agentCardCid: identity.publicSkills.agentCardCid } : {}),
+    ...(identity.agentCard?.cid ? { agentCardCid: identity.agentCard.cid } : {}),
     label: 'current published snapshot',
     identity: {
       address: identity.address,

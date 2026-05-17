@@ -2,8 +2,9 @@ import { atomicWriteText } from '../../../storage/atomicWrite.js'
 import type { EthagentIdentity } from '../../../storage/config.js'
 import {
   appendPublicSkillEntries,
+  createAgentCard,
   defaultPublicSkillsProfile,
-  renderPublicSkillsJson,
+  serializeAgentCard,
 } from '../publicSkills.js'
 import { ensureContinuityVault, ensureTrailingNewline, readOrDefault } from '../storage/files.js'
 import { listSkills } from './loadSkills.js'
@@ -14,19 +15,19 @@ export async function derivePublicSkillEntries(identity: EthagentIdentity): Prom
   return entries.filter(entry => entry.visibility === 'public')
 }
 
-export async function renderPublicSkillsJsonForIdentity(identity: EthagentIdentity): Promise<string> {
+export async function renderAgentCardJsonForIdentity(identity: EthagentIdentity): Promise<string> {
   const publicEntries = await derivePublicSkillEntries(identity)
   const profile = appendPublicSkillEntries(defaultPublicSkillsProfile(identity), publicEntries)
-  return renderPublicSkillsJson(profile)
+  return serializeAgentCard(createAgentCard(profile))
 }
 
-export async function syncPublicSkillsManifest(identity: EthagentIdentity): Promise<string> {
+export async function syncAgentCardManifest(identity: EthagentIdentity): Promise<string> {
   const ref = await ensureContinuityVault(identity)
-  const next = await renderPublicSkillsJsonForIdentity(identity)
-  const current = await readOrDefault(ref.publicSkillsPath, '')
+  const next = await renderAgentCardJsonForIdentity(identity)
+  const current = await readOrDefault(ref.agentCardPath, '')
   if (current === ensureTrailingNewline(next) || current === next) {
     return current
   }
-  await atomicWriteText(ref.publicSkillsPath, ensureTrailingNewline(next), { mode: 0o644 })
+  await atomicWriteText(ref.agentCardPath, ensureTrailingNewline(next), { mode: 0o644 })
   return next
 }

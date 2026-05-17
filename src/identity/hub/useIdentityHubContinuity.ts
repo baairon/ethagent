@@ -4,7 +4,7 @@ import { catFromIpfs, DEFAULT_IPFS_API_URL } from '../storage/ipfs.js'
 import {
   continuityVaultStatus,
   continuityWorkingTreeStatus,
-  ensurePublicSkillsFile,
+  ensureAgentCardFile,
   type ContinuityWorkingTreeStatus,
 } from '../continuity/storage.js'
 import { openFileInEditor, openInFileManager } from '../continuity/editor.js'
@@ -17,7 +17,7 @@ import {
   setSkillVisibility as setSkillVisibilityStorage,
 } from '../continuity/skills/loadSkills.js'
 import type { SkillVisibility } from '../continuity/skills/types.js'
-import { syncPublicSkillsManifest } from '../continuity/skills/publicSkillsSync.js'
+import { syncAgentCardManifest } from '../continuity/skills/publicSkillsSync.js'
 import { continuityVaultRef } from '../continuity/storage.js'
 import type { Step } from './identityHubReducer.js'
 
@@ -109,7 +109,7 @@ export function useIdentityHubContinuity({
       const id = await requireReadyVault()
       const notice = await args.run(id)
       invalidateSkillsCache(id)
-      await syncPublicSkillsManifest(id)
+      await syncAgentCardManifest(id)
       const next = args.successStep
         ? args.successStep(notice)
         : { kind: 'continuity-skills-tree' as const, notice }
@@ -126,12 +126,12 @@ export function useIdentityHubContinuity({
       : 'continuity-private'
     try {
       if (kind === 'skills') {
-        await ensurePublicSkillsFile(identity, {
-          fallback: () => readPublishedPublicSkills(identity),
+        await ensureAgentCardFile(identity, {
+          fallback: () => readPublishedAgentCard(identity),
         })
       }
       const ref = continuityVaultRef(identity)
-      const file = kind === 'soul' ? ref.soulPath : kind === 'memory' ? ref.memoryPath : ref.publicSkillsPath
+      const file = kind === 'soul' ? ref.soulPath : kind === 'memory' ? ref.memoryPath : ref.agentCardPath
       const result = await openFileInEditor(file)
       if (result.ok) {
         setStep({ kind: returnKind, editorOpened: true })
@@ -150,10 +150,10 @@ export function useIdentityHubContinuity({
       const result = await openFileInEditor(skill.absolutePath)
       invalidateSkillsCache(identity)
       try {
-        await syncPublicSkillsManifest(identity)
+        await syncAgentCardManifest(identity)
       } catch (syncErr: unknown) {
         const failPrefix = result.ok ? '' : `open failed: ${result.error}; `
-        setStep({ kind: 'continuity-skills-tree', notice: `${failPrefix}public manifest sync failed: ${(syncErr as Error).message}`, editorOpened: result.ok })
+        setStep({ kind: 'continuity-skills-tree', notice: `${failPrefix}agent card update failed: ${(syncErr as Error).message}`, editorOpened: result.ok })
         return
       }
       if (result.ok) {
@@ -194,7 +194,7 @@ export function useIdentityHubContinuity({
       const id = await requireReadyVault()
       const created = await createSkillFile(id, { name: normalizedName, visibility })
       invalidateSkillsCache(id)
-      await syncPublicSkillsManifest(id)
+      await syncAgentCardManifest(id)
       const result = await openFileInEditor(created.absolutePath)
       if (result.ok) {
         setStep({ kind: 'continuity-skills-tree', editorOpened: true })
@@ -248,9 +248,9 @@ export function sanitizeSkillSegment(value: string): string {
   return value.trim().toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60)
 }
 
-async function readPublishedPublicSkills(identity: EthagentIdentity): Promise<string> {
-  const cid = identity.publicSkills?.cid
-  if (!cid) throw new Error('No saved public skills CID')
+async function readPublishedAgentCard(identity: EthagentIdentity): Promise<string> {
+  const cid = identity.agentCard?.cid
+  if (!cid) throw new Error('No saved Agent Card CID')
   return new TextDecoder().decode(await catFromIpfs(
     identity.backup?.ipfsApiUrl ?? DEFAULT_IPFS_API_URL,
     cid,

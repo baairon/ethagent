@@ -4,7 +4,7 @@ import {
   writePreparedPrivateContinuityEdit,
 } from '../identity/continuity/privateEdit.js'
 import { recordPrivateContinuityHistorySnapshot } from '../identity/continuity/history.js'
-import { readContinuityFiles, readPublicSkillsFile } from '../identity/continuity/storage.js'
+import { readContinuityFiles, readAgentCardFile } from '../identity/continuity/storage.js'
 import type { Tool } from './contracts.js'
 import { formatFileChangeResult } from './fileDiff.js'
 
@@ -120,9 +120,9 @@ export const privateContinuityEditTool: Tool<typeof schema> = {
   },
   async execute(input, context) {
     const prepared = await preparePrivateContinuityEdit(input, context.config)
-    const [previousFiles, previousPublicSkills] = await Promise.all([
+    const [previousFiles, previousAgentCard] = await Promise.all([
       readContinuityFiles(prepared.identity),
-      readPublicSkillsFile(prepared.identity),
+      readAgentCardFile(prepared.identity),
     ])
     await recordPrivateContinuityHistorySnapshot({
       identity: prepared.identity,
@@ -131,7 +131,7 @@ export const privateContinuityEditTool: Tool<typeof schema> = {
       existedBefore: prepared.existedBefore,
       previousContent: prepared.previousContent,
       previousFiles,
-      previousPublicSkills,
+      previousAgentCard,
       changeSummary: prepared.changeSummary,
       sessionId: context.checkpoint?.sessionId,
       turnId: context.checkpoint?.turnId,

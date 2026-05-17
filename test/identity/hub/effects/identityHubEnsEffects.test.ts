@@ -109,18 +109,16 @@ test('advanced ENS save state rejects incoherent validation', () => {
   ), /token not held by owner wallet/i)
 })
 
-test('ENS record update writes only changed text records', () => {
+const ensip25Key = 'agent-registration[0x000100000101140000000000000000000000000000000000000001][2]'
+
+test('ENS record update writes the ENSIP-25 attestation when not yet present', () => {
   const writes = ensRecordWritesForUpdate({
-    currentRecords: {
-      token: 'eip155:1:0x0000000000000000000000000000000000000001:1',
-    },
-    records: {
-      token: 'eip155:1:0x0000000000000000000000000000000000000001:2',
-    },
+    currentRecords: {},
+    records: { [ensip25Key]: '1' },
   })
 
   assert.deepEqual(writes, {
-    'org.ethagent.token': 'eip155:1:0x0000000000000000000000000000000000000001:2',
+    [ensip25Key]: '1',
   })
 })
 
@@ -128,20 +126,20 @@ test('ENS record clearing writes empty strings only for populated records', () =
   const writes = ensRecordWritesForUpdate({
     clearRecords: true,
     currentRecords: {
-      token: 'eip155:1:0x0000000000000000000000000000000000000001:1',
+      [ensip25Key]: '1',
     },
-    records: { token: '' },
+    records: {},
   })
 
   assert.deepEqual(writes, {
-    'org.ethagent.token': '',
+    [ensip25Key]: '',
   })
 })
 
 test('ENS record clearing does not blindly write records when current values are unknown', () => {
   const writes = ensRecordWritesForUpdate({
     clearRecords: true,
-    records: { token: '' },
+    records: {},
   })
 
   assert.deepEqual(writes, {})
@@ -154,8 +152,8 @@ test('ENS record update preflights resolver transaction before opening wallet', 
     runUpdateEnsRecords({
       fullName: 'agent.example.eth',
       ownerAddress: owner,
-      records: { token: 'eip155:1:0x0000000000000000000000000000000000000001:2' },
-      currentRecords: { token: 'eip155:1:0x0000000000000000000000000000000000000001:1' },
+      records: { [ensip25Key]: '1' },
+      currentRecords: {},
       purpose: 'update-ens-records',
       callbacks: {
         onStep: () => {},

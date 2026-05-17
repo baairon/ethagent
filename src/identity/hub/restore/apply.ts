@@ -10,7 +10,7 @@ import {
   restoreSkillsTree,
   writeContinuityFiles,
 } from '../../continuity/storage.js'
-import { syncPublicSkillsManifest } from '../../continuity/skills/publicSkillsSync.js'
+import { syncAgentCardManifest } from '../../continuity/skills/publicSkillsSync.js'
 import { recordPublishedContinuitySnapshot } from '../../continuity/snapshots.js'
 import { requestBrowserWalletSignature } from '../../wallet/browserWallet.js'
 import { setVaultAddressField } from '../../identityCompat.js'
@@ -18,7 +18,7 @@ import type { Step } from '../identityHubReducer.js'
 import type { EffectCallbacks } from '../shared/effects/types.js'
 import { isContinuitySnapshotEnvelope } from './envelopes.js'
 import { restoreSignatureRequestForStep } from './auth.js'
-import { type BackupMetadata, operatorStateFromCandidate, restorePublishedPublicSkills } from './helpers.js'
+import { type BackupMetadata, operatorStateFromCandidate, restorePublishedAgentCard } from './helpers.js'
 
 export async function runRestoreAuthorize(
   step: Extract<Step, { kind: 'restore-authorizing' }>,
@@ -99,10 +99,9 @@ export async function runRestoreAuthorize(
     metadataCid: step.candidate.metadataCid,
     state: restoredState,
     backup,
-    ...(step.candidate.publicDiscovery ? {
-      publicSkills: {
-        ...(step.candidate.publicDiscovery.skillsCid ? { cid: step.candidate.publicDiscovery.skillsCid } : {}),
-        ...(step.candidate.publicDiscovery.agentCardCid ? { agentCardCid: step.candidate.publicDiscovery.agentCardCid } : {}),
+    ...(step.candidate.publicDiscovery?.agentCardCid ? {
+      agentCard: {
+        cid: step.candidate.publicDiscovery.agentCardCid,
         ...(step.candidate.publicDiscovery.updatedAt ? { updatedAt: step.candidate.publicDiscovery.updatedAt } : {}),
         status: 'pinned',
       },
@@ -115,9 +114,9 @@ export async function runRestoreAuthorize(
     await restoreSkillsTree(nextIdentity, continuitySkills)
   }
   callbacks.onRestoreProgress?.({ phase: 'finishing', label: 'finalizing restored identity...' })
-  await restorePublishedPublicSkills(nextIdentity, step.apiUrl, step.candidate.publicDiscovery?.skillsCid)
+  await restorePublishedAgentCard(nextIdentity, step.apiUrl, step.candidate.publicDiscovery?.agentCardCid)
   await ensureIdentityMarkdownScaffold(nextIdentity)
-  await syncPublicSkillsManifest(nextIdentity).catch(() => null)
+  await syncAgentCardManifest(nextIdentity).catch(() => null)
   await recordPublishedContinuitySnapshot({ identity: nextIdentity, label: 'restored from agent backup' }).catch(() => null)
   await callbacks.onIdentityComplete(nextIdentity, `ERC-8004 agent restored · #${step.candidate.agentId.toString()}`, 'restore')
 }

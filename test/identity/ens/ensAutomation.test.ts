@@ -83,7 +83,7 @@ test('advanced ENS preflight creates direct registry setup and resolver records'
   assert.ok(registryTx?.data.startsWith('0x'))
   assert.equal(registryTx?.to, '0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e')
   assert.equal(recordsTx?.to, ENS_PUBLIC_RESOLVER_ADDRESS_MAINNET)
-  assert.equal(recordsTx?.calls.length, 2)
+  assert.equal(recordsTx?.calls.length, 3)
 })
 
 test('simple ENS create preflight allows the connected wallet to own and operate the name', async () => {
@@ -108,8 +108,9 @@ test('simple ENS create preflight allows the connected wallet to own and operate
   assert.equal(result.setup.registryAction, 'create-subdomain')
 })
 
-test('advanced ENS preflight skips transactions when existing public records already match', async () => {
-  const tokenRef = `eip155:1:${registry.identityRegistryAddress.toLowerCase()}:42`
+test('advanced ENS preflight skips transactions when both ENSIP-25 and the discovery hint are already set', async () => {
+  const ensip25Key = `agent-registration[0x00010000010114${registry.identityRegistryAddress.slice(2).toLowerCase()}][42]`
+  const tokenValue = `eip155:1:${registry.identityRegistryAddress.toLowerCase()}:42`
   const result = await preflightEnsSetup({
     rootName: root,
     label,
@@ -121,7 +122,8 @@ test('advanced ENS preflight skips transactions when existing public records alr
       childResolver: resolver,
       addressRecord: owner,
       texts: {
-        'org.ethagent.token': tokenRef,
+        [ensip25Key]: '1',
+        'org.ethagent.token': tokenValue,
       },
     }),
     tokenPublicClient: tokenClient(),
@@ -150,26 +152,6 @@ test('advanced ENS preflight can set a missing resolver on an existing owner-own
   assert.equal(result.ok && result.setup.registryAction, 'set-resolver')
   if (!result.ok) return
   assert.equal(encodeEnsRegistryTransaction(result.setup)?.to, '0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e')
-})
-
-test('advanced ENS preflight blocks a subdomain already linked to another token', async () => {
-  const result = await preflightEnsSetup({
-    rootName: root,
-    label,
-    operatorAddress: operator,
-    registry,
-    agentId: '42',
-    ensClient: ensClient({
-      childOwner: owner,
-      childResolver: resolver,
-      addressRecord: owner,
-      texts: { 'org.ethagent.token': 'eip155:1:0xabc:99' },
-    }),
-    tokenPublicClient: tokenClient(),
-  })
-
-  assert.equal(result.ok, false)
-  assert.equal(!result.ok && result.fallback.reason, 'token-record-collision')
 })
 
 test('advanced ENS preflight automates a NameWrapper-managed parent', async () => {

@@ -4,11 +4,9 @@ import { getAddress, type Address } from 'viem'
 import { Surface } from '../../../ui/Surface.js'
 import { Select, type SelectOption } from '../../../ui/Select.js'
 import { theme } from '../../../ui/theme.js'
-import {
-  formatRecordValue,
-  recordLabel,
-  type AgentEnsRecords,
-  type AgentRecordDiff,
+import type {
+  AgentEnsRecords,
+  AgentRecordDiff,
 } from '../../ens/agentRecords.js'
 import type { EnsValidation } from '../../ens/ensLookup.js'
 import type {
@@ -194,7 +192,9 @@ export const EnsSetupBlockedScreen: React.FC<EnsSetupBlockedScreenProps> = ({
           {isSimple
             ? <EnsSetupRow label="Wallet" value={fallback.ownerAddress ? shortAddress(fallback.ownerAddress) : shortAddress(fallback.operatorAddress)} />
             : (fallback.ownerAddress ? <EnsSetupRow label="Owner wallet" value={shortAddress(fallback.ownerAddress)} /> : null)}
-          {fallback.nextRecords?.token ? <EnsSetupRow label="Token link" value={fallback.nextRecords.token} /> : null}
+          {fallback.nextRecords && Object.keys(fallback.nextRecords).length > 0
+            ? <EnsSetupRow label="Attestation" value="ENSIP-25 agent-registration record" />
+            : null}
           <EnsSetupRow label="Address" value={`Set the subdomain address record to the ${isSimple ? 'connected wallet' : 'owner wallet'}.`} />
           {!isSimple
             ? (
@@ -271,7 +271,7 @@ export const UnlinkEnsReviewScreen: React.FC<UnlinkEnsReviewScreenProps> = ({
             {changedDiffs.map(diff => (
               <Text key={diff.key}>
                 <Text color={theme.dim}>{`  ${diff.key}  `}</Text>
-                <Text color={theme.accentPeriwinkle}>{formatRecordValue(diff.field, diff.current)}</Text>
+                <Text color={theme.accentPeriwinkle}>{diff.current}</Text>
               </Text>
             ))}
           </Box>
@@ -420,16 +420,16 @@ export const ReviewScreen: React.FC<ReviewScreenProps> = ({
           : null}
         {recordsDiff.map(diff => (
           <Text key={diff.key}>
-            <Text color={theme.dim}>{`- ${recordLabel(diff.field)}: `}</Text>
+            <Text color={theme.dim}>{`- ${diff.key}: `}</Text>
             {diff.changed
               ? (
                 <>
-                  {renderRecordValue(diff.field, diff.current)}
+                  {renderRecordValue(diff.current)}
                   <Text color={theme.dim}>{' → '}</Text>
-                  {renderRecordValue(diff.field, diff.next)}
+                  {renderRecordValue(diff.next)}
                 </>
               )
-              : renderRecordValue(diff.field, diff.next)}
+              : renderRecordValue(diff.next)}
           </Text>
         ))}
         {!hasRecordChanges

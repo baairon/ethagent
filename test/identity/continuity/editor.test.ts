@@ -27,10 +27,10 @@ test('defaultEditorCommand uses open on macOS', () => {
 })
 
 test('defaultEditorCommand uses xdg-open on Linux', () => {
-  const command = defaultEditorCommand('/tmp/skills.json', 'linux')
+  const command = defaultEditorCommand('/tmp/agent-card.json', 'linux')
   assert.deepEqual(command, {
     cmd: 'xdg-open',
-    args: ['/tmp/skills.json'],
+    args: ['/tmp/agent-card.json'],
     method: 'xdg-open',
     waited: false,
   })
@@ -74,10 +74,10 @@ test('vscodeEditorCommand on macOS calls code directly with --reuse-window', () 
 })
 
 test('vscodeEditorCommand on Linux calls code directly with --reuse-window', () => {
-  const command = vscodeEditorCommand('/tmp/skills.json', 'linux')
+  const command = vscodeEditorCommand('/tmp/agent-card.json', 'linux')
   assert.deepEqual(command, {
     cmd: 'code',
-    args: ['--reuse-window', '/tmp/skills.json'],
+    args: ['--reuse-window', '/tmp/agent-card.json'],
     method: 'vscode',
     waited: false,
   })

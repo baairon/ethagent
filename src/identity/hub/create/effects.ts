@@ -14,7 +14,6 @@ import {
 import {
   createAgentCard,
   defaultPublicSkillsProfile,
-  renderPublicSkillsJson,
   serializeAgentCard,
 } from '../../continuity/publicSkills.js'
 import { recordPublishedContinuitySnapshot } from '../../continuity/snapshots.js'
@@ -43,17 +42,17 @@ import { awaitConfirmedReceipt } from '../shared/effects/receipts.js'
 import { assertVerifiedPin } from '../shared/effects/profilePrep.js'
 
 type BackupMetadata = NonNullable<EthagentIdentity['backup']>
-type PublicSkillsMetadata = NonNullable<EthagentIdentity['publicSkills']>
+type AgentCardMetadata = NonNullable<EthagentIdentity['agentCard']>
 
 type CreatePreparedTransaction = {
   ownerAddress: Address
   agentUri: string
   metadataCid: string
   backup: BackupMetadata
-  publicSkills: PublicSkillsMetadata
+  agentCard: AgentCardMetadata
   state: Record<string, unknown>
   continuityFiles: ReturnType<typeof defaultContinuityFiles>
-  publicSkillsJson: string
+  agentCardJson: string
 }
 
 export async function runCreatePreflight(
@@ -139,10 +138,8 @@ export async function runCreateSigning(
       })
       const continuityFiles = defaultContinuityFiles(draftIdentity)
       const publicProfile = defaultPublicSkillsProfile(draftIdentity)
-      const publicSkillsJson = renderPublicSkillsJson(publicProfile)
-      const publicSkillsPin = await addToIpfs(DEFAULT_IPFS_API_URL, publicSkillsJson, fetch, { pinataJwt: step.pinataJwt })
-      assertVerifiedPin(publicSkillsPin)
-      const agentCardPin = await addToIpfs(DEFAULT_IPFS_API_URL, serializeAgentCard(createAgentCard(publicProfile)), fetch, { pinataJwt: step.pinataJwt })
+      const agentCardJson = serializeAgentCard(createAgentCard(publicProfile))
+      const agentCardPin = await addToIpfs(DEFAULT_IPFS_API_URL, agentCardJson, fetch, { pinataJwt: step.pinataJwt })
       assertVerifiedPin(agentCardPin)
       const envelope = createContinuitySnapshotEnvelope({
         ownerAddress: wallet.account,
@@ -168,9 +165,8 @@ export async function runCreateSigning(
         rpcUrl: step.registry.rpcUrl,
         identityRegistryAddress: step.registry.identityRegistryAddress,
       }
-      const publicSkills: PublicSkillsMetadata = {
-        cid: publicSkillsPin.cid,
-        agentCardCid: agentCardPin.cid,
+      const agentCard: AgentCardMetadata = {
+        cid: agentCardPin.cid,
         updatedAt: envelope.createdAt,
         status: 'pinned',
       }
@@ -181,7 +177,7 @@ export async function runCreateSigning(
         ...(typeof state.imageUrl === 'string' ? { image: state.imageUrl } : {}),
       }, {
         backup: { cid, envelopeVersion: envelope.envelopeVersion, createdAt: envelope.createdAt },
-        publicDiscovery: { skillsCid: publicSkills.cid, agentCardCid: publicSkills.agentCardCid, updatedAt: publicSkills.updatedAt },
+        publicDiscovery: { agentCardCid: agentCard.cid, updatedAt: agentCard.updatedAt },
         registration: { chainId: step.registry.chainId, identityRegistryAddress: step.registry.identityRegistryAddress },
         ownerAddress: wallet.account,
       })
@@ -197,10 +193,10 @@ export async function runCreateSigning(
           agentUri,
           metadataCid,
           backup: { ...backup, metadataCid, agentUri },
-          publicSkills,
+          agentCard,
           state,
           continuityFiles,
-          publicSkillsJson,
+          agentCardJson,
         },
       }
     },
@@ -233,11 +229,11 @@ export async function runCreateSigning(
     metadataCid: result.prepared.metadataCid,
     state: result.prepared.state,
     backup,
-    publicSkills: result.prepared.publicSkills,
+    agentCard: result.prepared.agentCard,
   }
   await writeIdentityMarkdownScaffold(nextIdentity, {
     ...defaultContinuityFiles(nextIdentity),
-    'skills.json': result.prepared.publicSkillsJson,
+    'agent-card.json': result.prepared.agentCardJson,
   })
   await recordPublishedContinuitySnapshot({ identity: nextIdentity, label: 'initial published snapshot' }).catch(() => null)
   await callbacks.onIdentityComplete(nextIdentity, `ERC-8004 agent registered · #${registered.agentId.toString()}`, 'create')

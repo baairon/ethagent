@@ -12,7 +12,7 @@ import {
   restoreSkillsTree,
   writeContinuityFiles,
 } from '../../continuity/storage.js'
-import { syncPublicSkillsManifest } from '../../continuity/skills/publicSkillsSync.js'
+import { syncAgentCardManifest } from '../../continuity/skills/publicSkillsSync.js'
 import { recordPublishedContinuitySnapshot, updatePublishedContinuitySnapshotContentHashes } from '../../continuity/snapshots.js'
 import { catFromIpfs, DEFAULT_IPFS_API_URL } from '../../storage/ipfs.js'
 import {
@@ -24,7 +24,7 @@ import { setVaultAddressField } from '../../identityCompat.js'
 import type { EffectCallbacks } from '../shared/effects/types.js'
 import { isContinuitySnapshotEnvelope, parseRestorableEnvelope } from './envelopes.js'
 import { restoreMessageForWallet } from './auth.js'
-import { type BackupMetadata, operatorStateFromCandidate, restorePublishedPublicSkills } from './helpers.js'
+import { type BackupMetadata, operatorStateFromCandidate, restorePublishedAgentCard } from './helpers.js'
 
 export async function runRecoveryRefetch(
   identity: EthagentIdentity,
@@ -46,7 +46,7 @@ export async function runRecoveryRefetch(
   const raw = await catFromIpfs(apiUrl, candidate.backup.cid)
   const envelope = parseRestorableEnvelope(raw)
   if (!isContinuitySnapshotEnvelope(envelope)) {
-    throw new Error('This snapshot is in an unsupported envelope format and cannot be refetched here; use Load Agent')
+    throw new Error('This snapshot is in an unsupported envelope format and cannot be refetched here; use Switch Agent')
   }
   const eligibleAddresses: Address[] = [ownerAddress]
   if (isWalletContinuitySnapshotEnvelope(envelope)) {
@@ -119,10 +119,9 @@ export async function runRecoveryRefetch(
     metadataCid: candidate.metadataCid,
     state: refreshedState,
     backup: refreshedBackup,
-    ...(candidate.publicDiscovery ? {
-      publicSkills: {
-        ...(candidate.publicDiscovery.skillsCid ? { cid: candidate.publicDiscovery.skillsCid } : {}),
-        ...(candidate.publicDiscovery.agentCardCid ? { agentCardCid: candidate.publicDiscovery.agentCardCid } : {}),
+    ...(candidate.publicDiscovery?.agentCardCid ? {
+      agentCard: {
+        cid: candidate.publicDiscovery.agentCardCid,
         ...(candidate.publicDiscovery.updatedAt ? { updatedAt: candidate.publicDiscovery.updatedAt } : {}),
         status: 'pinned',
       },
@@ -133,11 +132,11 @@ export async function runRecoveryRefetch(
     await restoreSkillsTree(nextIdentity, payload.skills)
   }
   callbacks.onRestoreProgress?.({ phase: 'finishing', label: 'finalizing refreshed identity...' })
-  const publicSkillsRestored = await restorePublishedPublicSkills(nextIdentity, apiUrl, candidate.publicDiscovery?.skillsCid)
+  const agentCardRestored = await restorePublishedAgentCard(nextIdentity, apiUrl, candidate.publicDiscovery?.agentCardCid)
   await ensureIdentityMarkdownScaffold(nextIdentity)
-  await syncPublicSkillsManifest(nextIdentity).catch(() => null)
+  await syncAgentCardManifest(nextIdentity).catch(() => null)
   await recordPublishedContinuitySnapshot({ identity: nextIdentity, label: 'Refetched Latest Snapshot From Onchain' }).catch(() => null)
-  if (publicSkillsRestored) {
+  if (agentCardRestored) {
     const contentHashes = await localContinuitySnapshotContentHashes(nextIdentity)
     await updatePublishedContinuitySnapshotContentHashes(nextIdentity, candidate.backup.cid, contentHashes).catch(() => null)
   }

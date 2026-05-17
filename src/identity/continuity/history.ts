@@ -6,7 +6,7 @@ import type { ContinuityFiles } from './envelope.js'
 import {
   continuityVaultRef,
   ensureContinuityVault,
-  writePublicSkillsFile,
+  writeAgentCardFile,
   writeContinuityFiles,
   type PrivateContinuityFile,
 } from './storage.js'
@@ -20,7 +20,7 @@ type PrivateContinuityHistorySnapshot = {
   existedBefore: boolean
   previousContent: string
   previousFiles?: ContinuityFiles
-  previousPublicSkills?: string
+  previousAgentCard?: string
   changeSummary: string
   identity: {
     address: string
@@ -42,7 +42,7 @@ type RecordPrivateContinuityHistoryInput = {
   existedBefore: boolean
   previousContent: string
   previousFiles?: ContinuityFiles
-  previousPublicSkills?: string
+  previousAgentCard?: string
   changeSummary: string
   createdAt?: string
   sessionId?: string
@@ -69,7 +69,7 @@ export async function recordPrivateContinuityHistorySnapshot(
     existedBefore: input.existedBefore,
     previousContent: input.previousContent,
     ...(input.previousFiles ? { previousFiles: input.previousFiles } : {}),
-    ...(input.previousPublicSkills !== undefined ? { previousPublicSkills: input.previousPublicSkills } : {}),
+    ...(input.previousAgentCard !== undefined ? { previousAgentCard: input.previousAgentCard } : {}),
     changeSummary: input.changeSummary,
     identity: {
       address: input.identity.address,
@@ -125,8 +125,8 @@ export async function restorePrivateContinuityHistorySnapshot(
 
   if (snapshot.previousFiles) {
     await writeContinuityFiles(identity, snapshot.previousFiles)
-    if (snapshot.previousPublicSkills !== undefined) {
-      await writePublicSkillsFile(identity, snapshot.previousPublicSkills)
+    if (snapshot.previousAgentCard !== undefined) {
+      await writeAgentCardFile(identity, snapshot.previousAgentCard)
     }
     return snapshot
   }
@@ -137,8 +137,8 @@ export async function restorePrivateContinuityHistorySnapshot(
   } else {
     await fs.rm(snapshot.filePath, { force: true })
   }
-  if (snapshot.previousPublicSkills !== undefined) {
-    await writePublicSkillsFile(identity, snapshot.previousPublicSkills)
+  if (snapshot.previousAgentCard !== undefined) {
+    await writeAgentCardFile(identity, snapshot.previousAgentCard)
   }
   return snapshot
 }

@@ -1,51 +1,79 @@
-export const AGENT_RECORD_KEYS = {
-  token: 'org.ethagent.token',
-} as const
+import type { Address } from 'viem'
+import { encodeInteroperableAddress } from './erc7930.js'
 
-type AgentRecordKey = typeof AGENT_RECORD_KEYS[keyof typeof AGENT_RECORD_KEYS]
+export const AGENT_TOKEN_RECORD_KEY = 'org.ethagent.token'
 
-export const AGENT_RECORD_KEY_LIST: readonly AgentRecordKey[] = [
-  AGENT_RECORD_KEYS.token,
-] as const
-
-export const AGENT_RECORD_READ_KEY_LIST: readonly string[] = AGENT_RECORD_KEY_LIST
-
-export type AgentEnsRecords = {
-  token?: string
-}
-
-export type AgentEnsRecordState = AgentEnsRecords
+export type AgentEnsRecords = Record<string, string>
+export type AgentEnsRecordState = Record<string, string>
 
 export type AgentRecordDiff = {
-  key: AgentRecordKey
-  field: keyof AgentEnsRecordState
+  key: string
   current: string
   next: string
   changed: boolean
 }
 
-const FIELD_FOR_KEY: Record<AgentRecordKey, keyof AgentEnsRecords> = {
-  [AGENT_RECORD_KEYS.token]: 'token',
+export type Ensip25KeyArgs = {
+  chainId: number
+  identityRegistryAddress: Address | string
+  agentId: string | bigint
 }
 
-const LABEL_FOR_FIELD: Record<keyof AgentEnsRecordState, string> = {
-  token: 'Agent token',
+export function buildEnsip25Key(args: Ensip25KeyArgs): string {
+  const agentIdStr = typeof args.agentId === 'bigint' ? args.agentId.toString() : args.agentId.trim()
+  if (!agentIdStr) throw new Error('agentId is required to build the ENSIP-25 record key')
+  if (agentIdStr.includes('[') || agentIdStr.includes(']')) {
+    throw new Error('agentId must not contain square brackets per ENSIP-25')
+  }
+  const registry = encodeInteroperableAddress({
+    chainId: args.chainId,
+    address: args.identityRegistryAddress as Address,
+  })
+  return `agent-registration[${registry}][${agentIdStr}]`
 }
 
-export function recordsFromTextMap(text: Record<string, string>): AgentEnsRecordState {
+export function buildAgentTokenReferenceValue(args: Ensip25KeyArgs): string {
+  const agentIdStr = typeof args.agentId === 'bigint' ? args.agentId.toString() : args.agentId.trim()
+  return `eip155:${args.chainId}:${(args.identityRegistryAddress as string).toLowerCase()}:${agentIdStr}`
+}
+
+export function buildAgentEnsRecords(args: {
+  chainId: number
+  identityRegistryAddress: Address | string
+  agentId: string | bigint | undefined
+}): AgentEnsRecords {
+  if (args.agentId === undefined || args.agentId === '') return {}
+  const ensip25Key = buildEnsip25Key({
+    chainId: args.chainId,
+    identityRegistryAddress: args.identityRegistryAddress,
+    agentId: args.agentId,
+  })
+  const tokenValue = buildAgentTokenReferenceValue({
+    chainId: args.chainId,
+    identityRegistryAddress: args.identityRegistryAddress,
+    agentId: args.agentId,
+  })
   return {
-    token: text[AGENT_RECORD_KEYS.token] ?? '',
+    [ensip25Key]: '1',
+    [AGENT_TOKEN_RECORD_KEY]: tokenValue,
   }
 }
 
+export function recordsFromTextMap(text: Record<string, string>): AgentEnsRecordState {
+  const out: AgentEnsRecordState = {}
+  for (const [key, value] of Object.entries(text)) {
+    if (value) out[key] = value
+  }
+  return out
+}
+
 export function diffRecords(current: AgentEnsRecordState, next: AgentEnsRecords): AgentRecordDiff[] {
-  return AGENT_RECORD_KEY_LIST.map(key => {
-    const field = FIELD_FOR_KEY[key]
-    const currentValue = (current[field] ?? '').trim()
-    const nextValue = (next[field] ?? '').trim()
+  const keys = new Set<string>([...Object.keys(current), ...Object.keys(next)])
+  return Array.from(keys).map(key => {
+    const currentValue = (current[key] ?? '').trim()
+    const nextValue = (next[key] ?? '').trim()
     return {
       key,
-      field,
       current: currentValue,
       next: nextValue,
       changed: currentValue !== nextValue,
@@ -61,22 +89,10 @@ export function changedRecords(current: AgentEnsRecordState, next: AgentEnsRecor
   return out
 }
 
-export function recordLabel(field: keyof AgentEnsRecordState): string {
-  return LABEL_FOR_FIELD[field]
-}
-
-export function formatRecordValue(_field: keyof AgentEnsRecordState, value: string): string {
-  return value
-}
-
-export function buildAgentEnsRecords(args: {
-  chainId: number
-  identityRegistryAddress: string
-  agentId: string | undefined
-}): AgentEnsRecords {
-  const records: AgentEnsRecords = {}
-  if (args.agentId) {
-    records.token = `eip155:${args.chainId}:${args.identityRegistryAddress.toLowerCase()}:${args.agentId}`
+export function clearedRecords(current: AgentEnsRecordState): AgentEnsRecords {
+  const out: AgentEnsRecords = {}
+  for (const key of Object.keys(current)) {
+    out[key] = ''
   }
-  return records
+  return out
 }

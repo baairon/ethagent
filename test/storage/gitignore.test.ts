@@ -8,11 +8,11 @@ test('root identity continuity files are ignored without hiding nested docs', ()
     .map(line => line.trim())
     .filter(Boolean)
 
-  for (const entry of ['/SOUL.md', '/MEMORY.md', '/skills.json']) {
+  for (const entry of ['/SOUL.md', '/MEMORY.md', '/agent-card.json']) {
     assert.ok(lines.includes(entry), `${entry} should be ignored at the repo root`)
   }
 
-  for (const broadEntry of ['SOUL.md', 'MEMORY.md', 'skills.json']) {
+  for (const broadEntry of ['SOUL.md', 'MEMORY.md', 'agent-card.json']) {
     assert.equal(lines.includes(broadEntry), false, `${broadEntry} should not ignore nested docs`)
   }
 })

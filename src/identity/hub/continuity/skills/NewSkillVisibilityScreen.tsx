@@ -33,8 +33,8 @@ export const NewSkillVisibilityScreen: React.FC<NewSkillVisibilityScreenProps> =
     <Box marginTop={1}>
       <Select<SkillVisibility | 'back'>
         options={[
-          { value: 'private', label: 'Private', hint: 'Local-only. Not in skills.json.' },
-          { value: 'public', label: 'Public', hint: 'Default. Indexed in skills.json and Agent Card.' },
+          { value: 'private', label: 'Private', hint: 'Local-only. Not in the Agent Card.' },
+          { value: 'public', label: 'Public', hint: 'Default. Listed in the Agent Card.' },
           { value: 'back', role: 'section', label: 'Navigation' },
           { value: 'back', label: 'Back', hint: 'Return to the name step', role: 'utility' },
         ]}

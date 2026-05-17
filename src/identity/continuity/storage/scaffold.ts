@@ -1,3 +1,5 @@
+import fs from 'node:fs/promises'
+import path from 'node:path'
 import { atomicWriteText } from '../../../storage/atomicWrite.js'
 import type { EthagentIdentity } from '../../../storage/config.js'
 import type { ContinuityFiles, ContinuitySkillsTree } from '../envelope.js'
@@ -6,10 +8,10 @@ import {
   materializeSkillsTree,
 } from '../skills/loadSkills.js'
 import {
-  renderPublicSkillsJsonForIdentity,
-  syncPublicSkillsManifest,
+  renderAgentCardJsonForIdentity,
+  syncAgentCardManifest,
 } from '../skills/publicSkillsSync.js'
-import { defaultContinuityFiles, defaultPublicSkillsJson } from './defaults.js'
+import { defaultContinuityFiles, defaultAgentCardJson } from './defaults.js'
 import {
   ensureContinuityFiles,
   ensureContinuityVault,
@@ -24,14 +26,14 @@ import type { ContinuityVaultRef, IdentityMarkdownScaffold } from './types.js'
 
 export async function ensureIdentityMarkdownScaffold(
   identity: EthagentIdentity,
-  options: { publicSkillsFallback?: string | (() => Promise<string>) } = {},
+  options: { agentCardFallback?: string | (() => Promise<string>) } = {},
 ): Promise<IdentityMarkdownScaffold> {
   const privateFiles = await ensureContinuityFiles(identity)
-  const publicSkills = await ensurePublicSkillsFile(identity, { fallback: options.publicSkillsFallback })
-  const syncedPublic = await syncPublicSkillsManifest(identity).catch(() => publicSkills)
+  const agentCard = await ensureAgentCardFile(identity, { fallback: options.agentCardFallback })
+  const syncedCard = await syncAgentCardManifest(identity).catch(() => agentCard)
   return {
     ...privateFiles,
-    'skills.json': syncedPublic,
+    'agent-card.json': syncedCard,
   }
 }
 
@@ -43,7 +45,7 @@ export async function writeIdentityMarkdownScaffold(
     'SOUL.md': files['SOUL.md'],
     'MEMORY.md': files['MEMORY.md'],
   })
-  await writePublicSkillsFile(identity, files['skills.json'])
+  await writeAgentCardFile(identity, files['agent-card.json'])
   return ref
 }
 
@@ -57,7 +59,7 @@ export async function prepareSyncedIdentityMarkdownScaffold(identity: EthagentId
   await ensureIdentityMarkdownScaffold(identity)
   const privateFiles = await readContinuityFiles(identity)
   const privateDefaults = defaultContinuityFiles(identity)
-  const publicDefault = await renderPublicSkillsJsonForIdentity(identity)
+  const agentCardDefault = await renderAgentCardJsonForIdentity(identity)
   return {
     'SOUL.md': syncGeneratedMarkdown(privateFiles['SOUL.md'], privateDefaults['SOUL.md'], [
       { marker: 'identity' },
@@ -65,13 +67,13 @@ export async function prepareSyncedIdentityMarkdownScaffold(identity: EthagentId
     'MEMORY.md': syncGeneratedMarkdown(privateFiles['MEMORY.md'], privateDefaults['MEMORY.md'], [
       { marker: 'identity' },
     ]),
-    'skills.json': publicDefault,
+    'agent-card.json': agentCardDefault,
   }
 }
 
-export async function prepareSyncedPublicSkillsJson(identity: EthagentIdentity): Promise<string> {
-  await ensurePublicSkillsFile(identity)
-  return renderPublicSkillsJsonForIdentity(identity)
+export async function prepareSyncedAgentCardJson(identity: EthagentIdentity): Promise<string> {
+  await ensureAgentCardFile(identity)
+  return renderAgentCardJsonForIdentity(identity)
 }
 
 export async function prepareSyncedSkillsTree(identity: EthagentIdentity): Promise<ContinuitySkillsTree> {
@@ -87,30 +89,40 @@ export async function restoreSkillsTree(
 }
 
 
-export async function ensurePublicSkillsFile(
+export async function ensureAgentCardFile(
   identity: EthagentIdentity,
   options: { fallback?: string | (() => Promise<string>) } = {},
 ): Promise<string> {
   const ref = await ensureContinuityVault(identity)
-  if (await exists(ref.publicSkillsPath)) return readPublicSkillsFile(identity)
+  if (await exists(ref.agentCardPath)) return readAgentCardFile(identity)
 
-  const fallback = await resolvePublicSkillsFallback(identity, options.fallback)
-  await atomicWriteText(ref.publicSkillsPath, ensureTrailingNewline(fallback), { mode: 0o644 })
-  return readPublicSkillsFile(identity)
+  const legacyPath = path.join(ref.dir, 'skills.json')
+  if (await exists(legacyPath)) {
+    const legacyContent = await readOrDefault(legacyPath, '')
+    if (legacyContent) {
+      await atomicWriteText(ref.agentCardPath, ensureTrailingNewline(legacyContent), { mode: 0o644 })
+    }
+    await fs.rm(legacyPath, { force: true })
+    if (await exists(ref.agentCardPath)) return readAgentCardFile(identity)
+  }
+
+  const fallback = await resolveAgentCardFallback(identity, options.fallback)
+  await atomicWriteText(ref.agentCardPath, ensureTrailingNewline(fallback), { mode: 0o644 })
+  return readAgentCardFile(identity)
 }
 
-export async function readPublicSkillsFile(identity: EthagentIdentity): Promise<string> {
+export async function readAgentCardFile(identity: EthagentIdentity): Promise<string> {
   const ref = await ensureContinuityVault(identity)
-  return readOrDefault(ref.publicSkillsPath, defaultPublicSkillsJson(identity))
+  return readOrDefault(ref.agentCardPath, defaultAgentCardJson(identity))
 }
 
-export async function writePublicSkillsFile(identity: EthagentIdentity, content: string): Promise<ContinuityVaultRef> {
+export async function writeAgentCardFile(identity: EthagentIdentity, content: string): Promise<ContinuityVaultRef> {
   const ref = await ensureContinuityVault(identity)
-  await atomicWriteText(ref.publicSkillsPath, ensureTrailingNewline(content), { mode: 0o644 })
+  await atomicWriteText(ref.agentCardPath, ensureTrailingNewline(content), { mode: 0o644 })
   return ref
 }
 
-async function resolvePublicSkillsFallback(
+async function resolveAgentCardFallback(
   identity: EthagentIdentity,
   fallback: string | (() => Promise<string>) | undefined,
 ): Promise<string> {
@@ -119,8 +131,8 @@ async function resolvePublicSkillsFallback(
     try {
       return await fallback()
     } catch {
-      return defaultPublicSkillsJson(identity)
+      return defaultAgentCardJson(identity)
     }
   }
-  return defaultPublicSkillsJson(identity)
+  return defaultAgentCardJson(identity)
 }

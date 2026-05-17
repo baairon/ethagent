@@ -149,7 +149,7 @@ export async function markCurrentContinuityFilesPublished(
   identity: EthagentIdentity,
   publishedSources?: {
     privateFiles: ContinuityFiles
-    publicSkills: string
+    agentCard: string
     skills: ContinuitySkillsTree
   },
 ): Promise<void> {

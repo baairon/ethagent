@@ -18,7 +18,7 @@ export function recordsHaveCurrentValues(recordsDiff: AgentRecordDiff[]): boolea
 }
 
 export function emptyAgentEnsRecords(): AgentEnsRecords {
-  return { token: '' }
+  return {}
 }
 
 export function unlinkEnsLinkOptions(savedCustodyMode: CustodyMode | undefined, savedOwnerAddress: string): EnsLinkOptions {
@@ -84,8 +84,6 @@ export function manualReasonTitle(reason: EnsSetupBlockedPlan['reason']): string
     case 'wrapped-parent':
     case 'subdomain-wrapped':
       return 'ENS NameWrapper ownership could not be verified'
-    case 'token-record-collision':
-      return 'Subdomain already points to another token'
     case 'token-owner-mismatch':
       return 'Owner wallet does not own this ERC-8004 token'
     case 'token-owner-lookup-failed':

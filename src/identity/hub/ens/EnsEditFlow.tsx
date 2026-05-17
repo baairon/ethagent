@@ -2,8 +2,8 @@ import React from 'react'
 import { getAddress, type Address } from 'viem'
 import type { BrowserWalletReady } from '../../wallet/browserWallet.js'
 import {
-  AGENT_RECORD_READ_KEY_LIST,
   buildAgentEnsRecords,
+  buildEnsip25Key,
   diffRecords,
   recordsFromTextMap,
 } from '../../ens/agentRecords.js'
@@ -137,8 +137,15 @@ export const EnsEditFlow: React.FC<EnsEditProps> = ({
     setPhase({ kind: 'validating', fullName, mode, ownerAddress: phaseOwnerAddress, operatorWallet })
     try {
       const validation = await validateAgentEnsLink(fullName, ownerAddress)
-      const currentText = validation.ok
-        ? await readEthagentTextRecords(fullName, AGENT_RECORD_READ_KEY_LIST)
+      const readKeys = identity.agentId
+        ? [buildEnsip25Key({
+            chainId: registry.chainId,
+            identityRegistryAddress: registry.identityRegistryAddress,
+            agentId: identity.agentId,
+          })]
+        : []
+      const currentText = validation.ok && readKeys.length > 0
+        ? await readEthagentTextRecords(fullName, readKeys)
         : {}
       const current = recordsFromTextMap(currentText)
       const next = buildAgentEnsRecords({
@@ -252,7 +259,14 @@ export const EnsEditFlow: React.FC<EnsEditProps> = ({
   const runUnlinkEnsLoading = React.useCallback((fullName: string): void => {
     setValidationError(null)
     setPhase({ kind: 'unlink-loading', fullName })
-    readEthagentTextRecords(fullName, AGENT_RECORD_READ_KEY_LIST)
+    const readKeys = identity.agentId
+      ? [buildEnsip25Key({
+          chainId: registry.chainId,
+          identityRegistryAddress: registry.identityRegistryAddress,
+          agentId: identity.agentId,
+        })]
+      : []
+    readEthagentTextRecords(fullName, readKeys)
       .then(currentText => {
         const currentRecords = recordsFromTextMap(currentText)
         setPhase({
@@ -266,7 +280,7 @@ export const EnsEditFlow: React.FC<EnsEditProps> = ({
         setValidationError(err instanceof Error ? err.message : String(err))
         setPhase({ kind: 'mode-select' })
       })
-  }, [])
+  }, [identity.agentId, registry.chainId, registry.identityRegistryAddress])
 
   const maintenanceScreen = renderEnsMaintenancePhase({
     phase,

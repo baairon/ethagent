@@ -7,7 +7,7 @@ import {
   type Erc8004RegistryConfig,
 } from '../../registry/erc8004.js'
 import { parseAgentTokenReference, readEthagentTextRecords } from '../../ens/ensLookup.js'
-import { AGENT_RECORD_KEYS } from '../../ens/agentRecords.js'
+import { AGENT_TOKEN_RECORD_KEY } from '../../ens/agentRecords.js'
 
 const ETH_NAME_PATTERN = /^([a-z0-9-]+\.)+eth$/i
 
@@ -22,26 +22,28 @@ export async function resolveAgentEnsToCandidate(
   const trimmed = ensName.trim()
   if (!trimmed) return { ok: false, message: 'Enter an agent ENS name (e.g. agent.example.eth).' }
   if (!ETH_NAME_PATTERN.test(trimmed)) return { ok: false, message: 'Enter a valid .eth name.' }
+
   let records: Record<string, string>
   try {
-    records = await readEthagentTextRecords(trimmed, [AGENT_RECORD_KEYS.token])
+    records = await readEthagentTextRecords(trimmed, [AGENT_TOKEN_RECORD_KEY])
   } catch (err: unknown) {
-    return { ok: false, message: `Could not reach Ethereum mainnet to resolve ${trimmed}: ${err instanceof Error ? err.message : String(err)}` }
+    return { ok: false, message: `Could not reach Ethereum Mainnet to resolve ${trimmed}: ${err instanceof Error ? err.message : String(err)}` }
   }
-  const tokenValue = records[AGENT_RECORD_KEYS.token]
-  if (!tokenValue) return { ok: false, message: `${trimmed} has no org.ethagent.token record.` }
+  const tokenValue = records[AGENT_TOKEN_RECORD_KEY]
+  if (!tokenValue) return { ok: false, message: `${trimmed} has no agent discovery record. Use token-ID restore instead, or re-link this ENS name to refresh its records.` }
   const tokenRef = parseAgentTokenReference(tokenValue)
-  if (!tokenRef) return { ok: false, message: `${trimmed}'s org.ethagent.token record is not a valid eip155 reference.` }
+  if (!tokenRef) return { ok: false, message: `${trimmed}'s agent discovery record is not a valid eip155 reference.` }
   if (tokenRef.chainId !== registry.chainId) {
     return { ok: false, message: `${trimmed}'s agent token is onchain ${tokenRef.chainId}, not the network you selected.` }
   }
   const finalRegistry: Erc8004RegistryConfig = registry.identityRegistryAddress.toLowerCase() === tokenRef.identityRegistryAddress.toLowerCase()
     ? registry
     : { ...registry, identityRegistryAddress: tokenRef.identityRegistryAddress }
-  let owner: Address
+
+  let onchainOwner: Address
   try {
     const publicClient = createErc8004PublicClient(finalRegistry)
-    owner = await publicClient.readContract({
+    onchainOwner = await publicClient.readContract({
       address: finalRegistry.identityRegistryAddress,
       abi: [{ inputs: [{ name: 'tokenId', type: 'uint256' }], name: 'ownerOf', outputs: [{ name: '', type: 'address' }], stateMutability: 'view', type: 'function' }] as const,
       functionName: 'ownerOf',
@@ -53,7 +55,7 @@ export async function resolveAgentEnsToCandidate(
   try {
     const candidate = await discoverOwnedAgentBackupByTokenId({
       ...finalRegistry,
-      ownerHandle: owner,
+      ownerHandle: onchainOwner,
       ipfsApiUrl: DEFAULT_IPFS_API_URL,
       tokenId: tokenRef.agentId,
     })

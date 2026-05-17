@@ -11,7 +11,7 @@ export type EncodedEnsRecordTransaction = {
   calls: Hex[]
 }
 
-export async function encodeSetEthagentTextRecords(
+export async function encodeSetEnsip25TextRecord(
   fullName: string,
   records: Record<string, string>,
   opts: DiscoverOptions = {},

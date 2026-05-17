@@ -101,7 +101,7 @@ export const RestoreFlow: React.FC<RestoreFlowProps> = ({
   if (step.kind === 'restore-recovery-input') {
     return (
       <Surface
-        title={isSwitch ? 'Load Agent' : 'Restore Agent'}
+        title={isSwitch ? 'Switch Agent' : 'Restore Agent'}
         subtitle="The connected wallet doesn't directly own an agent token on this network."
         footer={footerHint('enter select · esc back')}
       >
@@ -126,7 +126,7 @@ export const RestoreFlow: React.FC<RestoreFlowProps> = ({
     if (step.busy) {
       return (
         <Surface
-          title={isSwitch ? 'Load Agent' : 'Restore Agent'}
+          title={isSwitch ? 'Switch Agent' : 'Restore Agent'}
           subtitle="Looking up the agent onchain."
           footer={footerHint('esc cancels')}
         >
@@ -138,7 +138,7 @@ export const RestoreFlow: React.FC<RestoreFlowProps> = ({
     }
     return (
       <Surface
-        title={isSwitch ? 'Load Agent' : 'Restore Agent'}
+        title={isSwitch ? 'Switch Agent' : 'Restore Agent'}
         subtitle="Enter the agent's ENS name to decrypt with an authorized operator wallet."
         footer={footerHint('enter continue · esc back')}
       >
@@ -162,7 +162,7 @@ export const RestoreFlow: React.FC<RestoreFlowProps> = ({
     if (step.busy) {
       return (
         <Surface
-          title={isSwitch ? 'Load Agent' : 'Restore Agent'}
+          title={isSwitch ? 'Switch Agent' : 'Restore Agent'}
           subtitle="Looking up the agent onchain."
           footer={footerHint('esc cancels')}
         >
@@ -174,7 +174,7 @@ export const RestoreFlow: React.FC<RestoreFlowProps> = ({
     }
     return (
       <Surface
-        title={isSwitch ? 'Load Agent' : 'Restore Agent'}
+        title={isSwitch ? 'Switch Agent' : 'Restore Agent'}
         subtitle={`Enter the ERC-8004 token ID on ${networkLabelForRegistry(step.registry)}.`}
         footer={footerHint('enter continue · esc back')}
       >
@@ -223,7 +223,7 @@ export const RestoreFlow: React.FC<RestoreFlowProps> = ({
   if (step.kind === 'restore-select-token') {
     return (
       <Surface
-        title={isSwitch ? 'Load an Agent' : 'Choose Your Agent'}
+        title={isSwitch ? 'Switch Agent' : 'Choose Your Agent'}
         subtitle={step.ownerHandle}
         footer={footerHint('enter select · esc back')}
       >
@@ -260,7 +260,7 @@ export const RestoreFlow: React.FC<RestoreFlowProps> = ({
   if (step.kind === 'restore-fetching') {
     return (
       <BusyScreen
-        title={isSwitch ? 'Loading Agent' : 'Restoring Your Agent'}
+        title={isSwitch ? 'Switching Agent' : 'Restoring Your Agent'}
         subtitle="IPFS"
         label="opening encrypted state from IPFS..."
         onCancel={onBack}
@@ -348,7 +348,7 @@ function restoreAuthorizationView(
       title: 'Operator Wallet Required',
       subtitle: `Sign with the operator wallet ${shortAddress(requester)} to decrypt this snapshot.`,
       label: 'waiting for operator wallet signature...',
-      progressTitle: isSwitch ? 'Loading Agent' : 'Restoring Your Agent',
+      progressTitle: isSwitch ? 'Switching Agent' : 'Restoring Your Agent',
     }
   }
 
@@ -356,6 +356,6 @@ function restoreAuthorizationView(
     title: 'Owner Wallet Required',
     subtitle: `This encrypted snapshot requires the owner wallet ${shortAddress(owner)}.`,
     label: 'waiting for owner wallet signature...',
-    progressTitle: isSwitch ? 'Loading Agent' : 'Restoring Your Agent',
+    progressTitle: isSwitch ? 'Switching Agent' : 'Restoring Your Agent',
   }
 }

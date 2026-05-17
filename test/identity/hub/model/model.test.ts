@@ -104,23 +104,22 @@ test('identity hub summary always shows the short state CID for the menu card', 
     },
   })
 
-  assert.deepEqual(rows.map(row => row.label), ['owner wallet', 'token', 'network', 'state', 'skills', 'card', 'icon'])
+  assert.deepEqual(rows.map(row => row.label), ['owner wallet', 'token', 'network', 'state', 'card', 'icon'])
   assert.equal(rows[3]?.value, 'bafybeigdy...3w6y7q')
   assert.equal(rows[0]?.value, '0x0000...dEaD')
-  assert.equal(rows[5]?.value, 'not saved')
-  assert.equal(rows[6]?.value, 'not attached')
+  assert.equal(rows[4]?.value, 'not saved')
+  assert.equal(rows[5]?.value, 'not attached')
 })
 
 test('identity hub summary collapses gracefully when no identity is loaded', () => {
   const rows = identitySummaryRows(undefined)
-  assert.deepEqual(rows.map(row => row.label), ['owner wallet', 'token', 'network', 'state', 'skills', 'card', 'icon'])
+  assert.deepEqual(rows.map(row => row.label), ['owner wallet', 'token', 'network', 'state', 'card', 'icon'])
   assert.equal(rows[0]?.value, 'not connected')
   assert.equal(rows[1]?.value, 'not created')
   assert.equal(rows[2]?.value, 'ethereum mainnet')
   assert.equal(rows[3]?.value, 'not saved yet')
   assert.equal(rows[4]?.value, 'not saved')
-  assert.equal(rows[5]?.value, 'not saved')
-  assert.equal(rows[6]?.value, 'not attached')
+  assert.equal(rows[5]?.value, 'not attached')
 })
 
 test('ensValidationReasonText covers advanced ENS ownership codes', () => {
@@ -141,7 +140,7 @@ test('identity hub local change status distinguishes clean and changed files', (
   const published = {
     'SOUL.md': 'soul-a',
     'MEMORY.md': 'memory-a',
-    'skills.json': 'skills-a',
+    'agent-card.json': 'card-a',
   }
   const clean = localChangeStatusView({
     ready: true,
@@ -161,7 +160,7 @@ test('identity hub local change status distinguishes clean and changed files', (
     localContentHashes: {
       'SOUL.md': 'soul-b',
       'MEMORY.md': 'memory-a',
-      'skills.json': 'skills-b',
+      'agent-card.json': 'card-b',
     },
     publishedContentHashes: published,
   })

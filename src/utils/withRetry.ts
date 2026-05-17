@@ -220,7 +220,7 @@ export async function fetchWithRetry(
         && options.parseRetryHintFromBody
       ) {
         let bodyText = ''
-        try { bodyText = await response.text() } catch { /* ignore */ }
+        try { bodyText = await response.text() } catch {}
         bufferedResponse = new Response(bodyText, {
           status: response.status,
           statusText: response.statusText,
@@ -240,7 +240,7 @@ export async function fetchWithRetry(
       if (!classification.retryable || attempt > policy.maxRetries) return bufferedResponse ?? response
 
       if (!bufferedResponse) {
-        try { await response.body?.cancel() } catch { /* ignore */ }
+        try { await response.body?.cancel() } catch {}
       }
       const delayMs = computeBackoffMs(
         attempt,

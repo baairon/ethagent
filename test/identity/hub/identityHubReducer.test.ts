@@ -37,7 +37,7 @@ const ensSetup = {
     changed: true,
   },
   currentRecords: {},
-  nextRecords: { token: 'eip155:1:0x1:1' },
+  nextRecords: { 'agent-registration[0x000100000101140000000000000000000000000000000000000001][1]': '1' },
   recordDiffs: [],
   txCount: 2,
   warnings: [],
@@ -142,7 +142,7 @@ test('identityHubReducer: ens-records-tx back returns to edit-profile-ens', () =
     identity,
     registry,
     fullName: 'ethagent.example.eth',
-    records: { token: 'eip155:1:0x1:1' },
+    records: { 'agent-registration[0x000100000101140000000000000000000000000000000000000001][1]': '1' },
     returnTo: { kind: 'menu' },
   }
   const next = identityHubReducer(state, { type: 'back', from: state })

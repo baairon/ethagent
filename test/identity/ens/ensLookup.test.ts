@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
   discoverOwnedEnsNameDetails,
-  encodeSetEthagentTextRecords,
+  encodeSetEnsip25TextRecord,
   isEthDomain,
   normalizeEthDomain,
   parseAgentTokenReference,
@@ -71,7 +71,7 @@ test('agent ENS validation rejects root .eth names before lookup', async () => {
 
 test('agent ENS record writes reject root .eth names before lookup', async () => {
   await assert.rejects(
-    encodeSetEthagentTextRecords('example.eth', { 'org.ethagent.token': 'eip155:1:0x1:42' }),
+    encodeSetEnsip25TextRecord('example.eth', { 'agent-registration[0x000100000101140000000000000000000000000000000000000001][1]': '1' }),
     /subdomain, not a root \.eth name/,
   )
 })

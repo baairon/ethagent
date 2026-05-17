@@ -26,8 +26,8 @@ export const UnlinkedIdentityScreen: React.FC<UnlinkedIdentityScreenProps> = ({
   onCancel,
 }) => {
   const options: Array<{ value: Action; label: string; hint?: string; role?: 'section' | 'utility' }> = [
-    { value: 'load-agent', role: 'section', label: 'Load Agent' },
-    { value: 'load-agent', label: 'Load Agent', hint: 'Reconnect this token by signing with the current owner wallet, or load a different one' },
+    { value: 'load-agent', role: 'section', label: 'Switch Agent' },
+    { value: 'load-agent', label: 'Switch Agent', hint: 'Reconnect this token by signing with the current owner wallet, or switch to a different one' },
     { value: 'open-menu', role: 'section', label: 'Identity Hub' },
     { value: 'open-menu', label: 'Open Identity Hub', hint: 'Browse local identity, continuity files, and settings without reconnecting' },
   ]

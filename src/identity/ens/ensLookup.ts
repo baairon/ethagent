@@ -16,4 +16,4 @@ export { resolveEnsAddress, readEthagentTextRecords, readResolverAddress } from 
 export { parseAgentTokenReference } from './ensLookup/tokenReference.js'
 export { discoverOwnedEnsNameDetails, discoverOwnedEnsNames } from './ensLookup/discovery.js'
 export { validateAgentEnsLink } from './ensLookup/validation.js'
-export { encodeSetEthagentTextRecords } from './ensLookup/records.js'
+export { encodeSetEnsip25TextRecord } from './ensLookup/records.js'

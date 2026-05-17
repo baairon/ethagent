@@ -9,7 +9,6 @@ import {
 } from 'viem'
 import { mainnet } from 'viem/chains'
 import {
-  AGENT_RECORD_READ_KEY_LIST,
   recordsFromTextMap,
   type AgentEnsRecordState,
 } from '../agentRecords.js'
@@ -81,9 +80,14 @@ export async function readAddressRecord(client: EnsAutomationReadClient, resolve
   }
 }
 
-export async function readTextRecords(client: EnsAutomationReadClient, resolverAddress: Address, node: Hex): Promise<AgentEnsRecordState> {
+export async function readTextRecords(
+  client: EnsAutomationReadClient,
+  resolverAddress: Address,
+  node: Hex,
+  keys: readonly string[],
+): Promise<AgentEnsRecordState> {
   const text: Record<string, string> = {}
-  for (const key of AGENT_RECORD_READ_KEY_LIST) {
+  for (const key of keys) {
     try {
       const value = await client.readContract({
         address: resolverAddress,
@@ -104,11 +108,4 @@ export function isZero(address: Address): boolean {
 
 export function sameAddress(a: Address, b: Address): boolean {
   return a.toLowerCase() === b.toLowerCase()
-}
-
-export function normalizeAgentRecords(records: AgentEnsRecordState): AgentEnsRecordState {
-  return {
-    ...records,
-    ...(records.token ? { token: records.token.toLowerCase() } : {}),
-  }
 }

@@ -10,14 +10,7 @@ import {
   readContinuityFiles,
 } from '../../continuity/storage.js'
 import {
-  appendPublicSkillEntries,
-  createAgentCard,
-  defaultPublicSkillsProfile,
-  serializeAgentCard,
-} from '../../continuity/publicSkills.js'
-import {
-  derivePublicSkillEntries,
-  syncPublicSkillsManifest,
+  syncAgentCardManifest,
 } from '../../continuity/skills/publicSkillsSync.js'
 import { addToIpfs, DEFAULT_IPFS_API_URL } from '../../storage/ipfs.js'
 import {
@@ -40,12 +33,12 @@ import {
 } from '../continuity/snapshot.js'
 
 type BackupMetadata = NonNullable<EthagentIdentity['backup']>
-type PublicSkillsMetadata = NonNullable<EthagentIdentity['publicSkills']>
+type AgentCardMetadata = NonNullable<EthagentIdentity['agentCard']>
 type WalletAccessContext = NonNullable<ReturnType<typeof walletRestoreAccessContext>>
 
 export type OperatorProfileArtifacts = {
   nextIdentity: EthagentIdentity
-  publicSkillsJson: string
+  agentCardJson: string
   agentUri: string
   metadataCid: string
 }
@@ -75,20 +68,8 @@ export async function prepareOperatorProfileArtifacts(args: {
   })
   const nextIdentityForFiles: EthagentIdentity = { ...step.identity, state }
 
-  const publicSkillsJson = await syncPublicSkillsManifest(nextIdentityForFiles)
-  const publicSkillsPin = await addToIpfs(DEFAULT_IPFS_API_URL, publicSkillsJson, fetch, { pinataJwt: step.pinataJwt })
-  assertVerifiedPin(publicSkillsPin)
-  const publicSkillEntries = await derivePublicSkillEntries(nextIdentityForFiles)
-  const augmentedPublicProfile = appendPublicSkillEntries(
-    defaultPublicSkillsProfile(nextIdentityForFiles),
-    publicSkillEntries,
-  )
-  const agentCardPin = await addToIpfs(
-    DEFAULT_IPFS_API_URL,
-    serializeAgentCard(createAgentCard(augmentedPublicProfile)),
-    fetch,
-    { pinataJwt: step.pinataJwt },
-  )
+  const agentCardJson = await syncAgentCardManifest(nextIdentityForFiles)
+  const agentCardPin = await addToIpfs(DEFAULT_IPFS_API_URL, agentCardJson, fetch, { pinataJwt: step.pinataJwt })
   assertVerifiedPin(agentCardPin)
 
   const continuityFiles = await readContinuityFiles(nextIdentityForFiles)
@@ -108,9 +89,8 @@ export async function prepareOperatorProfileArtifacts(args: {
   const statePin = await addToIpfs(DEFAULT_IPFS_API_URL, serializeContinuitySnapshotEnvelope(envelope), fetch, { pinataJwt: step.pinataJwt })
   assertVerifiedPin(statePin)
 
-  const publicSkills: PublicSkillsMetadata = {
-    cid: publicSkillsPin.cid,
-    agentCardCid: agentCardPin.cid,
+  const agentCard: AgentCardMetadata = {
+    cid: agentCardPin.cid,
     updatedAt: envelope.createdAt,
     status: 'pinned',
   }
@@ -134,7 +114,7 @@ export async function prepareOperatorProfileArtifacts(args: {
     ...(uploadedImageUri ? { image: uploadedImageUri } : {}),
   }, {
     backup: { cid: statePin.cid, envelopeVersion: envelope.envelopeVersion, createdAt: envelope.createdAt },
-    publicDiscovery: { skillsCid: publicSkills.cid, agentCardCid: publicSkills.agentCardCid, updatedAt: publicSkills.updatedAt },
+    publicDiscovery: { agentCardCid: agentCard.cid, updatedAt: agentCard.updatedAt },
     registration: { chainId: step.registry.chainId, identityRegistryAddress: step.registry.identityRegistryAddress, agentId: step.identity.agentId },
     ensName: nextEnsName,
     operators: operatorsPointerFromState(state, nextEnsName),
@@ -149,14 +129,14 @@ export async function prepareOperatorProfileArtifacts(args: {
     ...step.identity,
     state,
     backup: { ...backup, metadataCid, agentUri },
-    publicSkills,
+    agentCard,
     agentUri,
     metadataCid,
   }
 
   return {
     nextIdentity,
-    publicSkillsJson,
+    agentCardJson,
     agentUri,
     metadataCid,
   }

@@ -56,7 +56,6 @@ export type EnsSetupBlockedPlan = {
     | 'operator-matches-owner'
     | 'token-owner-mismatch'
     | 'token-owner-lookup-failed'
-    | 'token-record-collision'
     | 'lookup-failed'
   detail: string
   currentRecords?: AgentEnsRecordState

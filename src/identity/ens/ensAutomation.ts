@@ -24,6 +24,7 @@ export {
   encodeEnsRecordsTransaction,
   encodeEnsRegistryTransaction,
 } from './ensAutomation/transactions.js'
+export { readAddressRecord } from './ensAutomation/read.js'
 export { isRootEthName } from './ensAutomation/names.js'
 export { preflightDeleteSubdomain } from './ensAutomation/delete.js'
 export { compareOperatorSets } from './ensAutomation/operators.js'

@@ -11,18 +11,10 @@ import {
   continuityVaultStatus,
   prepareSyncedSkillsTree,
   readContinuityFiles,
-  readPublicSkillsFile,
-  writePublicSkillsFile,
+  writeAgentCardFile,
 } from '../../continuity/storage.js'
 import {
-  appendPublicSkillEntries,
-  createAgentCard,
-  defaultPublicSkillsProfile,
-  serializeAgentCard,
-} from '../../continuity/publicSkills.js'
-import {
-  derivePublicSkillEntries,
-  syncPublicSkillsManifest,
+  syncAgentCardManifest,
 } from '../../continuity/skills/publicSkillsSync.js'
 import { recordPublishedContinuitySnapshot } from '../../continuity/snapshots.js'
 import { addToIpfs, DEFAULT_IPFS_API_URL, isPinataUploadUrl } from '../../storage/ipfs.js'
@@ -47,7 +39,7 @@ import { tokenTransferProgressForPhase } from './progress.js'
 import { assertTokenNotInVault } from '../custody/preflight.js'
 
 type BackupMetadata = NonNullable<EthagentIdentity['backup']>
-type PublicSkillsMetadata = NonNullable<EthagentIdentity['publicSkills']>
+type AgentCardMetadata = NonNullable<EthagentIdentity['agentCard']>
 
 type TokenTransferResult = {
   identity: EthagentIdentity
@@ -167,20 +159,8 @@ export async function runTokenTransferSigning(
   }
   const nextIdentityForFiles: EthagentIdentity = { ...step.identity, state }
   const continuityFiles = await readContinuityFiles(nextIdentityForFiles)
-  const publicSkillsJson = await syncPublicSkillsManifest(nextIdentityForFiles)
-  const publicSkillsPin = await addToIpfs(DEFAULT_IPFS_API_URL, publicSkillsJson, fetch, { pinataJwt: step.pinataJwt })
-  assertVerifiedPin(publicSkillsPin)
-  const publicSkillEntries = await derivePublicSkillEntries(nextIdentityForFiles)
-  const augmentedPublicProfile = appendPublicSkillEntries(
-    defaultPublicSkillsProfile(nextIdentityForFiles),
-    publicSkillEntries,
-  )
-  const agentCardPin = await addToIpfs(
-    DEFAULT_IPFS_API_URL,
-    serializeAgentCard(createAgentCard(augmentedPublicProfile)),
-    fetch,
-    { pinataJwt: step.pinataJwt },
-  )
+  const agentCardJson = await syncAgentCardManifest(nextIdentityForFiles)
+  const agentCardPin = await addToIpfs(DEFAULT_IPFS_API_URL, agentCardJson, fetch, { pinataJwt: step.pinataJwt })
   assertVerifiedPin(agentCardPin)
   const skillsTree = await prepareSyncedSkillsTree(nextIdentityForFiles)
   const envelope = createTransferContinuitySnapshotEnvelope({
@@ -215,9 +195,8 @@ export async function runTokenTransferSigning(
     agentId: transferAgentId,
     ...(transferSnapshot ? { transferSnapshot } : {}),
   }
-  const publicSkills: PublicSkillsMetadata = {
-    cid: publicSkillsPin.cid,
-    agentCardCid: agentCardPin.cid,
+  const agentCard: AgentCardMetadata = {
+    cid: agentCardPin.cid,
     updatedAt: envelope.createdAt,
     status: 'pinned',
   }
@@ -232,7 +211,7 @@ export async function runTokenTransferSigning(
     ...(uploadedImageUri ? { image: uploadedImageUri } : {}),
   }, {
     backup: { cid: snapshotCid, envelopeVersion: envelope.envelopeVersion, createdAt: envelope.createdAt, ...(transferSnapshot ? { transferSnapshot } : {}) },
-    publicDiscovery: { skillsCid: publicSkills.cid, agentCardCid: publicSkills.agentCardCid, updatedAt: publicSkills.updatedAt },
+    publicDiscovery: { agentCardCid: agentCard.cid, updatedAt: agentCard.updatedAt },
     registration: { chainId: step.registry.chainId, identityRegistryAddress: step.registry.identityRegistryAddress, agentId: transferAgentId },
     ensName: nextEnsName,
     operators: operatorsPointerFromState(state, nextEnsName),
@@ -273,10 +252,10 @@ export async function runTokenTransferSigning(
     agentUri,
     metadataCid,
     backup: { ...backup, metadataCid, agentUri, txHash: tx.txHash },
-    publicSkills,
+    agentCard,
     state,
   }
-  await writePublicSkillsFile(nextIdentity, publicSkillsJson)
+  await writeAgentCardFile(nextIdentity, agentCardJson)
   await recordPublishedContinuitySnapshot({ identity: nextIdentity, label: 'published transfer snapshot' }).catch(() => null)
   callbacks.onTokenTransferProgress?.(null)
   return {
