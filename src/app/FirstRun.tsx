@@ -244,7 +244,7 @@ export const FirstRun: React.FC<FirstRunProps> = ({ onComplete, onCancel }) => {
     footer?: string,
   ): React.ReactElement => (
     <Box flexDirection="column" padding={1}>
-      <Splash />
+      <Splash showTagline />
       <Box marginTop={1}>
         <Surface
           title={title}
@@ -257,12 +257,18 @@ export const FirstRun: React.FC<FirstRunProps> = ({ onComplete, onCancel }) => {
     </Box>
   )
 
-  const renderRaw = (currentKind: FirstRunStepKind, body: React.ReactNode): React.ReactElement => (
+  const renderRaw = (
+    currentKind: FirstRunStepKind,
+    body: React.ReactNode,
+    bodyOwnsTimeline = false,
+  ): React.ReactElement => (
     <Box flexDirection="column" padding={1}>
-      <Splash />
-      <Box marginTop={1} marginBottom={1}>
-        <FirstRunTimeline current={firstRunStageNumber(currentKind)} />
-      </Box>
+      <Splash showTagline />
+      {bodyOwnsTimeline ? null : (
+        <Box marginTop={1} marginBottom={1}>
+          <FirstRunTimeline current={firstRunStageNumber(currentKind)} />
+        </Box>
+      )}
       {body}
     </Box>
   )
@@ -306,7 +312,7 @@ export const FirstRun: React.FC<FirstRunProps> = ({ onComplete, onCancel }) => {
           setStep({ kind: 'identity-start-saving', spec: step.spec, result })
         }}
       />
-    ))
+    ), true)
   }
 
   if (step.kind === 'identity-start-saving') {

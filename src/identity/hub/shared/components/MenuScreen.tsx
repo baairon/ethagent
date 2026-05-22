@@ -3,6 +3,7 @@ import { Box, Text } from 'ink'
 import { Surface } from '../../../../ui/Surface.js'
 import { Select, type SelectOption } from '../../../../ui/Select.js'
 import { theme } from '../../../../ui/theme.js'
+import { FirstRunTimeline } from '../../../../app/FirstRunTimeline.js'
 import type { EthagentConfig, EthagentIdentity } from '../../../../storage/config.js'
 import type { ContinuityWorkingTreeStatus } from '../../../continuity/storage.js'
 import { identityPerspective, readCustodyMode } from '../../custody/state.js'
@@ -75,9 +76,10 @@ export const MenuScreen: React.FC<MenuScreenProps> = ({
   onSkip,
   onCancel,
 }) => {
-  const title = mode === 'first-run' ? 'Set Up Agent Identity' : 'Identity Hub'
-  const subtitle = mode === 'first-run'
-    ? 'Create a portable agent or load one you already own.'
+  const isFirstRun = mode === 'first-run'
+  const title = isFirstRun ? 'Set Up Agent Identity' : 'Identity Hub'
+  const subtitle: React.ReactNode = isFirstRun
+    ? <FirstRunTimeline current={2} />
     : 'Manage agent identity, custody, encrypted continuity, and recovery.'
 
   const canRefetch = Boolean(canRebackup && identity?.backup?.cid)

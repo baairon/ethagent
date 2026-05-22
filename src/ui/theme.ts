@@ -31,7 +31,7 @@ export const theme = {
   codeTag: '#ffb3b3',
   codeAttribute: '#f2d087',
   border: '#555555',
-  dim: '#777777',
+  dim: '#909090',
   text: '#f1f1f1',
   textSubtle: '#9b9b9b',
 } as const

@@ -998,10 +998,6 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
       void appendHistory(value)
 
       if (streaming || pullInFlight || compactionUiRef.current) {
-        if (parseSlash(value)) {
-          pushNote('Slash commands cannot be queued. Wait for the current task to finish.', 'dim')
-          return
-        }
         setQueuedInputs(prev => [...prev, value])
         return
       }
@@ -1538,6 +1534,22 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ config: initialConfig, o
     setQueuedInputs(prev => prev.slice(1))
     void (async () => {
       if (!next) return
+      if (parseSlash(next)) {
+        const ctx = buildSlashContext()
+        const result = await dispatchSlash(next, ctx)
+        if (result && result.kind === 'note') {
+          pushNote(result.text, result.variant ?? 'info')
+        }
+        if (result && result.kind === 'submit') {
+          const projected = projectedUsageForInput(result.text)
+          if (shouldConfirmContextUsage(projected, CONTEXT_CONFIRM_PERCENT)) {
+            showContextLimitForPrompt(result.text)
+            return
+          }
+          await runStream(result.text)
+        }
+        return
+      }
       const projected = projectedUsageForInput(next)
       if (shouldConfirmContextUsage(projected, CONTEXT_CONFIRM_PERCENT)) {
         showContextLimitForPrompt(next)

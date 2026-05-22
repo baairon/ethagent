@@ -18,7 +18,7 @@ import type { ContextUsage } from '../runtime/compaction.js'
 import { formatModelDisplayName } from '../models/modelDisplay.js'
 import { providerDisplayName } from '../models/modelPickerOptions.js'
 import type { McpManager } from '../mcp/manager.js'
-import { runHuggingFace, runIdentity, runMcp } from './slashCommandHandlers.js'
+import { runIdentity, runMcp } from './slashCommandHandlers.js'
 import { renderStatus } from './slashCommandViews.js'
 
 export type IdentityRequestAction =
@@ -112,7 +112,7 @@ const COMMANDS: CommandSpec[] = [
   },
   {
     name: 'status',
-    summary: 'provider, model, session id, turns, context, elapsed',
+    summary: 'provider, model, session id, turns, context, state, cwd, elapsed',
     run: (_args, ctx) => ({ kind: 'note', text: renderStatus(ctx) }),
   },
   {
@@ -214,12 +214,6 @@ const COMMANDS: CommandSpec[] = [
     },
   },
   {
-    name: 'hf',
-    enterBehavior: 'fill',
-    summary: 'local model files · /hf [installed|download <link>]',
-    run: async (args, ctx) => runHuggingFace(args, ctx),
-  },
-  {
     name: 'resume',
     summary: 'reopen a prior session',
     run: (_args, ctx) => {
@@ -271,7 +265,7 @@ const COMMANDS: CommandSpec[] = [
   },
   {
     name: 'copy',
-    summary: 'copy an assistant reply to the clipboard · /copy [n]',
+    summary: 'copy an assistant reply to the clipboard · /copy [n] (1 = latest)',
     run: async (args, ctx) => {
       const assistant = ctx.assistantTurns()
       if (assistant.length === 0) {
@@ -334,7 +328,7 @@ const COMMANDS: CommandSpec[] = [
   {
     name: 'identity',
     enterBehavior: 'fill',
-    summary: 'Ethereum identity · /identity [status|create|load|remove]',
+    summary: 'agent identity · /identity [status|create|load|remove confirm]',
     run: async (args, ctx) => runIdentity(args, ctx),
   },
   {

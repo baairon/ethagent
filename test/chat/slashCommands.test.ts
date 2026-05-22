@@ -48,17 +48,13 @@ test('/model with no args requests the model picker overlay', async () => {
   assert.equal(requested, true)
 })
 
-test('/hf download opens the model picker without exposing a remote catalog', async () => {
-  let requested = false
-  const result = await dispatchSlash('/hf download https://huggingface.co/org/model-GGUF', context({
-    onModelPickerRequest: () => { requested = true },
-  }))
+test('/hf is no longer exposed after removing the standalone hugging face command', async () => {
+  const result = await dispatchSlash('/hf download https://huggingface.co/org/model-GGUF', context())
 
   assert.equal(result?.kind, 'note')
   if (result?.kind !== 'note') return
-  assert.equal(requested, true)
-  assert.match(result.text, /add local model file/i)
-  assert.doesNotMatch(result.text, /catalog/i)
+  assert.equal(result.variant, 'error')
+  assert.match(result.text, /unknown command: \/hf/i)
 })
 
 test('/pull is no longer exposed after removing Ollama support', async () => {

@@ -53,9 +53,10 @@ type SplashProps = {
   tipLine?: string
   updateNotice?: string | null
   compact?: boolean
+  showTagline?: boolean
 }
 
-export const BrandSplash: React.FC<SplashProps> = ({ contextLine, tipLine, updateNotice, compact }) => {
+export const BrandSplash: React.FC<SplashProps> = ({ contextLine, tipLine, updateNotice, compact, showTagline }) => {
   const [width, setWidth] = useState<number>(() => process.stdout.columns ?? 80)
 
   useEffect(() => {
@@ -74,7 +75,6 @@ export const BrandSplash: React.FC<SplashProps> = ({ contextLine, tipLine, updat
       <Box flexDirection="column" alignSelf="flex-start" padding={1}>
         <Eyes />
         <Text bold color={theme.accentWhite}>ethagent</Text>
-        <Text color={theme.dim}>privacy-first AI agent with a portable <Text color={theme.accentPeriwinkle}>Ethereum</Text> identity</Text>
         {contextLine ? <Text color={theme.dim}>{contextLine}</Text> : null}
         {tipLine ? <Text color={theme.dim}>{tipLine}</Text> : null}
         {updateNotice ? <Text color={theme.accentPeriwinkle}>{updateNotice}</Text> : null}
@@ -85,34 +85,36 @@ export const BrandSplash: React.FC<SplashProps> = ({ contextLine, tipLine, updat
   const w = 69
   const logoLines = glyphs.ethagent.split('\n').map(line => line.padEnd(w, ' '))
 
-  const topPad = Math.max(0, w - glyphs.tagline.length - 1)
-
   const bottomInline = contextLine ? ` ${truncateToFit(contextLine, w - 4)} ` : ''
   const bottomPad = Math.max(0, w - bottomInline.length - 1)
 
   return (
     <Box flexDirection="column" alignSelf="flex-start" padding={1}>
       <Eyes />
-      <Text>
-        <Text color={theme.border}>{glyphs.frame.topLeft}</Text>
-        <Text color={theme.dim}>{' privacy-first AI agent with a portable '}<Text color={theme.accentPeriwinkle}>Ethereum</Text>{' identity '}</Text>
-        <Text color={theme.border}>{glyphs.frame.horizontal.repeat(topPad)}{glyphs.frame.topRight}</Text>
-      </Text>
+      {showTagline ? (
+        <Text>
+          <Text color={theme.accentWhite}>{glyphs.frame.topLeft}</Text>
+          <Text color={theme.accentPeriwinkle}>{glyphs.tagline}</Text>
+          <Text color={theme.accentWhite}>{glyphs.frame.horizontal.repeat(Math.max(0, w - glyphs.tagline.length - 1))}{glyphs.frame.topRight}</Text>
+        </Text>
+      ) : (
+        <Text color={theme.accentWhite}>{glyphs.frame.topLeft.slice(0, 1) + glyphs.frame.horizontal.repeat(w) + glyphs.frame.topRight}</Text>
+      )}
       {logoLines.map((line, i) => (
         <Box key={i}>
-          <Text color={theme.border}>{glyphs.frame.side}</Text>
-          <Text color={theme.border}>{line}</Text>
-          <Text color={theme.border}>{glyphs.frame.side}</Text>
+          <Text color={theme.accentWhite}>{glyphs.frame.side}</Text>
+          <Text color={theme.accentWhite}>{line}</Text>
+          <Text color={theme.accentWhite}>{glyphs.frame.side}</Text>
         </Box>
       ))}
       {bottomInline ? (
         <Text>
-          <Text color={theme.border}>{glyphs.frame.bottomLeft}</Text>
+          <Text color={theme.accentWhite}>{glyphs.frame.bottomLeft}</Text>
           <Text color={theme.accentPeriwinkle}>{bottomInline}</Text>
-          <Text color={theme.border}>{glyphs.frame.horizontal.repeat(bottomPad)}{glyphs.frame.bottomRight}</Text>
+          <Text color={theme.accentWhite}>{glyphs.frame.horizontal.repeat(bottomPad)}{glyphs.frame.bottomRight}</Text>
         </Text>
       ) : (
-        <Text color={theme.border}>{glyphs.frame.bottomLeft.slice(0, 1) + glyphs.frame.horizontal.repeat(w) + glyphs.frame.bottomRight}</Text>
+        <Text color={theme.accentWhite}>{glyphs.frame.bottomLeft.slice(0, 1) + glyphs.frame.horizontal.repeat(w) + glyphs.frame.bottomRight}</Text>
       )}
       {tipLine || updateNotice ? (
         <Box marginTop={1} flexDirection="column">

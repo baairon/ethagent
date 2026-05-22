@@ -1,48 +1,5 @@
 import { clearIdentity, getIdentityStatus } from '../storage/identity.js'
-import { formatModelDisplayName } from '../models/modelDisplay.js'
-import { loadLocalHfModels } from '../models/huggingface.js'
 import type { SlashContext, SlashResult } from './commands.js'
-import { formatBytes } from './slashCommandViews.js'
-
-export async function runHuggingFace(args: string, ctx: SlashContext): Promise<SlashResult> {
-  const tokens = args.trim().split(/\s+/).filter(Boolean)
-  const sub = tokens[0]?.toLowerCase() ?? ''
-
-  if (!sub || sub === 'installed') {
-    const installed = await loadLocalHfModels()
-    if (installed.length === 0) {
-      return {
-        kind: 'note',
-        variant: 'dim',
-        text: 'No local model files downloaded. Press Alt+P and choose "Add Local Model File".',
-      }
-    }
-    const lines = installed.map(model => {
-      const marker = model.id === ctx.config.model && ctx.config.provider === 'llamacpp' ? '*' : ' '
-      const displayName = formatModelDisplayName('llamacpp', model.id, { displayName: model.displayName, maxLength: 64 })
-      return `${marker} ${displayName}  ${formatBytes(model.sizeBytes)}  ${model.risk}`
-    })
-    return { kind: 'note', text: ['installed Hugging Face models:', ...lines].join('\n') }
-  }
-
-  if (sub === 'download' || sub === 'model') {
-    const link = tokens.slice(1).join(' ')
-    ctx.onModelPickerRequest()
-    return {
-      kind: 'note',
-      variant: 'dim',
-      text: link
-        ? `Alt+P opened. Choose "Add Local Model File" and paste: ${link}`
-        : 'Alt+P opened. Choose "Add Local Model File" and paste the model URL or repo ID.',
-    }
-  }
-
-  return {
-    kind: 'note',
-    variant: 'error',
-    text: 'usage: /hf [installed|download <huggingface.co link or repo id>]',
-  }
-}
 
 export async function runMcp(args: string, ctx: SlashContext): Promise<SlashResult> {
   if (!ctx.mcp) {
@@ -117,11 +74,11 @@ export async function runIdentity(args: string, ctx: SlashContext): Promise<Slas
     }
     const lines = [
       `address    ${status.address}`,
-      `created    ${status.createdAt}`,
-      `backend    ${status.backend}`,
+      `updated    ${status.createdAt}`,
+      `wallet     ${status.backend}`,
     ]
-    if (status.source) lines.push(`source     ${status.source}`)
-    if (status.agentId) lines.push(`token      #${status.agentId}`)
+    if (status.source) lines.push(`registry   ${status.source}`)
+    if (status.agentId) lines.push(`agent      #${status.agentId}`)
     return { kind: 'note', text: lines.join('\n') }
   }
 
