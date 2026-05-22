@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { Text, Box } from 'ink'
-import { theme } from './theme.js'
+import { theme, gradientColor } from './theme.js'
 
 const glyphs = {
   ethagent: `░░░░░░░╗░░░░░░░░╗░░╗  ░░╗ █████╗  ██████╗ ███████╗███╗   ██╗████████╗
@@ -39,10 +39,15 @@ const glyphs = {
 
 const Eyes = () => {
   const lines = glyphs.eyes.split('\n')
+  const maxWidth = Math.max(1, ...lines.map(l => l.length))
   return (
     <Box flexDirection="column">
       {lines.map((line, li) => (
-        <Text key={li} color={theme.text}>{line}</Text>
+        <Text key={li}>
+          {[...line].map((ch, ci) => (
+            <Text key={ci} color={gradientColor(maxWidth <= 1 ? 0 : ci / (maxWidth - 1))}>{ch}</Text>
+          ))}
+        </Text>
       ))}
     </Box>
   )
@@ -53,10 +58,9 @@ type SplashProps = {
   tipLine?: string
   updateNotice?: string | null
   compact?: boolean
-  showTagline?: boolean
 }
 
-export const BrandSplash: React.FC<SplashProps> = ({ contextLine, tipLine, updateNotice, compact, showTagline }) => {
+export const BrandSplash: React.FC<SplashProps> = ({ contextLine, tipLine, updateNotice, compact }) => {
   const [width, setWidth] = useState<number>(() => process.stdout.columns ?? 80)
 
   useEffect(() => {
@@ -77,7 +81,7 @@ export const BrandSplash: React.FC<SplashProps> = ({ contextLine, tipLine, updat
         <Text bold color={theme.accentWhite}>ethagent</Text>
         {contextLine ? <Text color={theme.dim}>{contextLine}</Text> : null}
         {tipLine ? <Text color={theme.dim}>{tipLine}</Text> : null}
-        {updateNotice ? <Text color={theme.accentPeriwinkle}>{updateNotice}</Text> : null}
+        {updateNotice ? <Text color={theme.dim}>{updateNotice}</Text> : null}
       </Box>
     )
   }
@@ -91,35 +95,31 @@ export const BrandSplash: React.FC<SplashProps> = ({ contextLine, tipLine, updat
   return (
     <Box flexDirection="column" alignSelf="flex-start" padding={1}>
       <Eyes />
-      {showTagline ? (
-        <Text>
-          <Text color={theme.accentWhite}>{glyphs.frame.topLeft}</Text>
-          <Text color={theme.accentPeriwinkle}>{glyphs.tagline}</Text>
-          <Text color={theme.accentWhite}>{glyphs.frame.horizontal.repeat(Math.max(0, w - glyphs.tagline.length - 1))}{glyphs.frame.topRight}</Text>
-        </Text>
-      ) : (
-        <Text color={theme.accentWhite}>{glyphs.frame.topLeft.slice(0, 1) + glyphs.frame.horizontal.repeat(w) + glyphs.frame.topRight}</Text>
-      )}
+      <Text>
+        <Text color={theme.dim}>{glyphs.frame.topLeft}</Text>
+        <Text color={theme.dim}>{glyphs.tagline}</Text>
+        <Text color={theme.dim}>{glyphs.frame.horizontal.repeat(Math.max(0, w - glyphs.tagline.length - 1))}{glyphs.frame.topRight}</Text>
+      </Text>
       {logoLines.map((line, i) => (
         <Box key={i}>
-          <Text color={theme.accentWhite}>{glyphs.frame.side}</Text>
-          <Text color={theme.accentWhite}>{line}</Text>
-          <Text color={theme.accentWhite}>{glyphs.frame.side}</Text>
+          <Text color={theme.dim}>{glyphs.frame.side}</Text>
+          <Text color={theme.dim}>{line}</Text>
+          <Text color={theme.dim}>{glyphs.frame.side}</Text>
         </Box>
       ))}
       {bottomInline ? (
         <Text>
-          <Text color={theme.accentWhite}>{glyphs.frame.bottomLeft}</Text>
-          <Text color={theme.accentPeriwinkle}>{bottomInline}</Text>
-          <Text color={theme.accentWhite}>{glyphs.frame.horizontal.repeat(bottomPad)}{glyphs.frame.bottomRight}</Text>
+          <Text color={theme.dim}>{glyphs.frame.bottomLeft}</Text>
+          <Text color={theme.dim}>{bottomInline}</Text>
+          <Text color={theme.dim}>{glyphs.frame.horizontal.repeat(bottomPad)}{glyphs.frame.bottomRight}</Text>
         </Text>
       ) : (
-        <Text color={theme.accentWhite}>{glyphs.frame.bottomLeft.slice(0, 1) + glyphs.frame.horizontal.repeat(w) + glyphs.frame.bottomRight}</Text>
+        <Text color={theme.dim}>{glyphs.frame.bottomLeft.slice(0, 1) + glyphs.frame.horizontal.repeat(w) + glyphs.frame.bottomRight}</Text>
       )}
       {tipLine || updateNotice ? (
         <Box marginTop={1} flexDirection="column">
           {tipLine ? <Text color={theme.dim}>{tipLine}</Text> : null}
-          {updateNotice ? <Text color={theme.accentPeriwinkle}>{updateNotice}</Text> : null}
+          {updateNotice ? <Text color={theme.dim}>{updateNotice}</Text> : null}
         </Box>
       ) : null}
     </Box>

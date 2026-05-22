@@ -39,8 +39,9 @@ body {
   font-family: var(--font-ui);
   color: var(--fg-1);
   background: #120f17;
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: clamp(18px, 3vw, 28px);
 }
 
