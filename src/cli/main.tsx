@@ -38,8 +38,6 @@ function printHelp(): void {
     '  ethagent                    manage identity',
     '  ethagent reset              delete local identity, continuity, and secrets',
     '  ethagent --sync             sync soul, memory, and skills to every harness',
-    '  ethagent --sync-to=<name>   sync only to a named adapter (claude-code, codex)',
-    '  ethagent --sync-to=<path>   write per-skill folders under a custom path',
     '  ethagent --sync-list        list sync adapters and which ones detect here',
     '  ethagent --demo             walk identity with synthetic data',
     '  ethagent --status           print one-line identity summary',
@@ -51,14 +49,6 @@ function printHelp(): void {
     '  ethagent --memory-guard     keep agent memory in the portable markers, not local notes',
   ]
   for (const line of lines) process.stdout.write(line + '\n')
-}
-
-function valueFlag(argv: string[], name: string): string | undefined {
-  const prefix = `--${name}=`
-  for (const a of argv) if (a.startsWith(prefix)) return a.slice(prefix.length)
-  const idx = argv.indexOf(`--${name}`)
-  if (idx >= 0 && argv[idx + 1] && !argv[idx + 1]!.startsWith('-')) return argv[idx + 1]
-  return undefined
 }
 
 type Phase =
@@ -161,10 +151,7 @@ async function main(): Promise<number> {
   if (flags.has('--session-start')) return runSessionStart()
   if (flags.has('--memory-guard')) return runMemoryGuard()
   if (flags.has('--sync-list')) return runSyncList()
-  const syncTo = valueFlag(argv, 'sync-to')
-  if (flags.has('--sync') || syncTo !== undefined) {
-    return runSync(syncTo !== undefined ? { to: syncTo } : {})
-  }
+  if (flags.has('--sync')) return runSync()
   if (flags.has('--status')) return runStatus(version)
   if (flags.has('--demo')) {
     enableDemoMode()
@@ -172,7 +159,7 @@ async function main(): Promise<number> {
   }
   if (argv[0] === 'reset') return runResetCommand(argv.slice(1))
 
-  const unknown = argv.find(a => a.startsWith('-') && !a.startsWith('--sync-to'))
+  const unknown = argv.find(a => a.startsWith('-'))
   if (unknown && !flags.has('--demo')) {
     process.stderr.write(`unknown flag: ${unknown}\nrun 'ethagent --help' for usage\n`)
     return 2

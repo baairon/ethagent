@@ -2,7 +2,6 @@ import fs from 'node:fs/promises'
 import type { PublicSkill } from './shared.js'
 import { claudeCodeAdapter } from './claude-code.js'
 import { codexAdapter } from './codex.js'
-import { genericAdapter } from './generic.js'
 import { removeManagedBlock } from './managedBlock.js'
 
 export type SyncContext = {
@@ -41,16 +40,4 @@ export async function clearHarnessManagedBlocks(): Promise<string[]> {
     await adapter.cleanup?.().catch(() => {})
   }
   return cleared
-}
-
-export function namedAdapter(name: string): SyncAdapter | null {
-  return BUILT_IN_ADAPTERS.find(a => a.name === name) ?? null
-}
-
-export function pathAdapter(target: string): SyncAdapter {
-  return genericAdapter(target)
-}
-
-export function isPathTarget(value: string): boolean {
-  return value.includes('/') || value.includes('\\') || value.startsWith('.') || value.startsWith('~')
 }

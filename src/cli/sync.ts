@@ -9,15 +9,12 @@ import { hashManagedBody, normalizeBody, reconstructVaultFile, sectionKey } from
 import { hookFilePath, readHookPayload, samePath } from './hookIo.js'
 import {
   BUILT_IN_ADAPTERS,
-  isPathTarget,
-  namedAdapter,
-  pathAdapter,
   type SyncAdapter,
   type SyncContext,
 } from './syncAdapters/index.js'
 import type { PublicSkill } from './syncAdapters/shared.js'
 
-export type SyncOptions = { to?: string; quiet?: boolean }
+export type SyncOptions = { quiet?: boolean }
 
 export async function runSync(opts: SyncOptions = {}): Promise<number> {
   const config = await loadConfig()
@@ -32,13 +29,12 @@ export async function runSync(opts: SyncOptions = {}): Promise<number> {
   }
   const publicSkills: PublicSkill[] = all.filter(s => s.visibility === 'public')
 
-  const targets = await resolveTargets(opts.to)
-  if (targets === 'unknown') {
-    process.stderr.write(`unknown adapter: ${opts.to}\n`)
-    return 2
+  const targets: SyncAdapter[] = []
+  for (const adapter of BUILT_IN_ADAPTERS) {
+    if (await adapter.detect().catch(() => false)) targets.push(adapter)
   }
   if (targets.length === 0) {
-    if (!opts.quiet) process.stdout.write('ethagent: no harness detected; pass --sync-to=<path> to write skills somewhere\n')
+    if (!opts.quiet) process.stdout.write('ethagent: no harness detected\n')
     return 0
   }
 
@@ -144,21 +140,7 @@ export async function runSyncList(): Promise<number> {
     const mark = detected ? 'detected' : 'not detected'
     process.stdout.write(`  ${adapter.name.padEnd(14)} ${mark.padEnd(13)} ${adapter.description}\n`)
   }
-  process.stdout.write(`  generic        on-demand     pass --sync-to=<path> to write per-skill folders anywhere\n`)
   return 0
-}
-
-async function resolveTargets(to: string | undefined): Promise<SyncAdapter[] | 'unknown'> {
-  if (to) {
-    if (isPathTarget(to)) return [pathAdapter(to)]
-    const named = namedAdapter(to)
-    return named ? [named] : 'unknown'
-  }
-  const detected: SyncAdapter[] = []
-  for (const adapter of BUILT_IN_ADAPTERS) {
-    if (await adapter.detect().catch(() => false)) detected.push(adapter)
-  }
-  return detected
 }
 
 export async function runSyncOnEdit(): Promise<number> {
