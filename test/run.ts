@@ -1,5 +1,7 @@
 import './cli/syncAdapters/managedBlock.test.js'
 import './cli/syncOnEdit.test.js'
+import './cli/memoryGuard.test.js'
+import './cli/sessionStart.test.js'
 import './storage/config.test.js'
 import './storage/gitignore.test.js'
 import './storage/reset.test.js'

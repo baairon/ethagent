@@ -135,7 +135,7 @@ export async function cancelFlow(): Promise<void> {
     await post("/cancel", {}).catch(() => { });
   }
   setState("cancelled");
-  statusText.textContent = lastWalletError ? "Aborted · returning" : "Cancelled · returning";
+  statusText.textContent = lastWalletError ? "Aborted" : "Cancelled";
   closeSoon(CANCEL_CLOSE_DELAY_MS);
 }
 
@@ -171,7 +171,7 @@ export function startSessionMode(): void {
     events.close();
     __sessionMode = false;
     setState("done");
-    statusText.textContent = "All set · Returning";
+    statusText.textContent = "All set";
     closeSoon();
   });
   events.onerror = () => {

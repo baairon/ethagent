@@ -88,3 +88,32 @@ test('appendPublicSkillEntries hides private skills and surfaces only public', (
   assert.equal(skillIds.includes('private-skill'), false)
   assert.ok(skillIds.includes('public-skill'))
 })
+
+test('appendPublicSkillEntries omits draft public skills from agent card metadata', () => {
+  const profile = defaultPublicSkillsProfile(identity)
+  const entries: SkillIndexEntry[] = [
+    {
+      name: 'draft-skill',
+      description: '<one-line public description before publishing>',
+      visibility: 'public',
+      relativePath: 'draft-skill/SKILL.md',
+      absolutePath: '/tmp/draft-skill/SKILL.md',
+    },
+    {
+      name: 'overview-fallback',
+      description: 'Overview',
+      visibility: 'public',
+      relativePath: 'overview-fallback/SKILL.md',
+      absolutePath: '/tmp/overview-fallback/SKILL.md',
+    },
+    {
+      name: 'ready-skill',
+      description: 'Run ready workflows',
+      visibility: 'public',
+      relativePath: 'ready-skill/SKILL.md',
+      absolutePath: '/tmp/ready-skill/SKILL.md',
+    },
+  ]
+  const appended = appendPublicSkillEntries(profile, entries)
+  assert.deepEqual(appended.skills.map(s => s.id), ['ready-skill'])
+})

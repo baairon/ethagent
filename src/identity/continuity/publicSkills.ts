@@ -2,6 +2,7 @@ import type { EthagentIdentity } from '../../storage/config.js'
 import type { SkillIndexEntry } from './skills/types.js'
 import { identityOwnerAddress } from '../manager/custody/state.js'
 import { toChecksumAddress } from '../crypto/eth.js'
+import { isDraftScaffold } from './skills/scaffold.js'
 
 type PublicSkill = {
   id: string
@@ -82,6 +83,7 @@ export function appendPublicSkillEntries(
   const usedIds = new Set(baselineIds)
   for (const entry of entries) {
     if (entry.visibility !== 'public') continue
+    if (isDraftScaffold(entry)) continue
     const id = uniqueSkillId(entry.name, usedIds)
     usedIds.add(id)
     appended.push({

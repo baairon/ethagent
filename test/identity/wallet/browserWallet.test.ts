@@ -205,7 +205,6 @@ test('browser wallet page clearly requests owner wallet for restore signatures',
   assert.match(page, /Owner Wallet Required/)
   assert.match(page, /Sign With Owner Wallet/)
   assert.match(page, /Decrypts this snapshot/)
-  assert.match(page, /Required wallet:/)
   assert.match(page, /0x0+c01d/)
 })
 
@@ -221,7 +220,6 @@ test('browser wallet page clearly requests operator wallet for restore signature
   assert.match(page, /Operator Wallet Required/)
   assert.match(page, /Sign With Operator Wallet/)
   assert.match(page, /Decrypts this snapshot/)
-  assert.match(page, /Required wallet:/)
 })
 
 test('browser wallet page explains ENS record clearing on Ethereum mainnet', () => {
@@ -238,7 +236,6 @@ test('browser wallet page explains ENS record clearing on Ethereum mainnet', () 
 
   assert.match(page, /Submit With ENS Controller Wallet/)
   assert.match(page, /Submit With ENS Controller Wallet/)
-  assert.match(page, /Required wallet:/)
   assert.match(page, /Ethereum Mainnet/)
   assert.match(page, /eth_sendTransaction/)
 })
@@ -383,7 +380,7 @@ test('session lifecycle sign prompts tell users to keep the wallet page open', (
   assert.match(page, /function hasNextLifecyclePrompt/)
   assert.match(page, /Keep this page open\. The next wallet step will appear here\./)
   assert.match(page, /config\.kind === "sign"[\s\S]*hasNextLifecyclePrompt\(\) \? nextLifecycleHint\(\) : "Returning to terminal\."/)
-  assert.match(page, /config\.kind === "sign" \? \(hasNextLifecyclePrompt\(\) \? "Signed · Waiting" : "Signed · Returning"\)/)
+  assert.match(page, /hasNextLifecyclePrompt\(\) \? nextLifecycleHint\(\) : "This tab will close shortly\."/)
 })
 
 test('browser wallet account requests return the connected address without a signature', async () => {

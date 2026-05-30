@@ -11,7 +11,15 @@
     "SessionStart": [
       {
         "hooks": [
-          { "type": "command", "command": "npx -y ethagent --sync" }
+          { "type": "command", "command": "npx -y ethagent --session-start" }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          { "type": "command", "command": "npx -y ethagent --memory-guard" }
         ]
       }
     ],

@@ -12,6 +12,8 @@ import {
   identityPerspective,
   readCustodyMode,
 } from '../../../../src/identity/manager/custody/state.js'
+import { AppInputProvider } from '../../../../src/app/input/AppInputProvider.js'
+import { RecoveryConfirmScreen } from '../../../../src/identity/manager/continuity/RecoveryConfirmScreen.js'
 import { ensValidationReasonText } from '../../../../src/identity/manager/ens/state.js'
 import {
   chainSummaryRow,
@@ -166,6 +168,41 @@ test('identity manager local change status distinguishes clean and changed files
   assert.deepEqual(changed.files, ['SOUL.md', 'Skills'])
   assert.equal(changed.tone, 'warn')
   assert.equal(changed.hasLocalChanges, true)
+})
+
+test('recovery confirm warns before overwriting dirty local continuity files', () => {
+  const published = {
+    'SOUL.md': 'soul-a',
+    'MEMORY.md': 'memory-a',
+    'agent-card.json': 'card-a',
+  }
+  const output = renderToString(React.createElement(AppInputProvider, null,
+    React.createElement(RecoveryConfirmScreen, {
+      mode: 'refetch',
+      footer: null,
+      pendingPublish: true,
+      onConfirm: () => {},
+      onBack: () => {},
+      workingStatus: {
+        ready: true,
+        localChangedAfterBackup: true,
+        publishState: 'local-changes',
+        localContentHashes: {
+          'SOUL.md': 'soul-b',
+          'MEMORY.md': 'memory-a',
+          'agent-card.json': 'card-a',
+          'private-skills': 'skills-b',
+        },
+        publishedContentHashes: published,
+      },
+    }),
+  ))
+
+  assert.match(output, /Unsaved local changes detected/)
+  assert.match(output, /SOUL\.md,[\s\S]*Skills/)
+  assert.match(output, /Continuing replaces those files/)
+  assert.match(output, /Overwrite Local Changes/)
+  assert.match(output, /Local snapshot is also ahead of onchain/)
 })
 
 test('transfer snapshot view is perspective-aware', () => {

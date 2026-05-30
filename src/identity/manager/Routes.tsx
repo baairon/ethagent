@@ -4,10 +4,10 @@ import { getAddress, isAddress } from 'viem'
 import { Surface } from '../../ui/Surface.js'
 import { Select } from '../../ui/Select.js'
 import { theme } from '../../ui/theme.js'
-import type { SelectableNetwork } from '../../storage/config.js'
+import type { EthagentIdentity, SelectableNetwork } from '../../storage/config.js'
 import { copyToClipboard } from '../../utils/clipboard.js'
 import { DEFAULT_IPFS_API_URL } from '../storage/ipfs.js'
-import { chainIdForNetwork, erc8004ConfigForSupportedChain } from '../registry/erc8004.js'
+import { chainIdForNetwork, erc8004ConfigForSupportedChain, type Erc8004AgentCandidate } from '../registry/erc8004.js'
 import { shortAddress } from './shared/model/format.js'
 import { canRestoreCandidate } from './restore/discover.js'
 import {
@@ -34,8 +34,10 @@ import {
   isCreateStep,
   isRestoreStep,
 } from './shared/utils.js'
+import { localChangeStatusView } from './continuity/state.js'
 import { IdentityManagerOperationalRoutes } from './OperationalRoutes.js'
 import type { IdentityManagerController } from './useController.js'
+import type { Step } from './reducer.js'
 
 export const IdentityManagerRoutes: React.FC<{ controller: IdentityManagerController }> = ({ controller }) => {
   const {
@@ -64,6 +66,16 @@ export const IdentityManagerRoutes: React.FC<{ controller: IdentityManagerContro
   } = controller
 
   const footer = <Text color={theme.dim}>enter select · esc back</Text>
+  const setRestoreFetchingStep = (next: Extract<Step, { kind: 'restore-fetching' }>, backStep: Step): void => {
+    if (
+      isSameLoadedAgent(identity, next.candidate)
+      && localChangeStatusView(workingStatus).hasLocalChanges
+    ) {
+      setStep({ kind: 'continuity-overwrite-confirm', action: 'restore', next, back: backStep })
+      return
+    }
+    setStep(next)
+  }
 
   if (step.kind === 'first-run-ens-prompt') {
     const tokenLabel = step.identity.agentId ? `#${step.identity.agentId}` : ''
@@ -248,14 +260,14 @@ export const IdentityManagerRoutes: React.FC<{ controller: IdentityManagerContro
           if (step.kind !== 'restore-select-token') return
           const candidate = step.candidates.find(item => item.agentId.toString() === value)
           if (!candidate?.backup?.cid) return
-          setStep({
+          setRestoreFetchingStep({
             kind: 'restore-fetching',
             cid: candidate.backup.cid,
             apiUrl: DEFAULT_IPFS_API_URL,
             candidate,
             requesterAddress: step.requesterAddress,
             purpose: step.purpose,
-          })
+          }, step)
         }}
         onEnsSubmit={async value => {
           if (step.kind !== 'restore-ens-input') return
@@ -273,14 +285,14 @@ export const IdentityManagerRoutes: React.FC<{ controller: IdentityManagerContro
             setStep({ ...step, busy: false, error: `${shortAddress(step.ownerHandle)} is not an operator wallet for this agent. Sign in with an approved operator wallet, or with the owner wallet that holds the token.` })
             return
           }
-          setStep({
+          setRestoreFetchingStep({
             kind: 'restore-fetching',
             cid: resolution.candidate.backup.cid,
             apiUrl: DEFAULT_IPFS_API_URL,
             candidate: resolution.candidate,
             requesterAddress: step.ownerHandle,
             purpose: step.purpose,
-          })
+          }, { ...step, busy: false, error: undefined })
         }}
         onTokenIdSubmit={async value => {
           if (step.kind !== 'restore-token-id-input') return
@@ -298,14 +310,14 @@ export const IdentityManagerRoutes: React.FC<{ controller: IdentityManagerContro
             setStep({ ...step, busy: false, error: `${shortAddress(step.ownerHandle)} is not an operator wallet for this agent. Sign in with an approved operator wallet, or with the owner wallet that holds the token.` })
             return
           }
-          setStep({
+          setRestoreFetchingStep({
             kind: 'restore-fetching',
             cid: resolution.candidate.backup.cid,
             apiUrl: DEFAULT_IPFS_API_URL,
             candidate: resolution.candidate,
             requesterAddress: step.ownerHandle,
             purpose: step.purpose,
-          })
+          }, { ...step, busy: false, error: undefined })
         }}
         onPickRecoveryMethod={choice => {
           if (step.kind !== 'restore-recovery-input' && step.kind !== 'restore-select-token') return
@@ -355,4 +367,11 @@ export const IdentityManagerRoutes: React.FC<{ controller: IdentityManagerContro
   }
 
   return <IdentityManagerOperationalRoutes controller={controller} footer={footer} />
+}
+
+function isSameLoadedAgent(identity: EthagentIdentity | undefined, candidate: Erc8004AgentCandidate): boolean {
+  if (!identity?.agentId || !identity.chainId || !identity.identityRegistryAddress) return false
+  if (identity.chainId !== candidate.chainId) return false
+  if (identity.agentId !== candidate.agentId.toString()) return false
+  return identity.identityRegistryAddress.toLowerCase() === candidate.identityRegistryAddress.toLowerCase()
 }

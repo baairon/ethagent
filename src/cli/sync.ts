@@ -1,4 +1,3 @@
-import path from 'node:path'
 import { loadConfig, type EthagentIdentity } from '../storage/config.js'
 import { readContinuityFiles, statIfExists, writeContinuityFiles } from '../identity/continuity/storage/files.js'
 import { continuityVaultRef } from '../identity/continuity/storage/paths.js'
@@ -7,6 +6,7 @@ import { listPublishedContinuitySnapshots } from '../identity/continuity/snapsho
 import { changedContinuitySnapshotFiles } from '../identity/manager/continuity/state.js'
 import { listSkills } from '../identity/continuity/skills/loadSkills.js'
 import { hashManagedBody, normalizeBody, reconstructVaultFile, sectionKey } from './syncAdapters/managedBlock.js'
+import { hookFilePath, readHookPayload, samePath } from './hookIo.js'
 import {
   BUILT_IN_ADAPTERS,
   isPathTarget,
@@ -70,7 +70,7 @@ export async function runSync(opts: SyncOptions = {}): Promise<number> {
       process.stdout.write(`ethagent: pulled ${pulled.join(', ')} drift from your harness into the vault\n`)
     }
   }
-  await reportLocalChanges(config.identity)
+  if (!opts.quiet) await reportLocalChanges(config.identity)
   return 0
 }
 
@@ -180,28 +180,6 @@ export function isManagedCorePath(identity: EthagentIdentity, editedPath: string
   return managed.some(candidate => samePath(candidate, editedPath))
 }
 
-function samePath(a: string, b: string): boolean {
-  const na = path.resolve(a)
-  const nb = path.resolve(b)
-  return process.platform === 'win32' ? na.toLowerCase() === nb.toLowerCase() : na === nb
-}
-
 async function readEditedFilePathFromStdin(): Promise<string | null> {
-  if (process.stdin.isTTY) return null
-  let raw = ''
-  try {
-    process.stdin.setEncoding('utf8')
-    for await (const chunk of process.stdin) raw += chunk
-  } catch {
-    return null
-  }
-  raw = raw.trim()
-  if (!raw) return null
-  try {
-    const payload = JSON.parse(raw) as { tool_input?: { file_path?: unknown } }
-    const filePath = payload.tool_input?.file_path
-    return typeof filePath === 'string' && filePath.length > 0 ? filePath : null
-  } catch {
-    return null
-  }
+  return hookFilePath(await readHookPayload())
 }

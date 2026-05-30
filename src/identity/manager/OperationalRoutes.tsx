@@ -141,6 +141,18 @@ export const IdentityManagerOperationalRoutes: React.FC<IdentityManagerOperation
     )
   }
 
+  if (step.kind === 'continuity-overwrite-confirm') {
+    return (
+      <RecoveryConfirmScreen
+        mode="restore"
+        workingStatus={workingStatus}
+        footer={footer}
+        onConfirm={() => setStep(step.next)}
+        onBack={() => setStep(step.back)}
+      />
+    )
+  }
+
   if (step.kind === 'operation-complete') {
     return (
       <OperationCompleteScreen

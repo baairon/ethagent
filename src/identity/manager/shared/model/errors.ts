@@ -10,6 +10,7 @@ import {
   formatVaultBytecodeMismatchDetail,
 } from '../../../registry/vault.js'
 import { BrowserWalletError } from '../../../wallet/browserWallet.js'
+import { PinataUploadError } from '../../../storage/ipfs.js'
 import { TxGuardBusyError } from '../txGuard.js'
 import { shortAddress } from './format.js'
 
@@ -86,6 +87,34 @@ export function identityManagerErrorView(err: unknown): IdentityManagerErrorView
       title: err.title ?? 'Wallet Error',
       detail: lines.join('\n'),
       hint: 'Switch to the expected wallet, confirm you have funds, then retry. If the wallet keeps reporting an internal RPC error, change the RPC endpoint in your wallet settings.',
+    }
+  }
+  if (err instanceof PinataUploadError) {
+    if (err.status === 403) {
+      return {
+        title: 'Pinata Storage Limit Reached',
+        detail: 'Pinata refused the upload (403). Your account is likely at its file or storage limit; the free plan caps at 500 files.',
+        hint: 'Check your usage at https://app.pinata.cloud, remove old pins or upgrade your plan, then try again.',
+      }
+    }
+    if (err.status === 401) {
+      return {
+        title: 'Pinata Rejected the Credential',
+        detail: 'Pinata rejected the upload (401). Your Pinata JWT is invalid or expired.',
+        hint: 'Update your Pinata JWT in Storage settings, then try again.',
+      }
+    }
+    if (err.status === 429) {
+      return {
+        title: 'Pinata Rate Limited',
+        detail: 'Pinata is throttling uploads (429): too many requests in a short window.',
+        hint: 'Wait a moment, then try again.',
+      }
+    }
+    return {
+      title: 'Pinata Upload Failed',
+      detail: err.message,
+      hint: 'Check your Pinata account status at https://app.pinata.cloud, then try again.',
     }
   }
   const message = err instanceof Error ? err.message : String(err)

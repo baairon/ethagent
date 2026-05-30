@@ -8,11 +8,12 @@ import {
 } from '../publicSkills.js'
 import { ensureContinuityVault, ensureTrailingNewline, readOrDefault } from '../storage/files.js'
 import { listSkills } from './loadSkills.js'
+import { isDraftScaffold } from './scaffold.js'
 import type { SkillIndexEntry } from './types.js'
 
 export async function derivePublicSkillEntries(identity: EthagentIdentity): Promise<SkillIndexEntry[]> {
   const entries = await listSkills(identity)
-  return entries.filter(entry => entry.visibility === 'public')
+  return entries.filter(entry => entry.visibility === 'public' && !isDraftScaffold(entry))
 }
 
 export async function renderAgentCardJsonForIdentity(identity: EthagentIdentity): Promise<string> {

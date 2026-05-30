@@ -46,6 +46,7 @@ test('createSkillFile writes a Claude-style flat folder with the rich scaffold',
     const body = await fs.readFile(skillPath, 'utf8')
     assert.match(body, /^---\n/)
     assert.match(body, /name: obit/)
+    assert.match(body, /description: <one-line public description before publishing>/)
     assert.match(body, /# Overview/)
     assert.match(body, /# Instructions/)
     assert.match(body, /# Examples/)
@@ -308,6 +309,8 @@ test('isDraftScaffold detects empty, placeholder, and self-named descriptions', 
   assert.equal(isDraftScaffold({ description: '', name: 'obit' }), true)
   assert.equal(isDraftScaffold({ description: '<placeholder>', name: 'obit' }), true)
   assert.equal(isDraftScaffold({ description: 'obit', name: 'obit' }), true)
+  assert.equal(isDraftScaffold({ description: 'Overview', name: 'obit' }), true)
+  assert.equal(isDraftScaffold({ description: 'Replace this draft with one or two sentences describing what this skill does', name: 'obit' }), true)
   assert.equal(isDraftScaffold({ description: 'Draft eulogies for a given person', name: 'obit' }), false)
 })
 

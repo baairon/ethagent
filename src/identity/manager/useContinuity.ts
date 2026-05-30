@@ -29,6 +29,12 @@ const WORKING_STATUS_STEPS = new Set<string>([
   'continuity-skills-tree',
   'save-prompt',
   'rebackup-confirm',
+  'recovery-refetch-confirm',
+  'continuity-overwrite-confirm',
+  'restore-recovery-input',
+  'restore-ens-input',
+  'restore-token-id-input',
+  'restore-select-token',
 ])
 const WATCHED_VAULT_FILES = new Set<string>(['SOUL.md', 'MEMORY.md', 'agent-card.json'])
 

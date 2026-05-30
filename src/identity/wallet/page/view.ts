@@ -1,5 +1,6 @@
 let card: HTMLElement;
 let flowTitle: HTMLElement;
+let flowSubtitle: HTMLElement;
 let flowDetail: HTMLElement;
 let detailsBlock: HTMLElement;
 let detailKey: HTMLElement;
@@ -21,6 +22,7 @@ function requiredElement<T extends HTMLElement>(id: string): T {
 export function initializeViewElements(): void {
   card = requiredElement("card");
   flowTitle = requiredElement("flow-title");
+  flowSubtitle = requiredElement("flow-subtitle");
   flowDetail = requiredElement("flow-detail");
   detailsBlock = requiredElement("details-block");
   detailKey = requiredElement("detail-key");
@@ -105,6 +107,7 @@ export function showPreparedMessage(message: string): void {
   if (copy.detail !== "message") return;
   const preview = messagePreview(message);
   detailKey.textContent = copy.detail;
+  flowDetail.dataset.detail = copy.detail;
   detailVal.textContent = preview;
   flowDetail.hidden = preview.length === 0;
   detailsBlock.hidden = flowDetail.hidden;
@@ -121,6 +124,9 @@ export function applyFlowChrome(): void {
         : config.kind === "transaction"
           ? transactionPurposeTitle()
           : copy.title;
+  const subtitle = (config.purpose && purposeSubtitle()) || copy.subtitle || "";
+  flowSubtitle.textContent = subtitle;
+  flowSubtitle.hidden = subtitle.length === 0;
   setTabTitle(copy.tabTitle);
   applyTransferTimeline();
   if (!copy.detail) {
@@ -130,6 +136,7 @@ export function applyFlowChrome(): void {
     flowDetail.hidden = false;
     detailsBlock.hidden = false;
     detailKey.textContent = copy.detail;
+    flowDetail.dataset.detail = copy.detail;
     detailVal.textContent = detailPreview(copy);
     flowDetail.hidden = detailVal.textContent.length === 0;
     if (flowDetail.hidden) detailsBlock.hidden = true;

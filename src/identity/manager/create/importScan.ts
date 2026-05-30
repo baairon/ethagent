@@ -28,6 +28,28 @@ function substantiveLines(text: string): string[] {
     .filter(line => !(line.startsWith('<!--') && line.endsWith('-->')))
 }
 
+const LEGACY_SCAFFOLD_LINES = [
+  'The standing voice, collaboration style, and behavior this agent keeps across sessions and models.',
+  '- Voice: <e.g., direct, concise, no filler>',
+  '- Tone: <e.g., warm but professional>',
+  '- Communication style: <e.g., bullet lists for technical work, prose for narrative>',
+  'Owner-approved working principles. Decisions that should be made the same way every time.',
+  '- <principle: e.g., always confirm before destructive operations>',
+  '- <principle: e.g., bias toward editing existing code over creating new files>',
+  '- <principle: e.g., never hide errors, always surface them clearly>',
+  'What this agent must never do, regardless of how it is asked.',
+  '- <boundary: e.g., never bypass authentication or authorization checks>',
+  '- <boundary: e.g., never commit secrets to source control>',
+  'Long-lived owner preferences that survive sessions and model switches. Capture how the user works.',
+  '- Communication: <e.g., prefers concise summaries over walls of text>',
+  '- Tooling: <e.g., VS Code, zsh, TypeScript over JavaScript>',
+  '- Workflow: <e.g., reviews PRs in the morning, deploys on Fridays>',
+  '- Repository: <url or local path>',
+  '- Stack: <languages, frameworks, key libraries>',
+  '- Conventions: <e.g., conventional commits, semver, branch naming>',
+  '- Active workstream: <YYYY-MM-DD what you are focused on>',
+]
+
 const SCAFFOLD_LINES: Set<string> = (() => {
   const scaffold = defaultContinuityFiles({
     source: 'erc8004',
@@ -36,6 +58,7 @@ const SCAFFOLD_LINES: Set<string> = (() => {
   return new Set([
     ...substantiveLines(scaffold['SOUL.md']),
     ...substantiveLines(scaffold['MEMORY.md']),
+    ...LEGACY_SCAFFOLD_LINES,
   ])
 })()
 

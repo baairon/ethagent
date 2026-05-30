@@ -56,6 +56,10 @@ export function setState(state: string, payload?: any): void {
   currentState = state;
   errorSlot.innerHTML = "";
   statusBlock.style.display = "flex";
+  statusBlock.dataset.tone = state === "done" ? "success" : state === "cancelled" ? "cancelled" : "pending";
+  const terminal = state === "done" || state === "cancelled";
+  const cardEl = document.getElementById("card");
+  if (cardEl) cardEl.dataset.phase = terminal ? "terminal" : "active";
   setTabTitle(tabTitleForState(state));
   applyTransferTimeline();
   switch (state) {
@@ -97,13 +101,13 @@ export function setState(state: string, payload?: any): void {
     case "done":
       stopSpinner();
       statusMarker.innerHTML =
-        '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"' +
+        '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"' +
         ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
         '<polyline points="20 6 9 17 4 12"></polyline></svg>';
       statusText.textContent =
-        config.kind === "account" ? "Connected · Returning"
-          : config.kind === "sign" ? (hasNextLifecyclePrompt() ? "Signed · Waiting" : "Signed · Returning")
-            : "Submitted · Returning";
+        config.kind === "account" ? "Connected"
+          : config.kind === "sign" ? "Signed"
+            : "Submitted";
       statusHint.textContent = payload.txHash
         ? (isTransactionFlow() ? "Transaction submitted. Returning." : "This tab will close shortly.")
         : hasNextLifecyclePrompt() ? nextLifecycleHint() : "This tab will close shortly.";
@@ -111,10 +115,7 @@ export function setState(state: string, payload?: any): void {
       break;
     case "cancelled":
       stopSpinner();
-      statusMarker.innerHTML =
-        '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"' +
-        ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
-        '<line x1="6" y1="6" x2="18" y2="18"></line><line x1="6" y1="18" x2="18" y2="6"></line></svg>';
+      statusMarker.innerHTML = "";
       break;
     case "error":
       stopSpinner();

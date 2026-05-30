@@ -44,6 +44,10 @@
     "type": "git",
     "url": "git+https://github.com/baairon/ethagent.git"
   },
+  "homepage": "https://github.com/baairon/ethagent#readme",
+  "bugs": {
+    "url": "https://github.com/baairon/ethagent/issues"
+  },
   "author": "bairon.dev",
   "license": "MIT",
   "dependencies": {

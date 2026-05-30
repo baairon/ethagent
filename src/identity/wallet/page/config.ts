@@ -18,14 +18,15 @@ export interface FlowCopy {
   tabTitle: string;
   label: string;
   title: string;
+  subtitle: string;
   detail: string | null;
 }
 
 export const FLOW_COPY: Record<string, FlowCopy> = {
-  account:            { accent: "sign",        tabTitle: "Connect Wallet",   label: "Connection Request",   title: "Connect Wallet",   detail: null },
-  sign:               { accent: "sign",        tabTitle: "Sign Message",     label: "Signature Request",    title: "Sign Message",     detail: "message" },
-  "sign-transaction": { accent: "transaction", tabTitle: "Sign Snapshot",    label: "Snapshot Signature",   title: "Sign Snapshot",    detail: null },
-  transaction:        { accent: "transaction", tabTitle: "Submit Transaction", label: "Onchain Transaction", title: "Submit Transaction", detail: "registry" },
+  account:            { accent: "sign",        tabTitle: "Connect Wallet",   label: "Connection Request",   title: "Connect Wallet",   subtitle: "Shares your wallet address with the agent. No signature or transaction.", detail: null },
+  sign:               { accent: "sign",        tabTitle: "Sign Message",     label: "Signature Request",    title: "Sign Message",     subtitle: "Signs a message to prove wallet ownership. No transaction.", detail: "message" },
+  "sign-transaction": { accent: "transaction", tabTitle: "Sign Snapshot",    label: "Snapshot Signature",   title: "Sign Snapshot",    subtitle: "Signs your encrypted agent snapshot for restore access.", detail: null },
+  transaction:        { accent: "transaction", tabTitle: "Submit Transaction", label: "Onchain Transaction", title: "Submit Transaction", subtitle: "Submits one onchain transaction from your wallet.", detail: "registry" },
 };
 
 export const TRANSACTION_TITLES: Record<string, string> = {

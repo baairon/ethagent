@@ -9,13 +9,13 @@ export function defaultSkillScaffold({ name, visibility = 'public' }: SkillScaff
   return [
     '---',
     `name: ${name}`,
-    'description:',
+    'description: <one-line public description before publishing>',
     `visibility: ${visibility}`,
     '---',
     '',
     '# Overview',
     '',
-    'Describe in one or two sentences what this skill does and the problem it solves.',
+    'Replace this draft with one or two sentences describing what this skill does and the problem it solves.',
     '',
     '# When to use',
     '',
@@ -48,5 +48,8 @@ export function isDraftScaffold(entry: { description: string; name: string }): b
   if (desc.length === 0) return true
   if (/^<.*>$/.test(desc)) return true
   if (desc === entry.name) return true
+  if (/^overview$/i.test(desc)) return true
+  if (/^describe in one or two sentences/i.test(desc)) return true
+  if (/^replace this draft/i.test(desc)) return true
   return false
 }

@@ -30,6 +30,7 @@ export type ProfileUpdates = {
 }
 
 type RestorableBackupEnvelope = AgentStateBackupEnvelope | ContinuitySnapshotEnvelope
+type RestoreFetchingStep = { kind: 'restore-fetching'; cid: string; apiUrl: string; candidate: Erc8004AgentCandidate; requesterAddress?: string; purpose?: RestorePurpose }
 
 export type Step =
   | { kind: 'menu' }
@@ -54,7 +55,7 @@ export type Step =
   | { kind: 'restore-token-id-input'; ownerHandle: string; registry: Erc8004RegistryConfig; purpose?: RestorePurpose; busy?: boolean; error?: string }
   | { kind: 'restore-not-found'; ownerHandle: string; registry: Erc8004RegistryConfig; requesterAddress?: string; reason: RestoreNotFoundReason; purpose?: RestorePurpose }
   | { kind: 'restore-select-token'; ownerHandle: string; registry: Erc8004RegistryConfig; candidates: Erc8004AgentCandidate[]; requesterAddress?: string; purpose?: RestorePurpose }
-  | { kind: 'restore-fetching'; cid: string; apiUrl: string; candidate: Erc8004AgentCandidate; requesterAddress?: string; purpose?: RestorePurpose }
+  | RestoreFetchingStep
   | { kind: 'restore-authorizing'; cid: string; apiUrl: string; envelope: RestorableBackupEnvelope; candidate: Erc8004AgentCandidate; requesterAddress?: string; purpose?: RestorePurpose }
   | { kind: 'rebackup-signing'; identity: EthagentIdentity; registry: Erc8004RegistryConfig; pinataJwt?: string; profileUpdates?: ProfileUpdates; returnTo?: Step; walletPurpose?: WalletPurpose; vaultAddress?: `0x${string}` }
   | { kind: 'rebackup-storage'; identity: EthagentIdentity; registry: Erc8004RegistryConfig; error?: string; pinataJwt?: string; profileUpdates?: ProfileUpdates; returnTo?: Step; walletPurpose?: WalletPurpose; vaultAddress?: `0x${string}` }
@@ -70,6 +71,7 @@ export type Step =
   | { kind: 'rebackup-confirm'; back: Step }
   | { kind: 'recovery-refetch-confirm'; back: Step }
   | { kind: 'recovery-refetching'; identity: EthagentIdentity; registry: Erc8004RegistryConfig; back: Step }
+  | { kind: 'continuity-overwrite-confirm'; action: 'restore'; next: RestoreFetchingStep; back: Step }
   | { kind: 'rebackup-start'; back: Step }
   | { kind: 'edit-profile-menu'; identity: EthagentIdentity; registry: Erc8004RegistryConfig; name?: string; description?: string; imagePath?: string; returnTo?: Step }
   | { kind: 'edit-profile-name'; identity: EthagentIdentity; registry: Erc8004RegistryConfig; name?: string; description?: string; imagePath?: string; returnTo?: Step }
@@ -195,6 +197,8 @@ function backStep(from: Step): Step {
     case 'recovery-refetch-confirm':
     case 'recovery-refetching':
       return { kind: 'menu' }
+    case 'continuity-overwrite-confirm':
+      return from.back
     case 'edit-profile-menu':
       return from.returnTo ?? { kind: 'continuity-public' }
     case 'edit-profile-name':

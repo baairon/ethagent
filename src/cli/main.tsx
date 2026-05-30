@@ -12,6 +12,8 @@ import { IdentityManager } from '../identity/manager/IdentityManager.js'
 import type { IdentityManagerResult } from '../identity/manager/IdentityManager.js'
 import { loadConfig, saveConfig, type EthagentConfig } from '../storage/config.js'
 import { runSync, runSyncList, runSyncOnEdit } from './sync.js'
+import { runMemoryGuard } from './memoryGuard.js'
+import { runSessionStart } from './sessionStart.js'
 import { runStatus } from './status.js'
 import { runResetCommand } from './reset.js'
 import { enableDemoMode, synthDemoConfig } from './demo.js'
@@ -43,6 +45,10 @@ function printHelp(): void {
     '  ethagent --status           print one-line identity summary',
     '  ethagent --version          print version',
     '  ethagent --help             print this help',
+    '',
+    'plugin hooks (invoked automatically, not meant to be run by hand):',
+    '  ethagent --session-start    sync, then tell the agent where to record memory',
+    '  ethagent --memory-guard     keep agent memory in the portable markers, not local notes',
   ]
   for (const line of lines) process.stdout.write(line + '\n')
 }
@@ -152,6 +158,8 @@ async function main(): Promise<number> {
     return 0
   }
   if (flags.has('--sync-on-edit')) return runSyncOnEdit()
+  if (flags.has('--session-start')) return runSessionStart()
+  if (flags.has('--memory-guard')) return runMemoryGuard()
   if (flags.has('--sync-list')) return runSyncList()
   const syncTo = valueFlag(argv, 'sync-to')
   if (flags.has('--sync') || syncTo !== undefined) {

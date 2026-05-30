@@ -15,6 +15,26 @@ type IpfsOptions = {
   pinataJwt?: string
 }
 
+export class PinataUploadError extends Error {
+  readonly status: number
+  readonly statusText: string
+  constructor(status: number, statusText: string) {
+    super(pinataUploadErrorMessage(status, statusText))
+    this.name = 'PinataUploadError'
+    this.status = status
+    this.statusText = statusText
+  }
+}
+
+function pinataUploadErrorMessage(status: number, statusText: string): string {
+  const code = statusText ? `${status} ${statusText}` : String(status)
+  if (status === 401) return `Pinata rejected the upload (${code}): the storage credential is invalid or expired.`
+  if (status === 403) return `Pinata refused the upload (${code}): your account is likely at its file or storage limit.`
+  if (status === 429) return `Pinata is rate-limiting uploads (${code}): too many requests in a short window.`
+  if (status === 413) return `Pinata rejected the upload (${code}): the snapshot is larger than your plan allows.`
+  return `IPFS upload failed: ${code}.`
+}
+
 export function extractPinataJwt(input: string): string {
   const trimmed = input.trim()
   const matches = trimmed.match(/\b[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g) ?? []
@@ -142,7 +162,7 @@ async function addFileToPinata(
     },
     body,
   })
-  if (!response.ok) throw new Error(`IPFS upload failed: ${response.status} ${response.statusText}`)
+  if (!response.ok) throw new PinataUploadError(response.status, response.statusText)
   const data = await response.json() as { data?: { cid?: string }; IpfsHash?: string; Hash?: string; Cid?: string }
   const cid = data.data?.cid ?? data.IpfsHash ?? data.Hash ?? data.Cid
   if (!cid) throw new Error('IPFS upload response did not include a CID')

@@ -22,6 +22,13 @@ function claudeProjectMemoryMdPath(): string {
   return path.join(claudeDir(), 'projects', slug, 'memory', 'MEMORY.md')
 }
 
+// The Claude Code native per-project memory directory for the current project.
+// ethagent's portable memory supersedes this; the --memory-guard hook redirects
+// the model away from writing here so nothing siloes on one machine.
+export function claudeCodeNativeMemoryDir(): string {
+  return path.dirname(claudeProjectMemoryMdPath())
+}
+
 export const claudeCodeAdapter = {
   name: 'claude-code' as const,
   description: 'Mirror public skills into ~/.claude/skills and inject soul/memory into ~/.claude/CLAUDE.md and the project MEMORY.md.',

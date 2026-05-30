@@ -18,6 +18,7 @@ export function bootWallet(): void {
   initializeViewElements()
   attachWalletHandlers()
   applyFlowChrome()
+  setupCardResize()
   if (!window.__WALLET_PREVIEW__) {
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', bootWallet, { once: true })

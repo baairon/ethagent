@@ -4,25 +4,38 @@ export const WALLET_CSS = String.raw`
 *::after { box-sizing: border-box; }
 
 :root {
-  interpolate-size: allow-keywords;
-  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas,
-               "DejaVu Sans Mono", "Liberation Mono", monospace;
+  /* Monospace everywhere. JetBrains Mono is imported as a Google Font in
+     markup.ts, with a system mono fallback stack. */
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", SFMono-Regular, Menlo,
+               Consolas, "DejaVu Sans Mono", "Liberation Mono", monospace;
+  --font-ui: var(--font-mono);
+  --font-display: var(--font-mono);
 
+  /* Solid pitch-black ladder: the page is pure black, the card sits a hair off
+     it, and the panels ("connecting wallet", message, error) lift once more.
+     Depth and the glass edge come from shadows + a white rim, not translucency. */
   --bg: #000000;
-  --edge: 30px;
-  --box-pad: 14px 16px;
-  --tint: 220, 227, 242;
-  --line: rgba(var(--tint), 0.07);
-  --line-soft: rgba(var(--tint), 0.045);
-  --line-strong: rgba(var(--tint), 0.14);
-  --raise: rgba(var(--tint), 0.035);
-  --inset-hi: inset 0 1px 0 rgba(var(--tint), 0.05);
+  --surface: #000000;
+  --panel: #0a0a0c;
+  --raise: #131316;
 
-  --fg: #f1f3f8;
-  --fg-2: #bfc3cc;
-  --fg-3: #888c96;
-  --fg-4: #595d67;
-  --fg-5: #40434b;
+  --line: #1d1d21;
+  --line-soft: #161619;
+  --line-strong: #2a2a30;
+
+  /* Glass rim-light: faint white edge highlights, layered over the borders. */
+  --rim: rgba(255, 255, 255, 0.04);
+  --rim-strong: rgba(255, 255, 255, 0.06);
+
+  --radius: 0;
+  --radius-sm: 0;
+  --radius-xs: 0;
+
+  --fg: #eef0f6;
+  --fg-2: #b7bbc5;
+  --fg-3: #82868f;
+  --fg-4: #585c65;
+  --fg-5: #3d4047;
 
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
@@ -32,39 +45,51 @@ html, body { height: 100%; margin: 0; overflow: hidden; }
 
 body {
   position: relative;
-  font-family: var(--font-mono);
-  font-size: 10px;
+  font-family: var(--font-ui);
   color: var(--fg);
   background: var(--bg);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: clamp(16px, 3vw, 26px);
+  padding: clamp(18px, 3vw, 28px);
 }
 
 main {
   position: relative;
   z-index: 1;
-  width: min(520px, 100%);
-  max-height: calc(100dvh - 32px);
-  display: flex;
-  flex-direction: column;
-  background: var(--bg);
+  width: min(380px, 100%);
+  max-height: calc(100dvh - 36px);
   color: var(--fg);
-  border: 1px solid var(--line);
-  border-radius: 0;
-  box-shadow:
-    var(--inset-hi),
-    0 40px 120px -32px rgba(0, 0, 0, 0.9);
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
   overflow: hidden;
-  height: fit-content;
+  box-shadow:
+    0 24px 64px -24px rgba(0, 0, 0, 0.8);
+  animation: card-in 540ms var(--ease-out) both;
+  will-change: height;
 }
 
-main, .flow-title, .status, .status-line, .status-hint, .flow-detail,
+.card-inner {
+  display: flex;
+  flex-direction: column;
+}
+
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(12px) scale(0.984); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes block-in {
+  from { opacity: 0; transform: translateY(5px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+main, .flow-title, .flow-subtitle, .status, .status-line, .status-hint, .flow-detail,
 #error-block-slot, .details {
-  transition: height 460ms var(--ease-standard),
-              background-color 300ms var(--ease-standard),
+  transition: background-color 300ms var(--ease-standard),
               border-color 300ms var(--ease-standard),
+              box-shadow 320ms var(--ease-standard),
               color 300ms var(--ease-standard);
 }
 
@@ -73,21 +98,33 @@ main, .flow-title, .status, .status-line, .status-hint, .flow-detail,
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px 20px;
+  padding: 12px 14px 12px 20px;
   border-bottom: 1px solid var(--line);
-  background: transparent;
+  background: var(--bg);
   flex: none;
 }
 
-.chrome-spacer { flex: 1 1 0; min-width: 0; }
+.chrome-brand {
+  flex: 1 1 0;
+  min-width: 0;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: var(--fg-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
 .chrome-title {
   flex: 0 1 auto;
   text-align: center;
-  font-size: 9.5px;
-  color: var(--fg-3);
-  font-weight: 500;
-  letter-spacing: 0.08em;
+  font-family: var(--font-ui);
+  font-size: 10.5px;
+  color: var(--fg-4);
+  font-weight: 400;
+  letter-spacing: 0.01em;
   margin: 0;
   white-space: nowrap;
   overflow: hidden;
@@ -99,10 +136,10 @@ main, .flow-title, .status, .status-line, .status-hint, .flow-detail,
 .body {
   flex: 1;
   min-height: 0;
-  padding: 26px var(--edge) 30px;
+  padding: clamp(18px, 2.5vw, 24px) clamp(20px, 3vw, 26px) clamp(20px, 2.5vw, 26px);
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
   overflow: hidden;
 }
 
@@ -110,23 +147,14 @@ main, .flow-title, .status, .status-line, .status-hint, .flow-detail,
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 14px;
+  gap: 5px;
 }
-
-.card-logo {
-  width: calc(100% + var(--edge) * 2);
-  margin: -26px calc(var(--edge) * -1) 0;
-  overflow: hidden;
-  padding: 42px 24px 34px;
-}
-
-.card-logo svg { width: 100%; height: auto; display: block; }
 
 .flow-title {
-  font-family: var(--font-mono);
-  font-size: clamp(12px, 1.4vw, 13.5px);
-  font-weight: 600;
-  line-height: 1.32;
+  font-family: var(--font-display);
+  font-size: 13.5px;
+  font-weight: 700;
+  line-height: 1.3;
   letter-spacing: -0.01em;
   margin: 0;
   color: var(--fg);
@@ -134,30 +162,31 @@ main, .flow-title, .status, .status-line, .status-hint, .flow-detail,
   text-align: left;
 }
 
+.flow-subtitle {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.5;
+  letter-spacing: -0.005em;
+  margin: 0;
+  color: var(--fg-3);
+  text-align: left;
+  text-wrap: pretty;
+}
+
+.flow-subtitle[hidden] { display: none; }
+
 .timeline {
   margin: 0;
-  padding: 10px 0 2px;
+  padding: 1px 0 0;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-height: 64px;
-  opacity: 1;
   overflow: hidden;
-  transition: max-height 460ms var(--ease-standard),
-              padding 460ms var(--ease-standard),
-              margin 460ms var(--ease-standard),
-              opacity 460ms var(--ease-standard);
+  animation: block-in 380ms var(--ease-out) both;
 }
 
-.timeline[hidden] {
-  display: flex;
-  max-height: 0;
-  opacity: 0;
-  padding-top: 0;
-  padding-bottom: 0;
-  margin-top: -6px;
-  pointer-events: none;
-}
+.timeline[hidden] { display: none; }
 
 .timeline-head {
   display: flex;
@@ -168,10 +197,10 @@ main, .flow-title, .status, .status-line, .status-hint, .flow-detail,
 
 .timeline-now {
   min-width: 0;
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-  font-weight: 500;
-  letter-spacing: 0.01em;
+  font-family: var(--font-ui);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0;
   color: var(--fg);
   white-space: nowrap;
   overflow: hidden;
@@ -182,8 +211,8 @@ main, .flow-title, .status, .status-line, .status-hint, .flow-detail,
 .timeline-count {
   flex: none;
   font-family: var(--font-mono);
-  font-size: 9px;
-  font-weight: 500;
+  font-size: 10px;
+  font-weight: 400;
   letter-spacing: 0.08em;
   color: var(--fg-4);
   font-variant-numeric: tabular-nums;
@@ -201,17 +230,17 @@ main, .flow-title, .status, .status-line, .status-hint, .flow-detail,
   min-width: 0;
   height: 3px;
   border-radius: 0;
-  background: rgba(var(--tint), 0.1);
+  background: #1f1f24;
   transition: background-color 420ms var(--ease-standard),
               opacity 420ms var(--ease-standard);
 }
 
 .timeline-seg.is-done {
-  background: rgba(var(--tint), 0.62);
+  background: #6b6f79;
 }
 
 .timeline-seg.is-active {
-  background: rgba(var(--tint), 0.3);
+  background: #34363c;
   animation: seg-pulse 1.4s var(--ease-standard) infinite;
 }
 
@@ -223,63 +252,47 @@ main, .flow-title, .status, .status-line, .status-hint, .flow-detail,
 .details {
   display: flex;
   flex-direction: column;
-  gap: 7px;
-  padding: var(--box-pad);
-  background: var(--raise);
+  gap: 9px;
+  padding: 14px 16px;
+  background: var(--panel);
   border: 1px solid var(--line-soft);
-  border-radius: 0;
-  box-shadow: var(--inset-hi);
-  max-height: 210px;
-  opacity: 1;
-  margin-top: 0;
+  border-radius: var(--radius-sm);
   overflow: hidden;
-  transition: max-height 460ms var(--ease-standard),
-              padding 460ms var(--ease-standard),
-              margin 460ms var(--ease-standard),
-              opacity 460ms var(--ease-standard),
-              border-color 460ms var(--ease-standard);
+  box-shadow: 0 4px 16px -4px rgba(0, 0, 0, 0.45),
+              0 1px 0 var(--rim) inset;
+  animation: block-in 380ms var(--ease-out) both;
 }
 
-.details[hidden] {
-  display: flex;
-  max-height: 0;
-  opacity: 0;
-  padding-top: 0;
-  padding-bottom: 0;
-  margin-top: -14px;
-  border-color: transparent;
-  box-shadow: none;
-  pointer-events: none;
-}
+.details[hidden] { display: none; }
 
 .flow-detail {
   display: grid;
-  grid-template-columns: auto 1fr;
-  align-items: baseline;
-  gap: 10px;
-  font-size: 10px;
+  grid-template-columns: max-content 1fr;
+  align-items: center;
+  gap: 12px;
+  font-family: var(--font-ui);
+  font-size: 12px;
   color: var(--fg-2);
   margin: 0;
-  line-height: 1.4;
+  line-height: 1.35;
 }
 
 .flow-detail[hidden] { display: none; }
 
 .flow-detail .key {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 500;
   color: var(--fg-3);
   text-transform: lowercase;
-  letter-spacing: 0.02em;
-  padding: 2px 7px;
+  letter-spacing: 0.05em;
+  padding: 3px 8px;
   background: var(--raise);
   border: 1px solid var(--line-strong);
   border-radius: 0;
   justify-self: start;
   align-self: center;
   min-width: 0;
-  transition: opacity 460ms var(--ease-standard);
 }
 
 .flow-detail span:last-child {
@@ -290,15 +303,43 @@ main, .flow-title, .status, .status-line, .status-hint, .flow-detail,
   font-weight: 500;
 }
 
+.flow-detail[data-detail="message"] {
+  display: block;
+}
+
+.flow-detail[data-detail="message"] .key {
+  display: block;
+  margin: 0 0 8px;
+  padding: 0;
+  background: none;
+  border: 0;
+  text-transform: lowercase;
+  letter-spacing: 0.08em;
+  color: var(--fg-3);
+}
+
+.flow-detail[data-detail="message"] span:last-child {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  white-space: normal;
+  overflow: hidden;
+  word-break: break-word;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--fg);
+}
+
 .status {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: var(--box-pad);
-  background: var(--raise);
+  padding: 14px 16px;
+  background: var(--panel);
   border: 1px solid var(--line-soft);
-  border-radius: 0;
-  box-shadow: var(--inset-hi);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 4px 16px -4px rgba(0, 0, 0, 0.45),
+              0 1px 0 var(--rim) inset;
 }
 
 .status-line, .status-hint {
@@ -314,27 +355,70 @@ main, .flow-title, .status, .status-line, .status-hint, .flow-detail,
 
 .status-line {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 10px;
-  font-weight: 500;
+  align-items: flex-start;
+  gap: 9px;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.4;
   color: var(--fg);
   margin: 0;
 }
 
 .status-line .marker {
   font-family: var(--font-mono);
-  font-size: 12px;
-  width: 16px;
-  height: 16px;
+  font-size: 11px;
+  width: 14px;
+  height: 16.8px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: var(--fg-3);
+  color: var(--fg-4);
   flex: none;
   font-variant-numeric: tabular-nums;
+  font-weight: 600;
   line-height: 1;
+  transition: color 300ms var(--ease-standard);
 }
+
+/* The success / done terminal state drops the panel chrome entirely and shows a
+   clean unboxed glyph, so a finished action reads as a calm closing message
+   rather than another live input prompt. Cancelled keeps the panel (below). */
+.status[data-tone="success"] {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  padding: 4px 2px;
+  gap: 8px;
+}
+
+.status[data-tone="cancelled"] .status-line,
+.status[data-tone="success"] .status-line {
+  align-items: center;
+}
+
+.status[data-tone="success"] .marker {
+  width: 20px;
+  height: 20px;
+  border: 0;
+  background: none;
+  color: var(--fg);
+}
+
+/* Cancelled / aborted closes calmly with no glyph: just the text and its hint,
+   both flush to the panel's left edge. */
+.status[data-tone="cancelled"] .marker { display: none; }
+.status[data-tone="cancelled"] .status-hint { margin-left: 0; }
+
+.status[data-tone="success"] .status-hint {
+  margin-left: 29px;
+}
+
+/* On a finished (terminal) screen, drop the message-detail panel and the footer
+   action row so nothing reads as still-actionable: just the closing message. */
+#card[data-phase="terminal"] .details,
+#card[data-phase="terminal"] .footer { display: none; }
 
 .spinner {
   display: inline-block;
@@ -347,69 +431,63 @@ main, .flow-title, .status, .status-line, .status-hint, .flow-detail,
 }
 
 .status-hint {
-  font-size: 9px;
-  color: var(--fg-3);
-  margin: 0 0 0 26px;
-  line-height: 1.45;
+  font-family: var(--font-ui);
+  font-size: 10.5px;
+  font-weight: 400;
+  color: var(--fg-4);
+  margin: 4px 0 0 23px;
+  line-height: 1.55;
 }
 
-#error-block-slot:empty {
-  display: block;
-  max-height: 0;
-  opacity: 0;
-  padding-top: 0;
-  padding-bottom: 0;
-  margin-top: -14px;
-  border-color: transparent;
-  box-shadow: none;
-  pointer-events: none;
-}
+#error-block-slot:empty { display: none; }
 
 #error-block-slot {
-  padding: 14px 16px;
-  background: var(--raise);
+  padding: 16px 18px;
+  background: var(--panel);
   border: 1px solid var(--line-soft);
-  border-radius: 0;
-  box-shadow: var(--inset-hi);
-  max-height: 400px;
-  opacity: 1;
-  margin-top: 0;
+  border-radius: var(--radius-sm);
   overflow: hidden;
-  transition: max-height 460ms var(--ease-standard),
-              padding 460ms var(--ease-standard),
-              margin 460ms var(--ease-standard),
-              opacity 460ms var(--ease-standard),
-              border-color 300ms var(--ease-standard);
+  box-shadow: 0 8px 24px -6px rgba(0, 0, 0, 0.5),
+              0 1px 0 var(--rim) inset;
+  animation: block-in 380ms var(--ease-out) both;
 }
 
+/* Trailing element (often .error-msg when there's no hint, e.g. a "Rejected"
+   error) keeps its bottom margin, which stacks onto the slot padding and leaves
+   a gap under the last line. Collapse it so every error variant sits tight. */
+#error-block-slot > :last-child { margin-bottom: 0; }
+
 .error-title {
+  font-family: var(--font-ui);
   color: var(--fg);
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  text-transform: capitalize;
-  margin: 0 0 8px;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.35;
+  margin: 0 0 5px;
 }
 
 .error-msg {
-  color: var(--fg);
-  font-size: 10px;
-  font-weight: 500;
+  font-family: var(--font-ui);
+  color: var(--fg-4);
+  font-size: 10.5px;
+  font-weight: 400;
   margin: 0 0 10px;
-  line-height: 1.5;
+  line-height: 1.55;
 }
 
 .error-action {
-  color: var(--fg-3);
-  font-size: 9px;
+  font-family: var(--font-ui);
+  color: var(--fg-4);
+  font-size: 11px;
   margin: 0 0 6px;
   line-height: 1.5;
-  font-style: italic;
 }
 
 .error-cause {
-  color: var(--fg-3);
-  font-size: 9px;
+  font-family: var(--font-ui);
+  color: var(--fg-4);
+  font-size: 11px;
   margin: 0 0 4px 8px;
   line-height: 1.5;
   border-left: 1px solid var(--line-strong);
@@ -417,8 +495,9 @@ main, .flow-title, .status, .status-line, .status-hint, .flow-detail,
 }
 
 .error-hint {
+  font-family: var(--font-ui);
   color: var(--fg-3);
-  font-size: 9px;
+  font-size: 11px;
   margin: 8px 0 0;
   line-height: 1.5;
 }
@@ -427,16 +506,16 @@ main, .flow-title, .status, .status-line, .status-hint, .flow-detail,
   color: var(--fg);
   text-decoration: none;
   font-weight: 600;
-  border-bottom: 1px solid rgba(var(--tint),0.3);
+  border-bottom: 1px solid var(--line-strong);
   padding-bottom: 1px;
   transition: border-color 160ms var(--ease-out);
 }
 
-.error-hint a:hover { border-bottom-color: rgba(var(--tint),0.7); }
+.error-hint a:hover { border-bottom-color: var(--fg-4); }
 
 .error-hint code {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   display: inline-flex;
   align-items: center;
   padding: 1px 6px;
@@ -444,71 +523,62 @@ main, .flow-title, .status, .status-line, .status-hint, .flow-detail,
   background: var(--raise);
   border: 1px solid var(--line-strong);
   border-radius: 0;
-  letter-spacing: 0.01em;
+  letter-spacing: 0.02em;
 }
 
 .footer {
   flex: none;
-  padding: 17px var(--edge) 19px;
+  padding: 13px 18px 14px;
   border-top: 1px solid var(--line);
   background: transparent;
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 12px;
+  gap: 8px;
 }
 
-.actions { display: inline-flex; align-items: center; gap: 10px; }
+.actions { display: inline-flex; align-items: center; gap: 14px; }
 
+/* Bare keyboard-hint buttons: no box chrome, just the boxed keycap + a muted
+   label. Keeps the footer light and terminal-like instead of two chunky slabs. */
 .shortcut {
-  font: inherit;
-  font-size: 10px;
+  font-family: var(--font-ui);
+  font-size: 11px;
   font-weight: 500;
-  letter-spacing: 0.01em;
-  background: var(--raise);
-  border: 1px solid var(--line);
-  padding: 5px 10px;
+  letter-spacing: 0;
+  background: none;
+  border: 0;
+  padding: 5px 4px;
   cursor: pointer;
   color: var(--fg-3);
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  border-radius: 0;
-  transition: background-color 120ms var(--ease-out),
-              border-color 120ms var(--ease-out),
-              color 120ms var(--ease-out),
-              transform 90ms var(--ease-out);
+  justify-content: center;
+  gap: 7px;
+  transition: color 120ms var(--ease-out);
 }
 
 .shortcut:focus { outline: none; }
-.shortcut:focus-visible { outline: 1px solid rgba(var(--tint),0.55); outline-offset: 2px; }
+.shortcut:focus-visible { outline: 1px solid var(--fg-3); outline-offset: 2px; }
 
-.shortcut:hover:not(:disabled) {
-  transform: translateY(-0.5px);
-  border-color: rgba(var(--tint),0.5);
-  color: var(--fg-2);
+.shortcut:hover:not(:disabled) { color: var(--fg); }
+.shortcut:active:not(:disabled) { color: var(--fg-2); }
+.shortcut:hover:not(:disabled) .key {
+  color: var(--fg);
+  border-color: var(--line-strong);
+  background: var(--raise);
 }
-.shortcut:active:not(:disabled) { transform: translateY(0.5px); }
-.shortcut:hover:not(:disabled) .key { color: var(--fg-2); border-color: rgba(var(--tint),0.35); }
+.shortcut:active:not(:disabled) .key { transform: translateY(0.5px); }
 
-.shortcut:disabled { opacity: 1; background: transparent; border-color: var(--line); color: var(--fg-5); cursor: not-allowed; }
+.shortcut:disabled { color: var(--fg-5); cursor: not-allowed; }
+.shortcut:disabled .key { color: var(--fg-5); border-color: var(--line); }
 .shortcut[hidden] { display: none; }
 
-.shortcut.primary {
-  background: rgba(var(--tint),0.065);
-  border-color: var(--line-strong);
-  color: var(--fg);
-}
-
-.shortcut.primary:hover:not(:disabled) {
-  border-color: rgba(var(--tint),0.55);
-  color: var(--fg);
-}
-
-.shortcut.primary:hover:not(:disabled) .key { color: var(--fg); border-color: rgba(var(--tint),0.45); }
-
-.shortcut.primary:disabled { opacity: 1; background: var(--raise); border-color: var(--line); color: var(--fg-4); }
-
+/* Primary (retry) reads as primary through brighter text + keycap, not a fill. */
+.shortcut.primary { color: var(--fg); font-weight: 600; }
+.shortcut.primary:hover:not(:disabled) { color: var(--fg); }
+.shortcut.primary:hover:not(:disabled) .key { color: var(--fg); border-color: #3a3a42; background: var(--raise); }
+.shortcut.primary:disabled { color: var(--fg-4); }
 .shortcut.primary .key { color: var(--fg-2); border-color: var(--line-strong); }
 
 .key {
@@ -516,38 +586,46 @@ main, .flow-title, .status, .status-line, .status-hint, .flow-detail,
   align-items: center;
   justify-content: center;
   gap: 4px;
-  padding: 2px 5px;
+  padding: 2px 6px;
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 500;
-  color: var(--fg-4);
-  background: var(--raise);
-  border: 1px solid var(--line);
+  color: var(--fg-3);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
   border-radius: 0;
-  letter-spacing: 0.01em;
+  letter-spacing: 0.02em;
+  box-shadow: 0 1px 0 var(--rim) inset;
   transition: background-color 120ms var(--ease-out),
               border-color 120ms var(--ease-out),
-              color 120ms var(--ease-out);
+              color 120ms var(--ease-out),
+              transform 90ms var(--ease-out);
+}
+
+/* The esc/enter caps are real keys: layer the rim highlight with a soft drop so
+   they sit proud of the button. Scoped to the footer so the reused .key class on
+   the detail chips / message caption keeps its flat inset-only treatment. */
+.shortcut .key {
+  box-shadow: 0 1px 0 var(--rim) inset,
+              0 1px 1.5px rgba(0, 0, 0, 0.45);
 }
 
 @media (max-width: 560px), (max-height: 680px) {
   body { padding: 10px; }
-  main { max-height: calc(100dvh - 20px); --edge: 18px; }
-  .chrome { padding: 9px 14px; }
-  .body { padding: 16px 18px 18px; gap: 13px; }
-  .flow-title { font-size: 12px; text-align: left; }
-  .details, .status { padding: 10px 12px; }
-  .timeline { padding: 8px 0 2px; }
-  .timeline-now { font-size: 10px; }
-  .timeline-count { font-size: 8.5px; }
-  .status-line { gap: 9px; font-size: 10.5px; }
-  .status-line .marker { width: 15px; height: 15px; font-size: 11px; }
-  .status-hint { margin-left: 24px; font-size: 9.5px; }
-  .footer { padding: 11px 16px 13px; gap: 8px; }
-  .actions { gap: 7px; }
-  .shortcut { font-size: 10px; padding: 4px 8px; }
-  .card-logo { margin: -16px -18px 0; padding: 30px 16px 24px; }
-  .card-logo svg { width: 100%; }
+  main { max-height: calc(100dvh - 20px); border-radius: 0; }
+  .chrome { padding: 9px 12px 9px 16px; }
+  .body { padding: 12px 13px 14px; gap: 9px; }
+  .flow-title { font-size: 13px; }
+  .flow-subtitle { font-size: 10.5px; }
+  .details, .status { padding: 10px 11px; border-radius: 0; }
+  .flow-detail { grid-template-columns: max-content 1fr; gap: 8px; font-size: 11.5px; }
+  .timeline-now { font-size: 11px; }
+  .status-line { gap: 8px; font-size: 11px; }
+  .status-hint { margin-left: 22px; font-size: 10.5px; }
+  #error-block-slot { padding: 13px 14px; }
+  .footer { padding: 11px 14px 12px; gap: 12px; }
+  .actions { gap: 12px; }
+  .shortcut { font-size: 11px; padding: 5px 4px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

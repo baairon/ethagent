@@ -97,6 +97,34 @@ test('identityManagerReducer: top-level identity subviews back to manager', () =
   assert.equal(identityManagerReducer({ kind: 'storage-credential-input' }, { type: 'back', from: { kind: 'storage-credential-input' } }).kind, 'menu')
 })
 
+test('identityManagerReducer: continuity overwrite confirm backs to its restore source', () => {
+  const back: Step = { kind: 'restore-select-token', ownerHandle: 'owner.eth', registry, candidates: [], purpose: 'switch' }
+  const confirm: Step = {
+    kind: 'continuity-overwrite-confirm',
+    action: 'restore',
+    back,
+    next: {
+      kind: 'restore-fetching',
+      cid: 'bafyrestore',
+      apiUrl: 'https://uploads.pinata.cloud/v3/files',
+      candidate: {
+        chainId: 1,
+        rpcUrl: 'https://example.com',
+        identityRegistryAddress: registry.identityRegistryAddress,
+        agentId: 1n,
+        ownerAddress: identity.ownerAddress,
+        tokenOwnerAddress: identity.ownerAddress,
+        agentUri: 'ipfs://agent',
+        metadataCid: 'bafymetadata',
+        backup: { cid: 'bafyrestore' },
+      } as never,
+      purpose: 'switch',
+    },
+  }
+
+  assert.deepEqual(identityManagerReducer(confirm, { type: 'back', from: confirm }), back)
+})
+
 test('identityManagerReducer: edit profile back preserves identity and registry', () => {
   const state: Step = { kind: 'edit-profile-description', identity, registry, name: 'pip', description: 'line one\nline two', imagePath: 'ipfs://icon.png', returnTo: { kind: 'continuity-public' } }
   const next = identityManagerReducer(state, { type: 'back', from: state })
