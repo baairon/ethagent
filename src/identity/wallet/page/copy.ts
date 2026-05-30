@@ -1,56 +1,3 @@
-import { config } from './state.js'
-import { glyphs } from './html.js'
-
-export const CHAINS: Record<string, { name: string }> = {
-  "0x1": { name: "Ethereum Mainnet" },
-  "0xaa36a7": { name: "Sepolia" },
-  "0x2105": { name: "Base" },
-  "0x14a34": { name: "Base Sepolia" },
-};
-
-export interface FlowCopy {
-  accent: string;
-  tabTitle: string;
-  label: string;
-  title: string;
-  detail: string | null;
-}
-
-export const FLOW_COPY: Record<string, FlowCopy> = {
-  account:            { accent: "sign",        tabTitle: "Connect Wallet",   label: "Connection Request",   title: "Connect Wallet",   detail: null },
-  sign:               { accent: "sign",        tabTitle: "Sign Message",     label: "Signature Request",    title: "Sign Message",     detail: "message" },
-  "sign-transaction": { accent: "transaction", tabTitle: "Sign Snapshot",    label: "Snapshot Signature",   title: "Sign Snapshot",    detail: "message" },
-  transaction:        { accent: "transaction", tabTitle: "Submit Transaction", label: "Onchain Transaction", title: "Submit Transaction", detail: "registry" },
-};
-
-export const TRANSACTION_TITLES: Record<string, string> = {
-  "register-agent": "Mint Agent Token",
-  "create-agent": "Create Agent",
-  "update-ens-records": "Submit With ENS Controller Wallet",
-  "clear-ens-records": "Submit With ENS Controller Wallet",
-  "create-simple-ens-subdomain": "Submit With Connected Wallet",
-  "set-simple-ens-records": "Submit With Connected Wallet",
-  "create-agent-ens-subdomain": "Owner Wallet Required",
-  "set-agent-ens-records": "Owner Wallet Required",
-  "publish-transfer-snapshot": "Switch Back to Sender Wallet",
-};
-
-export function transactionPurposeTitle(): string {
-  const key = config.purpose || "";
-  const fromPurpose = PURPOSE_COPY[key]?.flowTitle;
-  const explicit = TRANSACTION_TITLES[key];
-  return fromPurpose || explicit || FLOW_COPY.transaction!.title;
-}
-
-export const STATE_TITLES = {
-  connecting: "Connecting Wallet",
-  approveSign: "Sign Message",
-  preparingTransaction: "Preparing Transaction",
-  approveTransaction: "Review Transaction",
-  error: "Wallet Error",
-  default: "Wallet Action",
-};
-
 export interface SubCopy { text: string; hint: string; }
 export interface PurposeCopyEntry {
   flowTitle: string;
@@ -85,19 +32,19 @@ export const PURPOSE_COPY: Record<string, PurposeCopyEntry> = {
   },
   "update-snapshot-owner": {
     flowTitle: "Owner Wallet Required",
-    sign: { text: "Sign With Owner Wallet", hint: "Encrypts local files before publishing. Owner wallet is required because this update changes ownership-protected fields." },
+    sign: { text: "Sign With Owner Wallet", hint: "Signs your owner restore-access key and encrypts local files. Owner wallet is required because this update changes ownership-protected fields." },
     prepare: { text: "Saving Snapshot...", hint: "Keep this page open." },
     transaction: { text: "Submit With Owner Wallet", hint: "Publishes the updated snapshot to the ERC-8004 token URI." },
   },
   "update-snapshot-operator": {
-    flowTitle: "Operator Wallet Save",
+    flowTitle: "Operator Wallet: Save Snapshot",
     sign: { text: "Sign With Operator Wallet", hint: "Signs the encrypted snapshot for restore access." },
     prepare: { text: "Saving Snapshot...", hint: "Keep this page open." },
     transaction: { text: "Submit With Operator Wallet", hint: "Publishes the latest agent snapshot through the Vault." },
   },
   "update-snapshot-connected": {
     flowTitle: "Save Snapshot",
-    sign: { text: "Sign With Connected Wallet", hint: "Encrypts local files before publishing. Single-wallet setup; no token approval." },
+    sign: { text: "Sign With Connected Wallet", hint: "Signs your restore-access key and encrypts local files. Single-wallet setup; no token approval." },
     prepare: { text: "Saving Snapshot...", hint: "Keep this page open." },
     transaction: { text: "Submit With Connected Wallet", hint: "Publishes the updated snapshot to the ERC-8004 token URI." },
   },
@@ -120,7 +67,7 @@ export const PURPOSE_COPY: Record<string, PurposeCopyEntry> = {
     transaction: { text: "Submit With Owner Wallet", hint: "Publishes the updated public profile to the ERC-8004 token URI." },
   },
   "update-profile-operator": {
-    flowTitle: "Operator Wallet Profile Update",
+    flowTitle: "Operator Wallet: Update Profile",
     sign: { text: "Sign With Operator Wallet", hint: "Signs the encrypted snapshot for restore access." },
     prepare: { text: "Preparing Profile Update...", hint: "Keep this page open." },
     transaction: { text: "Submit With Operator Wallet", hint: "Publishes the updated agent profile through the Vault. No ENS write." },
@@ -189,17 +136,17 @@ export const PURPOSE_COPY: Record<string, PurposeCopyEntry> = {
     prepare: { text: "Verifying Wallet...", hint: "Return to the terminal." },
   },
   "prepare-transfer-sender": {
-    flowTitle: "Submit With Sender Wallet",
+    flowTitle: "Sender Wallet: Sign Snapshot",
     sign: { text: "Sign With Sender Wallet", hint: "Creates sender restore access. No token approval." },
     prepare: { text: "Verifying Sender Wallet...", hint: "Return to the terminal." },
   },
   "prepare-transfer-target": {
-    flowTitle: "Switch to Receiver Wallet",
+    flowTitle: "Receiver Wallet: Sign Restore Access",
     sign: { text: "Sign With Receiver Wallet", hint: "Creates receiver restore access. No token approval." },
     prepare: { text: "Verifying Receiver Wallet...", hint: "Return to the terminal." },
   },
   "publish-transfer-snapshot": {
-    flowTitle: "Switch Back to Sender Wallet",
+    flowTitle: "Sender Wallet: Publish Snapshot",
     prepare: { text: "Preparing Token Update...", hint: "Keep this page open." },
     transaction: { text: "Submit With Sender Wallet", hint: "Submits one transaction to publish the transfer snapshot to the ERC-8004 token URI." },
   },
@@ -222,13 +169,13 @@ export const PURPOSE_COPY: Record<string, PurposeCopyEntry> = {
   },
   "rotate-agent-uri-vault-owner": {
     flowTitle: "Save Update Through Vault",
-    sign: { text: "Sign With Owner Wallet", hint: "Signs the new snapshot before saving onchain. No token approval." },
+    sign: { text: "Sign With Owner Wallet", hint: "Signs your owner restore-access key for the new snapshot. No token approval." },
     prepare: { text: "Preparing Update...", hint: "Keep this page open." },
     transaction: { text: "Submit With Owner Wallet", hint: "Saves your update onchain through the Vault. Your token is locked in its dedicated Vault, so updates go through it." },
   },
   "rotate-agent-uri-vault-operator": {
     flowTitle: "Save Update Through Vault",
-    sign: { text: "Sign With Operator Wallet", hint: "Signs the new snapshot before saving onchain. No token approval." },
+    sign: { text: "Sign With Operator Wallet", hint: "Signs your operator restore-access key for the new snapshot. No token approval." },
     prepare: { text: "Preparing Update...", hint: "Keep this page open." },
     transaction: { text: "Submit With Operator Wallet", hint: "Publishes the latest agent snapshot through the Vault. Your token is locked in its dedicated Vault, so the operator wallet calls the vault to publish." },
   },

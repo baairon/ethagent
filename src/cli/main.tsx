@@ -5,16 +5,16 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { theme } from '../ui/theme.js'
-import { FirstRun } from '../app/FirstRun.js'
-import { ChatScreen } from '../chat/ChatScreen.js'
-import { KeybindingProvider } from '../app/keybindings/KeybindingProvider.js'
-import { AppInputProvider, useAppInput } from '../app/input/AppInputProvider.js'
-import { loadConfig, type EthagentConfig } from '../storage/config.js'
-import { runResetCommand } from './reset.js'
-import { runPreviewCommand } from './preview.js'
-import { checkForUpdates } from './updateNotice.js'
 import { Spinner } from '../ui/Spinner.js'
-import { TITLE_STATIC, clearTerminalTitle, setTerminalTitle } from '../ui/terminalTitle.js'
+import { KeybindingProvider } from '../app/keybindings/KeybindingProvider.js'
+import { AppInputProvider } from '../app/input/AppInputProvider.js'
+import { IdentityManager } from '../identity/manager/IdentityManager.js'
+import type { IdentityManagerResult } from '../identity/manager/IdentityManager.js'
+import { loadConfig, saveConfig, type EthagentConfig } from '../storage/config.js'
+import { runSync, runSyncList, runSyncOnEdit } from './sync.js'
+import { runStatus } from './status.js'
+import { runResetCommand } from './reset.js'
+import { enableDemoMode, synthDemoConfig } from './demo.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -33,173 +33,149 @@ function printHelp(): void {
     'ethagent: privacy-first AI agent with a portable Ethereum identity',
     '',
     'usage:',
-    '  ethagent             start the agent (first run triggers setup)',
-    '  ethagent preview     show the brand splash and exit',
-    '  ethagent reset       factory reset local data (local LLMs kept)',
-    '  ethagent reset --yes run reset without the confirm prompt',
-    '  ethagent --version   print version',
-    '  ethagent --help      print this help',
-    '',
-    'inside the agent, type /help for slash commands.',
+    '  ethagent                    manage identity',
+    '  ethagent reset              delete local identity, continuity, and secrets',
+    '  ethagent --sync             sync soul, memory, and skills to every harness',
+    '  ethagent --sync-to=<name>   sync only to a named adapter (claude-code, codex)',
+    '  ethagent --sync-to=<path>   write per-skill folders under a custom path',
+    '  ethagent --sync-list        list sync adapters and which ones detect here',
+    '  ethagent --demo             walk identity with synthetic data',
+    '  ethagent --status           print one-line identity summary',
+    '  ethagent --version          print version',
+    '  ethagent --help             print this help',
   ]
   for (const line of lines) process.stdout.write(line + '\n')
 }
 
-type AppPhase =
-  | { kind: 'loading' }
-  | { kind: 'setup' }
-  | { kind: 'ready'; config: EthagentConfig }
-  | { kind: 'cancelled' }
-  | { kind: 'error'; message: string }
-
-const MIN_STARTUP_SPINNER_MS = 480
-
-function delay(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms))
+function valueFlag(argv: string[], name: string): string | undefined {
+  const prefix = `--${name}=`
+  for (const a of argv) if (a.startsWith(prefix)) return a.slice(prefix.length)
+  const idx = argv.indexOf(`--${name}`)
+  if (idx >= 0 && argv[idx + 1] && !argv[idx + 1]!.startsWith('-')) return argv[idx + 1]
+  return undefined
 }
 
-const AppRoot: React.FC<{ setExitCode: (code: number) => void; currentVersion: string }> = ({ setExitCode, currentVersion }) => {
-  const [phase, setPhase] = useState<AppPhase>({ kind: 'loading' })
-  const [updateNotice, setUpdateNotice] = useState<string | null>(null)
+type Phase =
+  | { kind: 'loading' }
+  | { kind: 'ready'; config: EthagentConfig | null }
+  | { kind: 'error'; message: string }
+
+type RootProps = {
+  setExit: (n: number) => void
+  initialConfig: EthagentConfig | null | undefined
+}
+
+const Root: React.FC<RootProps> = ({ setExit, initialConfig }) => {
+  const [phase, setPhase] = useState<Phase>(
+    initialConfig !== undefined
+      ? { kind: 'ready', config: initialConfig }
+      : { kind: 'loading' },
+  )
   const { exit } = useApp()
 
   useEffect(() => {
     if (phase.kind !== 'loading') return
     let cancelled = false
-    Promise.all([loadConfig(), delay(MIN_STARTUP_SPINNER_MS)])
-      .then(config => {
-        if (cancelled) return
-        setPhase(config[0] ? { kind: 'ready', config: config[0] } : { kind: 'setup' })
-      })
-      .catch((err: unknown) => {
-        if (cancelled) return
-        setPhase({ kind: 'error', message: (err as Error).message })
-      })
+    loadConfig()
+      .then(c => { if (!cancelled) setPhase({ kind: 'ready', config: c }) })
+      .catch(err => { if (!cancelled) setPhase({ kind: 'error', message: (err as Error).message }) })
     return () => { cancelled = true }
-  }, [phase])
-
-  useEffect(() => {
-    let cancelled = false
-    void checkForUpdates(currentVersion)
-      .then(notice => {
-        if (!cancelled) setUpdateNotice(notice)
-      })
-      .catch(() => {})
-    return () => { cancelled = true }
-  }, [currentVersion])
-
-  useEffect(() => {
-    setTerminalTitle(TITLE_STATIC)
-  }, [])
-
-  useEffect(() => {
-    if (phase.kind === 'cancelled') {
-      setExitCode(1)
-      const t = setTimeout(() => exit(), 10)
-      return () => clearTimeout(t)
-    }
-    if (phase.kind === 'error') {
-      setExitCode(1)
-      const t = setTimeout(() => exit(), 10)
-      return () => clearTimeout(t)
-    }
-    return undefined
-  }, [phase, exit, setExitCode])
-
-  useAppInput((input, key) => {
-    if (phase.kind === 'ready') return
-    if (key.ctrl && (input === 'c' || input === 'd')) {
-      if (phase.kind === 'setup') {
-        setPhase({ kind: 'cancelled' })
-      } else {
-        exit()
-      }
-    }
-  })
+  }, [phase.kind])
 
   if (phase.kind === 'loading') {
-    return (
-      <Box padding={1}>
-        <Spinner label="starting ethagent..." showElapsed={false} />
-      </Box>
-    )
-  }
-  if (phase.kind === 'setup') {
-    return (
-      <FirstRun
-        onComplete={config => setPhase({ kind: 'ready', config })}
-        onCancel={() => setPhase({ kind: 'cancelled' })}
-      />
-    )
-  }
-  if (phase.kind === 'cancelled') {
-    return (
-      <Box padding={1}>
-        <Text color={theme.dim}>Setup cancelled.</Text>
-      </Box>
-    )
+    return <Box padding={1}><Spinner label="loading identity..." showElapsed={false} /></Box>
   }
   if (phase.kind === 'error') {
-    return (
-      <Box padding={1}>
-        <Text color={theme.accentError}>Error: {phase.message}</Text>
-      </Box>
-    )
+    return <Box padding={1}><Text color={theme.accentError}>Error: {phase.message}</Text></Box>
   }
+
+  const mode = phase.config?.identity ? 'manage' : 'first-run'
+  const handleComplete = (result: IdentityManagerResult): void => {
+    setExit(result.kind === 'cancel' ? 1 : 0)
+    setTimeout(() => exit(), 10)
+  }
+  const handleConfigChange = (next: EthagentConfig): void => {
+    setPhase({ kind: 'ready', config: next })
+    void saveConfig(next)
+  }
+
   return (
-    <ChatScreen
-      config={phase.config}
-      onReplaceConfig={next => setPhase({ kind: 'ready', config: next })}
-      updateNotice={updateNotice}
+    <IdentityManager
+      mode={mode}
+      {...(phase.config ? { config: phase.config } : {})}
+      onConfigChange={handleConfigChange}
+      onComplete={handleComplete}
     />
   )
 }
 
-async function runDefault(currentVersion: string): Promise<number> {
+async function renderHub(initialConfig: EthagentConfig | null | undefined): Promise<number> {
   let exitCode = 0
-  setTerminalTitle(TITLE_STATIC)
-  process.once('exit', clearTerminalTitle)
   const instance = render(
     <AppInputProvider>
       <KeybindingProvider>
-        <AppRoot setExitCode={code => { exitCode = code }} currentVersion={currentVersion} />
+        <Root setExit={n => { exitCode = n }} initialConfig={initialConfig} />
       </KeybindingProvider>
     </AppInputProvider>,
-    {
-      exitOnCtrlC: false,
-    },
+    { exitOnCtrlC: false },
   )
+  const guard = (reason: unknown): void => {
+    const message = reason instanceof Error ? reason.message : String(reason)
+    process.stderr.write(`background error: ${message}\n`)
+  }
+  const onUnhandledRejection = (reason: unknown): void => guard(reason)
+  const onUncaughtException = (err: unknown): void => guard(err)
+  process.on('unhandledRejection', onUnhandledRejection)
+  process.on('uncaughtException', onUncaughtException)
   try {
     await instance.waitUntilExit()
   } catch {
     exitCode = 1
+  } finally {
+    process.removeListener('unhandledRejection', onUnhandledRejection)
+    process.removeListener('uncaughtException', onUncaughtException)
   }
   return exitCode
 }
 
 async function main(): Promise<number> {
   const argv = process.argv.slice(2)
-  const [cmd, ...rest] = argv
+  const flags = new Set(argv)
+  const version = readVersion()
 
-  if (!cmd) return runDefault(readVersion())
-  if (cmd === '--version' || cmd === '-v') {
-    process.stdout.write(`ethagent ${readVersion()}\n`)
+  if (flags.has('--version') || flags.has('-v')) {
+    process.stdout.write(`ethagent ${version}\n`)
     return 0
   }
-  if (cmd === '--help' || cmd === '-h' || cmd === 'help') {
+  if (flags.has('--help') || flags.has('-h') || argv[0] === 'help') {
     printHelp()
     return 0
   }
-
-  switch (cmd) {
-    case 'preview':
-      return runPreviewCommand()
-    case 'reset':
-      return runResetCommand(rest)
-    default:
-      process.stderr.write(`unknown command: ${cmd}\nrun 'ethagent --help' for usage\n`)
-      return 2
+  if (flags.has('--sync-on-edit')) return runSyncOnEdit()
+  if (flags.has('--sync-list')) return runSyncList()
+  const syncTo = valueFlag(argv, 'sync-to')
+  if (flags.has('--sync') || syncTo !== undefined) {
+    return runSync(syncTo !== undefined ? { to: syncTo } : {})
   }
+  if (flags.has('--status')) return runStatus(version)
+  if (flags.has('--demo')) {
+    enableDemoMode()
+    return renderHub(synthDemoConfig())
+  }
+  if (argv[0] === 'reset') return runResetCommand(argv.slice(1))
+
+  const unknown = argv.find(a => a.startsWith('-') && !a.startsWith('--sync-to'))
+  if (unknown && !flags.has('--demo')) {
+    process.stderr.write(`unknown flag: ${unknown}\nrun 'ethagent --help' for usage\n`)
+    return 2
+  }
+  const positional = argv[0]
+  if (positional) {
+    process.stderr.write(`unknown command: ${positional}\nrun 'ethagent --help' for usage\n`)
+    return 2
+  }
+
+  return renderHub(undefined)
 }
 
 main()

@@ -26,3 +26,21 @@ export function respondJson(res: http.ServerResponse, status: number, body: Reco
   })
   res.end(JSON.stringify(body))
 }
+
+function isLoopbackHost(host: string | undefined): boolean {
+  if (!host) return true
+  const hostname = host.replace(/:\d+$/, '').replace(/^\[|\]$/g, '')
+  return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1'
+}
+
+export function isAllowedWalletOrigin(req: http.IncomingMessage): boolean {
+  const origin = req.headers.origin
+  if (origin && origin !== 'null') {
+    try {
+      if (!isLoopbackHost(new URL(origin).host)) return false
+    } catch {
+      return false
+    }
+  }
+  return isLoopbackHost(req.headers.host)
+}

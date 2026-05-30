@@ -1,6 +1,20 @@
 import { getAddress, type Address, type Hex } from 'viem'
+import { recoverAddressFromSignature } from '../../crypto/eth.js'
 import { normalizeWalletPurposeValue } from '../walletPurposeCompat.js'
 import type { BrowserWalletErrorPayload, WalletPurpose } from './types.js'
+
+export function assertExpectedAccount(account: Address, expectedAccount: Address | undefined, purpose?: WalletPurpose): void {
+  if (expectedAccount && account.toLowerCase() !== expectedAccount.toLowerCase()) {
+    throw accountMismatchError(account, expectedAccount, purpose)
+  }
+}
+
+export function verifyRecoveredAccount(message: string, signature: Hex, account: Address): void {
+  const recovered = recoverAddressFromSignature(message, signature)
+  if (recovered.toLowerCase() !== account.toLowerCase()) {
+    throw new Error('Wallet signature does not match connected account')
+  }
+}
 
 export function parseBrowserWalletErrorBody(body: Record<string, unknown>): BrowserWalletErrorPayload {
   const message = typeof body.message === 'string' && body.message.trim() ? body.message.trim() : 'Wallet request failed'

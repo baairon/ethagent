@@ -36,6 +36,8 @@ import {
   type WalletContinuitySnapshotSlot,
 } from './envelopeTypes.js'
 
+const MAX_WALLET_RESTORE_SLOTS = 256
+
 export function restoreContinuitySnapshotEnvelope(args: {
   envelope: ContinuitySnapshotEnvelope
   walletSignature: string
@@ -232,7 +234,7 @@ function restoreTransferContinuitySnapshotEnvelope(args: {
 }): ContinuitySnapshotPayload {
   const currentAddress = args.currentOwnerAddress
     ? toChecksumAddress(args.currentOwnerAddress)
-    : toChecksumAddress(recoverAddressFromSignature(args.envelope.challenge, args.walletSignature))
+    : recoverTransferSlotAddress(args.envelope, args.walletSignature)
   const slot = transferSlotForCurrentOwner(args.envelope, currentAddress)
   assertSignatureForAddress(slot.challenge, args.walletSignature, slot.address)
 
@@ -348,6 +350,20 @@ function walletSlotForRestore(
   throw new ContinuitySnapshotRestoreSlotMissingError('unknown')
 }
 
+function recoverTransferSlotAddress(
+  envelope: TransferContinuitySnapshotEnvelope,
+  walletSignature: string,
+): string {
+  for (const slot of [envelope.slots.owner, envelope.slots.target]) {
+    try {
+      const recovered = recoverAddressFromSignature(slot.challenge, walletSignature)
+      if (recovered.toLowerCase() === slot.address.toLowerCase()) return toChecksumAddress(slot.address)
+    } catch {
+    }
+  }
+  throw new ContinuityTransferSnapshotTargetMismatchError(envelope.ownerAddress, envelope.targetAddress, 'unknown')
+}
+
 function transferSlotForCurrentOwner(
   envelope: TransferContinuitySnapshotEnvelope,
   currentOwner: string,
@@ -368,6 +384,9 @@ export function normalizeContinuitySnapshotEnvelope(input: unknown): ContinuityS
     }
     const ownerAddress = toChecksumAddress(input.ownerAddress)
     const token = normalizeContinuitySnapshotToken(input.token)
+    if (input.slots.length > MAX_WALLET_RESTORE_SLOTS) {
+      throw new Error('Continuity wallet snapshot has too many restore slots')
+    }
     const slots = input.slots.map(normalizeWalletSlot)
     if (slots.length === 0) throw new Error('Continuity wallet snapshot needs at least one slot')
     return {

@@ -4,12 +4,20 @@ import { loadWalletPageSource } from './walletPageSource.js'
 
 const WALLET_HTML = loadWalletHtml()
 
-export function walletPage(title: string, sessionToken: string, payload: Record<string, unknown>): string {
+function injectWalletConfig(shell: string, title: string, sessionToken: string, payload: Record<string, unknown>): string {
   const config = JSON.stringify({ sessionToken, ...normalizeWalletPayloadPurpose(payload) }).replaceAll('<', '\\u003c')
   const injection = `<script>window.__WALLET_CONFIG__ = ${config};</script>`
-  return WALLET_HTML
+  return shell
     .replace(/<title>.*?<\/title>/, `<title>${escapeHtml(title)}</title>`)
     .replace('<head>', `<head>\n  ${injection}`)
+}
+
+export function walletPage(title: string, sessionToken: string, payload: Record<string, unknown>): string {
+  return injectWalletConfig(WALLET_HTML, title, sessionToken, payload)
+}
+
+export function walletPageFresh(title: string, sessionToken: string, payload: Record<string, unknown>): string {
+  return injectWalletConfig(loadWalletHtml(), title, sessionToken, payload)
 }
 
 export function __testWalletPage(title: string, sessionToken: string, payload: Record<string, unknown>): string {

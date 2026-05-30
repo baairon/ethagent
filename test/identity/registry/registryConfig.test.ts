@@ -4,10 +4,8 @@ import type { EthagentConfig } from '../../../src/storage/config.js'
 import { registryConfigFromConfig, resolveSelectedNetwork } from '../../../src/identity/registry/registryConfig.js'
 
 const baseConfig: EthagentConfig = {
-  version: 1,
-  provider: 'openai',
-  model: 'gpt-5.2',
-  firstRunAt: new Date(0).toISOString(),
+  version: 2,
+  firstSeenAt: new Date(0).toISOString(),
 }
 
 test('resolveSelectedNetwork defaults to mainnet when nothing is set', () => {

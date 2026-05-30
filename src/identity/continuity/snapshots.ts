@@ -82,7 +82,7 @@ export async function updatePublishedContinuitySnapshotContentHashes(
 ): Promise<void> {
   await ensureContinuityVault(identity)
   const current = currentPublishedSnapshot(identity)
-  const snapshots = await readPublishedContinuitySnapshotFile(identity)
+  const { snapshots, unparsable } = await readPublishedContinuitySnapshotLines(identity)
   const index = snapshots.findIndex(item => item.cid === cid)
   if (index === -1) {
     const base = current.find(item => item.cid === cid)
@@ -93,7 +93,7 @@ export async function updatePublishedContinuitySnapshotContentHashes(
   }
   await atomicWriteText(
     publishedContinuitySnapshotsPath(identity),
-    snapshots.map(snapshot => JSON.stringify(snapshot)).join('\n') + '\n',
+    [...snapshots.map(snapshot => JSON.stringify(snapshot)), ...unparsable].join('\n') + '\n',
     { mode: 0o600 },
   )
 }
@@ -143,25 +143,32 @@ function refreshPublishedSnapshotSidecars(
 }
 
 async function readPublishedContinuitySnapshotFile(identity: EthagentIdentity): Promise<PublishedContinuitySnapshot[]> {
+  return (await readPublishedContinuitySnapshotLines(identity)).snapshots
+}
+
+async function readPublishedContinuitySnapshotLines(
+  identity: EthagentIdentity,
+): Promise<{ snapshots: PublishedContinuitySnapshot[]; unparsable: string[] }> {
   let raw: string
   try {
     raw = await fs.readFile(publishedContinuitySnapshotsPath(identity), 'utf8')
   } catch (error: unknown) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return []
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return { snapshots: [], unparsable: [] }
     throw error
   }
 
   const snapshots: PublishedContinuitySnapshot[] = []
+  const unparsable: string[] = []
   for (const line of raw.split('\n')) {
     const trimmed = line.trim()
     if (!trimmed) continue
     try {
       snapshots.push(JSON.parse(trimmed) as PublishedContinuitySnapshot)
     } catch {
-      continue
+      unparsable.push(trimmed)
     }
   }
-  return snapshots
+  return { snapshots, unparsable }
 }
 
 function currentPublishedSnapshot(identity: EthagentIdentity): PublishedContinuitySnapshot[] {

@@ -4,10 +4,6 @@ import os from 'node:os'
 import { z } from 'zod'
 import { atomicWriteText } from './atomicWrite.js'
 
-export const PROVIDERS = ['llamacpp', 'openai', 'anthropic', 'gemini'] as const
-export type ProviderId = (typeof PROVIDERS)[number]
-const LEGACY_PROVIDERS = ['ollama', ...PROVIDERS] as const
-
 export const SELECTABLE_NETWORKS = ['mainnet', 'base'] as const
 export type SelectableNetwork = (typeof SELECTABLE_NETWORKS)[number]
 
@@ -75,12 +71,8 @@ const IdentitySchema = z.object({
 })
 
 const ConfigSchema = z.object({
-  version: z.literal(1),
-  provider: z.enum(PROVIDERS),
-  model: z.string().min(1),
-  baseUrl: z.string().url().optional(),
-  localMmprojPath: z.string().min(1).optional(),
-  firstRunAt: z.string(),
+  version: z.literal(2),
+  firstSeenAt: z.string(),
   identity: IdentitySchema.optional(),
   erc8004: z.object({
     chainId: z.number().int().positive(),
@@ -96,16 +88,17 @@ const ConfigSchema = z.object({
   configVersion: z.number().int().nonnegative().optional(),
 })
 
-const LEGACY_OLLAMA_BASE_URL = 'http://localhost:11434/v1'
-const LegacyConfigSchema = ConfigSchema.extend({
-  provider: z.enum(LEGACY_PROVIDERS),
-})
-
-type LegacyConfig = z.infer<typeof LegacyConfigSchema>
+const LegacyV1Schema = z.object({
+  version: z.literal(1),
+  firstRunAt: z.string().optional(),
+  identity: IdentitySchema.optional(),
+  erc8004: ConfigSchema.shape.erc8004,
+  selectedNetwork: z.enum(SELECTABLE_NETWORKS).optional(),
+  configVersion: z.number().int().nonnegative().optional(),
+}).passthrough()
 
 export type EthagentIdentity = z.infer<typeof IdentitySchema>
 export type TransferSnapshotMetadata = NonNullable<NonNullable<EthagentIdentity['backup']>['transferSnapshot']>
-
 export type EthagentConfig = z.infer<typeof ConfigSchema>
 
 export function getConfigDir(): string {
@@ -133,11 +126,20 @@ export async function loadConfig(): Promise<EthagentConfig | null> {
     const parsed = JSON.parse(raw)
     const active = ConfigSchema.safeParse(parsed)
     if (active.success) return normalizeConfig(active.data)
-    const legacy = LegacyConfigSchema.safeParse(parsed)
-    if (legacy.success) return migrateLegacyConfig(legacy.data)
+    const legacy = LegacyV1Schema.safeParse(parsed)
+    if (legacy.success) return normalizeConfig(migrateLegacyV1(legacy.data))
+    await preserveUnreadableConfig(raw)
     return null
   } catch {
+    await preserveUnreadableConfig(raw)
     return null
+  }
+}
+
+async function preserveUnreadableConfig(raw: string): Promise<void> {
+  try {
+    await fs.writeFile(`${getConfigPath()}.corrupt`, raw, { encoding: 'utf8', mode: 0o600 })
+  } catch {
   }
 }
 
@@ -210,10 +212,8 @@ export function buildSeedConfigForIdentity(args: {
   identityRegistryAddress: string
 }): EthagentConfig {
   return {
-    version: 1,
-    provider: 'llamacpp',
-    model: defaultModelFor('llamacpp'),
-    firstRunAt: new Date().toISOString(),
+    version: 2,
+    firstSeenAt: new Date().toISOString(),
     identity: { ...args.identity, source: 'erc8004' },
     erc8004: {
       chainId: args.chainId,
@@ -288,34 +288,8 @@ export async function deleteConfig(): Promise<void> {
   }
 }
 
-export function defaultModelFor(provider: ProviderId): string {
-  switch (provider) {
-    case 'openai':    return 'gpt-5.2'
-    case 'anthropic': return 'claude-sonnet-4-5'
-    case 'gemini':    return 'gemini-2.0-flash'
-    case 'llamacpp':  return 'huggingface-link'
-  }
-}
-
-export function defaultBaseUrlFor(provider: ProviderId): string | undefined {
-  if (provider === 'llamacpp') return 'http://localhost:8080/v1'
-  return undefined
-}
-
-export type LocalProviderId = Extract<ProviderId, 'llamacpp'>
-
-export function localProviderBaseUrlFor(provider: LocalProviderId, baseUrl?: string): string {
-  const fallback = defaultBaseUrlFor(provider) ?? ''
-  if (!baseUrl) return fallback
-  return isDefaultBaseUrlFor(baseUrl, LEGACY_OLLAMA_BASE_URL) ? fallback : baseUrl
-}
-
 export function normalizeConfig(config: EthagentConfig): EthagentConfig {
   let next = config
-  if (next.provider === 'llamacpp') {
-    const baseUrl = localProviderBaseUrlFor(next.provider, next.baseUrl)
-    if (next.baseUrl !== baseUrl) next = { ...next, baseUrl }
-  }
   if (!next.erc8004 && next.identity?.chainId && next.identity.identityRegistryAddress && next.identity.rpcUrl) {
     next = {
       ...next,
@@ -329,37 +303,13 @@ export function normalizeConfig(config: EthagentConfig): EthagentConfig {
   return next
 }
 
-function migrateLegacyConfig(config: LegacyConfig): EthagentConfig {
-  if (config.provider !== 'ollama') return normalizeConfig(ConfigSchema.parse(config))
+function migrateLegacyV1(input: z.infer<typeof LegacyV1Schema>): EthagentConfig {
   return {
-    ...config,
-    provider: 'llamacpp',
-    model: defaultModelFor('llamacpp'),
-    baseUrl: defaultBaseUrlFor('llamacpp'),
+    version: 2,
+    firstSeenAt: input.firstRunAt ?? new Date().toISOString(),
+    ...(input.identity ? { identity: input.identity } : {}),
+    ...(input.erc8004 ? { erc8004: input.erc8004 } : {}),
+    ...(input.selectedNetwork ? { selectedNetwork: input.selectedNetwork } : {}),
+    ...(input.configVersion !== undefined ? { configVersion: input.configVersion } : {}),
   }
-}
-
-function isDefaultBaseUrlFor(value: string, fallback: string | undefined): boolean {
-  if (!fallback) return false
-  try {
-    const url = new URL(value)
-    const defaultUrl = new URL(fallback)
-    if (url.protocol !== defaultUrl.protocol) return false
-    if (url.hostname.toLowerCase() !== defaultUrl.hostname.toLowerCase()) return false
-    if (effectivePort(url) !== effectivePort(defaultUrl)) return false
-    const path = stripTrailingSlash(url.pathname) || '/'
-    const defaultPath = stripTrailingSlash(defaultUrl.pathname) || '/'
-    return path === '/' || path === defaultPath
-  } catch {
-    return stripTrailingSlash(value) === stripTrailingSlash(fallback)
-  }
-}
-
-function effectivePort(url: URL): string {
-  if (url.port) return url.port
-  return url.protocol === 'https:' ? '443' : '80'
-}
-
-function stripTrailingSlash(value: string): string {
-  return value.replace(/\/+$/, '')
 }

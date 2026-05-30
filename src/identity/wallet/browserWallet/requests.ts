@@ -1,4 +1,3 @@
-import { recoverAddressFromSignature } from '../../crypto/eth.js'
 import { normalizeWalletPayloadPurpose } from '../walletPurposeCompat.js'
 import { startBrowserWalletServer } from './requestServer.js'
 import type {
@@ -12,10 +11,11 @@ import type {
   TransactionRequest,
 } from './types.js'
 import {
-  accountMismatchError,
+  assertExpectedAccount,
   chainIdHex,
   parseAccount,
   parseHex,
+  verifyRecoveredAccount,
 } from './validation.js'
 
 export async function requestBrowserWalletAccount(args: AccountRequest = {}): Promise<BrowserWalletAccount> {
@@ -55,9 +55,7 @@ export async function requestBrowserWalletSignature(args: SignatureRequest): Pro
     }),
     prepare: body => {
       const account = parseAccount(body.account)
-      if (args.expectedAccount && account.toLowerCase() !== args.expectedAccount.toLowerCase()) {
-        throw accountMismatchError(account, args.expectedAccount, args.purpose)
-      }
+      assertExpectedAccount(account, args.expectedAccount, args.purpose)
       const message = args.messageForAccount ? args.messageForAccount(account) : args.message!
       return { message }
     },
@@ -65,13 +63,8 @@ export async function requestBrowserWalletSignature(args: SignatureRequest): Pro
       const account = parseAccount(body.account)
       const message = typeof body.message === 'string' ? body.message : ''
       const signature = parseHex(body.signature, 'wallet signature')
-      if (args.expectedAccount && account.toLowerCase() !== args.expectedAccount.toLowerCase()) {
-        throw accountMismatchError(account, args.expectedAccount, args.purpose)
-      }
-      const recovered = recoverAddressFromSignature(message, signature)
-      if (recovered.toLowerCase() !== account.toLowerCase()) {
-        throw new Error('Wallet signature does not match connected account')
-      }
+      assertExpectedAccount(account, args.expectedAccount, args.purpose)
+      verifyRecoveredAccount(message, signature, account)
       return { account, message, signature }
     },
   })
@@ -101,9 +94,7 @@ export async function sendBrowserWalletTransaction(args: TransactionRequest): Pr
     }),
     complete: body => {
       const account = parseAccount(body.account)
-      if (account.toLowerCase() !== args.expectedAccount.toLowerCase()) {
-        throw accountMismatchError(account, args.expectedAccount, args.purpose)
-      }
+      assertExpectedAccount(account, args.expectedAccount, args.purpose)
       return { account, txHash: parseHex(body.txHash, 'transaction hash') }
     },
   })
@@ -140,9 +131,7 @@ export async function requestBrowserWalletSignatureAndTransaction<TPrepared>(
     }),
     prepare: body => {
       const account = parseAccount(body.account)
-      if (args.expectedAccount && account.toLowerCase() !== args.expectedAccount.toLowerCase()) {
-        throw accountMismatchError(account, args.expectedAccount, args.purpose)
-      }
+      assertExpectedAccount(account, args.expectedAccount, args.purpose)
       const message = args.messageForAccount ? args.messageForAccount(account) : args.message!
       return { message }
     },
@@ -150,13 +139,8 @@ export async function requestBrowserWalletSignatureAndTransaction<TPrepared>(
       const account = parseAccount(body.account)
       const message = typeof body.message === 'string' ? body.message : ''
       const signature = parseHex(body.signature, 'wallet signature')
-      if (args.expectedAccount && account.toLowerCase() !== args.expectedAccount.toLowerCase()) {
-        throw accountMismatchError(account, args.expectedAccount, args.purpose)
-      }
-      const recovered = recoverAddressFromSignature(message, signature)
-      if (recovered.toLowerCase() !== account.toLowerCase()) {
-        throw new Error('Wallet signature does not match connected account')
-      }
+      assertExpectedAccount(account, args.expectedAccount, args.purpose)
+      verifyRecoveredAccount(message, signature, account)
       const next = await args.prepareTransaction({ account, message, signature })
       prepared = {
         account,
@@ -176,9 +160,7 @@ export async function requestBrowserWalletSignatureAndTransaction<TPrepared>(
     complete: body => {
       if (!prepared) throw new Error('Wallet transaction was not prepared')
       const account = parseAccount(body.account)
-      if (account.toLowerCase() !== prepared.account.toLowerCase()) {
-        throw accountMismatchError(account, prepared.account, args.purpose)
-      }
+      assertExpectedAccount(account, prepared.account, args.purpose)
       return {
         account,
         message: prepared.message,

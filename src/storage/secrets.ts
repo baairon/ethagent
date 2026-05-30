@@ -2,7 +2,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import os from 'node:os'
 import crypto from 'node:crypto'
-import { getConfigDir, ensureConfigDir, type ProviderId } from './config.js'
+import { getConfigDir, ensureConfigDir } from './config.js'
 import { atomicWriteText } from './atomicWrite.js'
 
 const KEYTAR_SERVICE = 'ethagent'
@@ -167,18 +167,3 @@ export async function whichBackend(): Promise<KeyBackend> {
   return (await loadKeytar()) ? 'keyring' : 'encrypted-file'
 }
 
-export function getKey(provider: ProviderId): Promise<string | null> {
-  return getSecret(provider)
-}
-
-export function setKey(provider: ProviderId, value: string): Promise<KeyBackend> {
-  return setSecret(provider, value)
-}
-
-export function rmKey(provider: ProviderId): Promise<void> {
-  return rmSecret(provider)
-}
-
-export function hasKey(provider: ProviderId): Promise<boolean> {
-  return hasSecret(provider)
-}

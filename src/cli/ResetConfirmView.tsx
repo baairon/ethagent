@@ -1,75 +1,76 @@
-import React from 'react'
-import { Box, Text, useApp } from 'ink'
+import React, { useEffect, useState } from 'react'
+import { Box, Text, useApp, useStdout } from 'ink'
 import { Surface } from '../ui/Surface.js'
 import { Select } from '../ui/Select.js'
 import { theme } from '../ui/theme.js'
-import type { FactoryResetPlan } from '../storage/factoryReset.js'
-
-type SectionTone = 'destructive' | 'safe' | 'untouched'
+import { Wordmark } from '../identity/manager/shared/components/Wordmark.js'
+import type { ResetPlan } from '../storage/reset.js'
 
 export const ResetConfirmView: React.FC<{
-  plan: FactoryResetPlan
+  plan: ResetPlan
   onDone: (confirmed: boolean) => void
 }> = ({ plan, onDone }) => {
   const { exit } = useApp()
+  const { stdout } = useStdout()
+  const [rows, setRows] = useState<number>(stdout?.rows ?? 24)
+
+  useEffect(() => {
+    if (!stdout) return
+    const onResize = () => setRows(stdout.rows ?? 24)
+    stdout.on('resize', onResize)
+    return () => { stdout.off('resize', onResize) }
+  }, [stdout])
+
   const finish = (confirmed: boolean) => {
     onDone(confirmed)
     exit()
   }
 
   return (
-    <Surface
-      title="Reset Local Data?"
-      subtitle="Deletes this machine's ethagent data. Models and onchain records stay."
-      footer="enter select · esc cancel"
-      tone="error"
-    >
-      <Box flexDirection="column">
-        <Section tone="destructive" title="Deletes" lines={[
-          'Identity files, sessions, history, credentials',
-          localDataLine(plan.deletePaths.length),
-        ]} />
-        <Section tone="safe" title="Keeps" lines={[
-          'Local GGUF models and llama.cpp runners',
-          ...(plan.preservedPaths.length > 0 ? [`${plan.preservedPaths.length} local model path${plan.preservedPaths.length === 1 ? '' : 's'}`] : ['No local model assets found']),
-        ]} />
-        <Section tone="untouched" title="Not Touched" lines={[
-          'ERC-8004 tokens and onchain records',
-          'IPFS snapshots and public metadata',
-        ]} />
+    <Box flexDirection="column" alignItems="center" justifyContent="center" width="100%" minHeight={rows}>
+      <Wordmark />
+      <Box flexDirection="column" marginTop={1} width="100%">
+        <Surface
+          title="Reset ethagent?"
+          subtitle="This only clears the current machine."
+          footer="enter select · esc cancel"
+          tone="error"
+        >
+          <Box flexDirection="column">
+            <Section title="Deletes" color={theme.accentError} lines={[
+              plan.configDir,
+              'soul, memory, skills, and config',
+              'your saved Pinata token',
+              "ethagent's block in your harness files (CLAUDE.md, AGENTS.md)",
+            ]} />
+            <Section title="Kept" color={theme.dim} lines={[
+              'your ERC-8004 token and ENS name',
+              'published snapshots on IPFS',
+            ]} />
+          </Box>
+          <Box marginTop={1}>
+            <Select<'confirm' | 'cancel'>
+              options={[
+                { value: 'confirm', label: 'Reset everything', hint: 'Clears local data', bold: true },
+                { value: 'cancel', label: 'Cancel', hint: 'Leave everything as is' },
+              ]}
+              hintLayout="inline"
+              initialIndex={1}
+              onSubmit={choice => finish(choice === 'confirm')}
+              onCancel={() => finish(false)}
+            />
+          </Box>
+        </Surface>
       </Box>
-      <Box marginTop={1}>
-        <Select<'confirm' | 'cancel'>
-          options={[
-            { value: 'confirm', label: 'Yes, reset local data', hint: 'Delete local ethagent data on this machine', bold: true },
-            { value: 'cancel', label: 'No, cancel', hint: 'Leave local data unchanged', role: 'utility' },
-          ]}
-          hintLayout="inline"
-          initialIndex={1}
-          onSubmit={choice => finish(choice === 'confirm')}
-          onCancel={() => finish(false)}
-        />
-      </Box>
-    </Surface>
+    </Box>
   )
 }
 
-const Section: React.FC<{ tone: SectionTone; title: string; lines: string[] }> = ({ tone, title, lines }) => (
+const Section: React.FC<{ title: string; color: string; lines: string[] }> = ({ title, color, lines }) => (
   <Box flexDirection="column" marginBottom={1}>
-    <Text color={sectionTitleColor(tone)}>{title}</Text>
-    {lines.map(line => (
-      <Text key={line} color={theme.textSubtle}>· {line}</Text>
+    <Text color={color}>{title}</Text>
+    {lines.map((line, i) => (
+      <Text key={i} color={theme.textSubtle}>· {line}</Text>
     ))}
   </Box>
 )
-
-function sectionTitleColor(tone: SectionTone): string {
-  if (tone === 'destructive') return theme.accentError
-  if (tone === 'safe') return theme.accentPeriwinkle
-  return theme.dim
-}
-
-function localDataLine(count: number): string {
-  if (count === 0) return 'No local ethagent data found'
-  return `${count} local path${count === 1 ? '' : 's'} under ~/.ethagent`
-}

@@ -624,7 +624,7 @@ test('old owner-only snapshot cannot be restored by an operator wallet without a
   }), /wallet signature/i)
 })
 
-test('operator cannot modify the access key list — slots are determined by owner-signed manifest', () => {
+test('operator cannot modify the access key list: slots are determined by owner-signed manifest', () => {
   const ownerKey = generatePrivateKey()
   const operatorKey = generatePrivateKey()
   const ownerAddress = addressFromPrivateKey(ownerKey)

@@ -13,8 +13,14 @@ function sourceFilesUnder(dir: string): string[] {
 }
 
 function ensEditFlowText(): string {
-  return sourceFilesUnder('src/identity/hub/ens')
+  return sourceFilesUnder('src/identity/manager/ens')
     .filter(file => /[\\/]EnsEdit|[\\/]editCopy\.ts$/.test(file))
+    .map(file => readFileSync(file, 'utf8'))
+    .join('\n')
+}
+
+function walletPageText(): string {
+  return sourceFilesUnder('src/identity/wallet/page')
     .map(file => readFileSync(file, 'utf8'))
     .join('\n')
 }
@@ -27,15 +33,12 @@ test('ERC-8004 identity registry path does not encode token approval or transfer
 })
 
 test('setup-facing wallet copy uses owner/operator wallet language', () => {
-  const walletPage = [
-    readFileSync('src/identity/wallet/page.tsx', 'utf8'),
-    readFileSync('src/identity/wallet/page/copy.ts', 'utf8'),
-  ].join('\n')
+  const walletPage = walletPageText()
   const editFlow = ensEditFlowText()
-  const operators = readFileSync('src/identity/hub/ens/EnsOperatorWalletsScreen.tsx', 'utf8')
-  const restoreFlow = readFileSync('src/identity/hub/restore/RestoreFlow.tsx', 'utf8')
-  const identityHub = readFileSync('src/identity/hub/IdentityHub.tsx', 'utf8')
-  const visibleCopy = [walletPage, editFlow, operators, restoreFlow, identityHub].join('\n')
+  const operators = readFileSync('src/identity/manager/ens/EnsOperatorWalletsScreen.tsx', 'utf8')
+  const restoreFlow = readFileSync('src/identity/manager/restore/RestoreFlow.tsx', 'utf8')
+  const identityManager = readFileSync('src/identity/manager/IdentityManager.tsx', 'utf8')
+  const visibleCopy = [walletPage, editFlow, operators, restoreFlow, identityManager].join('\n')
 
   assert.match(walletPage, /Owner Wallet Required/)
   assert.match(walletPage, /Operator Wallet Required/)
@@ -48,24 +51,24 @@ test('setup-facing wallet copy uses owner/operator wallet language', () => {
 test('refactored identity wallet and effects files do not contain mojibake text', () => {
   const files = [
     ...sourceFilesUnder('src/identity/wallet'),
-    ...sourceFilesUnder('src/identity/hub/shared/effects'),
-    ...sourceFilesUnder('src/identity/hub/shared/reconciliation'),
-    ...sourceFilesUnder('src/identity/hub/ens'),
+    ...sourceFilesUnder('src/identity/manager/shared/effects'),
+    ...sourceFilesUnder('src/identity/manager/shared/reconciliation'),
+    ...sourceFilesUnder('src/identity/manager/ens'),
   ]
   const text = files.map(file => readFileSync(file, 'utf8')).join('\n')
 
   assert.doesNotMatch(text, new RegExp('[\\u00c2\\u00c3\\ufffd]'))
 })
 
-test('Identity Hub advanced ENS flow remains compact and focused', () => {
+test('Identity Manager advanced ENS flow remains compact and focused', () => {
   const editFlow = ensEditFlowText()
-  const operators = readFileSync('src/identity/hub/ens/EnsOperatorWalletsScreen.tsx', 'utf8')
-  const transferFlow = readFileSync('src/identity/hub/transfer/TokenTransferScreens.tsx', 'utf8')
+  const operators = readFileSync('src/identity/manager/ens/EnsOperatorWalletsScreen.tsx', 'utf8')
+  const transferFlow = readFileSync('src/identity/manager/transfer/TokenTransferScreens.tsx', 'utf8')
 
   assert.match(editFlow, /title="ENS Name"/)
   assert.match(editFlow, /Current Setup/)
   assert.match(transferFlow, /title="Prepare Token Transfer"/)
-  assert.match(editFlow, /dedicated agent subdomain|agent ENS name/)
+  assert.match(editFlow, /agent subdomain|agent ENS name/i)
   assert.doesNotMatch(editFlow, /org\.ethagent\.operator/)
   assert.match(operators, /label: 'Operator Wallets'/)
   assert.match(operators, /label: 'Add Wallet'/)
@@ -80,27 +83,26 @@ test('Identity Hub advanced ENS flow remains compact and focused', () => {
   assert.doesNotMatch(editFlow, /SIMPLE_ENS_STEPS|ADVANCED_ENS_STEPS/)
 })
 
-test('Identity Hub token transfer copy keeps approvals out of the flow', () => {
-  const menu = readFileSync('src/identity/hub/shared/components/MenuScreen.tsx', 'utf8')
-  const guide = readFileSync('src/identity/hub/transfer/TokenTransferScreens.tsx', 'utf8')
-  const effects = readFileSync('src/identity/hub/transfer/progress.ts', 'utf8')
+test('Identity Manager token transfer copy keeps approvals out of the flow', () => {
+  const menu = readFileSync('src/identity/manager/shared/components/MenuScreen.tsx', 'utf8')
+  const guide = readFileSync('src/identity/manager/transfer/TokenTransferScreens.tsx', 'utf8')
+  const effects = readFileSync('src/identity/manager/transfer/progress.ts', 'utf8')
 
   assert.match(menu, /Prepare Transfer/)
-  assert.match(guide, /Use this before any ERC-8004 token transfer\./)
-  assert.match(guide, /Both signed wallets can read this snapshot/)
+  assert.match(guide, /Transfer the token externally, then restore with the receiver wallet\./)
   assert.match(effects, /title: 'Use Receiver Wallet'/)
   assert.match(effects, /title: 'Use Sender Wallet Again'/)
-  assert.match(guide, /No approve\(\), setApprovalForAll\(\), transferFrom\(\), or token approval is requested/)
+  assert.match(guide, /No token approval is requested\./)
 })
 
 test('identity copy uses onchain spelling', () => {
   const files = [
     'README.md',
     'src/identity/ens/ensLookup.ts',
-    'src/identity/hub/ens/transactions.ts',
-    'src/identity/hub/continuity/effects.ts',
-    'src/identity/hub/continuity/RecoveryConfirmScreen.tsx',
-    'src/identity/hub/transfer/TokenTransferScreens.tsx',
+    'src/identity/manager/ens/transactions.ts',
+    'src/identity/manager/continuity/effects.ts',
+    'src/identity/manager/continuity/RecoveryConfirmScreen.tsx',
+    'src/identity/manager/transfer/TokenTransferScreens.tsx',
   ]
   const text = files.map(file => readFileSync(file, 'utf8')).join('\n')
 
@@ -110,7 +112,7 @@ test('identity copy uses onchain spelling', () => {
 })
 
 test('vaulted public profile saves do not require Ethereum Mainnet ENS writes', () => {
-  const publicProfile = readFileSync('src/identity/hub/profile/effects.ts', 'utf8')
+  const publicProfile = readFileSync('src/identity/manager/profile/effects.ts', 'utf8')
   const vaultFlow = publicProfile.slice(
     publicProfile.indexOf('async function runOperatorWalletVaultPublicProfileSave'),
     publicProfile.indexOf('type OperatorProfileArtifacts'),
@@ -124,15 +126,15 @@ test('vaulted public profile saves do not require Ethereum Mainnet ENS writes', 
 })
 
 test('public profile completion feedback starts capitalized', () => {
-  const publicProfile = readFileSync('src/identity/hub/profile/effects.ts', 'utf8')
+  const publicProfile = readFileSync('src/identity/manager/profile/effects.ts', 'utf8')
 
   assert.doesNotMatch(publicProfile, /'profile updated/)
   assert.match(publicProfile, /'Profile updated/)
 })
 
 test('operator profile updates never write to ENS', () => {
-  const publicProfile = readFileSync('src/identity/hub/profile/effects.ts', 'utf8')
-  const walletCopy = readFileSync('src/identity/wallet/page/copy.ts', 'utf8')
+  const publicProfile = readFileSync('src/identity/manager/profile/effects.ts', 'utf8')
+  const walletCopy = walletPageText()
 
   assert.doesNotMatch(publicProfile, /publishOperatorProfileEnsRecord/)
   assert.doesNotMatch(publicProfile, /runUpdateEnsRecords/)
@@ -146,17 +148,16 @@ test('operator profile updates never write to ENS', () => {
   assert.doesNotMatch(operatorCopy, /ENS record|ENS name/i)
 })
 
-test('README documents custody modes, ENS, and token transfer flow', () => {
+test('README documents core-file sync, custody modes, ENS naming, and transfer', () => {
   const readme = readFileSync('README.md', 'utf8')
 
-  assert.match(readme, /## Custody Modes/)
-  assert.match(readme, /\*\*Simple\*\*/)
-  assert.match(readme, /\*\*Advanced\*\* splits an owner wallet/)
-  assert.match(readme, /never receive token approval or transfer rights/)
-  assert.match(readme, /Subdomains live under a parent name you control, never on root `\.eth` names directly/)
-  assert.match(readme, /token ID and network/)
-  assert.match(readme, /\*\*Switch Agent\*\* accepts an ENS name or an ERC-8004 token ID/)
-  assert.match(readme, /## Token Transfers/)
-  assert.match(readme, /Prepare Token Transfer.*before any ERC-8004 token transfer/)
-  assert.match(readme, /sender signs snapshot access, receiver signs restore access/i)
+  assert.match(readme, /Across your tools/)
+  assert.match(readme, /in sync with Claude Code/)
+  assert.match(readme, /Custody/)
+  assert.match(readme, /\*\*Simple\.\*\*/)
+  assert.match(readme, /\*\*Advanced\.\*\* An owner wallet holds the agent in a Vault/)
+  assert.match(readme, /operators can never transfer your agent/)
+  assert.match(readme, /give it a name under an ENS name you own/)
+  assert.match(readme, /found by its ENS name or token id/)
+  assert.match(readme, /transfer the token to their wallet/)
 })

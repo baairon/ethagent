@@ -1,7 +1,7 @@
 import http from 'node:http'
 import { randomUUID } from 'node:crypto'
 import { walletPage } from './html.js'
-import { readJson, respondHtml, respondJson } from './http.js'
+import { isAllowedWalletOrigin, readJson, respondHtml, respondJson } from './http.js'
 import { BrowserWalletError, type ReadyHandler } from './types.js'
 import {
   assertSessionToken,
@@ -43,6 +43,10 @@ export function startBrowserWalletServer<T>(args: {
 
     const handleRequest = async (req: http.IncomingMessage, res: http.ServerResponse): Promise<void> => {
       const url = new URL(req.url ?? '/', 'http://127.0.0.1')
+      if (req.method === 'POST' && !isAllowedWalletOrigin(req)) {
+        respondJson(res, 403, { ok: false, error: 'forbidden origin' })
+        return
+      }
       if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/ethagent')) {
         respondHtml(res, walletPage(args.title, sessionToken, args.payload))
         return

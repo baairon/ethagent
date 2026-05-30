@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Text } from 'ink'
-import { theme } from './theme.js'
+import { theme, PANEL_WIDTH } from './theme.js'
+
+const CONTENT_WIDTH = PANEL_WIDTH - 4
 
 export const SPINNER_VERBS: string[] = [
   'accomplishing',
@@ -212,7 +214,7 @@ type SpinnerProps = {
   showElapsed?: boolean
 }
 
-const FRAMES = ['.', 'o', 'O', 'o']
+const FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
 
 export const Spinner: React.FC<SpinnerProps> = ({
   active = true,
@@ -249,12 +251,21 @@ export const Spinner: React.FC<SpinnerProps> = ({
     if (!active) return
     const timer = setInterval(() => {
       setFrame(prev => (prev + 1) % FRAMES.length)
-    }, 120)
+    }, 80)
     return () => clearInterval(timer)
   }, [active])
 
   const autoLabel = stickyVerbRef.current ?? verb ?? 'thinking'
-  const text = spinnerText(label ?? `${autoLabel}…`)
+  const elapsed = showElapsed ? formatElapsedSeconds(Date.now() - (startedAt ?? internalStartedAtRef.current)) : null
+  const renderedHint = [rawHint, elapsed].filter(Boolean).join(' · ')
+  const hint = renderedHint ? spinnerHintText(renderedHint) : ''
+
+  const hintReserve = hint ? hint.length + 3 : 0
+  const labelBudget = Math.max(0, CONTENT_WIDTH - 2 - hintReserve)
+  let text = spinnerText(label ?? `${autoLabel}…`)
+  if (text.length > labelBudget) {
+    text = text.slice(0, Math.max(0, labelBudget - 1)) + '…'
+  }
 
   useEffect(() => {
     if (!active) return
@@ -267,10 +278,7 @@ export const Spinner: React.FC<SpinnerProps> = ({
 
   if (!active) return null
 
-  const glyph = FRAMES[frame] ?? 'o'
-  const elapsed = showElapsed ? formatElapsedSeconds(Date.now() - (startedAt ?? internalStartedAtRef.current)) : null
-  const renderedHint = [rawHint, elapsed].filter(Boolean).join(' · ')
-  const hint = renderedHint ? spinnerHintText(renderedHint) : ''
+  const glyph = FRAMES[frame] ?? '⠋'
 
   const shimmerStart = shimmerPos - 1
   const shimmerEnd = shimmerPos + 1
@@ -316,15 +324,10 @@ function restoreSpinnerTerms(value: string): string {
     .replace(/\bapi\b/g, 'API')
     .replace(/\bens\b/g, 'ENS')
     .replace(/\berc-8004\b/g, 'ERC-8004')
-    .replace(/\bgguf\b/g, 'GGUF')
-    .replace(/\bhugging face\b/g, 'Hugging Face')
     .replace(/\bipfs\b/g, 'IPFS')
     .replace(/\bjson\b/g, 'JSON')
     .replace(/\bjwt\b/g, 'JWT')
     .replace(/\bmemory\.md\b/g, 'MEMORY.md')
-    .replace(/\bopenai\b/g, 'OpenAI')
-    .replace(/\banthropic\b/g, 'Anthropic')
-    .replace(/\bgemini\b/g, 'Gemini')
     .replace(/\bos\b/g, 'OS')
     .replace(/\brpc\b/g, 'RPC')
     .replace(/\bsoul\.md\b/g, 'SOUL.md')
@@ -333,6 +336,4 @@ function restoreSpinnerTerms(value: string): string {
     .replace(/\bbase\b/g, 'Base')
     .replace(/\bethereum mainnet\b/g, 'Ethereum Mainnet')
     .replace(/\bethereum\b/g, 'Ethereum')
-    .replace(/\bsepolia\b/g, 'Sepolia')
-    .replace(/\bbase sepolia\b/g, 'Base Sepolia')
 }

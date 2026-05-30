@@ -1,13 +1,8 @@
-export type KeybindingContextName = 'Global' | 'Chat' | 'Overlay'
+export type KeybindingContextName = 'Global'
 
 export const ACTIONS = [
   'app:interrupt',
   'app:redraw',
-  'chat:cancel',
-  'chat:modelPicker',
-  'chat:identityHub',
-  'chat:cycleMode',
-  'chat:toggleReasoning',
 ] as const
 
 export type Action = (typeof ACTIONS)[number]

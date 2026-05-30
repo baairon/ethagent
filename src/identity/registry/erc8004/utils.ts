@@ -12,7 +12,7 @@ export function uniqueStrings(values: string[]): string[] {
 export function cleanRpcError(err: unknown): string {
   const message = err instanceof Error ? err.message : String(err)
   return message
-    .replace(/s+/g, ' ')
+    .replace(/\s+/g, ' ')
     .slice(0, 220)
 }
 

@@ -11,7 +11,7 @@ export const ENS_RPC_URLS = [
   'https://rpc.ankr.com/eth',
 ] as const
 
-export const ETH_NAME_PATTERN = /^([a-z0-9-]+.)+eth$/i
+export const ETH_NAME_PATTERN = /^([a-z0-9-]+\.)+eth$/i
 
 export const ENS_REGISTRY_ABI = parseAbi([
   'function owner(bytes32 node) view returns (address)',

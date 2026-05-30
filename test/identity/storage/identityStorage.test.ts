@@ -25,10 +25,8 @@ async function withTempHome(fn: () => Promise<void>): Promise<void> {
 }
 
 const baseConfig = (): EthagentConfig => ({
-  version: 1,
-  provider: 'openai',
-  model: 'gpt-test',
-  firstRunAt: new Date(0).toISOString(),
+  version: 2,
+  firstSeenAt: new Date(0).toISOString(),
 })
 
 test('setTokenIdentity persists ERC-8004 identity without a stored private key', async () => {
@@ -138,8 +136,6 @@ test('clearIdentity removes ERC-8004 identity metadata without touching other co
     const cleared = await clearIdentity(withToken)
 
     assert.equal(cleared.identity, undefined)
-    assert.equal(cleared.provider, config.provider)
-    assert.equal(cleared.model, config.model)
     assert.equal(cleared.selectedNetwork, 'base')
     assert.equal(cleared.erc8004?.chainId, 8453)
   })

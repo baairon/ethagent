@@ -1,15 +1,16 @@
 {
   "name": "ethagent",
-  "version": "3.3.4",
-  "description": "A privacy-first AI agent with a portable Ethereum identity",
+  "version": "4.0.0",
+  "description": "Portable Ethereum identity for your AI agent. Its soul, memory, and skills live onchain via ERC-8004 + IPFS and snap back into any session.",
   "type": "module",
-  "main": "bin/ethagent.js",
   "bin": {
     "ethagent": "bin/ethagent.js"
   },
   "files": [
     "bin",
     "src",
+    ".claude-plugin",
+    "commands",
     "README.md",
     "LICENSE"
   ],
@@ -28,37 +29,32 @@
   },
   "keywords": [
     "ethereum",
+    "identity",
+    "ai-agent",
     "erc-8004",
     "ens",
-    "ai-agent",
-    "cli",
-    "privacy",
+    "codex",
+    "claude-code",
+    "agents",
     "ipfs",
     "wallet",
-    "llm",
-    "gguf",
-    "mcp",
-    "identity"
+    "privacy"
   ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/baairon/ethagent.git"
   },
-  "author": "bairon.eth",
+  "author": "bairon.dev",
   "license": "MIT",
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.29.0",
     "@noble/curves": "^1.9.7",
     "@noble/hashes": "^1.8.0",
     "@noble/post-quantum": "^0.6.1",
-    "ajv": "^8.18.0",
-    "cli-highlight": "^2.1.11",
-    "esbuild": "^0.27.7",
+    "esbuild": "^0.27.0",
     "ink": "^6.8.0",
     "react": "^19.2.4",
     "tsx": "^4.21.0",
     "viem": "^2.48.4",
-    "wrap-ansi": "^9.0.2",
     "zod": "^3.25.76"
   },
   "devDependencies": {

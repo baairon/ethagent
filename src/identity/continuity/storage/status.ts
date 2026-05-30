@@ -109,7 +109,7 @@ function hashContinuitySnapshotContent(value: string): string {
   return createHash('sha256').update(normalizeSnapshotContent(value), 'utf8').digest('hex')
 }
 
-function normalizeSnapshotContent(value: string): string {
+export function normalizeSnapshotContent(value: string): string {
   const normalized = value.replace(/\r\n?/g, '\n')
   return normalized.endsWith('\n') ? normalized : `${normalized}\n`
 }

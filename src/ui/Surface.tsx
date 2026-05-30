@@ -1,6 +1,6 @@
 import React from 'react'
 import { Box, Text } from 'ink'
-import { theme } from './theme.js'
+import { theme, PANEL_WIDTH } from './theme.js'
 
 type SurfaceTone = 'primary' | 'muted' | 'error'
 
@@ -13,8 +13,8 @@ type SurfaceProps = {
 }
 
 const toneColor: Record<SurfaceTone, string> = {
-  primary: theme.accentPeriwinkle,
-  muted: theme.border,
+  primary: theme.accentWhite,
+  muted: theme.dim,
   error: theme.accentError,
 }
 
@@ -25,23 +25,27 @@ export const Surface: React.FC<SurfaceProps> = ({
   tone = 'primary',
   children,
 }) => {
-  const borderColor = toneColor[tone]
+  const titleColor = toneColor[tone]
   return (
-    <Box flexDirection="column" borderStyle="round" borderColor={borderColor} paddingX={2} paddingY={0} width="100%">
-      <Box flexDirection="column">
-        <Text color={borderColor} bold>{title}</Text>
-        {subtitle ? (
-          typeof subtitle === 'string'
-            ? <Text color={theme.dim}>{subtitle}</Text>
-            : subtitle
+    <Box flexDirection="column" alignItems="center" paddingY={1} width="100%">
+      <Box flexDirection="column" paddingX={2} width={PANEL_WIDTH}>
+        <Box flexDirection="column">
+          <Text color={titleColor} bold>{title}</Text>
+          {subtitle ? (
+            typeof subtitle === 'string'
+              ? <Text color={theme.menuStatus}>{subtitle}</Text>
+              : subtitle
+          ) : null}
+        </Box>
+        {children ? <Box flexDirection="column" marginTop={1}>{children}</Box> : null}
+        {footer ? (
+          <Box marginTop={1}>
+            {typeof footer === 'string'
+              ? <Text color={theme.menuStatus}>{footer}</Text>
+              : footer}
+          </Box>
         ) : null}
       </Box>
-      {children ? <Box flexDirection="column" marginTop={1}>{children}</Box> : null}
-      {footer ? (
-        <Box marginTop={1} borderTop={false}>
-          <Text color={theme.dim}>{footer}</Text>
-        </Box>
-      ) : null}
     </Box>
   )
 }

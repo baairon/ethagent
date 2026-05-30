@@ -25,11 +25,6 @@ type ProviderProps = {
 const DEFAULT_BINDINGS: Binding[] = [
   { context: 'Global', chord: { key: 'c', ctrl: true }, action: 'app:interrupt' },
   { context: 'Global', chord: { key: 'l', ctrl: true }, action: 'app:redraw' },
-  { context: 'Chat', chord: { key: 'escape' }, action: 'chat:cancel' },
-  { context: 'Chat', chord: { key: 'p', meta: true }, action: 'chat:modelPicker' },
-  { context: 'Chat', chord: { key: 'i', meta: true }, action: 'chat:identityHub' },
-  { context: 'Chat', chord: { key: 't', meta: true }, action: 'chat:toggleReasoning' },
-  { context: 'Chat', chord: { key: 'tab', shift: true }, action: 'chat:cycleMode' },
 ]
 
 export const KeybindingProvider: React.FC<ProviderProps> = ({ bindings = DEFAULT_BINDINGS, children }) => {
@@ -109,7 +104,7 @@ export function useKeybinding(
   options: UseKeybindingOptions = {},
 ): void {
   const ctx = useOptionalKeybindingContext()
-  const context = options.context ?? 'Chat'
+  const context = options.context ?? 'Global'
   const isActive = options.isActive ?? true
   const handlerRef = useRef(handler)
   useEffect(() => { handlerRef.current = handler }, [handler])

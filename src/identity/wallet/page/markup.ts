@@ -1,18 +1,22 @@
-import { WALLET_CSS } from './styles/index.js'
-
 export const CARD_HTML = `
-<canvas id="grainient" class="grainient-canvas" aria-hidden="true"></canvas>
 <main data-flow="sign" id="card">
   <div class="chrome">
     <span class="chrome-spacer"></span>
-    <span class="chrome-title" id="chrome-title">ethagent</span>
+    <span class="chrome-title" id="chrome-title"></span>
     <span class="chrome-actions"></span>
   </div>
   <div class="body">
-    <div class="splash-wrap"><pre class="splash" id="splash"></pre></div>
-    <div class="head"><span class="label" id="prompt-text">signature request</span></div>
-    <h2 class="flow-title" id="flow-title">Sign Message</h2>
-    <ol class="timeline" id="timeline" hidden aria-label="Wallet flow steps"></ol>
+    <div class="card-header">
+      <div class="card-logo">${LOGO_SVG}</div>
+      <h2 class="flow-title" id="flow-title">Sign Message</h2>
+    </div>
+    <div class="timeline" id="timeline" hidden>
+      <div class="timeline-head">
+        <span class="timeline-now" id="timeline-now"></span>
+        <span class="timeline-count" id="timeline-count"></span>
+      </div>
+      <div class="timeline-track" id="timeline-track"></div>
+    </div>
     <div class="details" id="details-block">
       <p class="flow-detail" id="flow-detail">
         <span class="key" id="detail-key">message</span>
@@ -30,7 +34,6 @@ export const CARD_HTML = `
     <div id="error-block-slot"></div>
   </div>
   <div class="footer">
-    <span class="net-pill" id="network-row"><span class="dot"></span><span id="net-val">Sepolia</span></span>
     <div class="actions">
       <button id="cancel" class="shortcut"><span class="key">esc</span><span>cancel</span></button>
       <button id="approve" class="shortcut primary" hidden>
@@ -42,6 +45,10 @@ export const CARD_HTML = `
 `;
 
 export function injectStylesAndMarkup(): void {
+  const link = document.createElement("link");
+  link.rel = "stylesheet";
+  link.href = "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap";
+  document.head.appendChild(link);
   const style = document.createElement("style");
   style.id = "wallet-styles";
   style.textContent = WALLET_CSS;

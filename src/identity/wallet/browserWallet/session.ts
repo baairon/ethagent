@@ -1,9 +1,10 @@
 import http from 'node:http'
 import { randomUUID } from 'node:crypto'
-import { recoverAddressFromSignature } from '../../crypto/eth.js'
 import { normalizeWalletPayloadPurpose } from '../walletPurposeCompat.js'
 import { walletPage } from './html.js'
-import { readJson, respondHtml, respondJson } from './http.js'
+import { isAllowedWalletOrigin, readJson, respondHtml, respondJson } from './http.js'
+
+const SSE_DRAIN_MS = 250
 import {
   BrowserWalletError,
   type BrowserWalletSession,
@@ -15,11 +16,12 @@ import {
   type SignAndTransactionRequest,
 } from './types.js'
 import {
-  accountMismatchError,
+  assertExpectedAccount,
   chainIdHex,
   parseAccount,
   parseBrowserWalletErrorBody,
   parseHex,
+  verifyRecoveredAccount,
 } from './validation.js'
 
 export async function openBrowserWalletSession(args: {
@@ -47,6 +49,10 @@ export async function openBrowserWalletSession(args: {
 
   const handleRequest = async (req: http.IncomingMessage, res: http.ServerResponse): Promise<void> => {
     const url = new URL(req.url ?? '/', 'http://127.0.0.1')
+    if ((req.method === 'POST' || url.pathname === '/events') && !isAllowedWalletOrigin(req)) {
+      respondJson(res, 403, { ok: false, error: 'forbidden origin' })
+      return
+    }
     if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/ethagent')) {
       respondHtml(res, walletPage(title, '', { kind: 'session-wait' }))
       return
@@ -98,10 +104,15 @@ export async function openBrowserWalletSession(args: {
         return
       }
       const finished = pending
+      try {
+        finished.resolve(body)
+      } catch (err) {
+        respondJson(res, 400, { ok: false, error: (err as Error).message })
+        return
+      }
       pending = null
-      respondJson(res, 200, { ok: true })
       clearTimeout(finished.timeout)
-      finished.resolve(body)
+      respondJson(res, 200, { ok: true })
       return
     }
     if (req.method === 'POST' && url.pathname === '/cancel') {
@@ -167,7 +178,7 @@ export async function openBrowserWalletSession(args: {
         ...(opts.prepare ? { prepare: opts.prepare } : {}),
         ...(opts.prepareTransaction ? { prepareTransaction: opts.prepareTransaction } : {}),
         resolve: body => {
-          try { resolve(opts.complete(body)) } catch (err) { reject(err) }
+          resolve(opts.complete(body))
         },
         reject,
         timeout,
@@ -194,9 +205,7 @@ export async function openBrowserWalletSession(args: {
         ...(req.timeoutMs !== undefined ? { timeoutMs: req.timeoutMs } : {}),
         prepare: body => {
           const account = parseAccount(body.account)
-          if (req.expectedAccount && account.toLowerCase() !== req.expectedAccount.toLowerCase()) {
-            throw accountMismatchError(account, req.expectedAccount, req.purpose)
-          }
+          assertExpectedAccount(account, req.expectedAccount, req.purpose)
           const message = req.messageForAccount ? req.messageForAccount(account) : req.message!
           return { message }
         },
@@ -204,13 +213,8 @@ export async function openBrowserWalletSession(args: {
           const account = parseAccount(body.account)
           const message = typeof body.message === 'string' ? body.message : ''
           const signature = parseHex(body.signature, 'wallet signature')
-          if (req.expectedAccount && account.toLowerCase() !== req.expectedAccount.toLowerCase()) {
-            throw accountMismatchError(account, req.expectedAccount, req.purpose)
-          }
-          const recovered = recoverAddressFromSignature(message, signature)
-          if (recovered.toLowerCase() !== account.toLowerCase()) {
-            throw new Error('Wallet signature does not match connected account')
-          }
+          assertExpectedAccount(account, req.expectedAccount, req.purpose)
+          verifyRecoveredAccount(message, signature, account)
           return { account, message, signature }
         },
       })
@@ -229,9 +233,7 @@ export async function openBrowserWalletSession(args: {
       ...(req.timeoutMs !== undefined ? { timeoutMs: req.timeoutMs } : {}),
       complete: body => {
         const account = parseAccount(body.account)
-        if (account.toLowerCase() !== req.expectedAccount.toLowerCase()) {
-          throw accountMismatchError(account, req.expectedAccount, req.purpose)
-        }
+        assertExpectedAccount(account, req.expectedAccount, req.purpose)
         return { account, txHash: parseHex(body.txHash, 'transaction hash') }
       },
     }),
@@ -262,9 +264,7 @@ export async function openBrowserWalletSession(args: {
         ...(req.timeoutMs !== undefined ? { timeoutMs: req.timeoutMs } : {}),
         prepare: body => {
           const account = parseAccount(body.account)
-          if (req.expectedAccount && account.toLowerCase() !== req.expectedAccount.toLowerCase()) {
-            throw accountMismatchError(account, req.expectedAccount, req.purpose)
-          }
+          assertExpectedAccount(account, req.expectedAccount, req.purpose)
           const message = req.messageForAccount ? req.messageForAccount(account) : req.message!
           return { message }
         },
@@ -272,13 +272,8 @@ export async function openBrowserWalletSession(args: {
           const account = parseAccount(body.account)
           const message = typeof body.message === 'string' ? body.message : ''
           const signature = parseHex(body.signature, 'wallet signature')
-          if (req.expectedAccount && account.toLowerCase() !== req.expectedAccount.toLowerCase()) {
-            throw accountMismatchError(account, req.expectedAccount, req.purpose)
-          }
-          const recovered = recoverAddressFromSignature(message, signature)
-          if (recovered.toLowerCase() !== account.toLowerCase()) {
-            throw new Error('Wallet signature does not match connected account')
-          }
+          assertExpectedAccount(account, req.expectedAccount, req.purpose)
+          verifyRecoveredAccount(message, signature, account)
           const next = await req.prepareTransaction({ account, message, signature })
           prepared = {
             account,
@@ -296,9 +291,7 @@ export async function openBrowserWalletSession(args: {
         complete: body => {
           if (!prepared) throw new Error('Wallet transaction was not prepared')
           const account = parseAccount(body.account)
-          if (account.toLowerCase() !== prepared.account.toLowerCase()) {
-            throw accountMismatchError(account, prepared.account, req.purpose)
-          }
+          assertExpectedAccount(account, prepared.account, req.purpose)
           return {
             account,
             message: prepared.message,
@@ -314,7 +307,7 @@ export async function openBrowserWalletSession(args: {
       closed = true
       if (pending) failPending(new Error('wallet session closed before request completed'))
       pushEvent('done', {})
-      await new Promise(resolve => setTimeout(resolve, 250))
+      await new Promise(resolve => setTimeout(resolve, SSE_DRAIN_MS))
       for (const res of sseClients) {
         try { res.end() } catch { }
       }

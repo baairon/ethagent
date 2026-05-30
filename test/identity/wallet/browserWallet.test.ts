@@ -63,12 +63,13 @@ test('browser wallet page explains the wallet signature request', () => {
   assert.match(page, /window\.__WALLET_CONFIG__/)
   assert.match(page, /"sessionToken":"hidden-token"/)
   assert.match(page, /"chainIdHex":"0x1"/)
-  assert.match(page, /<div class="head">[\s\S]*signature request/)
-  assert.match(page, /id="network-row"/)
+  assert.match(page, /class="card-header"[\s\S]*flow-title/)
+  assert.match(page, /Signature Request/)
+  assert.doesNotMatch(page, /id="network-row"/)
   assert.match(page, /Sign Message/)
   assert.match(page, /wrong network/i)
   assert.match(page, /cancelled/)
-  assert.doesNotMatch(page, /\d{4}-\d{4}/)
+  assert.doesNotMatch(page, /(?<!U\+)\d{4}-\d{4}/)
   assert.doesNotMatch(page, /localhost only/)
   assert.doesNotMatch(page, /import private key/i)
   assert.match(page, /personal_sign/)
@@ -132,6 +133,17 @@ test('browser wallet page supports the single signature and transaction flow', (
   assert.match(page, /approve-transaction/)
   assert.match(page, /Saving Snapshot/)
   assert.doesNotMatch(page, /this tab will close after you can read the hash/)
+})
+
+test('wallet timeline renders a discrete segmented stepper, not a fractional fill bar', () => {
+  const page = readWalletPageSource()
+
+  assert.match(page, /renderTimelineSegments/)
+  assert.match(page, /timeline-seg/)
+  assert.match(page, /is-active/)
+  assert.match(page, /is-done/)
+  assert.doesNotMatch(page, /timeline-fill/, 'continuous fill bar must be gone')
+  assert.doesNotMatch(page, /\(activeIndex \+ 0\.5\)/, 'midpoint fraction formula must be gone')
 })
 
 test('browser wallet page updates generated signature message details', () => {
@@ -438,7 +450,7 @@ test('operator-wallet snapshot save renders Sign With Operator Wallet copy', () 
     message: 'snapshot save',
   })
 
-  assert.match(page, /Operator Wallet Save/)
+  assert.match(page, /Operator Wallet: Save Snapshot/)
   assert.match(page, /Sign With Operator Wallet/)
   assert.doesNotMatch(page, /Sign With Wallet/)
 })

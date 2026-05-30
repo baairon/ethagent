@@ -1,7 +1,15 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Box, Text } from 'ink'
-import { theme } from './theme.js'
+import { theme, PANEL_WIDTH } from './theme.js'
 import { useAppInput } from '../app/input/AppInputProvider.js'
+
+const CONTENT_WIDTH = PANEL_WIDTH - 4
+
+function fitHint(hint: string, budget: number): string {
+  if (budget < 8) return ''
+  if (hint.length <= budget) return hint
+  return `${hint.slice(0, budget - 1)}…`
+}
 
 export type SelectOption<T> = {
   value: T
@@ -121,22 +129,36 @@ export function Select<T>({
         const bold = option.bold ?? (isSection || (isActive && selectable))
         const inlineHint = Boolean(option.hint && hintLayout === 'inline' && !isSection)
         const belowHint = Boolean(option.hint && (!inlineHint || isSection))
+        const inlineHintText = inlineHint
+          ? fitHint(option.hint ?? '', CONTENT_WIDTH - rowIndent - prefix.length - option.label.length - 4)
+          : ''
+        const belowHintText = belowHint
+          ? fitHint(option.hint ?? '', CONTENT_WIDTH - rowIndent - 2)
+          : ''
+        const showHeadHighlight = isActive && selectable && !isSection && option.label.length > 0
         return (
           <Box key={absoluteIndex} flexDirection="column">
             <Box flexDirection="row" marginLeft={rowIndent}>
               <Text color={prefixColor}>{cursor} </Text>
               {prefix ? <Text color={prefixColor}>{prefix}</Text> : null}
-              <Text color={labelColor} bold={bold}>{option.label}</Text>
-              {inlineHint ? <Text color={hintColor}>  {option.hint}</Text> : null}
+              {showHeadHighlight ? (
+                <>
+                  <Text color={theme.accentHighlight} bold>{option.label[0]}</Text>
+                  <Text color={labelColor} bold={bold}>{option.label.slice(1)}</Text>
+                </>
+              ) : (
+                <Text color={labelColor} bold={bold}>{option.label}</Text>
+              )}
+              {inlineHint && inlineHintText ? <Text color={hintColor}>  {inlineHintText}</Text> : null}
             </Box>
             {option.subtext ? (
               <Box marginLeft={2 + rowIndent}>
                 <Text color={subtextColor}>{option.subtext}</Text>
               </Box>
             ) : null}
-            {belowHint ? (
+            {belowHint && belowHintText ? (
               <Box marginLeft={2 + rowIndent}>
-                <Text color={hintColor}>{option.hint}</Text>
+                <Text color={hintColor}>{belowHintText}</Text>
               </Box>
             ) : null}
           </Box>

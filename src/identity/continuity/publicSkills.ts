@@ -1,6 +1,6 @@
 import type { EthagentIdentity } from '../../storage/config.js'
 import type { SkillIndexEntry } from './skills/types.js'
-import { identityOwnerAddress } from '../hub/custody/state.js'
+import { identityOwnerAddress } from '../manager/custody/state.js'
 import { toChecksumAddress } from '../crypto/eth.js'
 
 type PublicSkill = {

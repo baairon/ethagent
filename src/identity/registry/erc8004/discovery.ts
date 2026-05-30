@@ -5,7 +5,10 @@ import { isAgentInVault } from '../vault.js'
 import { ERC8004_ABI, TRANSFER_EVENT } from './abi.js'
 import {
   SUPPORTED_ERC8004_CHAINS,
+  chainSortIndex,
   erc8004ConfigForSupportedChain,
+  logBlockRangeForChain,
+  minLogBlockRangeForChain,
   supportedErc8004ChainForId,
 } from './chains.js'
 import { createErc8004PublicClient } from './client.js'
@@ -491,21 +494,4 @@ function blockRangesBackwards(
     end = start - 1n
   }
   return ranges
-}
-
-function logBlockRangeForChain(chainId: number): bigint {
-  const chain = supportedErc8004ChainForId(chainId)
-  if (!chain) return 10_000n
-  return chain.logBlockRange
-}
-
-function minLogBlockRangeForChain(chainId: number): bigint {
-  const chain = supportedErc8004ChainForId(chainId)
-  if (!chain) return 2_000n
-  return chain.kind === 'l2' ? chain.logBlockRange : chain.logBlockRange / 2n || 1n
-}
-
-function chainSortIndex(chainId: number): number {
-  const index = SUPPORTED_ERC8004_CHAINS.findIndex(chain => chain.chainId === chainId)
-  return index === -1 ? Number.MAX_SAFE_INTEGER : index
 }
