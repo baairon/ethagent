@@ -29,6 +29,25 @@ export function claudeCodeNativeMemoryDir(): string {
   return path.dirname(claudeProjectMemoryMdPath())
 }
 
+// Every project's mirrored MEMORY.md under a given ~/.claude root, across all
+// directories the agent has ever been synced in, not just the current cwd.
+// Reset uses this so no project is left whispering a stale ethagent block.
+export async function projectMemoryMirrorsUnder(claudeRoot: string): Promise<string[]> {
+  const projectsDir = path.join(claudeRoot, 'projects')
+  let slugs: string[]
+  try {
+    slugs = await fs.readdir(projectsDir)
+  } catch {
+    return []
+  }
+  const mirrors: string[] = []
+  for (const slug of slugs) {
+    const file = path.join(projectsDir, slug, 'memory', 'MEMORY.md')
+    if (await pathExists(file)) mirrors.push(file)
+  }
+  return mirrors
+}
+
 export const claudeCodeAdapter = {
   name: 'claude-code' as const,
   description: 'Mirror public skills into ~/.claude/skills and inject soul/memory into ~/.claude/CLAUDE.md and the project MEMORY.md.',
@@ -41,8 +60,8 @@ export const claudeCodeAdapter = {
   managedFilePaths(): string[] {
     return [claudeMdPath()]
   },
-  mirrorPaths(): string[] {
-    return [claudeProjectMemoryMdPath()]
+  async resetManagedFilePaths(): Promise<string[]> {
+    return [claudeMdPath(), ...(await projectMemoryMirrorsUnder(claudeDir()))]
   },
   async cleanup(): Promise<void> {
     const skillsDir = claudeSkillsDir()

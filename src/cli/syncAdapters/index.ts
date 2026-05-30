@@ -23,7 +23,7 @@ export type SyncAdapter = {
   detect: () => Promise<boolean>
   readManaged?: () => Promise<ManagedRead | null>
   managedFilePaths?: () => string[]
-  mirrorPaths?: () => string[]
+  resetManagedFilePaths?: () => Promise<string[]>
   cleanup?: () => Promise<void>
   mirror: (skills: PublicSkill[], context?: SyncContext) => Promise<{ count: number; skipped: number }>
 }
@@ -33,7 +33,9 @@ export const BUILT_IN_ADAPTERS: SyncAdapter[] = [claudeCodeAdapter, codexAdapter
 export async function clearHarnessManagedBlocks(): Promise<string[]> {
   const cleared: string[] = []
   for (const adapter of BUILT_IN_ADAPTERS) {
-    const paths = [...(adapter.managedFilePaths?.() ?? []), ...(adapter.mirrorPaths?.() ?? [])]
+    const paths = adapter.resetManagedFilePaths
+      ? await adapter.resetManagedFilePaths().catch(() => [])
+      : (adapter.managedFilePaths?.() ?? [])
     for (const filePath of paths) {
       if (await removeManagedBlock(filePath).catch(() => false)) cleared.push(filePath)
     }
