@@ -8,7 +8,7 @@ Your AI agent runs on everything you've taught it: the instructions you've writt
 
 ## ⚡ Quick start
 
-Install `ethagent` and create your agent: open a terminal and run
+Create your agent — no install required. `npx` downloads and runs `ethagent` on demand, so open a terminal and run
 
 ```bash
 npx ethagent
