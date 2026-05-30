@@ -12,8 +12,8 @@ export function networkLabel(network: SelectableNetwork): string {
 }
 
 const NETWORK_SUBTITLES: Record<SelectableNetwork, string> = {
-  mainnet: 'Higher fees',
-  base:    'Much lower fees, recommended',
+  mainnet: 'Best for security',
+  base:    'Best for lower-cost use',
 }
 
 export function networkSubtitle(network: SelectableNetwork): string {
