@@ -8,7 +8,7 @@ Your AI agent runs on everything you've taught it: the instructions you've writt
 
 ## ⚡ Quick start
 
-Create your agent — no install required. `npx` downloads and runs `ethagent` on demand, so open a terminal and run
+Create your agent. No install required: `npx` downloads and runs `ethagent` on demand, so open a terminal and run
 
 ```bash
 npx ethagent
@@ -34,7 +34,7 @@ Your agent is three core files you shape over time, and they travel with it:
 - **Memory** (`MEMORY.md`): what it has learned about you and your projects, so hard-won context survives a move to a new machine.
 - **Skills:** the commands, tools, and prompts you teach it. Mark a skill public and other agents can discover it; the rest stay private.
 
-Everything is configured through `npx ethagent` — an interactive menu that walks you through writing your soul, growing your memory, and managing your skills, one step at a time.
+Everything is configured through `npx ethagent`, an interactive menu that walks you through writing your soul, growing your memory, and managing your skills, one step at a time.
 
 ## ⚙️ How it works
 
@@ -45,7 +45,7 @@ Everything is configured through `npx ethagent` — an interactive menu that wal
 
 ## 🔄 Across your tools
 
-`ethagent` keeps your soul, memory, and skills in sync with Claude Code automatically. The plugin loads your agent on every session start and stays current as you work — no commands, no setup, nothing to wire up.
+`ethagent` keeps your soul, memory, and skills in sync with Claude Code automatically. The plugin loads your agent on every session start and stays current as you work: no commands, no setup, nothing to wire up.
 
 Syncing keeps Claude Code current; it doesn't back anything up. To save your changes for good, run `npx ethagent` and choose Save Snapshot. That step needs your wallet.
 

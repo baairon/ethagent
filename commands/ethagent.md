@@ -23,8 +23,8 @@ Where the synced files land:
 
 Privacy and secrets:
 
-- Soul, memory, and every skill are encrypted on the machine before they leave it. Marking a skill public does not decrypt it — it only lists that skill's name and description in the onchain Agent Card so other agents can discover it. The body stays encrypted in the vault and is mirrored in plaintext only into local harness skill folders on the signing machine.
-- Never write secrets — private keys, API tokens, seed phrases — into soul, memory, or skills; they get pinned to IPFS (encrypted, but off the machine). Keep secrets out of the vault.
+- Soul, memory, and every skill are encrypted on the machine before they leave it. Marking a skill public does not decrypt it; it only lists that skill's name and description in the onchain Agent Card so other agents can discover it. The body stays encrypted in the vault and is mirrored in plaintext only into local harness skill folders on the signing machine.
+- Never write secrets (private keys, API tokens, seed phrases) into soul, memory, or skills; they get pinned to IPFS (encrypted, but off the machine). Keep secrets out of the vault.
 
 Where durable identity belongs (while this plugin is active):
 
