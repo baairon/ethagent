@@ -1,8 +1,3 @@
-// Smoothly animates the card's height whenever its content changes, so the
-// surface glides between states instead of snapping. The animation is the
-// native Web Animations API, with no external library, so it stays lightweight
-// and runs the same on every machine. It falls back to an instant resize when
-// the API is unavailable or the user prefers reduced motion.
 
 let cardEl: HTMLElement | null = null;
 let cardInnerEl: HTMLElement | null = null;
@@ -11,7 +6,6 @@ let trackedHeight = 0;
 let measuredOnce = false;
 let cardResizeReady = false;
 
-// Snappy ease-out (mirrors --ease-out in css.ts): quick to start, gentle to settle.
 const RESIZE_DURATION_MS = 200;
 const RESIZE_EASING = "cubic-bezier(0.16, 1, 0.3, 1)";
 
@@ -57,11 +51,9 @@ function animateHeight(from: number, to: number): void {
   const el = cardEl;
   if (!el) return;
   if (resizeAnim) {
-    try { resizeAnim.cancel(); } catch (_) { /* noop */ }
+    try { resizeAnim.cancel(); } catch (_) {}
     resizeAnim = null;
   }
-  // The rounded inline height is the source of truth: set it first so the card
-  // rests at the final size once the animation ends (default fill is none).
   applyHeight(to);
   if (typeof el.animate !== "function" || prefersReducedMotion() || Math.abs(to - from) < 1) return;
   const anim = el.animate(

@@ -22,16 +22,10 @@ function claudeProjectMemoryMdPath(): string {
   return path.join(claudeDir(), 'projects', slug, 'memory', 'MEMORY.md')
 }
 
-// The Claude Code native per-project memory directory for the current project.
-// ethagent's portable memory supersedes this; the --memory-guard hook redirects
-// the model away from writing here so nothing siloes on one machine.
 export function claudeCodeNativeMemoryDir(): string {
   return path.dirname(claudeProjectMemoryMdPath())
 }
 
-// Every project's mirrored MEMORY.md under a given ~/.claude root, across all
-// directories the agent has ever been synced in, not just the current cwd.
-// Reset uses this so no project is left whispering a stale ethagent block.
 export async function projectMemoryMirrorsUnder(claudeRoot: string): Promise<string[]> {
   const projectsDir = path.join(claudeRoot, 'projects')
   let slugs: string[]

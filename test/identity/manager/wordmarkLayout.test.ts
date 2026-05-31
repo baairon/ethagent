@@ -4,13 +4,13 @@ import { wordmarkLayout } from '../../../src/identity/manager/shared/components/
 
 test('wordmarkLayout shows decorations only when both 12-col gutters fit beside the 69-col banner', () => {
   assert.equal(wordmarkLayout(120), 'full')
-  assert.equal(wordmarkLayout(93), 'full') // 69 banner + 12 + 12 gutters, exact fit
+  assert.equal(wordmarkLayout(93), 'full')
 })
 
 test('wordmarkLayout sheds the left and right decorations before the banner can mangle', () => {
   assert.equal(wordmarkLayout(92), 'bare')
   assert.equal(wordmarkLayout(80), 'bare')
-  assert.equal(wordmarkLayout(69), 'bare') // banner is exactly 69 columns wide
+  assert.equal(wordmarkLayout(69), 'bare')
 })
 
 test('wordmarkLayout purges the wordmark entirely once even the banner would wrap', () => {

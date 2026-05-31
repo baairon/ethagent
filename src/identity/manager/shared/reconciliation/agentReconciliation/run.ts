@@ -224,7 +224,6 @@ async function probeAgentUri(args: {
   }
 }
 
-
 type VaultProbe = { kind: 'confirmed' | 'missing' | 'unset' | 'unknown' }
 
 async function probeVault(args: {

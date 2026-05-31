@@ -16,7 +16,6 @@ test('projectMemoryMirrorsUnder finds every project MEMORY.md mirror, not just t
   }
   const a = mk('proj-a')
   const b = mk('proj-b')
-  // a project with a memory folder but no MEMORY.md must be ignored
   mkdirSync(join(root, 'projects', 'proj-c', 'memory'), { recursive: true })
 
   const found = await projectMemoryMirrorsUnder(root)

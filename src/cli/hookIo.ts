@@ -1,8 +1,5 @@
 import path from 'node:path'
 
-// Shared helpers for the Claude Code hook entrypoints (--sync-on-edit, --memory-guard).
-// A hook receives the harness payload as JSON on stdin and may answer with JSON on stdout.
-
 export async function readHookPayload(): Promise<Record<string, unknown> | null> {
   if (process.stdin.isTTY) return null
   let raw = ''
@@ -33,8 +30,6 @@ export function samePath(a: string, b: string): boolean {
   return process.platform === 'win32' ? na.toLowerCase() === nb.toLowerCase() : na === nb
 }
 
-// True when `file` is `dir` itself or sits anywhere beneath it. Compares on a
-// separator boundary so `.../memory` does not match a sibling like `.../memory-notes`.
 export function isWithinDir(dir: string, file: string): boolean {
   const fold = (p: string): string => (process.platform === 'win32' ? p.toLowerCase() : p)
   const nd = fold(path.resolve(dir))

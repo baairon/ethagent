@@ -31,18 +31,11 @@ export const RIGHT_DECOR = [
   '            ',
 ]
 
-// Each LINES row is 69 single-width glyphs; each decor gutter renders as 12
-// display columns. Below the combined width the row soft-wraps and the banner
-// mangles, so we shed the left and right gutters first, then drop the banner
-// entirely rather than show a broken wordmark.
 const WORDMARK_WIDTH = Math.max(...LINES.map(line => line.length))
 const DECOR_WIDTH = 12
 
 export type WordmarkLayout = 'full' | 'bare' | 'hidden'
 
-// Pick the widest form that fits the terminal without wrapping: decorations
-// plus banner when both 12-col gutters fit, the bare banner when only it fits,
-// and nothing once even the banner would mangle.
 export function wordmarkLayout(columns: number): WordmarkLayout {
   if (columns >= WORDMARK_WIDTH + DECOR_WIDTH * 2) return 'full'
   if (columns >= WORDMARK_WIDTH) return 'bare'

@@ -2,9 +2,6 @@ import { loadConfig } from '../storage/config.js'
 import { hookFilePath, isWithinDir, readHookPayload } from './hookIo.js'
 import { claudeCodeNativeMemoryDir } from './syncAdapters/claude-code.js'
 
-// Shown to the model when it tries to write into the harness-native memory dir.
-// The redirect points at a different file (~/.claude/CLAUDE.md), so the model's
-// next attempt succeeds and there is no deny loop.
 export const MEMORY_REDIRECT_REASON =
   "ethagent manages this agent's portable memory. Don't write to the Claude Code native memory directory; " +
   'those files stay on this machine and never reach your onchain vault. Record durable facts by editing ' +
@@ -24,8 +21,6 @@ export function decideMemoryGuard(
   return { deny: false }
 }
 
-// PreToolUse hook for Edit|Write|MultiEdit. Fail-open: any error or missing
-// identity allows the write, so the guard never wedges unrelated projects.
 export async function runMemoryGuard(): Promise<number> {
   try {
     const config = await loadConfig()
@@ -42,8 +37,6 @@ export async function runMemoryGuard(): Promise<number> {
         }) + '\n',
       )
     }
-  } catch {
-    // fail open
-  }
+  } catch {}
   return 0
 }

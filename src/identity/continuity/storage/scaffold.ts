@@ -88,7 +88,6 @@ export async function restoreSkillsTree(
   await materializeSkillsTree(identity, tree)
 }
 
-
 export async function ensureAgentCardFile(
   identity: EthagentIdentity,
   options: { fallback?: string | (() => Promise<string>) } = {},

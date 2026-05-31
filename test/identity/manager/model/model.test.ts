@@ -259,7 +259,6 @@ test('networkLabel and networkSubtitle return human-readable strings for every c
   }
 })
 
-
 test('chainSummaryRow prefers identity.chainId, falls back to selectedNetwork', () => {
   const onMainnet = chainSummaryRow(
     { version: 2, firstSeenAt: new Date(0).toISOString(), selectedNetwork: 'base' },

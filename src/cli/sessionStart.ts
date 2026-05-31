@@ -1,7 +1,5 @@
 import { runSync } from './sync.js'
 
-// Injected into the model's context on session start so it records durable facts
-// in the portable markers (which sync to the vault) instead of harness-local files.
 export function buildSessionStartContext(): string {
   return (
     "ethagent portable memory is active. As you converse, keep this agent's soul and memory current by editing " +
@@ -13,14 +11,10 @@ export function buildSessionStartContext(): string {
   )
 }
 
-// SessionStart hook: restore (sync vault -> harness) then remind (inject guidance).
-// runSync is quiet here so only the JSON envelope reaches stdout for the harness to parse.
 export async function runSessionStart(): Promise<number> {
   try {
     await runSync({ quiet: true })
-  } catch {
-    // still emit guidance even if the sync step failed
-  }
+  } catch {}
   process.stdout.write(
     JSON.stringify({
       hookSpecificOutput: {
