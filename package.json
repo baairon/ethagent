@@ -1,6 +1,6 @@
 {
   "name": "ethagent",
-  "version": "4.0.0",
+  "version": "4.1.0",
   "description": "Portable Ethereum identity for your AI agent. Its soul, memory, and skills live onchain via ERC-8004 + IPFS and snap back into any session.",
   "type": "module",
   "bin": {
@@ -33,9 +33,7 @@
     "ai-agent",
     "erc-8004",
     "ens",
-    "codex",
     "claude-code",
-    "agents",
     "ipfs",
     "wallet",
     "privacy"
