@@ -7,7 +7,6 @@ import { fileURLToPath } from 'node:url'
 import { theme } from '../ui/theme.js'
 import { Spinner } from '../ui/Spinner.js'
 import { KeybindingProvider } from '../app/keybindings/KeybindingProvider.js'
-import { AppInputProvider } from '../app/input/AppInputProvider.js'
 import { IdentityManager } from '../identity/manager/IdentityManager.js'
 import type { IdentityManagerResult } from '../identity/manager/IdentityManager.js'
 import { loadConfig, saveConfig, type EthagentConfig } from '../storage/config.js'
@@ -114,11 +113,9 @@ const Root: React.FC<RootProps> = ({ setExit, initialConfig }) => {
 async function renderHub(initialConfig: EthagentConfig | null | undefined): Promise<number> {
   let exitCode = 0
   const instance = render(
-    <AppInputProvider>
-      <KeybindingProvider>
-        <Root setExit={n => { exitCode = n }} initialConfig={initialConfig} />
-      </KeybindingProvider>
-    </AppInputProvider>,
+    <KeybindingProvider>
+      <Root setExit={n => { exitCode = n }} initialConfig={initialConfig} />
+    </KeybindingProvider>,
     { exitOnCtrlC: false },
   )
   const guard = (reason: unknown): void => {

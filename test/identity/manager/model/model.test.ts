@@ -12,7 +12,6 @@ import {
   identityPerspective,
   readCustodyMode,
 } from '../../../../src/identity/manager/custody/state.js'
-import { AppInputProvider } from '../../../../src/app/input/AppInputProvider.js'
 import { RecoveryConfirmScreen } from '../../../../src/identity/manager/continuity/RecoveryConfirmScreen.js'
 import { ensValidationReasonText } from '../../../../src/identity/manager/ens/state.js'
 import {
@@ -176,7 +175,7 @@ test('recovery confirm warns before overwriting dirty local continuity files', (
     'MEMORY.md': 'memory-a',
     'agent-card.json': 'card-a',
   }
-  const output = renderToString(React.createElement(AppInputProvider, null,
+  const output = renderToString(
     React.createElement(RecoveryConfirmScreen, {
       mode: 'refetch',
       footer: null,
@@ -196,7 +195,7 @@ test('recovery confirm warns before overwriting dirty local continuity files', (
         publishedContentHashes: published,
       },
     }),
-  ))
+  )
 
   assert.match(output, /Unsaved local changes detected/)
   assert.match(output, /SOUL\.md,[\s\S]*Skills/)

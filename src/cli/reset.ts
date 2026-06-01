@@ -1,7 +1,6 @@
 import React from 'react'
 import { render } from 'ink'
 import { stdout, stderr } from 'node:process'
-import { AppInputProvider } from '../app/input/AppInputProvider.js'
 import { ResetConfirmView } from './ResetConfirmView.js'
 import { resetPlan, runReset } from '../storage/reset.js'
 import { clearHarnessManagedBlocks } from './syncAdapters/index.js'
@@ -44,14 +43,10 @@ async function finishReset(): Promise<void> {
 async function confirmWithInk(configDir: string, secretAccounts: string[]): Promise<boolean> {
   let confirmed = false
   const instance = render(
-    React.createElement(
-      AppInputProvider,
-      null,
-      React.createElement(ResetConfirmView, {
-        plan: { configDir, secretAccounts },
-        onDone: (value: boolean) => { confirmed = value },
-      }),
-    ),
+    React.createElement(ResetConfirmView, {
+      plan: { configDir, secretAccounts },
+      onDone: (value: boolean) => { confirmed = value },
+    }),
     { exitOnCtrlC: false },
   )
   try {

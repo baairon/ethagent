@@ -78,6 +78,15 @@ export function TextArea({
       setCursor(lineStart)
       return
     }
+    if (key.home || (key.ctrl && input === 'a')) {
+      setCursor(Math.max(0, val.lastIndexOf('\n', cur - 1) + 1))
+      return
+    }
+    if (key.end || (key.ctrl && input === 'e')) {
+      const nextNewline = val.indexOf('\n', cur)
+      setCursor(nextNewline === -1 ? val.length : nextNewline)
+      return
+    }
     if (key.ctrl || key.meta || key.tab) return
     if (input) {
       const clean = input.replace(/\r/g, '')

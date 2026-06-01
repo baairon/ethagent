@@ -109,6 +109,14 @@ export function TextInput({
       if (error) setError(null)
       return
     }
+    if (key.home || (key.ctrl && input === 'a')) {
+      setCursor(0)
+      return
+    }
+    if (key.end || (key.ctrl && input === 'e')) {
+      setCursor(val.length)
+      return
+    }
     if (key.ctrl || key.meta || key.upArrow || key.downArrow || key.tab) {
       return
     }
