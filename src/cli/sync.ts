@@ -5,6 +5,7 @@ import { continuityWorkingTreeStatus } from '../identity/continuity/storage/stat
 import { listPublishedContinuitySnapshots } from '../identity/continuity/snapshots.js'
 import { changedContinuitySnapshotFiles } from '../identity/manager/continuity/state.js'
 import { listSkills } from '../identity/continuity/skills/loadSkills.js'
+import { isDraftScaffold } from '../identity/continuity/skills/scaffold.js'
 import { hashManagedBody, normalizeBody, reconstructVaultFile, sectionKey } from './syncAdapters/managedBlock.js'
 import { hookFilePath, readHookPayload, samePath } from './hookIo.js'
 import {
@@ -15,6 +16,15 @@ import {
 import type { PublicSkill } from './syncAdapters/shared.js'
 
 export type SyncOptions = { quiet?: boolean }
+
+/**
+ * Skills mirrored into local harnesses: every real skill (public AND private),
+ * so private skills are usable locally. The public Agent Card stays public-only
+ * (built separately via derivePublicSkillEntries). Drafts/scaffolds are skipped.
+ */
+export function selectMirrorSkills(all: readonly PublicSkill[]): PublicSkill[] {
+  return all.filter(s => !isDraftScaffold(s))
+}
 
 export async function runSync(opts: SyncOptions = {}): Promise<number> {
   const config = await loadConfig()
@@ -27,7 +37,7 @@ export async function runSync(opts: SyncOptions = {}): Promise<number> {
     process.stderr.write(`ethagent: could not load skills, skipping sync to avoid removing managed files (${(err as Error).message})\n`)
     return 1
   }
-  const publicSkills: PublicSkill[] = all.filter(s => s.visibility === 'public')
+  const mirrorSkills: PublicSkill[] = selectMirrorSkills(all)
 
   const targets: SyncAdapter[] = []
   for (const adapter of BUILT_IN_ADAPTERS) {
@@ -52,7 +62,7 @@ export async function runSync(opts: SyncOptions = {}): Promise<number> {
   const summaries: string[] = []
   for (const adapter of targets) {
     try {
-      const { count, skipped } = await adapter.mirror(publicSkills, context)
+      const { count, skipped } = await adapter.mirror(mirrorSkills, context)
       let summary = `${adapter.name}: ${count} skill${count === 1 ? '' : 's'}`
       if (skipped > 0) summary += `, skipped ${skipped} unmanaged`
       summaries.push(summary)

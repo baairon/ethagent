@@ -13,6 +13,8 @@ import type { IdentityManagerResult } from '../identity/manager/IdentityManager.
 import { loadConfig, saveConfig, type EthagentConfig } from '../storage/config.js'
 import { runSync, runSyncList, runSyncOnEdit } from './sync.js'
 import { runMemoryGuard } from './memoryGuard.js'
+import { runSkillGuard } from './skillGuard.js'
+import { runPreToolGuard } from './pretoolGuard.js'
 import { runSessionStart } from './sessionStart.js'
 import { runStatus } from './status.js'
 import { runResetCommand } from './reset.js'
@@ -46,7 +48,9 @@ function printHelp(): void {
     '',
     'plugin hooks (invoked automatically, not meant to be run by hand):',
     '  ethagent --session-start    sync, then tell the agent where to record memory',
+    '  ethagent --pretool-guard    one PreToolUse guard combining --memory-guard + --skill-guard',
     '  ethagent --memory-guard     keep agent memory in the portable markers, not local notes',
+    '  ethagent --skill-guard      keep skills in the portable vault, not the harness mirror',
   ]
   for (const line of lines) process.stdout.write(line + '\n')
 }
@@ -149,7 +153,9 @@ async function main(): Promise<number> {
   }
   if (flags.has('--sync-on-edit')) return runSyncOnEdit()
   if (flags.has('--session-start')) return runSessionStart()
+  if (flags.has('--pretool-guard')) return runPreToolGuard()
   if (flags.has('--memory-guard')) return runMemoryGuard()
+  if (flags.has('--skill-guard')) return runSkillGuard()
   if (flags.has('--sync-list')) return runSyncList()
   if (flags.has('--sync')) return runSync()
   if (flags.has('--status')) return runStatus(version)

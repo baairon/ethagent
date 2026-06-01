@@ -237,7 +237,7 @@ test('listSkills adopts a bare nameless SKILL.md at the skills/ root under impor
   })
 })
 
-test('listSkills auto-writes visibility: public to a SKILL.md that lacks a visibility field', async () => {
+test('listSkills auto-writes visibility: private to a SKILL.md that lacks a visibility field', async () => {
   await withHome(async () => {
     await ensureContinuityVault(identity)
     invalidateSkillsCache(identity)
@@ -253,10 +253,10 @@ test('listSkills auto-writes visibility: public to a SKILL.md that lacks a visib
 
     const entries = await listSkills(identity)
     assert.equal(entries.length, 1)
-    assert.equal(entries[0]?.visibility, 'public')
+    assert.equal(entries[0]?.visibility, 'private')
 
     const onDisk = await fs.readFile(skillFile, 'utf8')
-    assert.match(onDisk, /visibility:\s*public/)
+    assert.match(onDisk, /visibility:\s*private/)
   })
 })
 

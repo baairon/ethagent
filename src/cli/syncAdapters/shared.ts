@@ -1,6 +1,15 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import type { SkillIndexEntry } from '../../identity/continuity/skills/types.js'
+import {
+  isReservedWindowsSegment,
+  isValidFilenameSegment,
+  isValidSegment,
+  MAX_FOLDER_DEPTH,
+} from '../../identity/continuity/skills/skillPaths.js'
+
+// Cap copied files at the same size the vault loader enforces.
+const MAX_MIRROR_FILE_BYTES = 256 * 1024
 
 export type PublicSkill = SkillIndexEntry
 
@@ -30,6 +39,39 @@ export async function pathExists(file: string): Promise<boolean> {
   try { await fs.access(file); return true } catch { return false }
 }
 
+/**
+ * Copy a vault skill folder into the harness, applying the SAME vetting the
+ * vault loader uses (skip symlinks, dotfiles, reserved Windows names, invalid
+ * segments, and oversize files) so the mirror never copies a superset of — or a
+ * symlink escaping — the vault's recognized file set.
+ */
+async function copyVettedSkillTree(srcDir: string, destDir: string, depth = 0): Promise<void> {
+  if (depth > MAX_FOLDER_DEPTH) return
+  await fs.mkdir(destDir, { recursive: true })
+  let entries: import('node:fs').Dirent[]
+  try {
+    entries = await fs.readdir(srcDir, { withFileTypes: true })
+  } catch {
+    return
+  }
+  for (const ent of entries) {
+    if (ent.isSymbolicLink()) continue
+    if (ent.name.startsWith('.')) continue
+    if (isReservedWindowsSegment(ent.name)) continue
+    const srcPath = path.join(srcDir, ent.name)
+    const destPath = path.join(destDir, ent.name)
+    if (ent.isDirectory()) {
+      if (!isValidSegment(ent.name)) continue
+      await copyVettedSkillTree(srcPath, destPath, depth + 1)
+    } else if (ent.isFile()) {
+      if (!isValidFilenameSegment(ent.name)) continue
+      const stat = await fs.stat(srcPath).catch(() => null)
+      if (!stat || stat.size > MAX_MIRROR_FILE_BYTES) continue
+      await fs.copyFile(srcPath, destPath)
+    }
+  }
+}
+
 export async function mirrorAsSkillFolders(
   root: string,
   skills: PublicSkill[],
@@ -41,16 +83,25 @@ export async function mirrorAsSkillFolders(
   let skipped = 0
   for (const skill of skills) {
     const targetDir = path.join(root, skill.name)
-    const targetFile = path.join(targetDir, 'SKILL.md')
     const exists = await pathExists(targetDir)
     const isOurs = manifest.skills.includes(skill.name)
     if (exists && !isOurs) { skipped++; continue }
+    const srcDir = path.dirname(skill.absolutePath)
+    const tmpDir = path.join(root, `.${skill.name}.ethagent-tmp`)
     try {
-      const body = await fs.readFile(skill.absolutePath, 'utf8')
-      await fs.mkdir(targetDir, { recursive: true })
-      await fs.writeFile(targetFile, body, 'utf8')
+      // Stage the new copy in a temp sibling, then swap it in. This keeps the
+      // existing managed copy intact if the copy fails (no destructive
+      // rm-before-write window), and refreshes the whole folder (scripts/,
+      // assets/), dropping files removed upstream.
+      await fs.rm(tmpDir, { recursive: true, force: true })
+      await copyVettedSkillTree(srcDir, tmpDir)
+      await fs.rm(targetDir, { recursive: true, force: true })
+      await fs.rename(tmpDir, targetDir)
       owned.push(skill.name)
-    } catch {}
+    } catch (err) {
+      await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => null)
+      process.stderr.write(`ethagent: failed to mirror skill "${skill.name}": ${(err as Error).message}\n`)
+    }
   }
   const keep = new Set<string>(owned)
   for (const name of manifest.skills) if (incoming.has(name)) keep.add(name)

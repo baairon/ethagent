@@ -42,7 +42,7 @@ That's the whole setup. You'll only open `ethagent` again to hand-edit your agen
 
 - **Soul** (`SOUL.md`): who it is, your standards, your voice, the way you work.
 - **Memory** (`MEMORY.md`): what it has learned about you, your preferences, and your projects, so context survives the move to a new machine.
-- **Skills:** the commands, tools, and prompts you teach it. Public by default, so other agents can discover them; mark one private to keep it off your public Agent Card (the profile your token publishes).
+- **Skills:** the commands, tools, and prompts you teach it. **Private by default** — yours alone, encrypted in your vault and mirrored into your harnesses so you can use them locally, but kept off your public Agent Card. Make one **public** when you want other agents to discover it; then only its name and description go on the card your token publishes.
 
 You grow these mostly by talking: with the plugin on, your agent updates its own soul and memory as you converse, and the changes sync automatically. To edit them by hand, open `ethagent`. To save your agent onchain so it can come back on any machine, choose **Save Snapshot** and sign.
 
@@ -63,7 +63,7 @@ Using another harness? You can still sync, but only Claude Code does it automati
 npx ethagent --sync
 ```
 
-It syncs files between `ethagent` and your harness on this machine, but only when you run it. To back it up so you can restore it anywhere, open `ethagent` and choose **Save Snapshot**.
+One command syncs it into every harness on this machine — soul, memory, and skills (public and private) — but only when you run it. To back it up so you can restore it anywhere, open `ethagent` and choose **Save Snapshot**.
 
 ## 🔒 What stays private
 
@@ -95,6 +95,22 @@ Built on open standards, so your agent is never tied to one harness.
 | Naming | ENS | A human-readable name that resolves to your agent and restores it from the name alone. |
 | Backup | IPFS snapshot | The encrypted bundle of soul, memory, and skills, pinned offchain and unlocked only by your wallet. |
 
+## 🔄 Updating
+
+ethagent ships as two pieces, and a full update can touch both:
+
+- **The npm package** (the engine: sync, skills, the guards). The plugin's hooks call `npx -y ethagent`, which resolves the latest published release, so **publishing a new version is the update** — nothing for most people to run. If you installed it globally, or call a bare `ethagent` in a hook or your shell, refresh that copy:
+
+  ```bash
+  npm i -g ethagent@latest
+  ```
+
+  Confirm what you're running with `ethagent --version`.
+
+- **The Claude Code plugin** (the hook wiring). New hooks ship in the plugin manifest, so to pick them up, update the plugin from the marketplace with `/plugin`.
+
+Rule of thumb: new sync and skill behavior rides your existing hooks as soon as the package is published; a brand-new hook also needs a plugin update.
+
 ## ⌨️ Commands
 
 Run with `npx ethagent`:
@@ -102,7 +118,7 @@ Run with `npx ethagent`:
 | Command | What it does |
 | --- | --- |
 | `ethagent` | Open the interactive identity manager: create, ENS, custody, snapshots, transfer. |
-| `--sync` | Sync soul, memory, and public skills into every harness it detects. |
+| `--sync` | Sync soul, memory, and skills (public and private) into every harness it detects. |
 | `--sync-list` | List sync adapters and which ones detect in the current environment. |
 | `--status` | Print a one-line identity summary. |
 | `--demo` | Walk the manager with synthetic data, no wallet needed. |

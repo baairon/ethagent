@@ -9,7 +9,7 @@ function claudeDir(): string {
   return path.join(os.homedir(), '.claude')
 }
 
-function claudeSkillsDir(): string {
+export function claudeSkillsDir(): string {
   return path.join(claudeDir(), 'skills')
 }
 
@@ -44,7 +44,7 @@ export async function projectMemoryMirrorsUnder(claudeRoot: string): Promise<str
 
 export const claudeCodeAdapter = {
   name: 'claude-code' as const,
-  description: 'Mirror public skills into ~/.claude/skills and inject soul/memory into ~/.claude/CLAUDE.md and the project MEMORY.md.',
+  description: 'Mirror skills (public and private) into ~/.claude/skills and inject soul/memory into ~/.claude/CLAUDE.md and the project MEMORY.md.',
   async detect(): Promise<boolean> {
     return pathExists(claudeDir())
   },

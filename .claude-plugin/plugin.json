@@ -1,6 +1,6 @@
 {
   "name": "ethagent",
-  "version": "4.1.1",
+  "version": "4.2.0",
   "description": "Portable Ethereum identity for your AI agent. Its soul, memory, and skills live onchain via ERC-8004 + IPFS and snap back into any session.",
   "author": { "name": "bairon.dev" },
   "homepage": "https://github.com/baairon/ethagent",
@@ -19,7 +19,7 @@
       {
         "matcher": "Edit|Write|MultiEdit",
         "hooks": [
-          { "type": "command", "command": "npx -y ethagent --memory-guard" }
+          { "type": "command", "command": "npx -y ethagent --pretool-guard" }
         ]
       }
     ],

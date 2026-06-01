@@ -33,7 +33,7 @@ function neutralizeManagedMarkers(text: string): string {
 }
 
 function renderSkillsText(skills: EnrichedSkill[]): string {
-  if (skills.length === 0) return '_no public skills published yet._'
+  if (skills.length === 0) return '_no skills synced yet._'
   const lines: string[] = []
   for (const skill of skills) {
     lines.push(`## ${neutralizeManagedMarkers(skill.displayName ?? skill.name)}`, '')
@@ -45,7 +45,7 @@ function renderSkillsText(skills: EnrichedSkill[]): string {
 
 export const codexAdapter = {
   name: 'codex' as const,
-  description: 'Merge soul, memory, and public skill content into ~/.codex/AGENTS.md between ethagent markers.',
+  description: 'Merge soul, memory, and skill content (public and private) into ~/.codex/AGENTS.md between ethagent markers.',
   async detect(): Promise<boolean> {
     return pathExists(path.join(codexDir(), 'config.toml'))
   },

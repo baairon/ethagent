@@ -22,7 +22,7 @@ export const NewSkillVisibilityScreen: React.FC<NewSkillVisibilityScreenProps> =
 }) => (
   <Surface
     title={`Visibility · ${name}`}
-    subtitle="Public is the default."
+    subtitle="Private is the default."
     footer={footer}
   >
     {error && (
@@ -39,7 +39,7 @@ export const NewSkillVisibilityScreen: React.FC<NewSkillVisibilityScreenProps> =
           { value: 'back', label: 'Back', role: 'utility' },
         ]}
         hintLayout="inline"
-        initialIndex={1}
+        initialIndex={0}
         onSubmit={choice => {
           if (choice === 'back') return onCancel()
           return onSelect(choice)

@@ -517,7 +517,7 @@ async function pathExists(file: string): Promise<boolean> {
   }
 }
 
-const DEFAULT_PASTED_VISIBILITY: SkillVisibility = 'public'
+const DEFAULT_SKILL_VISIBILITY: SkillVisibility = 'private'
 const LEGACY_DISCOVERABLE_RE = /^\s*visibility\s*:\s*['"]?discoverable['"]?\s*$/im
 
 async function ensureSkillVisibilityWritten(skillFile: string, raw: string): Promise<string> {
@@ -531,7 +531,7 @@ async function ensureSkillVisibilityWritten(skillFile: string, raw: string): Pro
   if (LEGACY_DISCOVERABLE_RE.test(raw)) {
     target = 'private'
   } else if (parsed.frontmatter.visibility === undefined) {
-    target = DEFAULT_PASTED_VISIBILITY
+    target = DEFAULT_SKILL_VISIBILITY
   }
   if (target === null) return raw
   const next = rewriteVisibility(raw, target)
@@ -587,7 +587,7 @@ function buildIndexEntry(args: {
   const derivedName = folder || segments.join('/')
   const fm = args.parsed.frontmatter
   const description = pickDescription(fm.description, args.parsed.body)
-  const visibility: SkillVisibility = fm.visibility ?? DEFAULT_PASTED_VISIBILITY
+  const visibility: SkillVisibility = fm.visibility ?? DEFAULT_SKILL_VISIBILITY
   return {
     name: derivedName,
     ...(fm.name ? { displayName: fm.name } : {}),

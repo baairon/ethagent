@@ -5,7 +5,7 @@ export type SkillScaffoldArgs = {
   visibility?: SkillVisibility
 }
 
-export function defaultSkillScaffold({ name, visibility = 'public' }: SkillScaffoldArgs): string {
+export function defaultSkillScaffold({ name, visibility = 'private' }: SkillScaffoldArgs): string {
   return [
     '---',
     `name: ${name}`,
