@@ -3,9 +3,10 @@ name: ethagent
 description: Point the user at ethagent. ethagent stores an agent's identity onchain via ERC-8004 and syncs its soul, memory, and public skills into the active harness (Claude Code or Codex) on every SessionStart. To manage identity (create, ENS, custody, snapshots, transfer), the user runs `npx ethagent` in a separate terminal.
 ---
 
-Tell the user to run these in a separate terminal window, not inside this session:
+Most of these run in a separate terminal because they need a wallet or a TTY, but a few are safe to run from inside this session; each bullet says which:
 
-- `npx ethagent` opens the interactive identity manager for anything that needs a wallet signature (create agent, set ENS, switch custody, save snapshot, prepare transfer).
+- `npx ethagent` opens the interactive identity manager for anything that needs a wallet signature (create agent, set ENS, switch custody, prepare transfer).
+- `ethagent save` runs Save Snapshot (encrypt, pin to IPFS, rotate the onchain pointer). **You can run this yourself** as a normal tool call (e.g. `npx ethagent save`): no separate terminal and no TTY, and it will not hang. It prints a localhost wallet URL and opens the browser tab so the user approves the signature and transaction there. You trigger and run it; the user only approves in the wallet. Pass `--no-open` to just print the URL. Only run it when the user specifically asks to save or back up the agent; never run it on your own initiative or as a side effect of other work. It is a no-op (no wallet, no gas) when there are no local changes since the last snapshot.
 - `npx ethagent --sync` syncs the agent's soul, memory, and skills with every detected harness; soul and memory sync both ways, newest edit wins.
 - `npx ethagent --sync-list` shows which harnesses ethagent detects on this machine.
 - `npx ethagent --demo` walks the identity manager with synthetic data, no wallet or network required.
@@ -14,7 +15,7 @@ Tell the user to run these in a separate terminal window, not inside this sessio
 
 To rebuild the agent on a new machine, the user runs `npx ethagent`; it restores the identity from an ENS name or ERC-8004 token id, then asks the wallet to sign.
 
-You may run the non-interactive flags yourself when it helps (`--sync`, `--status`, `--sync-list`). Never launch the bare interactive `npx ethagent` or `--demo` from inside a session: they open a full-screen terminal app that needs a TTY and will hang the tool call. Anything that needs a wallet signature, the user always runs themselves.
+You may run the read-only non-interactive commands yourself whenever they help (`--sync`, `--status`, `--sync-list`). `ethagent save` is different: run it only when the user specifically asks you to save or back up the agent, never on your own initiative or as a side effect of other work. When they do ask, you can run it directly: there is no CLI step for the user and no separate terminal needed. It is headless, will not hang, prints a wallet URL, and opens the browser tab where the user approves the signature. You trigger and run the command; you never sign. (It is also a no-op when there are no local changes since the last snapshot.) Never launch the bare interactive `npx ethagent` or `--demo` from inside a session: they open a full-screen terminal app that needs a TTY and will hang the tool call. Anything else that needs a wallet signature (create, ENS, custody, transfer), the user always runs themselves.
 
 Where the synced files land:
 
@@ -35,6 +36,6 @@ The agent's portable identity lives in the ethagent vault and syncs into every h
   - Voice, standards, operating principles, and boundaries go in the vault `SOUL.md` in the same folder.
 - The vault files are the source of truth. After editing them, run `npx ethagent --sync` so the change propagates into `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, and any other detected harness.
 - Do NOT store durable identity in Claude Code's per-project memory (`~/.claude/projects/<slug>/memory/`): the sync treats those files as write-only mirror targets and overwrites them, and they never reach Codex or the encrypted backup. Keep only session- or repo-specific scratch notes there.
-- Syncing is not backup. To persist durable changes into the encrypted IPFS snapshot and onchain pointer, the user runs `npx ethagent` and chooses Save Snapshot (needs a wallet signature).
+- Syncing is not backup. To persist durable changes into the encrypted IPFS snapshot and onchain pointer, run `ethagent save` yourself: it pins the encrypted snapshot and rotates the onchain pointer, and the user only approves the signature in the browser wallet.
 
 If they ask "what's my agent" or "list my skills" without an identity yet, point them at `npx ethagent` to set one up first.

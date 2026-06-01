@@ -63,7 +63,7 @@ Using another harness? You can still sync, but only Claude Code does it automati
 npx ethagent --sync
 ```
 
-One command syncs it into every harness on this machine — soul, memory, and skills (public and private) — but only when you run it. To back it up so you can restore it anywhere, open `ethagent` and choose **Save Snapshot**.
+One command syncs it into every harness on this machine — soul, memory, and skills (public and private) — but only when you run it. To back it up so you can restore it anywhere, run `ethagent save` (or open `ethagent` and choose **Save Snapshot**); either way you approve the signature in your wallet.
 
 ## 🔒 What stays private
 
@@ -117,7 +117,8 @@ Run with `npx ethagent`:
 
 | Command | What it does |
 | --- | --- |
-| `ethagent` | Open the interactive identity manager: create, ENS, custody, snapshots, transfer. |
+| `ethagent` | Open the interactive identity manager: create, ENS, custody, transfer. |
+| `save` | Save an encrypted snapshot: pin to IPFS and rotate the onchain pointer. Opens your browser wallet to approve; add `--no-open` to only print the URL, `--json` for machine output. |
 | `--sync` | Sync soul, memory, and skills (public and private) into every harness it detects. |
 | `--sync-list` | List sync adapters and which ones detect in the current environment. |
 | `--status` | Print a one-line identity summary. |

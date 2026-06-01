@@ -2,7 +2,7 @@ import { useEffect, useReducer, useState } from 'react'
 import type { EthagentConfig, EthagentIdentity } from '../../storage/config.js'
 import { setTokenIdentity } from '../../storage/identity.js'
 import type { BrowserWalletReady } from '../wallet/browserWallet.js'
-import { registryConfigFromConfig } from '../registry/registryConfig.js'
+import { resolveRegistryForIdentity as resolveRegistryForIdentityFromConfig } from '../registry/registryConfig.js'
 import type { Erc8004RegistryConfig } from '../registry/erc8004.js'
 import {
   hasPinataJwt,
@@ -94,18 +94,8 @@ export function useIdentityManagerController({
     }
   }
 
-  const resolveRegistryForIdentity = (target: EthagentIdentity): Erc8004RegistryConfig | null => {
-    const resolution = registryConfigFromConfig(config)
-    if (target.chainId && target.identityRegistryAddress) {
-      return {
-        chainId: target.chainId,
-        rpcUrl: target.rpcUrl ?? resolution.defaultRpcUrl,
-        identityRegistryAddress: target.identityRegistryAddress as `0x${string}`,
-      }
-    }
-    if (resolution.config) return resolution.config
-    return null
-  }
+  const resolveRegistryForIdentity = (target: EthagentIdentity): Erc8004RegistryConfig | null =>
+    resolveRegistryForIdentityFromConfig(target, config)
 
   const completeTokenIdentity = async (nextIdentity: EthagentIdentity, message: string, source?: IdentityCompletionSource): Promise<void> => {
     if (mode === 'first-run' || !config) {

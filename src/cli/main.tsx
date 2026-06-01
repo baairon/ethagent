@@ -18,6 +18,7 @@ import { runPreToolGuard } from './pretoolGuard.js'
 import { runSessionStart } from './sessionStart.js'
 import { runStatus } from './status.js'
 import { runResetCommand } from './reset.js'
+import { runSave } from './save.js'
 import { enableDemoMode, synthDemoConfig } from './demo.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -38,6 +39,7 @@ function printHelp(): void {
     '',
     'usage:',
     '  ethagent                    manage identity',
+    '  ethagent save               save an encrypted snapshot: pin to IPFS, rotate the onchain pointer (you approve in your wallet)',
     '  ethagent reset              delete local identity, continuity, and secrets',
     '  ethagent --sync             sync soul, memory, and skills to every harness',
     '  ethagent --sync-list        list sync adapters and which ones detect here',
@@ -163,6 +165,8 @@ async function main(): Promise<number> {
     enableDemoMode()
     return renderHub(synthDemoConfig())
   }
+  if (argv[0] === 'save') return runSave(argv.slice(1))
+  if (flags.has('--save')) return runSave(argv.filter(a => a !== '--save'))
   if (argv[0] === 'reset') return runResetCommand(argv.slice(1))
 
   const unknown = argv.find(a => a.startsWith('-'))
