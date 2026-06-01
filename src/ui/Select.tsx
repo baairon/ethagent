@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Box, Text } from 'ink'
-import { theme, PANEL_WIDTH } from './theme.js'
+import { theme, PANEL_WIDTH, gradientColor } from './theme.js'
 import { useAppInput } from '../app/input/AppInputProvider.js'
 
 const CONTENT_WIDTH = PANEL_WIDTH - 4
@@ -9,6 +9,10 @@ function fitHint(hint: string, budget: number): string {
   if (budget < 8) return ''
   if (hint.length <= budget) return hint
   return `${hint.slice(0, budget - 1)}…`
+}
+
+function rainbowColor(index: number, total: number): string {
+  return gradientColor(total <= 1 ? 0 : index / (total - 1))
 }
 
 export type SelectOption<T> = {
@@ -135,17 +139,18 @@ export function Select<T>({
         const belowHintText = belowHint
           ? fitHint(option.hint ?? '', CONTENT_WIDTH - rowIndent - 2)
           : ''
-        const showHeadHighlight = isActive && selectable && !isSection && option.label.length > 0
+        const showActiveGradient = isActive && selectable && !isSection && option.label.length > 0
         return (
           <Box key={absoluteIndex} flexDirection="column">
             <Box flexDirection="row" marginLeft={rowIndent}>
               <Text color={prefixColor}>{cursor} </Text>
               {prefix ? <Text color={prefixColor}>{prefix}</Text> : null}
-              {showHeadHighlight ? (
-                <>
-                  <Text color={theme.accentHighlight} bold>{option.label[0]}</Text>
-                  <Text color={labelColor} bold={bold}>{option.label.slice(1)}</Text>
-                </>
+              {showActiveGradient ? (
+                <Text>
+                  {option.label.split('').map((ch, ci) => (
+                    <Text key={ci} color={rainbowColor(ci, option.label.length)}>{ch}</Text>
+                  ))}
+                </Text>
               ) : (
                 <Text color={labelColor} bold={bold}>{option.label}</Text>
               )}
