@@ -323,7 +323,7 @@ test('materializeSkillsTree with prune deletes local skills absent from the snap
   })
 })
 
-test('materializeSkillsTree with prune and an empty snapshot clears all local skills', async () => {
+test('materializeSkillsTree with prune REFUSES to wipe all skills when the snapshot has none (backstop)', async () => {
   await withHome(async () => {
     await ensureContinuityVault(identity)
     invalidateSkillsCache(identity)
@@ -332,12 +332,15 @@ test('materializeSkillsTree with prune and an empty snapshot clears all local sk
     await fs.mkdir(dir, { recursive: true, mode: 0o700 })
     await fs.writeFile(path.join(dir, 'SKILL.md'), '---\ndescription: local\nvisibility: public\n---\n\nbody\n', { mode: 0o600 })
 
+    // An undefined OR empty snapshot must NOT translate into deleting every local
+    // skill: a degenerate/corrupt/forged snapshot can never wipe the vault.
     await materializeSkillsTree(identity, undefined, { prune: true })
+    await materializeSkillsTree(identity, {}, { prune: true })
 
     invalidateSkillsCache(identity)
     const entries = await listSkills(identity)
-    assert.equal(entries.length, 0)
-    await assert.rejects(fs.access(dir))
+    assert.equal(entries.length, 1)
+    await fs.access(path.join(dir, 'SKILL.md'))
   })
 })
 

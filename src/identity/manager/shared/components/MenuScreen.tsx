@@ -202,9 +202,7 @@ function renderReconciliationBanner(r: AgentReconciliation, identity: EthagentId
       </>
     )
   }
-  if (r.token === 'unknown') {
-    return <Text color={theme.dim}>Ownership check failed (RPC?)</Text>
-  }
+  if (r.token === 'unknown') return null
   const lines: string[] = []
   if (r.custody === 'mid-flow-uri-pending') lines.push('Advanced setup pending')
   if (r.custody !== 'mid-flow-uri-pending' && r.agentUri === 'local-newer') lines.push('Local newer than onchain')

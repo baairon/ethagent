@@ -252,6 +252,10 @@ export async function materializeSkillsTree(
 }
 
 async function pruneSkillsDirToMatch(skillsDir: string, keep: Set<string>): Promise<void> {
+  if (keep.size === 0) {
+    process.stderr.write('ethagent: skill prune skipped because the restored snapshot carried no skills; keeping local skills to avoid a wipe\n')
+    return
+  }
   let topDirents: import('node:fs').Dirent[]
   try {
     topDirents = await fs.readdir(skillsDir, { withFileTypes: true })

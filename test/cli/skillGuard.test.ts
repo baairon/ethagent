@@ -35,10 +35,14 @@ test('decideSkillGuard allows when the file path is missing', () => {
   assert.equal(decideSkillGuard(undefined, { identityPresent: true }).deny, false)
 })
 
-test('decideSkillGuard deny carries a reason pointing at the vault and the private default', () => {
+test('decideSkillGuard deny carries a reason: read-only mirror, ask the user, do not run the TUI', () => {
   const dir = claudeSkillsDir()
   const decision = decideSkillGuard(path.join(dir, 'foo', 'SKILL.md'), { identityPresent: true })
   assert.equal(decision.deny, true)
   assert.match(decision.reason ?? '', /vault/i)
   assert.match(decision.reason ?? '', /private by default/i)
+  assert.match(decision.reason ?? '', /read-only/i)
+  assert.match(decision.reason ?? '', /overwritten/i)
+  assert.match(decision.reason ?? '', /ask the user/i)
+  assert.match(decision.reason ?? '', /will hang/i)
 })

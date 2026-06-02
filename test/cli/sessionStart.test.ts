@@ -16,3 +16,11 @@ test('session start context forbids the native memory directory', () => {
   assert.match(ctx, /native memory directory/)
   assert.match(ctx, /do not travel/)
 })
+
+test('session start context warns the skills mirror is read-only and routes adds through the user', () => {
+  const ctx = buildSessionStartContext()
+  assert.match(ctx, /skills/i)
+  assert.match(ctx, /~\/\.claude\/skills/)
+  assert.match(ctx, /read-only/i)
+  assert.match(ctx, /ask the user/i)
+})

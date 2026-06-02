@@ -3,12 +3,12 @@ import { hookFilePath, isWithinDir, readHookPayload } from './hookIo.js'
 import { claudeSkillsDir } from './syncAdapters/claude-code.js'
 
 export const SKILL_REDIRECT_REASON =
-  "ethagent keeps this agent's skills in its portable continuity vault and generates the ~/.claude/skills " +
-  'mirror from it. Skills you create or edit directly here do not travel with the agent, and ethagent-managed ' +
-  'mirror copies are regenerated from the vault on the next sync. Author or edit skills in the vault instead: ' +
-  'run `ethagent` and open Skills (create, edit, set visibility) so they are versioned, encrypted, and synced ' +
-  'into every harness automatically. New skills are private by default; switch one to public only when you want ' +
-  'it listed on your Agent Card.'
+  "~/.claude/skills is a read-only generated mirror of this agent's skills vault. Files you write or edit " +
+  'here do not travel with the agent and are overwritten from the vault on the next sync, so retrying the ' +
+  'write will not work. Do NOT run `npx ethagent` to fix this yourself: it is interactive, needs a TTY, and ' +
+  'will hang the tool call. Adding or editing a skill is a human action: stop here and ask the user to add ' +
+  'or edit the skill via `npx ethagent` -> Skills, describing the skill you want. Skills are private by ' +
+  'default; ask the user to switch one to public only when they want it listed on the Agent Card.'
 
 export function decideSkillGuard(
   filePath: string | null | undefined,

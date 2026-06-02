@@ -21,6 +21,7 @@ Where the synced files land:
 
 - Public skills appear under `~/.claude/skills/` (per-skill folders) for Claude Code and inside `~/.codex/AGENTS.md` (managed block) for Codex.
 - Private skills stay encrypted in `~/.ethagent/continuity/` and only exist locally on the machine that signs.
+- `~/.claude/skills/` is a read-only generated mirror; never create or edit files there. Adding or editing a skill is a human action: ask the user to do it via `npx ethagent` -> Skills, and never launch the interactive TUI yourself.
 
 Privacy and secrets:
 
