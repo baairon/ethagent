@@ -128,6 +128,8 @@ export async function restorePrivateContinuityHistorySnapshot(
     if (snapshot.previousAgentCard !== undefined) {
       await writeAgentCardFile(identity, snapshot.previousAgentCard)
     }
+    const sync = await import('../../cli/sync.js')
+    await sync.pushVaultSoulMemoryToHarness(identity).catch(() => undefined)
     return snapshot
   }
 
@@ -140,6 +142,8 @@ export async function restorePrivateContinuityHistorySnapshot(
   if (snapshot.previousAgentCard !== undefined) {
     await writeAgentCardFile(identity, snapshot.previousAgentCard)
   }
+  const sync = await import('../../cli/sync.js')
+  await sync.pushVaultSoulMemoryToHarness(identity).catch(() => undefined)
   return snapshot
 }
 

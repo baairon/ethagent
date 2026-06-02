@@ -128,6 +128,8 @@ export async function runOperatorWalletRebackup(args: {
     includeLastBackedUpAt: true,
   })
   const nextIdentityForFiles: EthagentIdentity = { ...step.identity, state }
+  const { pullHarnessSoulMemoryIntoVault } = await import('../../../cli/sync.js')
+  await pullHarnessSoulMemoryIntoVault(nextIdentityForFiles).catch(() => [])
   const markdownScaffold = step.profileUpdates
     ? await prepareSyncedIdentityMarkdownScaffold(nextIdentityForFiles)
     : undefined
@@ -257,6 +259,8 @@ async function runOperatorWalletVaultPublish(args: {
         includeLastBackedUpAt: true,
       })
       const nextIdentityForFiles: EthagentIdentity = { ...step.identity, state }
+      const { pullHarnessSoulMemoryIntoVault } = await import('../../../cli/sync.js')
+      await pullHarnessSoulMemoryIntoVault(nextIdentityForFiles).catch(() => [])
       const markdownScaffold = step.profileUpdates
         ? await prepareSyncedIdentityMarkdownScaffold(nextIdentityForFiles)
         : undefined

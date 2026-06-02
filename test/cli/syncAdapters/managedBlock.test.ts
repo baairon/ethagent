@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
-import { reconcileSoulMemory } from '../../../src/cli/sync.js'
+import { pullHarnessSoulMemoryIntoVault, pushVaultSoulMemoryToHarness, reconcileSoulMemory } from '../../../src/cli/sync.js'
 import { claudeCodeAdapter } from '../../../src/cli/syncAdapters/claude-code.js'
 import { codexAdapter } from '../../../src/cli/syncAdapters/codex.js'
 import { parseManagedContext, removeManagedBlock } from '../../../src/cli/syncAdapters/managedBlock.js'
@@ -216,6 +216,88 @@ test('a full reconcile-then-push cycle converges and a second sync is a no-op', 
     assert.equal(second.soul, '# SOUL.md\n\nedited by claude\n')
     assert.deepEqual(second.pulled, [])
     assert.equal((await readContinuityFiles(identity))['SOUL.md'], '# SOUL.md\n\nedited by claude\n')
+  })
+})
+
+test('pullHarnessSoulMemoryIntoVault captures a CLAUDE.md-only edit before a snapshot', async () => {
+  await withHome(async () => {
+    await seedVault('original soul body', 'original memory body')
+    const context = { soul: `# SOUL.md\n\noriginal soul body\n`, memory: `# MEMORY.md\n\noriginal memory body\n` }
+    await claudeCodeAdapter.mirror([], context)
+
+    const claudeFile = await claudeMdPath()
+    const edited = (await fs.readFile(claudeFile, 'utf8')).replace('original soul body', 'edited only in CLAUDE.md')
+    await fs.writeFile(claudeFile, edited, 'utf8')
+
+    const ref = continuityVaultRef(identity)
+    await touch(ref.soulPath, 1_000)
+    await touch(claudeFile, 2_000)
+
+    const pulled = await pullHarnessSoulMemoryIntoVault(identity)
+    assert.deepEqual(pulled, ['SOUL.md'])
+    const files = await readContinuityFiles(identity)
+    assert.equal(files['SOUL.md'], '# SOUL.md\n\nedited only in CLAUDE.md\n')
+  })
+})
+
+test('pushVaultSoulMemoryToHarness forces restored vault content into CLAUDE.md regardless of mtime', async () => {
+  await withHome(async () => {
+    await seedVault('stale local soul', 'stale local memory')
+    await claudeCodeAdapter.mirror([], {
+      soul: '# SOUL.md\n\nstale local soul\n',
+      memory: '# MEMORY.md\n\nstale local memory\n',
+    })
+
+    await writeContinuityFiles(identity, {
+      'SOUL.md': '# SOUL.md\n\nrestored soul body\n',
+      'MEMORY.md': '# MEMORY.md\n\nrestored memory body\n',
+    })
+    const ref = continuityVaultRef(identity)
+    const claudeFile = await claudeMdPath()
+    await touch(ref.soulPath, 1_000)
+    await touch(claudeFile, 9_000)
+
+    await pushVaultSoulMemoryToHarness(identity)
+
+    const parsed = parseManagedContext(await fs.readFile(claudeFile, 'utf8'))
+    assert.equal(parsed.soul, 'restored soul body')
+    assert.equal(parsed.memory, 'restored memory body')
+
+    const reconciled = await reconcileSoulMemory(identity, [claudeCodeAdapter])
+    assert.deepEqual(reconciled.pulled, [])
+    assert.equal((await readContinuityFiles(identity))['SOUL.md'], '# SOUL.md\n\nrestored soul body\n')
+  })
+})
+
+test('reconcile does not let an empty CLAUDE.md block overwrite real vault content', async () => {
+  await withHome(async () => {
+    await seedVault('real soul body', 'real memory body')
+    await claudeCodeAdapter.mirror([], { soul: '# SOUL.md\n\nreal soul body\n', memory: '# MEMORY.md\n\nreal memory body\n' })
+
+    const claudeFile = await claudeMdPath()
+    const blanked = (await fs.readFile(claudeFile, 'utf8')).replace('real soul body', '')
+    await fs.writeFile(claudeFile, blanked, 'utf8')
+
+    const ref = continuityVaultRef(identity)
+    await touch(ref.soulPath, 1_000)
+    await touch(claudeFile, 9_000)
+
+    const result = await reconcileSoulMemory(identity, [claudeCodeAdapter])
+    const files = await readContinuityFiles(identity)
+    assert.equal(files['SOUL.md'], '# SOUL.md\n\nreal soul body\n')
+    assert.deepEqual(result.pulled, [])
+  })
+})
+
+test('claude-code mirror writes managed sync state for the project MEMORY.md too', async () => {
+  await withHome(async () => {
+    await seedVault('soul body', 'memory body')
+    await claudeCodeAdapter.mirror([], { soul: '# SOUL.md\n\nsoul body\n', memory: '# MEMORY.md\n\nmemory body\n' })
+
+    const slug = process.cwd().replace(/[:\\\/]/g, '-')
+    const projState = path.join(os.homedir(), '.claude', 'projects', slug, 'memory', '.ethagent-sync.json')
+    const exists = await fs.access(projState).then(() => true, () => false)
+    assert.equal(exists, true)
   })
 })
 

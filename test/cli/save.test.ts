@@ -33,8 +33,8 @@ const COMPLETED: EthagentIdentity = {
   },
 }
 
-type Spies = { saved: EthagentConfig[]; rebackupCalls: number; opened: string[] }
-const freshSpies = (): Spies => ({ saved: [], rebackupCalls: 0, opened: [] })
+type Spies = { saved: EthagentConfig[]; rebackupCalls: number; opened: string[]; pulls: number }
+const freshSpies = (): Spies => ({ saved: [], rebackupCalls: 0, opened: [], pulls: 0 })
 
 function makeDeps(spies: Spies, overrides: Partial<RunSaveDeps> = {}): RunSaveDeps {
   const base: RunSaveDeps = {
@@ -54,6 +54,7 @@ function makeDeps(spies: Spies, overrides: Partial<RunSaveDeps> = {}): RunSaveDe
       await cb.onIdentityComplete(COMPLETED, 'done', 'update')
     },
     openExternalUrl: url => { spies.opened.push(url) },
+    pullHarnessSoulMemoryIntoVault: async () => { spies.pulls++; return [] },
   }
   return { ...base, ...overrides }
 }
@@ -170,6 +171,14 @@ test('save: success persists the merged identity, opens the wallet, returns 0', 
   assert.equal(spies.opened.length, 1)
   assert.equal(spies.saved.length, 1)
   assert.equal(spies.saved[0]?.identity?.backup?.cid, 'snap-cid')
+})
+
+test('save: pulls harness soul/memory into the vault before snapshotting', async () => {
+  const spies = freshSpies()
+  const { result } = await withCapturedOutput(() => runSave([], makeDeps(spies)))
+  assert.equal(result, 0)
+  assert.equal(spies.pulls, 1)
+  assert.equal(spies.rebackupCalls, 1)
 })
 
 test('save: --no-open succeeds without opening the browser', async () => {

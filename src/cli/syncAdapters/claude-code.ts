@@ -52,7 +52,7 @@ export const claudeCodeAdapter = {
     return readManagedContext(claudeMdPath())
   },
   managedFilePaths(): string[] {
-    return [claudeMdPath()]
+    return [claudeMdPath(), claudeProjectMemoryMdPath()]
   },
   async resetManagedFilePaths(): Promise<string[]> {
     return [claudeMdPath(), ...(await projectMemoryMirrorsUnder(claudeDir()))]
@@ -72,8 +72,8 @@ export const claudeCodeAdapter = {
     if (context) {
       for (const target of [claudeMdPath(), claudeProjectMemoryMdPath()]) {
         await injectManagedBlock(target, renderManagedBlock(context))
+        await writeManagedSyncState(target, context)
       }
-      await writeManagedSyncState(claudeMdPath(), context)
     }
     return result
   },

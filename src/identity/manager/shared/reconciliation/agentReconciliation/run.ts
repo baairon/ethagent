@@ -10,6 +10,7 @@ import type { EthagentConfig, EthagentIdentity } from '../../../../../storage/co
 import { readVaultAddressField } from '../../../../identityCompat.js'
 import { readCustodyMode } from '../../../custody/state.js'
 import { continuityWorkingTreeStatus, type ContinuityWorkingTreeStatus } from '../../../../continuity/storage.js'
+import { listPublishedContinuitySnapshots } from '../../../../continuity/snapshots.js'
 import type { AgentReconciliation } from './types.js'
 
 export function emptyReconciliation(): AgentReconciliation {
@@ -244,7 +245,8 @@ type WorkingTreeProbe = { kind: 'clean' | 'dirty' | 'unknown' }
 
 async function probeWorkingTree(identity: EthagentIdentity): Promise<WorkingTreeProbe> {
   try {
-    const status: ContinuityWorkingTreeStatus = await continuityWorkingTreeStatus(identity)
+    const [latest] = await listPublishedContinuitySnapshots(identity, 1)
+    const status: ContinuityWorkingTreeStatus = await continuityWorkingTreeStatus(identity, latest)
     if (!status.ready) return { kind: 'unknown' }
     return status.localChangedAfterBackup ? { kind: 'dirty' } : { kind: 'clean' }
   } catch {

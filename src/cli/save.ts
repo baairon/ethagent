@@ -9,6 +9,7 @@ import type { EffectCallbacks } from '../identity/manager/shared/effects/types.j
 import { isWalletCancelled } from '../identity/manager/shared/utils.js'
 import type { Step } from '../identity/manager/reducer.js'
 import { openExternalUrl } from '../utils/openExternal.js'
+import { pullHarnessSoulMemoryIntoVault } from './sync.js'
 
 // Headless Save Snapshot: encrypt soul/memory/skills, pin to IPFS, and rotate the
 // ERC-8004 onchain pointer. The agent can trigger this; the human still approves the
@@ -28,6 +29,7 @@ export type RunSaveDeps = {
   listPublishedContinuitySnapshots: typeof listPublishedContinuitySnapshots
   runRebackupSigning: typeof runRebackupSigning
   openExternalUrl: typeof openExternalUrl
+  pullHarnessSoulMemoryIntoVault: typeof pullHarnessSoulMemoryIntoVault
 }
 
 const defaultDeps: RunSaveDeps = {
@@ -39,6 +41,7 @@ const defaultDeps: RunSaveDeps = {
   listPublishedContinuitySnapshots,
   runRebackupSigning,
   openExternalUrl,
+  pullHarnessSoulMemoryIntoVault,
 }
 
 export async function runSave(args: string[] = [], deps: RunSaveDeps = defaultDeps): Promise<number> {
@@ -76,6 +79,8 @@ export async function runSave(args: string[] = [], deps: RunSaveDeps = defaultDe
   if (!vault.ready) {
     return fail(1, 'Local continuity files are not restored. Run `npx ethagent` and restore this identity before saving a snapshot.')
   }
+
+  await deps.pullHarnessSoulMemoryIntoVault(identity).catch(() => [])
 
   // Only proceed when the working tree actually differs from the last published
   // snapshot. If it is already up to date, do nothing: no wallet, no transaction, no

@@ -135,6 +135,8 @@ export async function runRecoveryRefetch(
   const agentCardRestored = await restorePublishedAgentCard(nextIdentity, apiUrl, candidate.publicDiscovery?.agentCardCid)
   await ensureIdentityMarkdownScaffold(nextIdentity)
   await syncAgentCardManifest(nextIdentity).catch(() => null)
+  const { pushVaultSoulMemoryToHarness } = await import('../../../cli/sync.js')
+  await pushVaultSoulMemoryToHarness(nextIdentity).catch(() => undefined)
   await recordPublishedContinuitySnapshot({ identity: nextIdentity, label: 'Refetched Latest Snapshot From Onchain' }).catch(() => null)
   if (agentCardRestored) {
     const contentHashes = await localContinuitySnapshotContentHashes(nextIdentity)

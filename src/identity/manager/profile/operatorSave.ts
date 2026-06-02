@@ -67,6 +67,8 @@ export async function prepareOperatorProfileArtifacts(args: {
     includeLastBackedUpAt: true,
   })
   const nextIdentityForFiles: EthagentIdentity = { ...step.identity, state }
+  const { pullHarnessSoulMemoryIntoVault } = await import('../../../cli/sync.js')
+  await pullHarnessSoulMemoryIntoVault(nextIdentityForFiles).catch(() => [])
 
   const agentCardJson = await syncAgentCardManifest(nextIdentityForFiles)
   const agentCardPin = await addToIpfs(DEFAULT_IPFS_API_URL, agentCardJson, fetch, { pinataJwt: step.pinataJwt })

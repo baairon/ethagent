@@ -117,6 +117,10 @@ export async function runRestoreAuthorize(
   await restorePublishedAgentCard(nextIdentity, step.apiUrl, step.candidate.publicDiscovery?.agentCardCid)
   await ensureIdentityMarkdownScaffold(nextIdentity)
   await syncAgentCardManifest(nextIdentity).catch(() => null)
+  if (continuityFiles) {
+    const { pushVaultSoulMemoryToHarness } = await import('../../../cli/sync.js')
+    await pushVaultSoulMemoryToHarness(nextIdentity).catch(() => undefined)
+  }
   await recordPublishedContinuitySnapshot({ identity: nextIdentity, label: 'restored from agent backup' }).catch(() => null)
   await callbacks.onIdentityComplete(nextIdentity, `ERC-8004 agent restored · #${step.candidate.agentId.toString()}`, 'restore')
 }

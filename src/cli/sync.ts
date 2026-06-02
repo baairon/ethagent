@@ -30,19 +30,7 @@ export async function runSync(opts: SyncOptions = {}): Promise<number> {
   const config = await loadConfig()
   if (!config?.identity) return 0
 
-  let all: Awaited<ReturnType<typeof listSkills>>
-  try {
-    all = await listSkills(config.identity)
-  } catch (err) {
-    process.stderr.write(`ethagent: could not load skills, skipping sync to avoid removing managed files (${(err as Error).message})\n`)
-    return 1
-  }
-  const mirrorSkills: PublicSkill[] = selectMirrorSkills(all)
-
-  const targets: SyncAdapter[] = []
-  for (const adapter of BUILT_IN_ADAPTERS) {
-    if (await adapter.detect().catch(() => false)) targets.push(adapter)
-  }
+  const targets = await detectSyncTargets()
   if (targets.length === 0) {
     if (!opts.quiet) process.stdout.write('ethagent: no harness detected\n')
     return 0
@@ -58,6 +46,15 @@ export async function runSync(opts: SyncOptions = {}): Promise<number> {
     process.stderr.write(`ethagent: could not reconcile soul/memory, skipping sync to avoid overwriting harness files (${(err as Error).message})\n`)
     return 1
   }
+
+  let all: Awaited<ReturnType<typeof listSkills>>
+  try {
+    all = await listSkills(config.identity)
+  } catch (err) {
+    process.stderr.write(`ethagent: could not load skills, skipped skill mirror (soul/memory already synced) (${(err as Error).message})\n`)
+    return 1
+  }
+  const mirrorSkills: PublicSkill[] = selectMirrorSkills(all)
 
   const summaries: string[] = []
   for (const adapter of targets) {
@@ -132,7 +129,7 @@ function pickNewest(
   let winningBody: string | null = null
   let winningMtime = vaultMtimeMs
   for (const candidate of candidates) {
-    if (candidate.body === null) continue
+    if (!candidate.body || !candidate.body.trim()) continue
     if (normalizeBody(candidate.body) === vaultKey) continue
     if (candidate.lastPushedHash && hashManagedBody(candidate.body) === candidate.lastPushedHash) continue
     if (candidate.mtimeMs > winningMtime) {
@@ -142,6 +139,46 @@ function pickNewest(
   }
   if (winningBody === null) return { content: vaultContent, pulled: false }
   return { content: reconstructVaultFile(vaultContent, winningBody, fallbackHeader), pulled: true }
+}
+
+export async function detectSyncTargets(): Promise<SyncAdapter[]> {
+  const targets: SyncAdapter[] = []
+  for (const adapter of BUILT_IN_ADAPTERS) {
+    if (await adapter.detect().catch(() => false)) targets.push(adapter)
+  }
+  return targets
+}
+
+export async function pullHarnessSoulMemoryIntoVault(identity: EthagentIdentity): Promise<string[]> {
+  try {
+    const targets = await detectSyncTargets()
+    if (targets.length === 0) return []
+    const reconciled = await reconcileSoulMemory(identity, targets)
+    return reconciled.pulled
+  } catch {
+    return []
+  }
+}
+
+export async function pushVaultSoulMemoryToHarness(identity: EthagentIdentity): Promise<void> {
+  try {
+    const targets = await detectSyncTargets()
+    if (targets.length === 0) return
+    const files = await readContinuityFiles(identity)
+    const context: SyncContext = { soul: files['SOUL.md'], memory: files['MEMORY.md'] }
+    const mirrorSkills = selectMirrorSkills(await listSkills(identity))
+    const failed: string[] = []
+    for (const adapter of targets) {
+      try {
+        await adapter.mirror(mirrorSkills, context)
+      } catch {
+        failed.push(adapter.name)
+      }
+    }
+    if (failed.length > 0) {
+      process.stderr.write(`ethagent: could not push soul/memory to ${failed.join(', ')} (will reconcile on next sync)\n`)
+    }
+  } catch {}
 }
 
 export async function runSyncList(): Promise<number> {
