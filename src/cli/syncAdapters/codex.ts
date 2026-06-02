@@ -23,7 +23,7 @@ async function enrichSkills(skills: PublicSkill[]): Promise<EnrichedSkill[]> {
       const raw = await fs.readFile(skill.absolutePath, 'utf8')
       const { body } = parseSkillFile(raw)
       out.push({ ...skill, body })
-    } catch {}
+    } catch { /* skip skills that can't be read or parsed */ }
   }
   return out
 }

@@ -114,12 +114,12 @@ export function useIdentityManagerContinuity({
         if (filename && !WATCHED_VAULT_FILES.has(String(filename))) return
         schedule()
       })
-      watcher.on('error', () => { try { watcher?.close() } catch {} })
-    } catch {}
+      watcher.on('error', () => { try { watcher?.close() } catch { /* already gone */ } })
+    } catch { /* fs.watch unsupported/failed; status just won't auto-refresh */ }
     return () => {
       cancelled = true
       if (timer) clearTimeout(timer)
-      try { watcher?.close() } catch {}
+      try { watcher?.close() } catch { /* best-effort close on unmount */ }
     }
   }, [identity, step.kind, computeStatus])
 

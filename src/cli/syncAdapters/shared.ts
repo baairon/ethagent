@@ -26,7 +26,7 @@ export async function readManifest(root: string): Promise<Manifest> {
     const raw = await fs.readFile(path.join(root, MANIFEST_FILE), 'utf8')
     const parsed = JSON.parse(raw) as Manifest
     if (parsed.version === 1 && Array.isArray(parsed.skills)) return parsed
-  } catch {}
+  } catch { /* missing or corrupt manifest -> fall back to an empty one */ }
   return { version: 1, managedAt: new Date(0).toISOString(), skills: [] }
 }
 

@@ -37,6 +37,6 @@ export async function runMemoryGuard(): Promise<number> {
         }) + '\n',
       )
     }
-  } catch {}
+  } catch { /* on any guard failure, stay silent and allow the tool call */ }
   return 0
 }

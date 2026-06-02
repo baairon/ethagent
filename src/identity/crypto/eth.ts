@@ -1,5 +1,7 @@
 import { secp256k1 } from '@noble/curves/secp256k1.js'
 import { keccak_256 } from '@noble/hashes/sha3.js'
+import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
+import { getAddress } from 'viem'
 import crypto from 'node:crypto'
 
 type RecoverableSecp256k1 = typeof secp256k1 & {
@@ -12,26 +14,6 @@ const SIG_RE = /^0x[0-9a-fA-F]{130}$/
 
 function stripHex(input: string): string {
   return input.startsWith('0x') || input.startsWith('0X') ? input.slice(2) : input
-}
-
-function hexToBytes(hex: string): Uint8Array {
-  const stripped = stripHex(hex)
-  if (stripped.length % 2 !== 0) throw new Error('Hex string has odd length')
-  const out = new Uint8Array(stripped.length / 2)
-  for (let i = 0; i < out.length; i += 1) {
-    const byte = Number.parseInt(stripped.slice(i * 2, i * 2 + 2), 16)
-    if (Number.isNaN(byte)) throw new Error('Invalid hex')
-    out[i] = byte
-  }
-  return out
-}
-
-function bytesToHex(bytes: Uint8Array): string {
-  let out = ''
-  for (let i = 0; i < bytes.length; i += 1) {
-    out += bytes[i]!.toString(16).padStart(2, '0')
-  }
-  return out
 }
 
 function ethereumMessageDigest(message: string | Uint8Array): Uint8Array {
@@ -90,18 +72,7 @@ export function addressFromPrivateKey(input: string): string {
 
 export function toChecksumAddress(address: string): string {
   if (!ADDR_RE.test(address)) throw new Error('Invalid address')
-  const lower = address.slice(2).toLowerCase()
-  const hashHex = bytesToHex(keccak_256(new TextEncoder().encode(lower)))
-  let out = '0x'
-  for (let i = 0; i < lower.length; i += 1) {
-    const ch = lower[i]!
-    if (ch >= 'a' && ch <= 'f') {
-      out += Number.parseInt(hashHex[i]!, 16) >= 8 ? ch.toUpperCase() : ch
-    } else {
-      out += ch
-    }
-  }
-  return out
+  return getAddress(address)
 }
 
 export function signMessage(privateKey: string, message: string | Uint8Array): string {

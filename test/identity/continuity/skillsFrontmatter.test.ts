@@ -89,3 +89,53 @@ test('does not interpret ${...} substitutions in body', () => {
   assert.match(parsed.body, /\$\{VAR\}/)
   assert.match(parsed.body, /\$\{CLAUDE_SKILL_DIR\}/)
 })
+
+test('keeps a colon inside an unquoted value verbatim', () => {
+  const content = [
+    '---',
+    'name: t',
+    'description: Use this skill when: committing changes',
+    'when_to_use: trigger: on commit',
+    '---',
+    'body',
+  ].join('\n')
+  const parsed = parseSkillFile(content)
+  assert.equal(parsed.frontmatter.description, 'Use this skill when: committing changes')
+  assert.equal(parsed.frontmatter.whenToUse, 'trigger: on commit')
+})
+
+test('keeps a value that starts with a reserved character verbatim', () => {
+  const content = [
+    '---',
+    'name: t',
+    'description: @mention and `code` stay literal',
+    '---',
+    'body',
+  ].join('\n')
+  const parsed = parseSkillFile(content)
+  assert.equal(parsed.frontmatter.description, '@mention and `code` stay literal')
+})
+
+test('a duplicated key takes the last value', () => {
+  const content = [
+    '---',
+    'name: first',
+    'name: second',
+    '---',
+    'body',
+  ].join('\n')
+  const parsed = parseSkillFile(content)
+  assert.equal(parsed.frontmatter.name, 'second')
+})
+
+test('preserves version string formatting (no numeric coercion)', () => {
+  const content = [
+    '---',
+    'name: t',
+    'version: 1.0',
+    '---',
+    'body',
+  ].join('\n')
+  const parsed = parseSkillFile(content)
+  assert.equal(parsed.frontmatter.version, '1.0')
+})

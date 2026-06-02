@@ -48,7 +48,7 @@ export function renderManagedBlock(context: SyncContext | undefined, extra?: str
 export async function injectManagedBlock(filePath: string, block: string): Promise<void> {
   await fs.mkdir(path.dirname(filePath), { recursive: true })
   let existing = ''
-  try { existing = await fs.readFile(filePath, 'utf8') } catch {}
+  try { existing = await fs.readFile(filePath, 'utf8') } catch { /* file may not exist yet; start from empty */ }
 
   let next: string
   const startIdx = existing.indexOf(START)

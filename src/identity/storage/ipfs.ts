@@ -220,15 +220,10 @@ function isWellFormedJwt(input: string): boolean {
 function isJsonObjectBase64Url(value: string): boolean {
   if (!/^[A-Za-z0-9_-]+$/.test(value)) return false
   try {
-    const json = Buffer.from(base64UrlToBase64(value), 'base64').toString('utf8')
+    const json = Buffer.from(value, 'base64url').toString('utf8')
     const parsed = JSON.parse(json) as unknown
     return Boolean(parsed && typeof parsed === 'object' && !Array.isArray(parsed))
   } catch {
     return false
   }
-}
-
-function base64UrlToBase64(value: string): string {
-  const normalized = value.replaceAll('-', '+').replaceAll('_', '/')
-  return normalized.padEnd(normalized.length + ((4 - normalized.length % 4) % 4), '=')
 }

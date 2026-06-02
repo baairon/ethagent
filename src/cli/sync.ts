@@ -88,7 +88,7 @@ async function reportLocalChanges(identity: EthagentIdentity): Promise<void> {
     const files = changedContinuitySnapshotFiles(status)
     const detail = files.length > 0 ? ` (${files.join(', ')})` : ''
     process.stdout.write(`ethagent: local changes detected${detail}, run 'ethagent' and Save Snapshot to back up\n`)
-  } catch {}
+  } catch { /* local-change notice is advisory; ignore status/read failures */ }
 }
 
 export async function reconcileSoulMemory(

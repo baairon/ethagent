@@ -14,7 +14,7 @@ export function buildSessionStartContext(): string {
 export async function runSessionStart(): Promise<number> {
   try {
     await runSync({ quiet: true })
-  } catch {}
+  } catch { /* sync is best-effort; never block session start on it */ }
   process.stdout.write(
     JSON.stringify({
       hookSpecificOutput: {
