@@ -85,7 +85,7 @@ export async function restoreSkillsTree(
   identity: EthagentIdentity,
   tree: ContinuitySkillsTree | undefined,
 ): Promise<void> {
-  await materializeSkillsTree(identity, tree)
+  await materializeSkillsTree(identity, tree, { prune: true })
 }
 
 export async function ensureAgentCardFile(

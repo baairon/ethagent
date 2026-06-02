@@ -86,7 +86,6 @@ test('mirrorAsSkillFolders refreshes a managed skill in place, dropping files re
     await mirrorAsSkillFolders(harness, [skill])
     await fs.access(path.join(harness, 'demo', 'scripts', 'install.mjs'))
 
-    // Mutate the vault: drop the old script, add a new one.
     await fs.rm(path.join(vault, 'demo', 'scripts', 'install.mjs'))
     await fs.writeFile(path.join(vault, 'demo', 'scripts', 'run.mjs'), 'export const y = 2\n')
 

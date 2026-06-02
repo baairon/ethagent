@@ -3,12 +3,6 @@ import { hookFilePath, readHookPayload } from './hookIo.js'
 import { decideMemoryGuard } from './memoryGuard.js'
 import { decideSkillGuard } from './skillGuard.js'
 
-/**
- * Combined PreToolUse guard: runs the memory-dir guard and the skills-mirror
- * guard from a single process, so each Edit/Write/MultiEdit spawns one `npx`
- * (one config load, one stdin read) instead of two. The two guards check
- * disjoint directories, so at most one denies.
- */
 export async function runPreToolGuard(): Promise<number> {
   try {
     const config = await loadConfig()

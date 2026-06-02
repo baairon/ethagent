@@ -230,10 +230,13 @@ export async function loadSkillsTree(identity: EthagentIdentity): Promise<Contin
 export async function materializeSkillsTree(
   identity: EthagentIdentity,
   tree: ContinuitySkillsTree | undefined,
+  opts?: { prune?: boolean },
 ): Promise<void> {
-  if (!tree) return
+  const prune = opts?.prune ?? false
+  if (!tree && !prune) return
   const ref = await ensureContinuityVault(identity)
-  for (const [rawRel, content] of Object.entries(tree)) {
+  const written = new Set<string>()
+  for (const [rawRel, content] of Object.entries(tree ?? {})) {
     const rel = rawRel.replace(/\\/g, '/')
     if (!isValidSkillFilePath(rel)) continue
     if (typeof content !== 'string') continue
@@ -242,8 +245,59 @@ export async function materializeSkillsTree(
     if (!isWithin(ref.skillsDir, absolute)) continue
     await fs.mkdir(path.dirname(absolute), { recursive: true, mode: 0o700 })
     await atomicWriteText(absolute, content, { mode: 0o600 })
+    written.add(rel)
   }
+  if (prune) await pruneSkillsDirToMatch(ref.skillsDir, written)
   invalidateSkillsCache(identity)
+}
+
+async function pruneSkillsDirToMatch(skillsDir: string, keep: Set<string>): Promise<void> {
+  let topDirents: import('node:fs').Dirent[]
+  try {
+    topDirents = await fs.readdir(skillsDir, { withFileTypes: true })
+  } catch {
+    return
+  }
+  const keptFolders = new Set<string>()
+  for (const rel of keep) {
+    const folder = rel.split('/')[0]
+    if (folder) keptFolders.add(folder)
+  }
+  for (const ent of topDirents) {
+    if (ent.isSymbolicLink()) continue
+    const target = path.join(skillsDir, ent.name)
+    if (ent.isDirectory()) {
+      if (!keptFolders.has(ent.name)) {
+        await fs.rm(target, { recursive: true, force: true }).catch(() => null)
+        continue
+      }
+      const files: SkillFileEntry[] = []
+      await walkFolderFiles(target, '', 0, files)
+      for (const file of files) {
+        const rel = `${ent.name}/${file.relativePath}`
+        if (!keep.has(rel)) await fs.rm(file.absolutePath, { force: true }).catch(() => null)
+      }
+      await removeEmptySubdirs(target)
+    } else if (ent.isFile()) {
+      await fs.rm(target, { force: true }).catch(() => null)
+    }
+  }
+}
+
+async function removeEmptySubdirs(root: string): Promise<void> {
+  let entries: import('node:fs').Dirent[]
+  try {
+    entries = await fs.readdir(root, { withFileTypes: true })
+  } catch {
+    return
+  }
+  for (const ent of entries) {
+    if (!ent.isDirectory() || ent.isSymbolicLink()) continue
+    const sub = path.join(root, ent.name)
+    await removeEmptySubdirs(sub)
+    const rest = await fs.readdir(sub).catch(() => [] as string[])
+    if (rest.length === 0) await fs.rmdir(sub).catch(() => null)
+  }
 }
 
 export type CreateSkillArgs = {

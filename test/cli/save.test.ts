@@ -33,6 +33,45 @@ const COMPLETED: EthagentIdentity = {
   },
 }
 
+const LOCAL_ONLY_PIN: EthagentIdentity = {
+  ...IDENTITY,
+  backup: {
+    cid: 'snap-cid-local',
+    createdAt: '2026-06-01T00:00:00.000Z',
+    envelopeVersion: '1',
+    ipfsApiUrl: 'https://api.pinata.cloud/pinning/pinFileToIPFS',
+    status: 'pinned',
+  },
+}
+const OPERATOR_PENDING_MESSAGE = 'Snapshot saved locally. Owner wallet still needs to publish to rotate the onchain pointer.'
+
+const VAULT_PUBLISHED: EthagentIdentity = {
+  ...IDENTITY,
+  agentUri: 'ipfs://meta-cid-2',
+  metadataCid: 'meta-cid-2',
+  backup: {
+    cid: 'snap-cid-2',
+    createdAt: '2026-06-01T00:00:00.000Z',
+    envelopeVersion: '1',
+    ipfsApiUrl: 'https://api.pinata.cloud/pinning/pinFileToIPFS',
+    status: 'pinned',
+    metadataCid: 'meta-cid-2',
+  },
+}
+
+const PENDING_PUBLISH: EthagentIdentity = {
+  ...IDENTITY,
+  metadataCid: 'old-meta-cid',
+  agentUri: 'ipfs://old-meta-cid',
+  backup: {
+    cid: 'pinned-not-published-cid',
+    createdAt: '2026-06-01T00:00:00.000Z',
+    envelopeVersion: '1',
+    ipfsApiUrl: 'https://api.pinata.cloud/pinning/pinFileToIPFS',
+    status: 'pinned',
+  },
+}
+
 type Spies = { saved: EthagentConfig[]; rebackupCalls: number; opened: string[]; pulls: number }
 const freshSpies = (): Spies => ({ saved: [], rebackupCalls: 0, opened: [], pulls: 0 })
 
@@ -55,6 +94,7 @@ function makeDeps(spies: Spies, overrides: Partial<RunSaveDeps> = {}): RunSaveDe
     },
     openExternalUrl: url => { spies.opened.push(url) },
     pullHarnessSoulMemoryIntoVault: async () => { spies.pulls++; return [] },
+    discoverOwnedAgentBackupByTokenId: async () => ({ backup: { cid: 'snap-cid' } }) as never,
   }
   return { ...base, ...overrides }
 }
@@ -117,6 +157,26 @@ test('save: no local changes is a no-op (no wallet, returns 0)', async () => {
   assert.equal(spies.opened.length, 0)
   assert.equal(spies.saved.length, 0)
   assert.match(out, /nothing to save/i)
+})
+
+test('save: a pending publish (pinned but pointer not rotated) is NOT skipped even when content is unchanged', async () => {
+  const spies = freshSpies()
+  const deps = makeDeps(spies, {
+    loadConfig: async () => ({ ...CONFIG, identity: PENDING_PUBLISH }),
+    continuityWorkingTreeStatus: async () => ({
+      ready: true,
+      localChangedAfterBackup: false,
+      publishState: 'published',
+    }),
+    runRebackupSigning: async (_step, cb) => {
+      spies.rebackupCalls++
+      cb.onWalletReady({ url: 'http://localhost:9999/' } as never)
+      await cb.onIdentityComplete(VAULT_PUBLISHED, 'Snapshot published onchain through the Vault.', 'update')
+    },
+  })
+  const { result } = await withCapturedOutput(() => runSave([], deps))
+  assert.equal(result, 0)
+  assert.equal(spies.rebackupCalls, 1)
 })
 
 test('save: no local changes with --json reports skipped', async () => {
@@ -207,4 +267,72 @@ test('save: wallet cancellation returns 3 and saves nothing', async () => {
   const { result } = await withCapturedOutput(() => runSave([], deps))
   assert.equal(result, 3)
   assert.equal(spies.saved.length, 0)
+})
+
+test('save: operator local-only pin is reported as pending (not published) and returns 4', async () => {
+  const spies = freshSpies()
+  const deps = makeDeps(spies, {
+    runRebackupSigning: async (_step, cb) => {
+      spies.rebackupCalls++
+      cb.onWalletReady({ url: 'http://localhost:9999/' } as never)
+      await cb.onIdentityComplete(LOCAL_ONLY_PIN, OPERATOR_PENDING_MESSAGE, 'update')
+    },
+  })
+  const { result, out, err } = await withCapturedOutput(() => runSave([], deps))
+  assert.equal(result, 4)
+  assert.equal(spies.saved.length, 1)
+  assert.doesNotMatch(out, /published onchain/i)
+  assert.match(out, /owner/i)
+  assert.match(err, /NOT published onchain/i)
+})
+
+test('save: operator local-only pin with --json reports published:false + pending owner-publish', async () => {
+  const spies = freshSpies()
+  const deps = makeDeps(spies, {
+    runRebackupSigning: async (_step, cb) => {
+      spies.rebackupCalls++
+      cb.onWalletReady({ url: 'http://localhost:9999/' } as never)
+      await cb.onIdentityComplete(LOCAL_ONLY_PIN, OPERATOR_PENDING_MESSAGE, 'update')
+    },
+  })
+  const { result, out } = await withCapturedOutput(() => runSave(['--json'], deps))
+  assert.equal(result, 4)
+  const parsed = JSON.parse(out.trim())
+  assert.equal(parsed.published, false)
+  assert.equal(parsed.pending, 'owner-publish')
+  assert.equal(parsed.cid, 'snap-cid-local')
+})
+
+test('save: published path verifies the onchain pointer and returns 0', async () => {
+  const spies = freshSpies()
+  const { result, out } = await withCapturedOutput(() => runSave([], makeDeps(spies)))
+  assert.equal(result, 0)
+  assert.match(out, /published onchain/i)
+  assert.match(out, /verified/i)
+})
+
+test('save: published but onchain pointer still stale returns 0 with a warning', async () => {
+  const spies = freshSpies()
+  const deps = makeDeps(spies, {
+    discoverOwnedAgentBackupByTokenId: async () => ({ backup: { cid: 'a-different-cid' } }) as never,
+  })
+  const { result, err } = await withCapturedOutput(() => runSave([], deps))
+  assert.equal(result, 0)
+  assert.match(err, /does not yet resolve/i)
+})
+
+test('save: an operator-through-vault publish (metadataCid set, no txHash) reports published and returns 0', async () => {
+  const spies = freshSpies()
+  const deps = makeDeps(spies, {
+    runRebackupSigning: async (_step, cb) => {
+      spies.rebackupCalls++
+      cb.onWalletReady({ url: 'http://localhost:9999/' } as never)
+      await cb.onIdentityComplete(VAULT_PUBLISHED, 'Snapshot published onchain through the Vault.', 'update')
+    },
+    discoverOwnedAgentBackupByTokenId: async () => ({ backup: { cid: 'snap-cid-2' } }) as never,
+  })
+  const { result, out } = await withCapturedOutput(() => runSave([], deps))
+  assert.equal(result, 0)
+  assert.match(out, /published onchain/i)
+  assert.equal(spies.saved[0]?.identity?.backup?.cid, 'snap-cid-2')
 })

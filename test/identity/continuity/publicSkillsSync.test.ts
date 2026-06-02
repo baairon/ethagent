@@ -40,7 +40,6 @@ test('private skills are excluded from the Agent Card; public skills appear; fli
     })
     invalidateSkillsCache(identity)
 
-    // Public-only on the card path.
     const pub = await derivePublicSkillEntries(identity)
     assert.deepEqual(pub.map(e => e.name).sort(), ['shared'])
 
@@ -48,7 +47,6 @@ test('private skills are excluded from the Agent Card; public skills appear; fli
     assert.match(card, /shared/)
     assert.doesNotMatch(card, /classified/)
 
-    // Flip the private one to public -> now it joins the card.
     await setSkillVisibility(identity, 'classified/SKILL.md', 'public')
     invalidateSkillsCache(identity)
 

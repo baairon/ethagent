@@ -40,12 +40,12 @@ export const ResetConfirmView: React.FC<{
             <Section title="Deletes" color={theme.accentError} lines={[
               plan.configDir,
               'soul, memory, skills, and config',
-              'your saved Pinata token',
               "ethagent's block in your harness files (CLAUDE.md, AGENTS.md)",
             ]} />
             <Section title="Kept" color={theme.dim} lines={[
               'your ERC-8004 token and ENS name',
               'published snapshots on IPFS',
+              'your saved Pinata / IPFS storage token',
             ]} />
           </Box>
           <Box marginTop={1}>

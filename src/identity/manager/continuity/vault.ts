@@ -32,7 +32,7 @@ import {
   requestBrowserWalletSignatureAndTransaction,
   type WalletPurpose,
 } from '../../wallet/browserWallet.js'
-import type { Step } from '../reducer.js'
+import type { Step, ProfileUpdates } from '../reducer.js'
 import type { EffectCallbacks } from '../shared/effects/types.js'
 import { awaitConfirmedReceipt } from '../shared/effects/receipts.js'
 import {
@@ -50,6 +50,22 @@ import {
   walletRestoreAccessContext,
 } from './snapshot.js'
 import { markCurrentContinuityFilesPublished } from '../shared/effects/sync.js'
+import { readVaultAddressField } from '../../identityCompat.js'
+import { readCustodyMode } from '../custody/state.js'
+
+export function operatorPinCompletionMessage(profileUpdates: ProfileUpdates | undefined): string {
+  if (profileUpdates?.ensName !== undefined) {
+    return 'Snapshot saved locally. Owner wallet still needs to publish to make ENS changes discoverable.'
+  }
+  if (
+    profileUpdates?.imagePath !== undefined
+    || profileUpdates?.name !== undefined
+    || profileUpdates?.description !== undefined
+  ) {
+    return 'Snapshot saved locally. Owner wallet still needs to publish to make profile changes discoverable.'
+  }
+  return 'Snapshot saved locally. Owner wallet still needs to publish to rotate the onchain pointer.'
+}
 
 type BackupMetadata = NonNullable<EthagentIdentity['backup']>
 type AgentCardMetadata = NonNullable<EthagentIdentity['agentCard']>
@@ -82,7 +98,9 @@ export async function runOperatorWalletRebackup(args: {
   const expectedSigner = expectedAccountForSnapshotSave(step.identity, step.profileUpdates, walletAccess)
 
   const effectiveSigner = expectedSigner ?? operatorSignerFor(step.identity)
-  if (step.vaultAddress && effectiveSigner) {
+  const stateVault = readVaultAddressField(step.identity.state as Record<string, unknown> | undefined)
+  const vaultAddress = step.vaultAddress ?? (stateVault ? getAddress(stateVault) : undefined)
+  if (vaultAddress && effectiveSigner) {
     await runOperatorWalletVaultPublish({
       step,
       callbacks,
@@ -91,10 +109,17 @@ export async function runOperatorWalletRebackup(args: {
       walletAccess,
       challengePurpose,
       expectedSigner: effectiveSigner,
-      vaultAddress: step.vaultAddress,
+      vaultAddress,
       deriveAgentName: args.deriveAgentName,
     })
     return
+  }
+  if (readCustodyMode(step.identity.state as Record<string, unknown> | undefined) === 'advanced') {
+    throw new Error(
+      !vaultAddress
+        ? 'Cannot publish this snapshot: advanced custody is configured but the operator vault address could not be resolved. Run `npx ethagent` -> Fix Records to repair the vault link.'
+        : 'Cannot publish this snapshot: no authorized operator wallet is available to sign. Connect an approved operator wallet, or run `npx ethagent` -> Fix Records.',
+    )
   }
 
   const wallet = await requestBrowserWalletSignature({
@@ -114,11 +139,7 @@ export async function runOperatorWalletRebackup(args: {
 
   assertSnapshotSaveSignerAuthorized(step.identity, step.profileUpdates, wallet.account, snapshotOwner, walletAccess)
 
-  const {
-    state,
-    nextEnsName,
-    uploadedImageUri,
-  } = await prepareProfileStateForSave({
+  const { state } = await prepareProfileStateForSave({
     identity: step.identity,
     registry: step.registry,
     profileUpdates: step.profileUpdates,
@@ -189,11 +210,7 @@ export async function runOperatorWalletRebackup(args: {
     agentCard: agentCardJson,
     skills: skillsTree,
   }).catch(() => null)
-  const completionMessage = nextEnsName !== undefined && nextEnsName !== ((step.identity.state as Record<string, unknown> | undefined)?.ensName as string | undefined)
-    ? 'Snapshot saved locally. Owner wallet still needs to publish to make ENS changes discoverable.'
-    : uploadedImageUri !== undefined
-      ? 'Snapshot saved locally. Owner wallet still needs to publish to make profile changes discoverable.'
-      : 'Snapshot saved locally. Owner wallet still needs to publish to rotate the onchain pointer.'
+  const completionMessage = operatorPinCompletionMessage(step.profileUpdates)
   await callbacks.onIdentityComplete(nextIdentity, completionMessage, 'update')
 }
 
@@ -370,7 +387,9 @@ async function runOperatorWalletVaultPublish(args: {
     { kind: 'rebackup-uri-vault', chainId: step.registry.chainId },
   )
 
-  const nextIdentity = result.prepared.nextIdentity
+  const nextIdentity: EthagentIdentity = result.prepared.nextIdentity.backup
+    ? { ...result.prepared.nextIdentity, backup: { ...result.prepared.nextIdentity.backup, txHash: result.txHash } }
+    : result.prepared.nextIdentity
   if (result.prepared.markdownScaffold) {
     await writeIdentityMarkdownScaffold(nextIdentity, result.prepared.markdownScaffold)
   }

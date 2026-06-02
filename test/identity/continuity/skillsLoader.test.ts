@@ -7,10 +7,12 @@ import {
   invalidateSkillsCache,
   listSkills,
   listSkillFiles,
+  materializeSkillsTree,
 } from '../../../src/identity/continuity/skills/loadSkills.js'
 import {
   continuityVaultRef,
   ensureContinuityVault,
+  restoreSkillsTree,
 } from '../../../src/identity/continuity/storage.js'
 import type { EthagentIdentity } from '../../../src/storage/config.js'
 
@@ -300,6 +302,99 @@ test('listSkills leaves an explicit visibility untouched on scan', async () => {
 
     const onDisk = await fs.readFile(skillFile, 'utf8')
     assert.equal(onDisk, original)
+  })
+})
+
+test('materializeSkillsTree with prune deletes local skills absent from the snapshot', async () => {
+  await withHome(async () => {
+    await ensureContinuityVault(identity)
+    invalidateSkillsCache(identity)
+    const ref = continuityVaultRef(identity)
+    const localOnly = path.join(ref.skillsDir, 'outlook-email')
+    await fs.mkdir(localOnly, { recursive: true, mode: 0o700 })
+    await fs.writeFile(path.join(localOnly, 'SKILL.md'), '---\ndescription: local only\nvisibility: public\n---\n\nbody\n', { mode: 0o600 })
+
+    await materializeSkillsTree(identity, {
+      'video-downloader/SKILL.md': '---\ndescription: published\nvisibility: public\n---\n\nbody\n',
+    }, { prune: true })
+
+    await fs.access(path.join(ref.skillsDir, 'video-downloader', 'SKILL.md'))
+    await assert.rejects(fs.access(localOnly), 'unsaved local skill should be pruned on restore')
+  })
+})
+
+test('materializeSkillsTree with prune and an empty snapshot clears all local skills', async () => {
+  await withHome(async () => {
+    await ensureContinuityVault(identity)
+    invalidateSkillsCache(identity)
+    const ref = continuityVaultRef(identity)
+    const dir = path.join(ref.skillsDir, 'outlook-email')
+    await fs.mkdir(dir, { recursive: true, mode: 0o700 })
+    await fs.writeFile(path.join(dir, 'SKILL.md'), '---\ndescription: local\nvisibility: public\n---\n\nbody\n', { mode: 0o600 })
+
+    await materializeSkillsTree(identity, undefined, { prune: true })
+
+    invalidateSkillsCache(identity)
+    const entries = await listSkills(identity)
+    assert.equal(entries.length, 0)
+    await assert.rejects(fs.access(dir))
+  })
+})
+
+test('materializeSkillsTree with prune sheds stale supporting files inside a kept skill', async () => {
+  await withHome(async () => {
+    await ensureContinuityVault(identity)
+    invalidateSkillsCache(identity)
+    const ref = continuityVaultRef(identity)
+    const dir = path.join(ref.skillsDir, 'tool')
+    const scripts = path.join(dir, 'scripts')
+    await fs.mkdir(scripts, { recursive: true, mode: 0o700 })
+    await fs.writeFile(path.join(dir, 'SKILL.md'), '---\ndescription: keep\nvisibility: public\n---\n\nbody\n', { mode: 0o600 })
+    await fs.writeFile(path.join(scripts, 'old.mjs'), 'console.log(1)\n', { mode: 0o600 })
+
+    await materializeSkillsTree(identity, {
+      'tool/SKILL.md': '---\ndescription: keep\nvisibility: public\n---\n\nbody v2\n',
+    }, { prune: true })
+
+    await fs.access(path.join(dir, 'SKILL.md'))
+    await assert.rejects(fs.access(path.join(scripts, 'old.mjs')), 'stale supporting file should be pruned')
+    await assert.rejects(fs.access(scripts), 'emptied subdir should be removed')
+  })
+})
+
+test('materializeSkillsTree without prune leaves existing local skills intact (additive)', async () => {
+  await withHome(async () => {
+    await ensureContinuityVault(identity)
+    invalidateSkillsCache(identity)
+    const ref = continuityVaultRef(identity)
+    const existing = path.join(ref.skillsDir, 'keep-me')
+    await fs.mkdir(existing, { recursive: true, mode: 0o700 })
+    await fs.writeFile(path.join(existing, 'SKILL.md'), '---\ndescription: keep\nvisibility: public\n---\n\nbody\n', { mode: 0o600 })
+
+    await materializeSkillsTree(identity, {
+      'added/SKILL.md': '---\ndescription: added\nvisibility: public\n---\n\nbody\n',
+    })
+
+    await fs.access(path.join(existing, 'SKILL.md'))
+    await fs.access(path.join(ref.skillsDir, 'added', 'SKILL.md'))
+  })
+})
+
+test('restoreSkillsTree prunes unsaved local skills (prune wired through)', async () => {
+  await withHome(async () => {
+    await ensureContinuityVault(identity)
+    invalidateSkillsCache(identity)
+    const ref = continuityVaultRef(identity)
+    const localOnly = path.join(ref.skillsDir, 'outlook-email')
+    await fs.mkdir(localOnly, { recursive: true, mode: 0o700 })
+    await fs.writeFile(path.join(localOnly, 'SKILL.md'), '---\ndescription: local\nvisibility: public\n---\n\nbody\n', { mode: 0o600 })
+
+    await restoreSkillsTree(identity, {
+      'video-downloader/SKILL.md': '---\ndescription: published\nvisibility: public\n---\n\nbody\n',
+    })
+
+    await fs.access(path.join(ref.skillsDir, 'video-downloader', 'SKILL.md'))
+    await assert.rejects(fs.access(localOnly))
   })
 })
 

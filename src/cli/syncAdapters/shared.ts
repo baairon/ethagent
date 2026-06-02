@@ -8,7 +8,6 @@ import {
   MAX_FOLDER_DEPTH,
 } from '../../identity/continuity/skills/skillPaths.js'
 
-// Cap copied files at the same size the vault loader enforces.
 const MAX_MIRROR_FILE_BYTES = 256 * 1024
 
 export type PublicSkill = SkillIndexEntry
@@ -39,12 +38,6 @@ export async function pathExists(file: string): Promise<boolean> {
   try { await fs.access(file); return true } catch { return false }
 }
 
-/**
- * Copy a vault skill folder into the harness, applying the SAME vetting the
- * vault loader uses (skip symlinks, dotfiles, reserved Windows names, invalid
- * segments, and oversize files) so the mirror never copies a superset of — or a
- * symlink escaping — the vault's recognized file set.
- */
 async function copyVettedSkillTree(srcDir: string, destDir: string, depth = 0): Promise<void> {
   if (depth > MAX_FOLDER_DEPTH) return
   await fs.mkdir(destDir, { recursive: true })
@@ -89,10 +82,6 @@ export async function mirrorAsSkillFolders(
     const srcDir = path.dirname(skill.absolutePath)
     const tmpDir = path.join(root, `.${skill.name}.ethagent-tmp`)
     try {
-      // Stage the new copy in a temp sibling, then swap it in. This keeps the
-      // existing managed copy intact if the copy fails (no destructive
-      // rm-before-write window), and refreshes the whole folder (scripts/,
-      // assets/), dropping files removed upstream.
       await fs.rm(tmpDir, { recursive: true, force: true })
       await copyVettedSkillTree(srcDir, tmpDir)
       await fs.rm(targetDir, { recursive: true, force: true })

@@ -68,10 +68,6 @@ export function registryConfigFromConfig(config?: EthagentConfig): RegistryResol
   }
 }
 
-// Resolve the registry an existing identity should operate against: prefer the
-// identity's own chain + registry address (filling in a default RPC when it has
-// none), otherwise fall back to the config-derived registry. Pure function of
-// (identity, config) so both the TUI controller and headless commands share it.
 export function resolveRegistryForIdentity(
   identity: Pick<EthagentIdentity, 'chainId' | 'identityRegistryAddress' | 'rpcUrl'>,
   config?: EthagentConfig,

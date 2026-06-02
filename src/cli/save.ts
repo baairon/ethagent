@@ -1,5 +1,5 @@
 import { stdout, stderr } from 'node:process'
-import { loadConfig, saveConfig, type EthagentConfig } from '../storage/config.js'
+import { loadConfig, saveConfig, type EthagentConfig, type EthagentIdentity } from '../storage/config.js'
 import { resolveRegistryForIdentity } from '../identity/registry/registryConfig.js'
 import { continuityVaultStatus, continuityWorkingTreeStatus } from '../identity/continuity/storage/status.js'
 import { listPublishedContinuitySnapshots } from '../identity/continuity/snapshots.js'
@@ -10,15 +10,11 @@ import { isWalletCancelled } from '../identity/manager/shared/utils.js'
 import type { Step } from '../identity/manager/reducer.js'
 import { openExternalUrl } from '../utils/openExternal.js'
 import { pullHarnessSoulMemoryIntoVault } from './sync.js'
-
-// Headless Save Snapshot: encrypt soul/memory/skills, pin to IPFS, and rotate the
-// ERC-8004 onchain pointer. The agent can trigger this; the human still approves the
-// signature and transaction in the browser wallet tab. The whole pipeline is reused
-// from the ink TUI (`runRebackupSigning`) with a print-only callbacks shim.
-//
-// Exit codes: 0 success · 1 no identity / not restored / generic runtime error ·
-// 2 usage (unknown option) · 3 credential or wallet problem the human must resolve
-// (no JWT, invalid JWT, or wallet cancelled/timed out).
+import { discoverOwnedAgentBackupByTokenId } from '../identity/registry/erc8004/discovery.js'
+import { DEFAULT_IPFS_API_URL } from '../identity/storage/ipfs.js'
+import { resolveVaultAddress } from '../identity/manager/custody/transactions.js'
+import { hasPendingPublish } from '../identity/manager/continuity/state.js'
+import { getAddress } from 'viem'
 
 export type RunSaveDeps = {
   loadConfig: typeof loadConfig
@@ -30,6 +26,7 @@ export type RunSaveDeps = {
   runRebackupSigning: typeof runRebackupSigning
   openExternalUrl: typeof openExternalUrl
   pullHarnessSoulMemoryIntoVault: typeof pullHarnessSoulMemoryIntoVault
+  discoverOwnedAgentBackupByTokenId: typeof discoverOwnedAgentBackupByTokenId
 }
 
 const defaultDeps: RunSaveDeps = {
@@ -42,6 +39,7 @@ const defaultDeps: RunSaveDeps = {
   runRebackupSigning,
   openExternalUrl,
   pullHarnessSoulMemoryIntoVault,
+  discoverOwnedAgentBackupByTokenId,
 }
 
 export async function runSave(args: string[] = [], deps: RunSaveDeps = defaultDeps): Promise<number> {
@@ -82,10 +80,6 @@ export async function runSave(args: string[] = [], deps: RunSaveDeps = defaultDe
 
   await deps.pullHarnessSoulMemoryIntoVault(identity).catch(() => [])
 
-  // Only proceed when the working tree actually differs from the last published
-  // snapshot. If it is already up to date, do nothing: no wallet, no transaction, no
-  // gas. We only block on the confirmed-equal state ('published'); first saves
-  // ('not-published') and undeterminable cases still go through.
   let publishState: string | undefined
   try {
     const [latest] = await deps.listPublishedContinuitySnapshots(identity, 1)
@@ -94,14 +88,12 @@ export async function runSave(args: string[] = [], deps: RunSaveDeps = defaultDe
   } catch {
     publishState = undefined
   }
-  if (publishState === 'published') {
+  if (publishState === 'published' && !hasPendingPublish(identity)) {
     if (json) stdout.write(JSON.stringify({ ok: true, skipped: true, reason: 'no-local-changes' }) + '\n')
     else stdout.write('No local changes since the last snapshot; nothing to save.\n')
     return 0
   }
 
-  // JWT is resolved and validated BEFORE opening the wallet, so we never ask for a
-  // signature on a snapshot that then cannot be pinned.
   let jwt: string | undefined
   try {
     jwt = await deps.resolveValidatedPinataJwt()
@@ -114,6 +106,8 @@ export async function runSave(args: string[] = [], deps: RunSaveDeps = defaultDe
   }
 
   let completed = false
+  let savedIdentity: EthagentIdentity | undefined
+  let completionMessage = ''
   const callbacks: EffectCallbacks = {
     onStep: () => {},
     onWalletReady: ready => {
@@ -123,31 +117,22 @@ export async function runSave(args: string[] = [], deps: RunSaveDeps = defaultDe
       sink.write('Connect your wallet, sign one message, and approve one transaction (up to ~5 minutes)...\n')
       if (!noOpen) deps.openExternalUrl(ready.url)
     },
-    onIdentityComplete: async nextIdentity => {
+    onIdentityComplete: async (nextIdentity, message) => {
       await deps.saveConfig({ ...activeConfig, identity: nextIdentity })
       completed = true
-      if (json) {
-        stdout.write(JSON.stringify({
-          ok: true,
-          cid: nextIdentity.backup?.cid ?? null,
-          txHash: nextIdentity.backup?.txHash ?? null,
-          agentUri: nextIdentity.agentUri ?? null,
-        }) + '\n')
-      } else {
-        stdout.write('Snapshot saved.\n')
-        if (nextIdentity.backup?.cid) stdout.write(`  CID:      ${nextIdentity.backup.cid}\n`)
-        if (nextIdentity.backup?.txHash) stdout.write(`  tx:       ${nextIdentity.backup.txHash}\n`)
-        if (nextIdentity.agentUri) stdout.write(`  agentURI: ${nextIdentity.agentUri}\n`)
-      }
+      savedIdentity = nextIdentity
+      completionMessage = message
     },
   }
 
+  const vaultAddress = resolveVaultAddress(identity, activeConfig.erc8004?.operatorVaults)
   const step: Extract<Step, { kind: 'rebackup-signing' }> = {
     kind: 'rebackup-signing',
     identity,
     registry,
     pinataJwt: jwt,
     returnTo: { kind: 'menu' },
+    ...(vaultAddress ? { vaultAddress } : {}),
   }
 
   try {
@@ -160,8 +145,49 @@ export async function runSave(args: string[] = [], deps: RunSaveDeps = defaultDe
     return fail(1, `Save failed: ${message}`)
   }
 
-  if (!completed) {
+  if (!completed || !savedIdentity) {
     return fail(1, 'Save did not complete and no snapshot was recorded. Retry `ethagent save`.')
   }
-  return 0
+
+  const ni = savedIdentity
+  const cid = ni.backup?.cid ?? null
+  const published = Boolean(ni.backup?.txHash || ni.backup?.metadataCid)
+
+  if (published) {
+    let verification: 'verified' | 'mismatch' | 'unknown' = 'unknown'
+    try {
+      const candidate = await deps.discoverOwnedAgentBackupByTokenId({
+        ...registry,
+        ownerHandle: getAddress(ni.ownerAddress ?? ni.address),
+        tokenId: BigInt(identity.agentId),
+        ipfsApiUrl: ni.backup?.ipfsApiUrl ?? DEFAULT_IPFS_API_URL,
+      })
+      const onchainCid = candidate.backup?.cid ?? null
+      verification = onchainCid ? (onchainCid === cid ? 'verified' : 'mismatch') : 'unknown'
+    } catch {
+      verification = 'unknown'
+    }
+    if (json) {
+      stdout.write(JSON.stringify({ ok: true, published: true, verification, cid, txHash: ni.backup?.txHash ?? null, agentUri: ni.agentUri ?? null }) + '\n')
+    } else {
+      stdout.write('Snapshot published onchain.\n')
+      if (cid) stdout.write(`  CID:      ${cid}\n`)
+      if (ni.backup?.txHash) stdout.write(`  tx:       ${ni.backup.txHash}\n`)
+      if (ni.agentUri) stdout.write(`  agentURI: ${ni.agentUri}\n`)
+      if (verification === 'verified') stdout.write('  verified: onchain pointer resolves to this snapshot.\n')
+      else if (verification === 'mismatch') stderr.write('  warning: the onchain pointer does not yet resolve to this snapshot (propagation delay?).\n')
+    }
+    return 0
+  }
+
+  const detail = completionMessage || 'Snapshot saved locally. The owner wallet still needs to publish to rotate the onchain pointer.'
+  if (json) {
+    stdout.write(JSON.stringify({ ok: true, published: false, pending: 'owner-publish', cid, message: detail }) + '\n')
+  } else {
+    stdout.write(`${detail}\n`)
+    if (cid) stdout.write(`  pinned CID: ${cid}\n`)
+    stderr.write('NOT published onchain yet: this snapshot will not survive a reset/restore until the owner publishes it.\n')
+    stderr.write('Publish with the owner wallet via `npx ethagent` -> Save Snapshot (it shows a "publish" step).\n')
+  }
+  return 4
 }

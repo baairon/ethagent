@@ -17,11 +17,6 @@ import type { PublicSkill } from './syncAdapters/shared.js'
 
 export type SyncOptions = { quiet?: boolean }
 
-/**
- * Skills mirrored into local harnesses: every real skill (public AND private),
- * so private skills are usable locally. The public Agent Card stays public-only
- * (built separately via derivePublicSkillEntries). Drafts/scaffolds are skipped.
- */
 export function selectMirrorSkills(all: readonly PublicSkill[]): PublicSkill[] {
   return all.filter(s => !isDraftScaffold(s))
 }

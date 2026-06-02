@@ -16,10 +16,6 @@ export function decideSkillGuard(
 ): { deny: boolean; reason?: string } {
   if (!opts.identityPresent) return { deny: false }
   if (!filePath) return { deny: false }
-  // Scope: this guards the Claude Code skills mirror only. The Codex
-  // ~/.codex/AGENTS.md skill mirror is intentionally left unguarded, matching
-  // the Claude-only --memory-guard — the PreToolUse hook is registered only in
-  // the Claude Code plugin manifest.
   if (isWithinDir(claudeSkillsDir(), filePath)) {
     return { deny: true, reason: SKILL_REDIRECT_REASON }
   }
