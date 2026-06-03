@@ -35,9 +35,11 @@ export async function openBrowserWalletSession(args: {
 
   const pushEvent = (kind: string, data: Record<string, unknown>): void => {
     const payload = `event: ${kind}\ndata: ${JSON.stringify(data)}\n\n`
+    const dead: http.ServerResponse[] = []
     for (const res of sseClients) {
-      try { res.write(payload) } catch { }
+      try { res.write(payload) } catch { dead.push(res) }
     }
+    for (const res of dead) sseClients.delete(res)
   }
 
   const failPending = (err: unknown): void => {

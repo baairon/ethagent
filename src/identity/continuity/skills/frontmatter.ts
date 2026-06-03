@@ -22,6 +22,101 @@ export type ParsedSkillFile = {
   body: string
 }
 
+/**
+ * Quote a value as a strict-valid YAML double-quoted scalar. Escapes the structural
+ * characters AND every code point YAML forbids literally in a double-quoted scalar (C0
+ * controls, DEL, the C1 range, and lone surrogates), so the result loads in a strict parser
+ * (e.g. Codex) no matter what the value contains.
+ */
+function yamlQuote(value: string): string {
+  let out = '"'
+  for (const ch of value) {
+    const code = ch.codePointAt(0) as number
+    if (ch === '\\') out += '\\\\'
+    else if (ch === '"') out += '\\"'
+    else if (ch === '\n') out += '\\n'
+    else if (ch === '\t') out += '\\t'
+    else if (ch === '\r') out += '\\r'
+    else if (code < 0x20 || code === 0x7f || (code >= 0x80 && code <= 0x9f)) {
+      out += '\\x' + code.toString(16).toUpperCase().padStart(2, '0')
+    } else if (code >= 0xd800 && code <= 0xdfff) {
+      out += '\\u' + code.toString(16).toUpperCase().padStart(4, '0')
+    } else {
+      out += ch
+    }
+  }
+  return out + '"'
+}
+
+/**
+ * Re-emit a skill file with strictly-valid YAML frontmatter. Every scalar is double-quoted,
+ * so values containing `:` or `"` (which the lenient line parser and Claude tolerate but a
+ * strict YAML parser like Codex's rejects) load everywhere. Round-trips through parseSkillFile.
+ */
+export function serializeSkillFile(frontmatter: SkillFrontmatter, body: string): string {
+  const lines: string[] = ['---']
+  if (frontmatter.name) lines.push(`name: ${yamlQuote(frontmatter.name)}`)
+  if (frontmatter.description) lines.push(`description: ${yamlQuote(frontmatter.description)}`)
+  if (frontmatter.whenToUse) lines.push(`when_to_use: ${yamlQuote(frontmatter.whenToUse)}`)
+  if (frontmatter.version) lines.push(`version: ${yamlQuote(frontmatter.version)}`)
+  if (frontmatter.argumentHint) lines.push(`argument-hint: ${yamlQuote(frontmatter.argumentHint)}`)
+  if (frontmatter.tags && frontmatter.tags.length > 0) {
+    lines.push(`tags: [${frontmatter.tags.map(yamlQuote).join(', ')}]`)
+  }
+  if (frontmatter.visibility) lines.push(`visibility: ${yamlQuote(frontmatter.visibility)}`)
+  lines.push('---', '')
+  const trimmedBody = body.trim()
+  return lines.join('\n') + (trimmedBody ? trimmedBody + '\n' : '')
+}
+
+/**
+ * Make a SKILL.md's YAML frontmatter safe for a strict parser (e.g. Codex) WITHOUT dropping
+ * any keys: re-quote each `key: <plain scalar>` line as a double-quoted scalar (so values with
+ * a ':' or '"' load), while leaving already-quoted/flow values, list items, comments,
+ * unrecognized keys, block-scalar (`|`/`>`) content, and the body untouched. Returns the input
+ * unchanged when there's no frontmatter. Unlike serializeSkillFile this never drops keys and
+ * never emits a nameless block.
+ */
+export function sanitizeSkillFileForStrictYaml(content: string): string {
+  const normalized = content.replace(/^﻿/, '').replace(/\r\n?/g, '\n')
+  if (!normalized.startsWith('---\n')) return content
+  const closeRel = normalized.slice(4).search(/^---\s*$/m)
+  if (closeRel < 0) return content
+  const fmText = normalized.slice(4, 4 + closeRel)
+  const rest = normalized.slice(4 + closeRel) // from the closing '---' line through the body
+
+  const out: string[] = []
+  const lines = fmText.split('\n')
+  // Leading-space count of the key that opened a `|`/`>` block scalar; its (more-indented)
+  // content lines are literal text and must never be re-quoted, even if they look like key: value.
+  let blockIndent: number | null = null
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i] ?? ''
+    if (blockIndent !== null) {
+      const ind = line.search(/\S/)
+      if (ind === -1 || ind > blockIndent) { out.push(line); continue } // blank/deeper -> block content
+      blockIndent = null // dedented back to mapping level; treat as a normal line again
+    }
+    const m = /^(\s*)([A-Za-z_][\w-]*)\s*:\s*(.*)$/.exec(line)
+    if (!m) { out.push(line); continue } // list item, comment, blank
+    const indent = m[1] ?? ''
+    const key = m[2] ?? ''
+    const value = (m[3] ?? '').trim()
+    if (value === '') { out.push(line); continue } // empty value: nested mapping/list follows
+    if (/^["'[{|>&*!#]/.test(value)) {
+      if (value[0] === '|' || value[0] === '>') blockIndent = indent.length // following content is literal
+      out.push(line)
+      continue
+    }
+    // A more-indented, non-blank next line means this is a multi-line plain scalar; quoting only
+    // the first line would strand the continuation and produce strict-INVALID YAML, so leave it.
+    const next = lines[i + 1]
+    if (next !== undefined && next.trim() !== '' && next.search(/\S/) > indent.length) { out.push(line); continue }
+    out.push(`${indent}${key}: ${yamlQuote(value)}`)
+  }
+  return `---\n${out.join('\n')}${rest}`
+}
+
 export function parseSkillFile(content: string): ParsedSkillFile {
   const normalized = content.replace(/^﻿/, '').replace(/\r\n?/g, '\n')
   if (!normalized.startsWith('---\n') && normalized !== '---' && !normalized.startsWith('---\r')) {

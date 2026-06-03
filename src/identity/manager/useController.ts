@@ -74,7 +74,7 @@ export function useIdentityManagerController({
 
   useEffect(() => {
     let cancelled = false
-    hasPinataJwt().then(v => { if (!cancelled) setJwtSaved(v) }).catch(() => {})
+    hasPinataJwt().then(v => { if (!cancelled) setJwtSaved(v) }).catch(() => { if (!cancelled) setJwtSaved(false) })
     return () => { cancelled = true }
   }, [step.kind])
 

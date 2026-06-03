@@ -22,7 +22,9 @@ You'll need an Ethereum wallet, the same wallet that holds and unlocks your agen
 
 A guided menu does the rest: create its token, give it a name, and write who it is. Your wallet signs each step.
 
-**2. Add it to Claude Code.** Paste these in one at a time:
+**2. Use it anywhere.** That's the whole setup. ethagent wires itself into the AI tools you use, like Claude Code and Codex, automatically and with no extra steps, on any machine or operating system. Your agent follows you everywhere and keeps learning as you go; you'll only open `ethagent` again to hand-edit it or save a backup.
+
+Using Claude Code? Add the plugin for the richest experience. Paste these in one at a time:
 
 ```
 /plugin marketplace add baairon/ethagent
@@ -34,46 +36,32 @@ then:
 /plugin install ethagent@ethagent
 ```
 
-**3. Talk to your agent.** From here on it shows up in every session and gets to know you as you go.
-
-That's the whole setup. You'll only open `ethagent` again to hand-edit your agent or save a backup.
+After it installs, reload the plugin and restart Claude Code so the hooks take effect.
 
 ## 📦 Soul, memory, skills
 
 - **Soul** (`SOUL.md`): who it is, your standards, your voice, the way you work.
 - **Memory** (`MEMORY.md`): what it has learned about you, your preferences, and your projects, so context survives the move to a new machine.
-- **Skills:** the commands, tools, and prompts you teach it. **Private by default** — yours alone, encrypted in your vault and mirrored into your harnesses so you can use them locally, but kept off your public Agent Card. Make one **public** when you want other agents to discover it; then only its name and description go on the card your token publishes.
+- **Skills:** the commands and know-how you teach it, encrypted in your vault. Private by default; make one public to share it.
 
-You grow these mostly by talking: with the plugin on, your agent updates its own soul and memory as you converse, and the changes sync automatically. To edit them by hand, open `ethagent`. To save your agent onchain so it can come back on any machine, choose **Save Snapshot** and sign.
+You grow these mostly by talking: your agent updates its own soul and memory as you work, and you can just ask it to create a skill. Changes sync everywhere automatically; open `ethagent` to edit by hand, or choose **Save Snapshot** to back it up onchain.
 
 ## 💡 How it works
 
 1. **Own it.** Your wallet holds an ERC-8004 token; that token, not a platform account, is the agent.
-2. **Configure it.** Shape its soul, memory, and skills under an ENS name you own.
+2. **Configure it.** Shape its soul, memory, and skills. Optionally, give it an ENS name you own.
 3. **Save it.** `ethagent` encrypts everything on your machine, stores the encrypted copy on IPFS, and updates your token to point at it.
 4. **Restore it.** On any machine, `ethagent` finds your agent automatically from your connected wallet, or by ENS name or token id, then reads the pointer, asks your wallet to sign, and fetches and decrypts the snapshot to rebuild it.
 
 ## ✨ Using your agent
 
-**Claude Code comes first.** Install the plugin and your agent shows up in every session, already up to date, and anything it learns gets saved back. Nothing to set up.
+Your agent follows you. ethagent wires itself into the tools you use, like Claude Code and Codex, and keeps them in step in the background, so it's the same everywhere. Update it in one tool and the change carries to the rest. You never run a sync command, and `ethagent pause` stops it anytime.
 
-Using another harness? You can still sync, but only Claude Code does it automatically: the plugin's hooks refresh on every session and after edits. Anywhere else, you run it yourself whenever you want to pull changes in:
-
-```bash
-npx ethagent --sync
-```
-
-One command syncs your agent into every harness on this machine: soul, memory, and skills (public and private). To back it up so you can restore it anywhere, run `ethagent save` (or open `ethagent` and choose **Save Snapshot**). Either way, you approve the signature in your wallet.
+One honest difference: in Claude Code your agent is also kept on track in the moment, if it tries to save something where it won't travel, it's redirected. Other tools get the same rules in writing and the same syncing, just without that live nudge, so the experience is a bit more polished on Claude Code.
 
 ## 🔒 What stays private
 
-Everything is encrypted on your machine before it leaves: `SOUL.md`, `MEMORY.md`, and every skill.
-
-- The encryption keys come from a wallet signature `ethagent` never sees. Signing it is free and moves none of your money. (Saving a backup is separate: it updates your token, a normal transaction with a small fee, usually less than a cent on Base.)
-- Even a public skill keeps its body encrypted: only its name and description go on the Agent Card. That card, carried by your token, also publishes your agent's profile (name, description, optional image) and your owner wallet, which is already public as the token holder.
-- Private skills, soul, and memory are never exposed.
-
-In short: the network stores a locked box, and only your wallet holds the key.
+Everything is encrypted on your machine before it leaves: soul, memory, and skills. The keys come from a wallet signature `ethagent` never sees, so the network only ever holds a locked box that only your wallet can open. The one exception is what you choose to publish: a public skill's name and description appear on your token's card.
 
 ## 🔑 Custody
 
@@ -86,28 +74,24 @@ To move the agent to another wallet, stage a transfer snapshot in `ethagent`. Bo
 
 ## 🔍 Architecture
 
-Built on open standards, so your agent is never tied to one harness.
+Built on open standards, so your agent is never tied to one app.
 
 | Layer | Built on | What it does |
 | --- | --- | --- |
 | Ownership | ERC-8004 | The onchain token your wallet holds, on Ethereum mainnet or Base. Owning it is what makes the agent yours. |
 | Discovery | Agent Card | Your public profile and skill listing, carried by the token, so other agents can find yours. |
-| Naming | ENS | A human-readable name that resolves to your agent and restores it from the name alone. |
+| Naming | ENS | An optional readable name that resolves to your agent and restores it from the name alone. |
 | Backup | IPFS snapshot | The encrypted bundle of soul, memory, and skills, pinned offchain and unlocked only by your wallet. |
 
 ## 🔄 Updating
 
-ethagent ships as two pieces, and a full update can touch both:
+ethagent updates itself. Everything runs through `npx ethagent`, which always fetches the latest published version, so a new release reaches you with nothing to install. If you keep a global copy on your PATH, refresh it with:
 
-- **The npm package** (the engine: sync, skills, the guards). The plugin's hooks call `npx -y ethagent`, which resolves the latest published release, so **publishing a new version is the update** — nothing for most people to run. If you installed it globally, or call a bare `ethagent` in a hook or your shell, refresh that copy:
+```bash
+npm i -g ethagent@latest
+```
 
-  ```bash
-  npm i -g ethagent@latest
-  ```
-
-  Confirm what you're running with `ethagent --version`.
-
-- **The Claude Code plugin** (the hook wiring). New hooks ship in the plugin manifest, so to pick them up, update the plugin from the marketplace with `/plugin`.
+Check what you're running with `ethagent --version`. Update the Claude Code plugin from the marketplace with `/plugin`.
 
 ## ⌨️ Commands
 
@@ -115,10 +99,10 @@ Run with `npx ethagent`:
 
 | Command | What it does |
 | --- | --- |
-| `ethagent` | Open the interactive identity manager: create, ENS, custody, transfer. |
-| `save` | Save an encrypted snapshot: pin to IPFS and rotate the onchain pointer. |
-| `--sync` | Sync soul, memory, and skills (public and private) into every harness it detects. |
-| `--sync-list` | List sync adapters and which ones detect in the current environment. |
-| `--status` | Print a one-line identity summary. |
-| `--demo` | Walk the manager with synthetic data, no wallet needed. |
-| `reset` | Delete local identity, continuity, and secrets. |
+| `ethagent` | Open the interactive manager (create, ENS, custody, transfer). |
+| `save` | Back up your agent onchain (you sign in your wallet). |
+| `--add <path>` | Wire a tool ethagent doesn't auto-detect (point at its `AGENTS.md`). |
+| `pause` / `resume` | Pause or resume background sync. |
+| `--status` | Show the agent summary and detected tools. |
+| `--demo` | Open the interactive manager preloaded with a sample agent, so you can explore how ethagent works without creating an identity, connecting a wallet, or going online. |
+| `reset` | Delete the local identity, data, and secrets. |

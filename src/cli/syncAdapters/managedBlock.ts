@@ -9,7 +9,7 @@ const SYNC_STATE_FILE = '.ethagent-sync.json'
 
 export const START = '<!-- ethagent:start -->'
 export const END = '<!-- ethagent:end -->'
-const MANAGED_NOTE = '<!-- managed by ethagent; edits between these markers are pulled into your vault on `ethagent --sync`. -->'
+const MANAGED_NOTE = '<!-- managed by ethagent; edits between these markers are pulled into your vault automatically. -->'
 const SOUL_START = '<!-- ethagent:soul:start -->'
 const SOUL_END = '<!-- ethagent:soul:end -->'
 const MEMORY_START = '<!-- ethagent:memory:start -->'
@@ -17,6 +17,16 @@ const MEMORY_END = '<!-- ethagent:memory:end -->'
 
 function stripFirstHeader(value: string): string {
   return value.replace(/^#[^\n]*\n/, '')
+}
+
+/**
+ * Defang ethagent marker syntax in injected content so a body can never contain a real
+ * start/end/soul/memory marker that would truncate or mis-splice the managed block. Rewrites
+ * `<!-- ethagent:` to `<!-- ethagent `. Applied to soul, memory, and skill content alike.
+ * A no-op for normal content (which never contains the marker syntax).
+ */
+export function neutralizeManagedMarkers(text: string): string {
+  return text.replace(/<!--\s*ethagent:/gi, '<!-- ethagent ')
 }
 
 export function sectionKey(fileContent: string): string {
@@ -30,11 +40,11 @@ export function normalizeBody(body: string): string {
 export function renderManagedBlock(context: SyncContext | undefined, extra?: string): string {
   const lines: string[] = [START, MANAGED_NOTE, '']
   if (context) {
-    const soul = stripFirstHeader(context.soul).trim()
+    const soul = neutralizeManagedMarkers(stripFirstHeader(context.soul).trim())
     lines.push(SOUL_START)
     if (soul) lines.push(soul)
     lines.push(SOUL_END, '')
-    const memory = stripFirstHeader(context.memory).trim()
+    const memory = neutralizeManagedMarkers(stripFirstHeader(context.memory).trim())
     lines.push(MEMORY_START)
     if (memory) lines.push(memory)
     lines.push(MEMORY_END, '')
@@ -67,6 +77,7 @@ export async function injectManagedBlock(filePath: string, block: string): Promi
       : `${block}\n`
   }
 
+  if (next === existing) return
   await fs.writeFile(filePath, next, 'utf8')
 }
 
@@ -100,6 +111,21 @@ export function extractOutsideManaged(fileContent: string): string {
     return [before, after].filter(Boolean).join('\n\n').trim()
   }
   return fileContent.trim()
+}
+
+/**
+ * The skill/guidance portion of the managed block (everything after the soul/memory
+ * sub-blocks). Used to detect when a harness edited its skills so the edit can be
+ * preserved before a mirror overwrites it. Returns null when there is no managed block.
+ */
+export function extractManagedExtra(fileContent: string): string | null {
+  const startIdx = fileContent.indexOf(START)
+  const endIdx = fileContent.indexOf(END)
+  if (startIdx === -1 || endIdx === -1 || endIdx <= startIdx) return null
+  const inner = fileContent.slice(startIdx + START.length, endIdx)
+  const memoryEndIdx = inner.indexOf(MEMORY_END)
+  const tail = memoryEndIdx !== -1 ? inner.slice(memoryEndIdx + MEMORY_END.length) : inner
+  return tail.replace(MANAGED_NOTE, '').trim()
 }
 
 function extractBetween(text: string, start: string, end: string): string | null {

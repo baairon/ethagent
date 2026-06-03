@@ -272,7 +272,7 @@ async function savePendingTxMutation(
     } catch (err: unknown) {
       if (!(err instanceof ConfigVersionStaleError)) throw err
       if (attempt === 1) {
-        console.warn('[ethagent] pending-tx config write skipped: cross-tab conflict persisted after retry')
+        process.stderr.write('[ethagent] pending-tx config write skipped: cross-tab conflict persisted after retry\n')
         return null
       }
     }

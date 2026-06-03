@@ -4,6 +4,7 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { mirrorAsSkillFolders, readManifest, type PublicSkill } from '../../../src/cli/syncAdapters/shared.js'
+import { parseSkillFile } from '../../../src/identity/continuity/skills/frontmatter.js'
 
 async function makeVaultSkill(
   vaultSkills: string,
@@ -50,6 +51,77 @@ test('mirrorAsSkillFolders copies the whole skill folder (scripts + assets), not
 
     const manifest = await readManifest(harness)
     assert.deepEqual(manifest.skills, ['sovereign-pink'])
+  } finally {
+    await fs.rm(tmp, { recursive: true, force: true }).catch(() => null)
+  }
+})
+
+test('mirrorAsSkillFolders does not rewrite an unchanged managed skill (idempotent, no churn -> no watch loop)', async () => {
+  const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'ethagent-mirror-'))
+  try {
+    const vault = path.join(tmp, 'vault')
+    const harness = path.join(tmp, 'harness')
+    await fs.mkdir(vault, { recursive: true })
+    const skill = await makeVaultSkill(vault, 'demo', { withFiles: true })
+
+    await mirrorAsSkillFolders(harness, [skill])
+    const mirrored = path.join(harness, 'demo', 'SKILL.md')
+    const firstMtime = (await fs.stat(mirrored)).mtimeMs
+
+    // A second identical mirror must leave the files untouched. If it rewrote them, the
+    // bumped mtime would re-fire the daemon's recursive watcher and spin a sync loop.
+    const result = await mirrorAsSkillFolders(harness, [skill])
+    assert.equal(result.count, 1)
+    assert.equal((await fs.stat(mirrored)).mtimeMs, firstMtime)
+  } finally {
+    await fs.rm(tmp, { recursive: true, force: true }).catch(() => null)
+  }
+})
+
+test('a skill containing a Windows reserved-name file (nul.md) still mirrors (file skipped, not aborted)', async () => {
+  const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'ethagent-mirror-'))
+  try {
+    const vault = path.join(tmp, 'vault')
+    const harness = path.join(tmp, 'harness')
+    await fs.mkdir(vault, { recursive: true })
+    const skill = await makeVaultSkill(vault, 'demo', { withFiles: true })
+    await fs.writeFile(path.join(vault, 'demo', 'nul.md'), 'reserved device name\n')
+
+    const result = await mirrorAsSkillFolders(harness, [skill])
+    assert.equal(result.count, 1) // the skill mirrors; the reserved file does not abort it
+    await fs.access(path.join(harness, 'demo', 'SKILL.md'))
+    await assert.rejects(fs.access(path.join(harness, 'demo', 'nul.md'))) // reserved-name file skipped
+  } finally {
+    await fs.rm(tmp, { recursive: true, force: true }).catch(() => null)
+  }
+})
+
+test('mirrorAsSkillFolders rewrites SKILL.md frontmatter as strict-valid YAML (Codex-safe)', async () => {
+  const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'ethagent-mirror-'))
+  try {
+    const vault = path.join(tmp, 'vault')
+    const harness = path.join(tmp, 'harness')
+    const dir = path.join(vault, 'vscode-setup')
+    await fs.mkdir(dir, { recursive: true })
+    const description = 'Set it up in one shot: apply my "Dark" theme'
+    // Lenient (Claude-tolerated) frontmatter: an unquoted colon + quotes a strict parser rejects.
+    await fs.writeFile(
+      path.join(dir, 'SKILL.md'),
+      `---\nname: vscode-setup\ndescription: ${description}\nvisibility: public\n---\n\nbody\n`,
+    )
+    const skill: PublicSkill = {
+      name: 'vscode-setup',
+      description,
+      visibility: 'public',
+      relativePath: 'vscode-setup/SKILL.md',
+      absolutePath: path.join(dir, 'SKILL.md'),
+    }
+
+    await mirrorAsSkillFolders(harness, [skill])
+
+    const mirrored = await fs.readFile(path.join(harness, 'vscode-setup', 'SKILL.md'), 'utf8')
+    assert.match(mirrored, /description: "/) // now a quoted YAML scalar
+    assert.equal(parseSkillFile(mirrored).frontmatter.description, description) // round-trips
   } finally {
     await fs.rm(tmp, { recursive: true, force: true }).catch(() => null)
   }

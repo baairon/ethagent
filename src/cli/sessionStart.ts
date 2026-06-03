@@ -1,4 +1,5 @@
 import { runSync } from './sync.js'
+import { ensureDaemon } from './daemon.js'
 
 export function buildSessionStartContext(): string {
   return (
@@ -16,6 +17,9 @@ export async function runSessionStart(): Promise<number> {
   try {
     await runSync({ quiet: true })
   } catch { /* sync is best-effort; never block session start on it */ }
+  try {
+    ensureDaemon()
+  } catch { /* keeping the autosync daemon alive is best-effort too */ }
   process.stdout.write(
     JSON.stringify({
       hookSpecificOutput: {

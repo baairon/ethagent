@@ -6,7 +6,7 @@ import path from 'node:path'
 import { pullHarnessSoulMemoryIntoVault, pushVaultSoulMemoryToHarness, reconcileSoulMemory } from '../../../src/cli/sync.js'
 import { claudeCodeAdapter } from '../../../src/cli/syncAdapters/claude-code.js'
 import { codexAdapter } from '../../../src/cli/syncAdapters/codex.js'
-import { parseManagedContext, removeManagedBlock } from '../../../src/cli/syncAdapters/managedBlock.js'
+import { parseManagedContext, removeManagedBlock, renderManagedBlock } from '../../../src/cli/syncAdapters/managedBlock.js'
 import { continuityVaultRef, readContinuityFiles, writeContinuityFiles } from '../../../src/identity/continuity/storage.js'
 import type { SkillIndexEntry } from '../../../src/identity/continuity/skills/types.js'
 import type { EthagentIdentity } from '../../../src/storage/config.js'
@@ -21,6 +21,19 @@ const identity: EthagentIdentity = {
   agentId: '42',
   state: { name: 'test agent', description: 'public test agent' },
 }
+
+test('a literal ethagent marker in soul/memory is neutralized, so the body round-trips without truncation', () => {
+  const context = {
+    soul: '# SOUL.md\n\nvoice line\n',
+    memory: '# MEMORY.md\n\nNote: ethagent bounds memory with <!-- ethagent:memory:end --> and keeps going after it\n',
+  }
+  const block = renderManagedBlock(context, 'guidance tail')
+  // only the real closing marker exists; the one in the body was defanged
+  assert.equal((block.match(/<!-- ethagent:memory:end -->/g) ?? []).length, 1)
+  const parsed = parseManagedContext(block)
+  assert.match(parsed.memory ?? '', /Note: ethagent bounds memory/)
+  assert.match(parsed.memory ?? '', /keeps going after it/) // nothing dropped
+})
 
 async function seedVault(soulBody: string, memoryBody: string): Promise<void> {
   await writeContinuityFiles(identity, {

@@ -1,5 +1,6 @@
 import { loadConfig } from '../storage/config.js'
 import { hookFilePath, isWithinDir, readHookPayload } from './hookIo.js'
+import { writePreToolDeny } from './guardOutput.js'
 import { claudeCodeNativeMemoryDir } from './syncAdapters/claude-code.js'
 
 export const MEMORY_REDIRECT_REASON =
@@ -26,17 +27,7 @@ export async function runMemoryGuard(): Promise<number> {
     const config = await loadConfig()
     const filePath = hookFilePath(await readHookPayload())
     const decision = decideMemoryGuard(filePath, { identityPresent: !!config?.identity })
-    if (decision.deny) {
-      process.stdout.write(
-        JSON.stringify({
-          hookSpecificOutput: {
-            hookEventName: 'PreToolUse',
-            permissionDecision: 'deny',
-            permissionDecisionReason: decision.reason,
-          },
-        }) + '\n',
-      )
-    }
+    if (decision.deny && decision.reason) writePreToolDeny(decision.reason)
   } catch { /* on any guard failure, stay silent and allow the tool call */ }
   return 0
 }

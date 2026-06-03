@@ -1,6 +1,95 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { parseSkillFile } from '../../../src/identity/continuity/skills/frontmatter.js'
+import { parseSkillFile, serializeSkillFile, sanitizeSkillFileForStrictYaml } from '../../../src/identity/continuity/skills/frontmatter.js'
+
+test('sanitizeSkillFileForStrictYaml quotes colon-y values, preserves unknown keys, leaves the body', () => {
+  const src = [
+    '---',
+    'name: media-dl',
+    'description: Download media in one shot: mp4, mp3, gif',
+    'allowed-tools: Bash, Read',
+    'visibility: public',
+    '---',
+    '',
+    'body line: stays as-is',
+    '',
+  ].join('\n')
+  const out = sanitizeSkillFileForStrictYaml(src)
+  assert.match(out, /description: "Download media in one shot: mp4, mp3, gif"/) // colon-y value quoted -> strict-valid
+  assert.match(out, /allowed-tools: "Bash, Read"/) // unknown key PRESERVED (not dropped)
+  assert.match(out, /name: "media-dl"/)
+  assert.match(out, /^body line: stays as-is$/m) // body untouched (not quoted)
+  assert.equal(parseSkillFile(out).frontmatter.description, 'Download media in one shot: mp4, mp3, gif')
+})
+
+test('sanitizeSkillFileForStrictYaml leaves a multi-line plain scalar valid (does not strand its continuation)', () => {
+  const src = [
+    '---',
+    'name: demo',
+    'description: line one',
+    '  line two continues the scalar',
+    'visibility: public',
+    '---',
+    '',
+    'body',
+    '',
+  ].join('\n')
+  const out = sanitizeSkillFileForStrictYaml(src)
+  // quoting only "line one" would strand "  line two" -> strict-invalid YAML, so leave it unquoted
+  assert.match(out, /^description: line one$/m)
+  assert.match(out, /^  line two continues the scalar$/m)
+  assert.match(out, /visibility: "public"/) // a normal sibling key is still quoted
+})
+
+test('sanitizeSkillFileForStrictYaml leaves block-scalar content lines verbatim (no corruption)', () => {
+  const src = [
+    '---',
+    'name: demo',
+    'description: |',
+    '  summary: a colon here',
+    '  detail: more',
+    'visibility: public',
+    '---',
+    '',
+    'body',
+    '',
+  ].join('\n')
+  const out = sanitizeSkillFileForStrictYaml(src)
+  assert.match(out, /^  summary: a colon here$/m) // block content untouched, not re-quoted
+  assert.match(out, /^  detail: more$/m)
+  assert.match(out, /visibility: "public"/) // the sibling key after the block is still quoted
+})
+
+test('serializeSkillFile emits strict-valid quoted YAML and round-trips through parseSkillFile', () => {
+  const frontmatter = {
+    name: 'vscode-setup',
+    // The real-world breakage: a colon and embedded double-quotes in the description, which
+    // a strict YAML parser (Codex) rejects when unquoted.
+    description: 'Set up VS Code in one shot: apply my "Preferences Dark" theme',
+    visibility: 'public' as const,
+    tags: ['vscode', 'setup'],
+  }
+  const out = serializeSkillFile(frontmatter, 'body text\n')
+  // The description must be double-quoted (so the colon/quotes are inside a YAML scalar).
+  assert.match(out, /description: "Set up VS Code in one shot: apply my \\"Preferences Dark\\" theme"/)
+  const parsed = parseSkillFile(out)
+  assert.equal(parsed.frontmatter.name, frontmatter.name)
+  assert.equal(parsed.frontmatter.description, frontmatter.description)
+  assert.equal(parsed.frontmatter.visibility, 'public')
+  assert.deepEqual(parsed.frontmatter.tags, frontmatter.tags)
+  assert.equal(parsed.body, 'body text')
+})
+
+test('serializeSkillFile escapes control characters so a strict YAML parser stays happy', () => {
+  // form feed (0x0C), BEL (0x07), ESC (0x1B), DEL (0x7F) are invalid raw in a YAML scalar
+  const out = serializeSkillFile({ name: 'x', description: 'a\fb\x07c\x1bd\x7fe' }, '')
+  // no raw control chars survive (newline 0x0A and tab 0x09 are fine; check the forbidden set)
+  assert.doesNotMatch(out, /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/)
+  assert.match(out, /\\x0C/)
+  assert.match(out, /\\x07/)
+  assert.match(out, /\\x1B/)
+  assert.match(out, /\\x7F/)
+})
 
 test('parses supported frontmatter keys with quoted and bare scalars', () => {
   const content = [

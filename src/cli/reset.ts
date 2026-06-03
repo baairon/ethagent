@@ -4,6 +4,9 @@ import { stdout, stderr } from 'node:process'
 import { ResetConfirmView } from './ResetConfirmView.js'
 import { resetPlan, runReset, type ResetPlan } from '../storage/reset.js'
 import { clearHarnessManagedBlocks } from './syncAdapters/index.js'
+import { removeClaudeHooks } from './syncAdapters/claude-code.js'
+import { uninstallAutostart } from './autostart.js'
+import { stopDaemon } from './daemon.js'
 
 export async function runResetCommand(args: string[] = []): Promise<number> {
   const yes = args.includes('--yes') || args.includes('-y')
@@ -36,6 +39,9 @@ export async function runResetCommand(args: string[] = []): Promise<number> {
 }
 
 async function finishReset(): Promise<void> {
+  stopDaemon()
+  uninstallAutostart()
+  await removeClaudeHooks()
   const cleared = await clearHarnessManagedBlocks()
   if (cleared.length > 0) {
     stdout.write(`Cleared ethagent markers from ${cleared.length} file${cleared.length === 1 ? '' : 's'}.\n`)

@@ -94,9 +94,17 @@ export async function reconcileSoulMemory(
     statIfExists(ref.memoryPath),
   ])
 
-  const reads = await Promise.all(
-    adapters.map(adapter => (adapter.readManaged ? adapter.readManaged().catch(() => null) : Promise.resolve(null))),
+  // Gather every managed file as a separate candidate. Adapters with multiple managed files
+  // (the generic adapter's N targets) expose readManagedCandidates so each target's newest
+  // edit is considered; collapsing them to one read could silently drop a non-newest edit.
+  const readsPerAdapter = await Promise.all(
+    adapters.map(async adapter => {
+      if (adapter.readManagedCandidates) return adapter.readManagedCandidates().catch(() => [])
+      if (adapter.readManaged) { const r = await adapter.readManaged().catch(() => null); return r ? [r] : [] }
+      return []
+    }),
   )
+  const reads = readsPerAdapter.flat()
 
   const soulPick = soulStat
     ? pickNewest(files['SOUL.md'], soulStat.mtimeMs, reads.map(r => ({ body: r?.soul ?? null, mtimeMs: r?.mtimeMs ?? 0, lastPushedHash: r?.lastSoulHash })), '# SOUL.md')
@@ -174,15 +182,6 @@ export async function pushVaultSoulMemoryToHarness(identity: EthagentIdentity): 
       process.stderr.write(`ethagent: could not push soul/memory to ${failed.join(', ')} (will reconcile on next sync)\n`)
     }
   } catch {}
-}
-
-export async function runSyncList(): Promise<number> {
-  for (const adapter of BUILT_IN_ADAPTERS) {
-    const detected = await adapter.detect().catch(() => false)
-    const mark = detected ? 'detected' : 'not detected'
-    process.stdout.write(`  ${adapter.name.padEnd(14)} ${mark.padEnd(13)} ${adapter.description}\n`)
-  }
-  return 0
 }
 
 export async function runSyncOnEdit(): Promise<number> {

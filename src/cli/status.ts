@@ -1,5 +1,6 @@
 import { loadConfig, type EthagentIdentity } from '../storage/config.js'
 import { getIdentityStatus } from '../storage/identity.js'
+import { detectSyncTargets } from './sync.js'
 import { continuityWorkingTreeStatus } from '../identity/continuity/storage/status.js'
 import { listPublishedContinuitySnapshots } from '../identity/continuity/snapshots.js'
 import { changedContinuitySnapshotFiles } from '../identity/manager/continuity/state.js'
@@ -30,6 +31,10 @@ export async function runStatus(version: string): Promise<number> {
   const localChanges = config?.identity ? await localChangesSegment(config.identity) : null
   if (localChanges) bits.push(localChanges)
   process.stdout.write(bits.join(' · ') + '\n')
+  if (config?.identity) {
+    const names = (await detectSyncTargets().catch(() => [])).map(t => t.name)
+    process.stdout.write(`wired into: ${names.length ? names.join(', ') : 'none detected yet'}\n`)
+  }
   return 0
 }
 

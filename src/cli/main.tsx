@@ -10,7 +10,7 @@ import { KeybindingProvider } from '../app/keybindings/KeybindingProvider.js'
 import { IdentityManager } from '../identity/manager/IdentityManager.js'
 import type { IdentityManagerResult } from '../identity/manager/IdentityManager.js'
 import { loadConfig, saveConfig, type EthagentConfig } from '../storage/config.js'
-import { runSync, runSyncList, runSyncOnEdit } from './sync.js'
+import { runSyncOnEdit } from './sync.js'
 import { runMemoryGuard } from './memoryGuard.js'
 import { runSkillGuard } from './skillGuard.js'
 import { runPreToolGuard } from './pretoolGuard.js'
@@ -18,6 +18,10 @@ import { runSessionStart } from './sessionStart.js'
 import { runStatus } from './status.js'
 import { runResetCommand } from './reset.js'
 import { runSave } from './save.js'
+import { ensureBootstrapped } from './bootstrap.js'
+import { ensureDaemon } from './daemon.js'
+import { runWatch } from './watch.js'
+import { runAddTool, runPause, runResume } from './prefs.js'
 import { enableDemoMode, synthDemoConfig } from './demo.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -38,20 +42,14 @@ function printHelp(): void {
     '',
     'usage:',
     '  ethagent                    manage identity',
-    '  ethagent save               save an encrypted snapshot: pin to IPFS, rotate the onchain pointer (you approve in your wallet)',
+    '  ethagent save               back up your agent onchain (you approve in your wallet)',
     '  ethagent reset              delete local identity, continuity, and secrets',
-    '  ethagent --sync             sync soul, memory, and skills to every harness',
-    '  ethagent --sync-list        list sync adapters and which ones detect here',
-    '  ethagent --demo             walk identity with synthetic data',
-    '  ethagent --status           print one-line identity summary',
+    '  ethagent --add <path>       wire another tool by its config file (e.g. AGENTS.md)',
+    '  ethagent pause              pause background sync (resume with: ethagent resume)',
+    '  ethagent --status           print a one-line identity summary',
+    '  ethagent --demo             explore with synthetic data, no wallet needed',
     '  ethagent --version          print version',
     '  ethagent --help             print this help',
-    '',
-    'plugin hooks (invoked automatically, not meant to be run by hand):',
-    '  ethagent --session-start    sync, then tell the agent where to record memory',
-    '  ethagent --pretool-guard    one PreToolUse guard combining --memory-guard + --skill-guard',
-    '  ethagent --memory-guard     keep agent memory in the portable markers, not local notes',
-    '  ethagent --skill-guard      keep skills in the portable vault, not the harness mirror',
   ]
   for (const line of lines) process.stdout.write(line + '\n')
 }
@@ -150,13 +148,25 @@ async function main(): Promise<number> {
     printHelp()
     return 0
   }
+  // Hook flags must stay fast and side-effect-light; they wire nothing heavy here.
   if (flags.has('--sync-on-edit')) return runSyncOnEdit()
   if (flags.has('--session-start')) return runSessionStart()
   if (flags.has('--pretool-guard')) return runPreToolGuard()
   if (flags.has('--memory-guard')) return runMemoryGuard()
   if (flags.has('--skill-guard')) return runSkillGuard()
-  if (flags.has('--sync-list')) return runSyncList()
-  if (flags.has('--sync')) return runSync()
+  // The shell-profile hook fires this on terminal open: bring the daemon up, then exit fast.
+  if (flags.has('--ensure-daemon')) { ensureDaemon(); return 0 }
+
+  // `watch` is the background sync engine ethagent spawns for itself; not a user command.
+  if (argv[0] === 'watch') return runWatch(argv.slice(1))
+
+  if (flags.has('--add')) return runAddTool(argv.filter(a => a !== '--add'))
+  if (argv[0] === 'pause') return runPause()
+  if (argv[0] === 'resume') return runResume()
+
+  // Normal invocations self-wire invisibly: set up tools (first run) and keep autosync alive.
+  if (argv[0] !== 'reset' && !flags.has('--demo')) await ensureBootstrapped()
+
   if (flags.has('--status')) return runStatus(version)
   if (flags.has('--demo')) {
     enableDemoMode()
@@ -177,7 +187,10 @@ async function main(): Promise<number> {
     return 2
   }
 
-  return renderHub(undefined)
+  const exitCode = await renderHub(undefined)
+  // Creating an identity in the manager should wire your tools right away, not on the next run.
+  await ensureBootstrapped()
+  return exitCode
 }
 
 main()
