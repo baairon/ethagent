@@ -241,7 +241,7 @@ async function runOperatorWalletPublicProfileSave(
 ): Promise<void> {
   if (!step.identity.agentId) throw new Error('Cannot update public profile: identity is missing an agent token ID')
   if (!step.vaultAddress) {
-    throw new Error('Operator-wallet profile updates require a Vault. Set one up via Advanced Mode, or connect the owner wallet to update the profile.')
+    throw new Error('Operator-wallet profile updates require a Vault. Set one up via Custody Mode (choose Advanced), or connect the owner wallet to update the profile.')
   }
   const snapshotOwner = ownerAddressForSnapshotSave(step.identity, step.profileUpdates)
   const walletAccess = walletRestoreAccessContext(step.identity, step.registry, step.profileUpdates, snapshotOwner)

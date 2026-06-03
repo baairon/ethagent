@@ -93,7 +93,7 @@ export function identityManagerErrorView(err: unknown): IdentityManagerErrorView
     if (err.status === 403) {
       return {
         title: 'Pinata Storage Limit Reached',
-        detail: 'Pinata refused the upload (403). Your account is likely at its file or storage limit; the free plan caps at 500 files.',
+        detail: 'Pinata refused the upload (403). Your account is likely at its file or storage limit.',
         hint: 'Check your usage at https://app.pinata.cloud, remove old pins or upgrade your plan, then try again.',
       }
     }

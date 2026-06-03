@@ -63,7 +63,7 @@ Using another harness? You can still sync, but only Claude Code does it automati
 npx ethagent --sync
 ```
 
-One command syncs it into every harness on this machine — soul, memory, and skills (public and private) — but only when you run it. To back it up so you can restore it anywhere, run `ethagent save` (or open `ethagent` and choose **Save Snapshot**); either way you approve the signature in your wallet.
+One command syncs your agent into every harness on this machine: soul, memory, and skills (public and private). To back it up so you can restore it anywhere, run `ethagent save` (or open `ethagent` and choose **Save Snapshot**). Either way, you approve the signature in your wallet.
 
 ## 🔒 What stays private
 
@@ -109,8 +109,6 @@ ethagent ships as two pieces, and a full update can touch both:
 
 - **The Claude Code plugin** (the hook wiring). New hooks ship in the plugin manifest, so to pick them up, update the plugin from the marketplace with `/plugin`.
 
-Rule of thumb: new sync and skill behavior rides your existing hooks as soon as the package is published; a brand-new hook also needs a plugin update.
-
 ## ⌨️ Commands
 
 Run with `npx ethagent`:
@@ -118,7 +116,7 @@ Run with `npx ethagent`:
 | Command | What it does |
 | --- | --- |
 | `ethagent` | Open the interactive identity manager: create, ENS, custody, transfer. |
-| `save` | Save an encrypted snapshot: pin to IPFS and rotate the onchain pointer. Opens your browser wallet to approve; add `--no-open` to only print the URL, `--json` for machine output. |
+| `save` | Save an encrypted snapshot: pin to IPFS and rotate the onchain pointer. |
 | `--sync` | Sync soul, memory, and skills (public and private) into every harness it detects. |
 | `--sync-list` | List sync adapters and which ones detect in the current environment. |
 | `--status` | Print a one-line identity summary. |

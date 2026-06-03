@@ -117,8 +117,8 @@ export async function runOperatorWalletRebackup(args: {
   if (readCustodyMode(step.identity.state as Record<string, unknown> | undefined) === 'advanced') {
     throw new Error(
       !vaultAddress
-        ? 'Cannot publish this snapshot: advanced custody is configured but the operator vault address could not be resolved. Run `npx ethagent` -> Fix Records to repair the vault link.'
-        : 'Cannot publish this snapshot: no authorized operator wallet is available to sign. Connect an approved operator wallet, or run `npx ethagent` -> Fix Records.',
+        ? 'Cannot publish this snapshot: advanced custody is configured but the operator vault address could not be resolved. Run `npx ethagent` -> Custody Mode to repair the vault link.'
+        : 'Cannot publish this snapshot: no authorized operator wallet is available to sign. Connect an approved operator wallet, or run `npx ethagent` -> Custody Mode.',
     )
   }
 
@@ -240,7 +240,7 @@ async function runOperatorWalletVaultPublish(args: {
   }) as boolean
   if (!isOperator) {
     throw new Error(
-      `Operator wallet ${expectedSigner} is not yet authorized on the Vault to rotate this agent's URI. Connect the owner wallet and run "Fix Records" or re-add this operator to grant the permission.`,
+      `Operator wallet ${expectedSigner} is not yet authorized on the Vault to rotate this agent's URI. Connect the owner wallet and run \`npx ethagent\` -> Custody Mode or re-add this operator to grant the permission.`,
     )
   }
 
