@@ -4,7 +4,6 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import {
-  createSkillFile,
   invalidateSkillsCache,
   setSkillVisibility,
 } from '../../../src/identity/continuity/skills/loadSkills.js'
@@ -30,14 +29,8 @@ test('private skills are excluded from the Agent Card; public skills appear; fli
   await withHome(async () => {
     await ensureContinuityVault(identity)
     invalidateSkillsCache(identity)
-    await createSkillFile(identity, {
-      name: 'classified',
-      body: '---\nname: classified\ndescription: a real private skill\nvisibility: private\n---\n\nbody\n',
-    })
-    await createSkillFile(identity, {
-      name: 'shared',
-      body: '---\nname: shared\ndescription: a real public skill\nvisibility: public\n---\n\nbody\n',
-    })
+    await writeSkill('classified', '---\nname: classified\ndescription: a real private skill\nvisibility: private\n---\n\nbody\n')
+    await writeSkill('shared', '---\nname: shared\ndescription: a real public skill\nvisibility: public\n---\n\nbody\n')
     invalidateSkillsCache(identity)
 
     const pub = await derivePublicSkillEntries(identity)
@@ -56,6 +49,14 @@ test('private skills are excluded from the Agent Card; public skills appear; fli
     assert.match(card2, /classified/)
   })
 })
+
+async function writeSkill(name: string, body: string): Promise<void> {
+  const ref = await ensureContinuityVault(identity)
+  const skillDir = path.join(ref.skillsDir, name)
+  await fs.mkdir(skillDir, { recursive: true, mode: 0o700 })
+  await fs.writeFile(path.join(skillDir, 'SKILL.md'), body, { mode: 0o600 })
+  invalidateSkillsCache(identity)
+}
 
 async function withHome(fn: (home: string) => Promise<void>): Promise<void> {
   const prevHome = process.env.HOME

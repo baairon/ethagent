@@ -4,7 +4,6 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import {
-  createSkillFile,
   deleteSkillEntry,
   invalidateSkillsCache,
   isValidSkillEntryKey,
@@ -16,7 +15,7 @@ import {
   loadSkillsTree,
   setSkillVisibility,
 } from '../../../src/identity/continuity/skills/loadSkills.js'
-import { defaultSkillScaffold, isDraftScaffold } from '../../../src/identity/continuity/skills/scaffold.js'
+import { isDraftScaffold } from '../../../src/identity/continuity/skills/scaffold.js'
 import {
   continuityVaultRef,
   ensureContinuityVault,
@@ -34,36 +33,10 @@ const identity: EthagentIdentity = {
   state: { name: 'mutation test' },
 }
 
-test('createSkillFile writes a Claude-style flat folder with the rich scaffold', async () => {
-  await withHome(async () => {
-    await ensureContinuityVault(identity)
-    const created = await createSkillFile(identity, { name: 'obit' })
-    assert.equal(created.relativePath, 'obit/SKILL.md')
-    assert.equal(created.displayName, 'obit')
-
-    const ref = continuityVaultRef(identity)
-    const skillPath = path.join(ref.skillsDir, 'obit', 'SKILL.md')
-    const body = await fs.readFile(skillPath, 'utf8')
-    assert.match(body, /^---\n/)
-    assert.match(body, /name: obit/)
-    assert.match(body, /description: <one-line public description before publishing>/)
-    assert.match(body, /# Overview/)
-    assert.match(body, /# Instructions/)
-    assert.match(body, /# Examples/)
-    assert.match(body, /# Notes/)
-    assert.match(body, /visibility: private/)
-
-    const tree = await listSkillsTree(identity)
-    assert.equal(tree.skills.length, 1)
-    assert.equal(tree.skills[0]?.name, 'obit')
-    assert.equal(tree.skills[0]?.relativePath, 'obit/SKILL.md')
-  })
-})
-
 test('deleteSkillEntry removes the skill folder and all supporting files', async () => {
   await withHome(async () => {
     await ensureContinuityVault(identity)
-    await createSkillFile(identity, { name: 'obit' })
+    await writeSkill('obit', '---\nname: obit\nvisibility: private\n---\n\nbody\n')
     const ref = continuityVaultRef(identity)
     const referencesDir = path.join(ref.skillsDir, 'obit', 'references')
     await fs.mkdir(referencesDir, { recursive: true, mode: 0o700 })
@@ -75,26 +48,6 @@ test('deleteSkillEntry removes the skill folder and all supporting files', async
 
     const tree = await listSkillsTree(identity)
     assert.deepEqual(tree.skills, [])
-  })
-})
-
-test('createSkillFile rejects duplicate folder names', async () => {
-  await withHome(async () => {
-    await ensureContinuityVault(identity)
-    await createSkillFile(identity, { name: 'obit' })
-    await assert.rejects(
-      () => createSkillFile(identity, { name: 'obit' }),
-      /already exists/,
-    )
-  })
-})
-
-test('createSkillFile rejects path-traversal segments', async () => {
-  await withHome(async () => {
-    await ensureContinuityVault(identity)
-    await assert.rejects(() => createSkillFile(identity, { name: '..' }))
-    await assert.rejects(() => createSkillFile(identity, { name: 'with/slash' }))
-    await assert.rejects(() => createSkillFile(identity, { name: 'with space' }))
   })
 })
 
@@ -144,7 +97,7 @@ test('materializeSkillsTree writes the canonical layout including supporting fil
 test('loadSkillsTree round-trips both SKILL.md and supporting files', async () => {
   await withHome(async () => {
     await ensureContinuityVault(identity)
-    const body = defaultSkillScaffold({ name: 'obit' })
+    const body = '---\nname: obit\nvisibility: private\n---\n\n# Overview\n\nbody\n'
     await materializeSkillsTree(identity, {
       'obit/SKILL.md': body,
       'obit/references/api.md': '# api\n',
@@ -241,7 +194,7 @@ test('normalizeContinuitySkills: canonical flat key always wins over colliding l
 test('setSkillVisibility flips frontmatter and preserves body', async () => {
   await withHome(async () => {
     await ensureContinuityVault(identity)
-    await createSkillFile(identity, { name: 'obit' })
+    await writeSkill('obit', '---\nname: obit\nvisibility: private\n---\n\n# Overview\n\nbody\n')
     const ref = continuityVaultRef(identity)
     const file = path.join(ref.skillsDir, 'obit', 'SKILL.md')
 
@@ -277,35 +230,6 @@ test('setSkillVisibility adds visibility line when missing', async () => {
   })
 })
 
-test('createSkillFile defaults to visibility: private when no visibility is passed', async () => {
-  await withHome(async () => {
-    await ensureContinuityVault(identity)
-    const created = await createSkillFile(identity, { name: 'default-vis' })
-    const body = await fs.readFile(created.absolutePath, 'utf8')
-    assert.match(body, /visibility: private/)
-    assert.doesNotMatch(body, /visibility: public/)
-  })
-})
-
-test('createSkillFile honors explicit visibility: public', async () => {
-  await withHome(async () => {
-    await ensureContinuityVault(identity)
-    const created = await createSkillFile(identity, { name: 'public-skill', visibility: 'public' })
-    const body = await fs.readFile(created.absolutePath, 'utf8')
-    assert.match(body, /visibility: public/)
-  })
-})
-
-test('createSkillFile honors explicit visibility: private', async () => {
-  await withHome(async () => {
-    await ensureContinuityVault(identity)
-    const created = await createSkillFile(identity, { name: 'private-skill', visibility: 'private' })
-    const body = await fs.readFile(created.absolutePath, 'utf8')
-    assert.match(body, /visibility: private/)
-    assert.doesNotMatch(body, /visibility: public/)
-  })
-})
-
 test('isDraftScaffold detects empty, placeholder, and self-named descriptions', () => {
   assert.equal(isDraftScaffold({ description: '', name: 'obit' }), true)
   assert.equal(isDraftScaffold({ description: '<placeholder>', name: 'obit' }), true)
@@ -314,6 +238,14 @@ test('isDraftScaffold detects empty, placeholder, and self-named descriptions', 
   assert.equal(isDraftScaffold({ description: 'Replace this draft with one or two sentences describing what this skill does', name: 'obit' }), true)
   assert.equal(isDraftScaffold({ description: 'Draft eulogies for a given person', name: 'obit' }), false)
 })
+
+async function writeSkill(name: string, body: string): Promise<void> {
+  const ref = continuityVaultRef(identity)
+  const skillDir = path.join(ref.skillsDir, name)
+  await fs.mkdir(skillDir, { recursive: true, mode: 0o700 })
+  await fs.writeFile(path.join(skillDir, 'SKILL.md'), body, { mode: 0o600 })
+  invalidateSkillsCache(identity)
+}
 
 async function withHome(fn: (home: string) => Promise<void>): Promise<void> {
   const prevHome = process.env.HOME

@@ -5,7 +5,6 @@ import type { EthagentIdentity } from '../../../storage/config.js'
 import { ensureContinuityVault } from '../storage/files.js'
 import { continuityVaultRef } from '../storage/paths.js'
 import { parseSkillFile } from './frontmatter.js'
-import { defaultSkillScaffold } from './scaffold.js'
 import {
   isReservedWindowsSegment,
   isValidFilenameSegment,
@@ -301,50 +300,6 @@ async function removeEmptySubdirs(root: string): Promise<void> {
     await removeEmptySubdirs(sub)
     const rest = await fs.readdir(sub).catch(() => [] as string[])
     if (rest.length === 0) await fs.rmdir(sub).catch(() => null)
-  }
-}
-
-export type CreateSkillArgs = {
-  name: string
-  body?: string
-  visibility?: SkillVisibility
-}
-
-export type CreateSkillResult = {
-  relativePath: string
-  absolutePath: string
-  displayName: string
-}
-
-export async function createSkillFile(
-  identity: EthagentIdentity,
-  args: CreateSkillArgs,
-): Promise<CreateSkillResult> {
-  if (!isValidSegment(args.name)) throw new Error('folder name must contain only letters, digits, dots, dashes, or underscores')
-  const ref = await ensureContinuityVault(identity)
-  await migrateLegacySkillFiles(ref.skillsDir)
-  const skillDir = path.join(ref.skillsDir, args.name)
-  const file = path.join(skillDir, SKILL_FILE_NAME)
-  const relativePath = `${args.name}/${SKILL_FILE_NAME}`
-  if (await pathExists(file)) {
-    throw new Error(`skill already exists at ${relativePath}`)
-  }
-  const skillDirExisted = await pathExists(skillDir)
-  await fs.mkdir(skillDir, { recursive: true, mode: 0o700 })
-  const body = args.body ?? defaultSkillScaffold({ name: args.name, ...(args.visibility ? { visibility: args.visibility } : {}) })
-  try {
-    await atomicWriteText(file, body, { mode: 0o600 })
-  } catch (err) {
-    if (!skillDirExisted) {
-      await fs.rm(skillDir, { recursive: true, force: true }).catch(() => null)
-    }
-    throw err
-  }
-  invalidateSkillsCache(identity)
-  return {
-    relativePath,
-    absolutePath: file,
-    displayName: args.name,
   }
 }
 
