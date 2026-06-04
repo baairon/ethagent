@@ -16,6 +16,7 @@ import { runSkillGuard } from './skillGuard.js'
 import { runPreToolGuard } from './pretoolGuard.js'
 import { runSessionStart } from './sessionStart.js'
 import { runStatus } from './status.js'
+import { runVaultDir } from './vaultDir.js'
 import { runResetCommand } from './reset.js'
 import { runSave } from './save.js'
 import { ensureBootstrapped } from './bootstrap.js'
@@ -47,6 +48,7 @@ function printHelp(): void {
     '  ethagent --add <path>       wire another tool by its config file (e.g. AGENTS.md)',
     '  ethagent pause              pause background sync (resume with: ethagent resume)',
     '  ethagent --status           print a one-line identity summary',
+    "  ethagent --vault-dir        print this agent's vault directory path",
     '  ethagent --demo             explore with synthetic data, no wallet needed',
     '  ethagent --version          print version',
     '  ethagent --help             print this help',
@@ -163,6 +165,8 @@ async function main(): Promise<number> {
   if (flags.has('--add')) return runAddTool(argv.filter(a => a !== '--add'))
   if (argv[0] === 'pause') return runPause()
   if (argv[0] === 'resume') return runResume()
+  // --vault-dir is a pure read of config (no tool-wiring, no daemon), so resolve it before bootstrap.
+  if (flags.has('--vault-dir')) return runVaultDir()
 
   // Normal invocations self-wire invisibly: set up tools (first run) and keep autosync alive.
   if (argv[0] !== 'reset' && !flags.has('--demo')) await ensureBootstrapped()

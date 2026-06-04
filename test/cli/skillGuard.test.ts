@@ -35,7 +35,7 @@ test('decideSkillGuard allows when the file path is missing', () => {
   assert.equal(decideSkillGuard(undefined, { identityPresent: true }).deny, false)
 })
 
-test('decideSkillGuard deny carries a reason: read-only mirror, ask the user, do not run the TUI', () => {
+test('decideSkillGuard deny carries a reason: read-only mirror, route adds directly to the vault skills dir', () => {
   const dir = claudeSkillsDir()
   const decision = decideSkillGuard(path.join(dir, 'foo', 'SKILL.md'), { identityPresent: true })
   assert.equal(decision.deny, true)
@@ -43,6 +43,6 @@ test('decideSkillGuard deny carries a reason: read-only mirror, ask the user, do
   assert.match(decision.reason ?? '', /private by default/i)
   assert.match(decision.reason ?? '', /read-only/i)
   assert.match(decision.reason ?? '', /overwritten/i)
-  assert.match(decision.reason ?? '', /ask the user/i)
-  assert.match(decision.reason ?? '', /will hang/i)
+  assert.match(decision.reason ?? '', /--vault-dir/)
+  assert.match(decision.reason ?? '', /directly/i)
 })

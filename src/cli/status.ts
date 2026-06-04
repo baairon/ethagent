@@ -1,6 +1,7 @@
 import { loadConfig, type EthagentIdentity } from '../storage/config.js'
 import { getIdentityStatus } from '../storage/identity.js'
 import { detectSyncTargets } from './sync.js'
+import { continuityVaultRef } from '../identity/continuity/storage.js'
 import { continuityWorkingTreeStatus } from '../identity/continuity/storage/status.js'
 import { listPublishedContinuitySnapshots } from '../identity/continuity/snapshots.js'
 import { changedContinuitySnapshotFiles } from '../identity/manager/continuity/state.js'
@@ -32,6 +33,7 @@ export async function runStatus(version: string): Promise<number> {
   if (localChanges) bits.push(localChanges)
   process.stdout.write(bits.join(' · ') + '\n')
   if (config?.identity) {
+    process.stdout.write(`vault: ${continuityVaultRef(config.identity).dir}\n`)
     const names = (await detectSyncTargets().catch(() => [])).map(t => t.name)
     process.stdout.write(`wired into: ${names.length ? names.join(', ') : 'none detected yet'}\n`)
   }

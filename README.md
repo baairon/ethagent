@@ -44,7 +44,7 @@ After it installs, reload the plugin and restart Claude Code so the hooks take e
 - **Memory** (`MEMORY.md`): what it has learned about you, your preferences, and your projects, so context survives the move to a new machine.
 - **Skills:** the commands and know-how you teach it, encrypted in your vault. Private by default; make one public to share it.
 
-You grow these mostly by talking: your agent updates its own soul and memory as you work, and you can just ask it to create a skill. Changes sync everywhere automatically; open `ethagent` to edit by hand, or choose **Save Snapshot** to back it up onchain.
+You grow these mostly by talking: your agent updates its own soul and memory as you work, and you can ask it to create itself a skill. Changes sync everywhere automatically; open `ethagent` to edit by hand, or choose **Save Snapshot** to back it up onchain.
 
 ## 💡 How it works
 
@@ -104,5 +104,6 @@ Run with `npx ethagent`:
 | `--add <path>` | Wire a tool ethagent doesn't auto-detect (point at its `AGENTS.md`). |
 | `pause` / `resume` | Pause or resume background sync. |
 | `--status` | Show the agent summary and detected tools. |
+| `--vault-dir` | Print this agent's vault directory (where soul, memory, and skills live). |
 | `--demo` | Open the interactive manager preloaded with a sample agent, so you can explore how ethagent works without creating an identity, connecting a wallet, or going online. |
 | `reset` | Delete the local identity, data, and secrets. |

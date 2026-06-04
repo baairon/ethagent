@@ -14,7 +14,6 @@ import type { ContinuityWorkingTreeStatus } from '../../../continuity/storage.js
 
 type SkillsTreeAction =
   | { kind: 'skill'; relativePath: string }
-  | { kind: 'new' }
   | { kind: 'open-folder' }
   | { kind: 'noop' }
   | { kind: 'back' }
@@ -27,7 +26,6 @@ interface SkillsTreeScreenProps {
   editorOpened?: boolean
   footer: React.ReactNode
   onOpenSkill: (relativePath: string) => void
-  onNewSkill: () => void
   onOpenFolder: () => void
   onBack: () => void
 }
@@ -40,7 +38,6 @@ export const SkillsTreeScreen: React.FC<SkillsTreeScreenProps> = ({
   editorOpened,
   footer,
   onOpenSkill,
-  onNewSkill,
   onOpenFolder,
   onBack,
 }) => {
@@ -100,7 +97,6 @@ export const SkillsTreeScreen: React.FC<SkillsTreeScreenProps> = ({
           hintLayout="inline"
           onSubmit={choice => {
             if (choice.kind === 'skill') return onOpenSkill(choice.relativePath)
-            if (choice.kind === 'new') return onNewSkill()
             if (choice.kind === 'open-folder') return onOpenFolder()
             if (choice.kind === 'back') return onBack()
           }}
@@ -147,10 +143,6 @@ function buildOptions(
     rows.push({ value: noopValue, role: 'section', label: '' })
   }
 
-  rows.push({
-    value: { kind: 'new' },
-    label: 'New Skill',
-  })
   rows.push({
     value: { kind: 'open-folder' },
     label: 'Open Skills Folder',

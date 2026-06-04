@@ -64,8 +64,6 @@ export type Step =
   | { kind: 'continuity-private'; notice?: string; editorOpened?: boolean }
   | { kind: 'continuity-public'; notice?: string; editorOpened?: boolean }
   | { kind: 'continuity-skills-tree'; notice?: string; editorOpened?: boolean }
-  | { kind: 'continuity-skill-new'; error?: string }
-  | { kind: 'continuity-skill-new-visibility'; name: string; error?: string }
   | { kind: 'continuity-skill-actions'; relativePath: string; notice?: string }
   | { kind: 'continuity-skill-delete-confirm'; target: { kind: 'skill'; relativePath: string } }
   | { kind: 'rebackup-confirm'; back: Step }
@@ -185,10 +183,6 @@ function backStep(from: Step): Step {
       return { kind: 'menu' }
     case 'continuity-skills-tree':
       return { kind: 'menu' }
-    case 'continuity-skill-new':
-      return { kind: 'continuity-skills-tree' }
-    case 'continuity-skill-new-visibility':
-      return { kind: 'continuity-skill-new' }
     case 'continuity-skill-actions':
       return { kind: 'continuity-skills-tree' }
     case 'continuity-skill-delete-confirm':

@@ -11,7 +11,6 @@ import {
 import { openFileInEditor, openInFileManager } from '../continuity/editor.js'
 import { listPublishedContinuitySnapshots } from '../continuity/snapshots.js'
 import {
-  createSkillFile,
   deleteSkillEntry,
   invalidateSkillsCache,
   readSkillByRelativePath,
@@ -57,7 +56,6 @@ export function useIdentityManagerContinuity({
   openContinuityFile: (kind: 'soul' | 'memory' | 'skills') => Promise<void>
   openSkillFile: (relativePath: string) => Promise<void>
   openSkillsFolder: () => Promise<void>
-  createSkill: (name: string, visibility: SkillVisibility) => Promise<void>
   deleteSkill: (relativePath: string) => Promise<void>
   setSkillVisibility: (relativePath: string, visibility: SkillVisibility) => Promise<void>
 } {
@@ -213,31 +211,6 @@ export function useIdentityManagerContinuity({
     }
   }
 
-  const createSkill = async (name: string, visibility: SkillVisibility): Promise<void> => {
-    const normalizedName = sanitizeSkillSegment(name)
-    if (!normalizedName) {
-      handleStepError(
-        new Error('Folder name must contain only letters, numbers, dashes, underscores, or dots'),
-        { kind: 'continuity-skill-new' },
-      )
-      return
-    }
-    try {
-      const id = await requireReadyVault()
-      const created = await createSkillFile(id, { name: normalizedName, visibility })
-      invalidateSkillsCache(id)
-      await syncAgentCardManifest(id)
-      const result = await openFileInEditor(created.absolutePath)
-      if (result.ok) {
-        setStep({ kind: 'continuity-skills-tree', editorOpened: true })
-      } else {
-        setStep({ kind: 'continuity-skills-tree', notice: `created ${created.relativePath}; open failed: ${result.error}`, editorOpened: false })
-      }
-    } catch (err: unknown) {
-      handleStepError(err, { kind: 'continuity-skill-new' })
-    }
-  }
-
   const deleteSkill = async (relativePath: string): Promise<void> => {
     await mutateSkillsTree({
       backStep: { kind: 'continuity-skills-tree' },
@@ -270,14 +243,9 @@ export function useIdentityManagerContinuity({
     openContinuityFile,
     openSkillFile,
     openSkillsFolder,
-    createSkill,
     deleteSkill,
     setSkillVisibility,
   }
-}
-
-export function sanitizeSkillSegment(value: string): string {
-  return value.trim().toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60)
 }
 
 async function readPublishedAgentCard(identity: EthagentIdentity): Promise<string> {

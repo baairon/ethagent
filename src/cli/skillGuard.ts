@@ -6,10 +6,10 @@ import { claudeSkillsDir } from './syncAdapters/claude-code.js'
 export const SKILL_REDIRECT_REASON =
   "~/.claude/skills is a read-only generated mirror of this agent's skills vault. Files you write or edit " +
   'here do not travel with the agent and are overwritten from the vault on the next sync, so retrying the ' +
-  'write will not work. Do NOT run `npx ethagent` to fix this yourself: it is interactive, needs a TTY, and ' +
-  'will hang the tool call. Adding or editing a skill is a human action: stop here and ask the user to add ' +
-  'or edit the skill via `npx ethagent` -> Skills, describing the skill you want. Skills are private by ' +
-  'default; ask the user to switch one to public only when they want it listed on the Agent Card.'
+  'write will not work. To add or change a skill, put its folder directly in the vault skills dir instead: ' +
+  'run `npx ethagent --vault-dir` to print the vault path (this flag is non-interactive and safe to run), ' +
+  'then create or edit the `<name>/SKILL.md` folder inside its `skills/` subdir. Skills are private by ' +
+  'default; set one to public only when it should be listed on the Agent Card.'
 
 export function decideSkillGuard(
   filePath: string | null | undefined,

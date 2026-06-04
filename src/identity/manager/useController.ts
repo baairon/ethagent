@@ -393,7 +393,6 @@ export function useIdentityManagerController({
     openContinuityFile: continuity.openContinuityFile,
     openSkillFile: continuity.openSkillFile,
     openSkillsFolder: continuity.openSkillsFolder,
-    createSkill: continuity.createSkill,
     deleteSkill: continuity.deleteSkill,
     setSkillVisibility: continuity.setSkillVisibility,
   }

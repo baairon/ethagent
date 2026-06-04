@@ -1,7 +1,5 @@
 import React from 'react'
 import { SkillsTreeScreen } from './SkillsTreeScreen.js'
-import { NewSkillScreen } from './NewSkillScreen.js'
-import { NewSkillVisibilityScreen } from './NewSkillVisibilityScreen.js'
 import { SkillActionsScreen } from './SkillActionsScreen.js'
 import { DeleteSkillConfirmScreen } from './DeleteSkillConfirmScreen.js'
 import type { Step } from '../../reducer.js'
@@ -12,16 +10,12 @@ type StepOf<K extends Step['kind']> = Extract<Step, { kind: K }>
 type SkillsStep = StepOf<
   | 'continuity-skills-tree'
   | 'continuity-skill-actions'
-  | 'continuity-skill-new'
-  | 'continuity-skill-new-visibility'
   | 'continuity-skill-delete-confirm'
 >
 
 export function isSkillsStep(step: Step): step is SkillsStep {
   return step.kind === 'continuity-skills-tree'
     || step.kind === 'continuity-skill-actions'
-    || step.kind === 'continuity-skill-new'
-    || step.kind === 'continuity-skill-new-visibility'
     || step.kind === 'continuity-skill-delete-confirm'
 }
 
@@ -40,7 +34,6 @@ export const SkillsRoutes: React.FC<SkillsRoutesProps> = ({ controller, footer }
     back,
     openSkillFile,
     openSkillsFolder,
-    createSkill,
     deleteSkill,
     setSkillVisibility,
   } = controller
@@ -55,7 +48,6 @@ export const SkillsRoutes: React.FC<SkillsRoutesProps> = ({ controller, footer }
         editorOpened={step.editorOpened}
         footer={footer}
         onOpenSkill={relativePath => setStep({ kind: 'continuity-skill-actions', relativePath })}
-        onNewSkill={() => setStep({ kind: 'continuity-skill-new' })}
         onOpenFolder={() => { void openSkillsFolder() }}
         onBack={back}
       />
@@ -73,29 +65,6 @@ export const SkillsRoutes: React.FC<SkillsRoutesProps> = ({ controller, footer }
         onSetVisibility={(relativePath, visibility) => { void setSkillVisibility(relativePath, visibility) }}
         onDelete={relativePath => setStep({ kind: 'continuity-skill-delete-confirm', target: { kind: 'skill', relativePath } })}
         onBack={back}
-      />
-    )
-  }
-
-  if (step.kind === 'continuity-skill-new') {
-    return (
-      <NewSkillScreen
-        error={step.error}
-        footer={footer}
-        onSubmit={name => setStep({ kind: 'continuity-skill-new-visibility', name })}
-        onCancel={back}
-      />
-    )
-  }
-
-  if (step.kind === 'continuity-skill-new-visibility') {
-    return (
-      <NewSkillVisibilityScreen
-        name={step.name}
-        {...(step.error ? { error: step.error } : {})}
-        footer={footer}
-        onSelect={visibility => { void createSkill(step.name, visibility) }}
-        onCancel={back}
       />
     )
   }

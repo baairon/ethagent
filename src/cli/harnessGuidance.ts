@@ -28,6 +28,7 @@ export function buildPortableInstruction(opts: PortableInstructionOptions): stri
     `the background; if you have paused it, resume with \`npx ethagent resume\`. This agent's skills and the files they bundle ` +
     `(scripts, assets) are mirrored read-only into ${skillsWhere}; when a skill refers to a file by a relative path, resolve it ` +
     "inside that skill's folder there. Do not hand-edit them (they are regenerated from the vault). To add or change a skill, " +
-    'ask the user to do it via `npx ethagent` -> Skills.'
+    'put its folder in the vault skills dir (NOT this read-only mirror): run `npx ethagent --vault-dir` to print the vault ' +
+    "path, then create or edit the `<name>/SKILL.md` folder inside its `skills/` subdir."
   )
 }
