@@ -51,6 +51,11 @@ async function touch(file: string, mtimeMs: number): Promise<void> {
   await fs.utimes(file, when, when)
 }
 
+function projectMemoryPath(): string {
+  const slug = process.cwd().replace(/[:\\\/]/g, '-')
+  return path.join(os.homedir(), '.claude', 'projects', slug, 'memory', 'MEMORY.md')
+}
+
 test('claude-code mirror injects soul and memory sub-marker blocks', async () => {
   await withHome(async () => {
     await seedVault('original soul body', 'original memory body')
@@ -311,6 +316,43 @@ test('claude-code mirror writes managed sync state for the project MEMORY.md too
     const projState = path.join(os.homedir(), '.claude', 'projects', slug, 'memory', '.ethagent-sync.json')
     const exists = await fs.access(projState).then(() => true, () => false)
     assert.equal(exists, true)
+  })
+})
+
+test('reconcile pulls an edit made in the project MEMORY.md back into the vault', async () => {
+  await withHome(async () => {
+    await seedVault('original soul body', 'original memory body')
+    const context = { soul: '# SOUL.md\n\noriginal soul body\n', memory: '# MEMORY.md\n\noriginal memory body\n' }
+    await claudeCodeAdapter.mirror([], context)
+
+    // Edit lands only in the project MEMORY.md managed block, never in CLAUDE.md.
+    const projFile = projectMemoryPath()
+    const edited = (await fs.readFile(projFile, 'utf8')).replace('original memory body', 'edited in project memory')
+    await fs.writeFile(projFile, edited, 'utf8')
+
+    const ref = continuityVaultRef(identity)
+    await touch(ref.memoryPath, 1_000)
+    await touch(projFile, 2_000)
+
+    const result = await reconcileSoulMemory(identity, [claudeCodeAdapter])
+    const files = await readContinuityFiles(identity)
+    assert.equal(files['MEMORY.md'], '# MEMORY.md\n\nedited in project memory\n')
+    assert.deepEqual(result.pulled, ['MEMORY.md'])
+  })
+})
+
+test('mirror refreshes a pre-existing OTHER project memory mirror, not just the current cwd', async () => {
+  await withHome(async () => {
+    await seedVault('soul body', 'memory body')
+    const otherFile = path.join(os.homedir(), '.claude', 'projects', 'C--some-other-project', 'memory', 'MEMORY.md')
+    await fs.mkdir(path.dirname(otherFile), { recursive: true })
+    await fs.writeFile(otherFile, '# MEMORY.md\n\nstale unrelated content\n', 'utf8')
+
+    await claudeCodeAdapter.mirror([], { soul: '# SOUL.md\n\nsoul body\n', memory: '# MEMORY.md\n\nmemory body\n' })
+
+    const parsed = parseManagedContext(await fs.readFile(otherFile, 'utf8'))
+    assert.equal(parsed.soul, 'soul body')
+    assert.equal(parsed.memory, 'memory body')
   })
 })
 

@@ -159,6 +159,20 @@ export async function projectMemoryMirrorsUnder(claudeRoot: string): Promise<str
   return mirrors
 }
 
+/**
+ * Every project MEMORY.md this adapter mirrors into: all existing
+ * projects/<slug>/memory/MEMORY.md files plus the current session's project path
+ * (so a brand-new project's mirror is still created by the foreground, correctly
+ * cwd'd, session). Enumerating the existing mirrors makes mirror/read/watch
+ * cwd-independent: the long-lived daemon inherits a frozen cwd, so without this it
+ * would keep writing only its original project's MEMORY.md and starve whichever
+ * project the user actually moved to. The vault soul/memory is global to the agent,
+ * so the same managed block is correct for every project mirror.
+ */
+async function projectMemoryTargets(): Promise<string[]> {
+  return [...new Set([...(await projectMemoryMirrorsUnder(claudeDir())), claudeProjectMemoryMdPath()])]
+}
+
 export const claudeCodeAdapter = {
   name: 'claude-code' as const,
   description: 'Mirror skills (public and private) into ~/.claude/skills and inject soul/memory into ~/.claude/CLAUDE.md and the project MEMORY.md.',
@@ -184,8 +198,22 @@ export const claudeCodeAdapter = {
   async readManaged(): Promise<ManagedRead | null> {
     return readManagedContext(claudeMdPath())
   },
+  // One read per managed file (global CLAUDE.md + every project MEMORY.md) so
+  // reconcile honors each file's newest edit. Without this the project MEMORY.md is
+  // a write-only mirror target and edits landing there never reach the vault.
+  async readManagedCandidates(): Promise<ManagedRead[]> {
+    const reads: ManagedRead[] = []
+    for (const target of [claudeMdPath(), ...(await projectMemoryTargets())]) {
+      const read = await readManagedContext(target)
+      if (read) reads.push(read)
+    }
+    return reads
+  },
   managedFilePaths(): string[] {
     return [claudeMdPath(), claudeProjectMemoryMdPath()]
+  },
+  async managedFilePathsAsync(): Promise<string[]> {
+    return projectMemoryTargets()
   },
   async resetManagedFilePaths(): Promise<string[]> {
     return [claudeMdPath(), ...(await projectMemoryMirrorsUnder(claudeDir()))]
@@ -203,7 +231,7 @@ export const claudeCodeAdapter = {
   async mirror(skills: PublicSkill[], context?: SyncContext): Promise<{ count: number; skipped: number }> {
     const result = await mirrorAsSkillFolders(claudeSkillsDir(), skills)
     if (context) {
-      for (const target of [claudeMdPath(), claudeProjectMemoryMdPath()]) {
+      for (const target of [claudeMdPath(), ...(await projectMemoryTargets())]) {
         await injectManagedBlock(target, renderManagedBlock(context))
         await writeManagedSyncState(target, context)
       }
