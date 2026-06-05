@@ -43,11 +43,15 @@ const defaultDeps: RunSaveDeps = {
 }
 
 export async function runSave(args: string[] = [], deps: RunSaveDeps = defaultDeps): Promise<number> {
+  if (args.includes('--operator')) {
+    const { runOperatorSave } = await import('./operatorSave.js')
+    return runOperatorSave(args.filter(a => a !== '--operator'))
+  }
   const json = args.includes('--json')
   const noOpen = args.includes('--no-open')
   const unknown = args.filter(a => a !== '--json' && a !== '--no-open')
   if (unknown.length > 0) {
-    stderr.write(`unknown save option: ${unknown[0]}\nusage: ethagent save [--json] [--no-open]\n`)
+    stderr.write(`unknown save option: ${unknown[0]}\nusage: ethagent save [--json] [--no-open] [--operator]\n`)
     return 2
   }
 

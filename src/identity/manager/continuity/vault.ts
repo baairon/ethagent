@@ -32,6 +32,7 @@ import {
   requestBrowserWalletSignatureAndTransaction,
   type WalletPurpose,
 } from '../../wallet/browserWallet.js'
+import type { SignAndTransactionRunner } from '../../wallet/localKeyWallet.js'
 import type { Step, ProfileUpdates } from '../reducer.js'
 import type { EffectCallbacks } from '../shared/effects/types.js'
 import { awaitConfirmedReceipt } from '../shared/effects/receipts.js'
@@ -86,8 +87,10 @@ export async function runOperatorWalletRebackup(args: {
   callbacks: EffectCallbacks
   walletPurpose: WalletPurpose
   deriveAgentName: (identity: EthagentIdentity) => string
+  signAndTransaction?: SignAndTransactionRunner
 }): Promise<void> {
   const { step, callbacks } = args
+  const signAndTransaction = args.signAndTransaction ?? requestBrowserWalletSignatureAndTransaction
   if (!step.identity.agentId) throw new Error('Cannot back up: identity is missing an agent token ID')
   const sourceAgentId = step.identity.agentId
   const snapshotOwner = ownerAddressForSnapshotSave(step.identity, step.profileUpdates)
@@ -111,6 +114,7 @@ export async function runOperatorWalletRebackup(args: {
       expectedSigner: effectiveSigner,
       vaultAddress,
       deriveAgentName: args.deriveAgentName,
+      signAndTransaction,
     })
     return
   }
@@ -224,8 +228,9 @@ async function runOperatorWalletVaultPublish(args: {
   expectedSigner: Address
   vaultAddress: Address
   deriveAgentName: (identity: EthagentIdentity) => string
+  signAndTransaction: SignAndTransactionRunner
 }): Promise<void> {
-  const { step, callbacks, sourceAgentId, snapshotOwner, walletAccess, challengePurpose, expectedSigner, vaultAddress } = args
+  const { step, callbacks, sourceAgentId, snapshotOwner, walletAccess, challengePurpose, expectedSigner, vaultAddress, signAndTransaction } = args
 
   const probeClient = createErc8004PublicClient(step.registry)
   const isOperator = await probeClient.readContract({
@@ -244,7 +249,7 @@ async function runOperatorWalletVaultPublish(args: {
     )
   }
 
-  const result = await requestBrowserWalletSignatureAndTransaction<VaultPublishPrepared>({
+  const result = await signAndTransaction<VaultPublishPrepared>({
     chainId: step.registry.chainId,
     messageForAccount: account => createWalletRestoreAccessChallenge({
       token: walletAccess.token,

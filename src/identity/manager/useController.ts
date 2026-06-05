@@ -1,5 +1,6 @@
 import { useEffect, useReducer, useState } from 'react'
 import type { EthagentConfig, EthagentIdentity } from '../../storage/config.js'
+import { loadConfig } from '../../storage/config.js'
 import { setTokenIdentity } from '../../storage/identity.js'
 import type { BrowserWalletReady } from '../wallet/browserWallet.js'
 import { resolveRegistryForIdentity as resolveRegistryForIdentityFromConfig } from '../registry/registryConfig.js'
@@ -84,6 +85,24 @@ export function useIdentityManagerController({
     const timer = setTimeout(() => setCopyNotice(null), 2500)
     return () => clearTimeout(timer)
   }, [copyNotice])
+
+  useEffect(() => {
+    if (step.kind !== 'menu') return
+    let cancelled = false
+    const refreshFromDisk = async (): Promise<void> => {
+      const fresh = await loadConfig().catch(() => null)
+      if (cancelled || !fresh?.identity) return
+      const current = config?.identity
+      const changed =
+        current?.backup?.cid !== fresh.identity.backup?.cid
+        || current?.metadataCid !== fresh.identity.metadataCid
+        || current?.agentUri !== fresh.identity.agentUri
+      if (changed) onConfigChange?.(fresh)
+    }
+    void refreshFromDisk()
+    const timer = setInterval(() => void refreshFromDisk(), 3000)
+    return () => { cancelled = true; clearInterval(timer) }
+  }, [step.kind, config?.identity?.backup?.cid, config?.identity?.metadataCid, config?.identity?.agentUri])
 
   const registryFromIdentity = (nextIdentity: EthagentIdentity): Erc8004RegistryConfig | null => {
     if (!nextIdentity.chainId || !nextIdentity.identityRegistryAddress) return null
