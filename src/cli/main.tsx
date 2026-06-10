@@ -23,7 +23,6 @@ import { ensureBootstrapped } from './bootstrap.js'
 import { ensureDaemon } from './daemon.js'
 import { runWatch } from './watch.js'
 import { runAddTool, runPause, runResume } from './prefs.js'
-import { enableDemoMode, synthDemoConfig } from './demo.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -49,7 +48,6 @@ function printHelp(): void {
     '  ethagent pause              pause background sync (resume with: ethagent resume)',
     '  ethagent --status           print a one-line identity summary',
     "  ethagent --vault-dir        print this agent's vault directory path",
-    '  ethagent --demo             explore with synthetic data, no wallet needed',
     '  ethagent --version          print version',
     '  ethagent --help             print this help',
   ]
@@ -169,19 +167,15 @@ async function main(): Promise<number> {
   if (flags.has('--vault-dir')) return runVaultDir()
 
   // Normal invocations self-wire invisibly: set up tools (first run) and keep autosync alive.
-  if (argv[0] !== 'reset' && !flags.has('--demo')) await ensureBootstrapped()
+  if (argv[0] !== 'reset') await ensureBootstrapped()
 
   if (flags.has('--status')) return runStatus(version)
-  if (flags.has('--demo')) {
-    enableDemoMode()
-    return renderHub(synthDemoConfig())
-  }
   if (argv[0] === 'save') return runSave(argv.slice(1))
   if (flags.has('--save')) return runSave(argv.filter(a => a !== '--save'))
   if (argv[0] === 'reset') return runResetCommand(argv.slice(1))
 
   const unknown = argv.find(a => a.startsWith('-'))
-  if (unknown && !flags.has('--demo')) {
+  if (unknown) {
     process.stderr.write(`unknown flag: ${unknown}\nrun 'ethagent --help' for usage\n`)
     return 2
   }

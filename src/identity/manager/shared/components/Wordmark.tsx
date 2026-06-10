@@ -32,14 +32,63 @@ export const RIGHT_DECOR = [
 ]
 
 const WORDMARK_WIDTH = Math.max(...LINES.map(line => line.length))
-const DECOR_WIDTH = 12
 
-export type WordmarkLayout = 'full' | 'bare' | 'hidden'
+export type WordmarkLayout = 'bare' | 'compact'
 
 export function wordmarkLayout(columns: number): WordmarkLayout {
-  if (columns >= WORDMARK_WIDTH + DECOR_WIDTH * 2) return 'full'
   if (columns >= WORDMARK_WIDTH) return 'bare'
-  return 'hidden'
+  return 'compact'
+}
+
+export const COMPACT_LINES = [
+  '█▀▀ ▀█▀ █ █ ▄▀█ █▀▀ █▀▀ █▄ █ ▀█▀',
+  '██▄  █  █▀█ █▀█ █▄█ ██▄ █ ▀█  █ ',
+]
+
+export const COMPACT_SPLIT = 12
+
+const COMPACT_WIDTH = Math.max(...COMPACT_LINES.map(line => line.length))
+
+const ROW_SHADE = [1, 0.62]
+
+export function shadeColor(hex: string, factor: number): string {
+  const n = parseInt(hex.slice(1), 16)
+  const channel = (shift: number): string =>
+    Math.round(((n >> shift) & 0xff) * factor).toString(16).padStart(2, '0')
+  return `#${channel(16)}${channel(8)}${channel(0)}`
+}
+
+const CompactBanner: React.FC<{ columns: number }> = ({ columns }) => {
+  if (columns < COMPACT_WIDTH) {
+    const agent = 'agent'
+    const maxAgent = Math.max(1, agent.length - 1)
+    return (
+      <Text bold>
+        <Text color={theme.wordmarkEth}>eth</Text>
+        {[...agent].map((ch, j) => (
+          <Text key={j} color={gradientColor(j / maxAgent)}>{ch}</Text>
+        ))}
+      </Text>
+    )
+  }
+  return (
+    <Box flexDirection="column">
+      {COMPACT_LINES.map((line, i) => {
+        const shade = ROW_SHADE[Math.min(i, ROW_SHADE.length - 1)]!
+        const eth = line.slice(0, COMPACT_SPLIT)
+        const agent = line.slice(COMPACT_SPLIT)
+        const maxAgent = Math.max(1, agent.length - 1)
+        return (
+          <Text key={i} bold>
+            <Text color={shadeColor(theme.wordmarkEth, shade)}>{eth}</Text>
+            {[...agent].map((ch, j) => (
+              <Text key={j} color={shadeColor(gradientColor(j / maxAgent), shade)}>{ch}</Text>
+            ))}
+          </Text>
+        )
+      })}
+    </Box>
+  )
 }
 
 const Banner: React.FC = () => (
@@ -71,14 +120,6 @@ export const Wordmark: React.FC = () => {
   }, [stdout])
 
   const layout = wordmarkLayout(columns)
-  if (layout === 'hidden') return null
-  if (layout === 'bare') return <Banner />
-
-  return (
-    <Box flexDirection="row">
-      <Text color={theme.wordmarkEth}>{LEFT_DECOR.join('\n')}</Text>
-      <Banner />
-      <Text color={theme.wordmarkEth}>{RIGHT_DECOR.join('\n')}</Text>
-    </Box>
-  )
+  if (layout === 'compact') return <CompactBanner columns={columns} />
+  return <Banner />
 }

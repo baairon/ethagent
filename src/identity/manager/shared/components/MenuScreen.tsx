@@ -1,7 +1,6 @@
 import React from 'react'
 import { Box, Text } from 'ink'
 import { theme } from '../../../../ui/theme.js'
-import { isDemoMode } from '../../../../cli/demo.js'
 import type { EthagentConfig, EthagentIdentity } from '../../../../storage/config.js'
 import { identityPerspective } from '../../custody/state.js'
 import { transferSnapshotView } from '../../transfer/state.js'
@@ -168,14 +167,7 @@ export const MenuScreen: React.FC<MenuScreenProps> = ({
       </Box>
       {statusBits.length > 0 ? (
         <Box marginTop={2}>
-          {isDemoMode() ? (
-            <Text>
-              <Text color={theme.accentHighlight}>demo </Text>
-              <Text color={theme.menuStatus}>· {statusBits.join(' · ')}</Text>
-            </Text>
-          ) : (
-            <Text color={theme.menuStatus}>{statusBits.join(' · ')}</Text>
-          )}
+          <Text color={theme.menuStatus}>{statusBits.join(' · ')}</Text>
         </Box>
       ) : null}
     </Box>

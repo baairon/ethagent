@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import type { EthagentConfig } from '../../../../../storage/config.js'
 import { emptyReconciliation, runReconciliation } from './run.js'
 import type { AgentReconciliation } from './types.js'
-import { isDemoMode, synthDemoReconciliation } from '../../../../../cli/demo.js'
 
 export function useAgentReconciliation(
   config: EthagentConfig | null,
@@ -20,10 +19,6 @@ export function useAgentReconciliation(
   const [refreshKey, setRefreshKey] = useState(0)
 
   useEffect(() => {
-    if (isDemoMode()) {
-      setReconciliation(synthDemoReconciliation())
-      return
-    }
     if (!config?.identity || !config.identity.agentId || !config.identity.chainId || !config.identity.identityRegistryAddress) {
       setReconciliation(emptyReconciliation())
       return

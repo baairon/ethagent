@@ -83,6 +83,26 @@ Built on open standards, so your agent is never tied to one app.
 | Naming | ENS | An optional readable name that resolves to your agent and restores it from the name alone. |
 | Backup | IPFS snapshot | The encrypted bundle of soul, memory, and skills, pinned offchain and unlocked only by your wallet. |
 
+## My tool isn't detected
+
+Run `npx ethagent --status` to see which tools ethagent found. If yours is missing, work down this list:
+
+1. **Open the tool once first.** Claude Code and Codex are found automatically, but only after they've been run at least once. Any other tool needs the next step.
+
+2. **Ask your agent to wire it.** Open the tool that's missing and paste:
+
+   ```text
+   Find the instructions file you read at the start of every session (your AGENTS.md or equivalent) and run `npx ethagent --add <that path>` to wire this tool into ethagent.
+   ```
+
+   The one thing a tool needs is a notes file it reads at the start of every session. That's where your agent lives. If the tool has no such file, ethagent has nowhere to put it.
+
+3. **Make sure syncing isn't paused.** If you ever ran `ethagent pause`, turn it back on:
+
+   ```bash
+   npx ethagent resume
+   ```
+
 ## Updating
 
 ethagent updates itself. Everything runs through `npx ethagent`, which always fetches the latest published version, so a new release reaches you with nothing to install. If you keep a global copy on your PATH, refresh it with:
@@ -99,11 +119,9 @@ Run with `npx ethagent`:
 
 | Command | What it does |
 | --- | --- |
-| `ethagent` | Open the interactive manager (create, ENS, custody, transfer). |
-| `save` | Back up your agent onchain (you sign in your wallet). |
-| `--add <path>` | Wire a tool ethagent doesn't auto-detect (point at its `AGENTS.md`). |
-| `pause` / `resume` | Pause or resume background sync. |
-| `--status` | Show the agent summary and detected tools. |
-| `--vault-dir` | Print this agent's vault directory (where soul, memory, and skills live). |
-| `--demo` | Open the interactive manager preloaded with a sample agent, so you can explore how ethagent works without creating an identity, connecting a wallet, or going online. |
-| `reset` | Delete the local identity, data, and secrets. |
+| `ethagent` | Open the manager. |
+| `save` | Back up your agent onchain. |
+| `--add <path>` | Wire a tool by its instructions file. |
+| `pause` / `resume` | Pause or resume syncing. |
+| `--status` | Show your agent and detected tools. |
+| `reset` | Delete everything local. |

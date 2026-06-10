@@ -13,11 +13,6 @@ type EditorCommand = {
 }
 
 export async function openFileInEditor(file: string): Promise<EditorOpenResult> {
-  if (isVscodeEnvironment()) {
-    const vscode = vscodeEditorCommand(file)
-    const result = await openEditorCommand(vscode)
-    if (result.ok) return result
-  }
   const command = defaultEditorCommand(file)
   if (!command) return { ok: false, error: 'no default open command for this platform' }
   return openEditorCommand(command)
@@ -57,18 +52,4 @@ export function defaultEditorCommand(file: string, platform: NodeJS.Platform = p
   if (platform === 'win32') return { cmd: 'cmd', args: ['/c', 'start', '', file], method: 'cmd', waited: false }
   if (platform === 'darwin') return { cmd: 'open', args: [file], method: 'open', waited: false }
   return { cmd: 'xdg-open', args: [file], method: 'xdg-open', waited: false }
-}
-
-export function isVscodeEnvironment(env: NodeJS.ProcessEnv = process.env): boolean {
-  if (env.TERM_PROGRAM === 'vscode') return true
-  if (env.VSCODE_PID) return true
-  if (env.VSCODE_GIT_IPC_HANDLE) return true
-  return false
-}
-
-export function vscodeEditorCommand(file: string, platform: NodeJS.Platform = process.platform): EditorCommand {
-  if (platform === 'win32') {
-    return { cmd: 'cmd', args: ['/c', 'code', '--reuse-window', file], method: 'vscode', waited: false }
-  }
-  return { cmd: 'code', args: ['--reuse-window', file], method: 'vscode', waited: false }
 }
