@@ -79,7 +79,7 @@ export function renderCustodyStep({
       <Surface
         title="Pick a Vaulted Token"
         subtitle={`${step.tokens.length} vaulted tokens on ${chainLabel(step.registry.chainId)}.`}
-        footer={<Text color={theme.dim}>enter select · esc back</Text>}
+        footer={<Text color={theme.dim}>↵ select · esc back</Text>}
       >
         <Box marginTop={1}>
           <Select<string>
@@ -131,7 +131,7 @@ export function renderCustodyStep({
       <Surface
         title="Token Returned to Owner Wallet"
         subtitle={`Token returned to ${shortAddress(step.recipient)}.`}
-        footer={<Text color={theme.dim}>enter select · esc back</Text>}
+        footer={<Text color={theme.dim}>↵ select · esc back</Text>}
       >
         <Box marginTop={1}>
           <Select<'return-to-vault' | 'keep-out'>
@@ -169,7 +169,7 @@ export function renderCustodyStep({
       <Surface
         title="Advanced Custody Active"
         subtitle="Token held in its Vault. Operators rotate the URI onchain."
-        footer={<Text color={theme.dim}>enter continues</Text>}
+        footer={<Text color={theme.dim}>↵ continues</Text>}
       >
         <Box flexDirection="column">
           {step.vaultAddress ? <Row label="Vault" value={shortAddress(step.vaultAddress)} /> : null}
@@ -192,7 +192,7 @@ export function renderCustodyStep({
       <Surface
         title="Simple Custody Active"
         subtitle="Token back in owner wallet."
-        footer={<Text color={theme.dim}>enter continues</Text>}
+        footer={<Text color={theme.dim}>↵ continues</Text>}
       >
         <Box flexDirection="column">
           <Row label="Owner Wallet" value={shortAddress(ownerWallet)} />

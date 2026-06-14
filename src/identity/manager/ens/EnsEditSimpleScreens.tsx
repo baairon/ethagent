@@ -149,7 +149,7 @@ export function renderSimpleEnsPhase({
       <Surface
         title="Assign ENS Name"
         subtitle="Choose a root .eth name to create an agent subdomain under."
-        footer={footerHint('enter select · esc back')}
+        footer={footerHint('↵ select · esc back')}
       >
         <EnsStatusBanner identity={identity} noRootEnsName={noOwnedNames} />
         {advancedMode
@@ -205,7 +205,7 @@ export function renderSimpleEnsPhase({
       <Surface
         title="Your Root .eth Name"
         subtitle="Type the root .eth name you own. Your agent becomes a subdomain of it."
-        footer={footerHint('enter continues · esc back')}
+        footer={footerHint('↵ continues · esc back')}
       >
         {statusBanner}
         {advancedMode

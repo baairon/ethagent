@@ -3,8 +3,8 @@
 // work: no DOM, no external resources, safe for GitHub's README sanitizer.
 //
 // Ported from soundcli's scripts/ansi-to-svg.ts. The base is recolored to the
-// VS Code "Preferences Dark" terminal background (#030509) and given mac-style
-// window dots so each frame reads as a real terminal window.
+// VS Code "Preferences Dark" terminal background (#030509) and given a dim
+// centered title so each frame reads as a real terminal window.
 //
 // Layout strategy: every styled run becomes its own <text> pinned to the
 // character grid with textLength + lengthAdjust, so the picture stays
@@ -19,12 +19,12 @@ export interface AnsiToSvgOptions {
   title?: string;
   /** Cap rendered width (px); scales down on narrow viewports, never stretches wider. */
   maxWidth?: number;
-  /** Draw the terminal window chrome (bg, border, dots, title). Off = transparent, text only (the hero). */
+  /** Draw the terminal window chrome (bg, border, centered title). Off = transparent, text only. */
   chrome?: boolean;
   /** Row pitch in px (default 22). Tighten it to close block-art line gaps. */
   lineHeight?: number;
   /** Paint wordmark block glyphs as vector rects instead of text. Off = faithful
-   *  outline glyphs (the hero); on = solid blocks (the clean compact wordmark). */
+   *  text glyphs; on = solid block rects (used for the wordmark in every preview). */
   solidBlocks?: boolean;
   /** Margin around the content in px (default 32). Trim it to hug the mark. */
   pad?: number;
@@ -51,7 +51,7 @@ const LINE_H = 22;
 const PAD = 32;
 const HEADER_H = 36;
 const RADIUS = 14;
-const ROW_GAP = 3; // separation between the two solid-block wordmark rows (matches soundcli's)
+const ROW_GAP = 0; // vertical trim per solid-block row; 0 so the two wordmark rows connect seamlessly, matching soundcli's wordmark (its glyphs are plain text, so its rows have no seam)
 const BG = "#030509"; // VS Code "Preferences Dark" terminal.background
 const BORDER = "#1b1e26"; // soft hairline that reads on the near-black base
 const FG_DEFAULT = "#dadce6"; // ethagent theme.text

@@ -131,7 +131,7 @@ type SubdomainEntryProps = {
 export const SubdomainEntry: React.FC<SubdomainEntryProps> = ({ parent, ownerAddress, initialValue, placeholder, error, onConfirm, onBack }) => (
   <Surface
     title={`Subdomain of ${parent}`}
-    footer={footerHint('enter continues · esc back')}
+    footer={footerHint('↵ continues · esc back')}
   >
     {error ? <Text color={theme.accentError}>{error}</Text> : null}
     <TextInput

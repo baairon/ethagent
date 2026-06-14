@@ -141,7 +141,7 @@ export function TextArea({
         </Box>
       )}
       <Box marginTop={1}>
-        <Text color={theme.dim}>ctrl+s save · enter newline · esc back</Text>
+        <Text color={theme.dim}>ctrl+s save · ↵ newline · esc back</Text>
       </Box>
     </Box>
   )

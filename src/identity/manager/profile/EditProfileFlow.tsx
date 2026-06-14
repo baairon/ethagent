@@ -69,7 +69,7 @@ export const EditProfileFlow: React.FC<EditProfileFlowProps> = ({
   if (step.kind === 'edit-profile-name') {
     const currentName = step.name ?? readIdentityStateString(step.identity.state, 'name')
     return (
-      <Surface title="Edit Name" footer={footerHint('enter save · esc back')}>
+      <Surface title="Edit Name" footer={footerHint('↵ save · esc back')}>
         <Text color={theme.menuStatus}>Saved: {readIdentityStateString(step.identity.state, 'name') || '(unnamed)'}</Text>
         <Box marginTop={1}>
           <TextInput
@@ -154,7 +154,7 @@ const EditProfileMenuStep: React.FC<{
   const saveHint = dirty ? 'Publish public profile and update the token URI' : 'No changes to save'
 
   return (
-    <Surface title="Edit Profile" subtitle="Save publishes all fields together." footer={footerHint('enter select · esc back')}>
+    <Surface title="Edit Profile" subtitle="Save publishes all fields together." footer={footerHint('↵ select · esc back')}>
       <Select<'name' | 'description' | 'image' | 'save' | 'back'>
         options={[
           { value: 'name', label: 'Name', hint: nameHint },
@@ -190,7 +190,7 @@ const AgentIconStep: React.FC<{
 
   if (entryMode) {
     return (
-      <Surface title="Edit Icon" footer={footerHint('enter save · esc back')}>
+      <Surface title="Edit Icon" footer={footerHint('↵ save · esc back')}>
         <Text color={theme.menuStatus}>Current: {currentIcon ? shortIconReference(currentIcon) : '(no icon)'}</Text>
         <Box marginTop={1}>
           <TextInput
@@ -206,7 +206,7 @@ const AgentIconStep: React.FC<{
   }
 
   return (
-    <Surface title="Edit Icon" footer={footerHint('enter select · esc back')}>
+    <Surface title="Edit Icon" footer={footerHint('↵ select · esc back')}>
       <Box flexDirection="column">
         <Text color={theme.menuStatus}>Agent Icon: {selectedIcon}</Text>
         {step.error ? <Text color={theme.accentError}>{step.error}</Text> : null}
@@ -242,7 +242,7 @@ const EditProfileReviewStep: React.FC<{
 }> = ({ step, onSave, onBack }) => {
   const currentIcon = readIdentityStateString(step.identity.state, 'imageUrl')
   return (
-    <Surface title="Review Public Profile" footer={footerHint('enter save · esc back')}>
+    <Surface title="Review Public Profile" footer={footerHint('↵ save · esc back')}>
       <Box flexDirection="column">
         <ReviewRow label="Name" value={step.name || '(unnamed)'} />
         <ReviewRow label="Description" value={step.description || '(no description)'} />

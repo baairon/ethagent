@@ -62,7 +62,7 @@ export const RestoreFlow: React.FC<RestoreFlowProps> = ({
       <Surface
         title={`${resolution.network ? networkLabel(resolution.network).charAt(0).toUpperCase() + networkLabel(resolution.network).slice(1) : ''} Agent Registry`}
         subtitle={step.error ? `Lookup failed: ${step.error}` : 'Paste the agent registry address for this network.'}
-        footer={footerHint('enter discover · esc back')}
+        footer={footerHint('↵ discover · esc back')}
       >
         <Text color={theme.dim}>RPC defaults to {resolution.defaultRpcUrl}</Text>
         <TextInput
@@ -103,7 +103,7 @@ export const RestoreFlow: React.FC<RestoreFlowProps> = ({
       <Surface
         title={isSwitch ? 'Switch Agent' : 'Restore Agent'}
         subtitle="This wallet doesn't directly own an agent token."
-        footer={footerHint('enter select · esc back')}
+        footer={footerHint('↵ select · esc back')}
       >
         <Select<'ens' | 'token-id' | 'back'>
           options={[
@@ -137,7 +137,7 @@ export const RestoreFlow: React.FC<RestoreFlowProps> = ({
       <Surface
         title={isSwitch ? 'Switch Agent' : 'Restore Agent'}
         subtitle="Enter the agent ENS name."
-        footer={footerHint('enter continue · esc back')}
+        footer={footerHint('↵ continue · esc back')}
       >
         <TextInput
           placeholder="agent.example.eth"
@@ -172,7 +172,7 @@ export const RestoreFlow: React.FC<RestoreFlowProps> = ({
       <Surface
         title={isSwitch ? 'Switch Agent' : 'Restore Agent'}
         subtitle={`Token ID on ${networkLabelForRegistry(step.registry)}.`}
-        footer={footerHint('enter continue · esc back')}
+        footer={footerHint('↵ continue · esc back')}
       >
         <TextInput
           placeholder="45744"
@@ -195,7 +195,7 @@ export const RestoreFlow: React.FC<RestoreFlowProps> = ({
       <Surface
         title={view.title}
         subtitle={view.subtitle}
-        footer={footerHint('enter continue · esc back')}
+        footer={footerHint('↵ continue · esc back')}
       >
         <Text color={theme.dim}>{view.detail}</Text>
         <Select<'retry' | 'network'>
@@ -219,7 +219,7 @@ export const RestoreFlow: React.FC<RestoreFlowProps> = ({
       <Surface
         title={isSwitch ? 'Switch Agent' : 'Choose Your Agent'}
         subtitle={step.ownerHandle}
-        footer={footerHint('enter select · esc back')}
+        footer={footerHint('↵ select · esc back')}
       >
         <Select<string>
           options={[

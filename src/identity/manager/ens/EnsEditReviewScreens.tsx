@@ -55,7 +55,7 @@ export const SimpleEnsIssueScreen: React.FC<SimpleEnsIssueScreenProps> = ({
   return (
     <Surface
       title="ENS Name Not Found"
-      footer={footerHint('enter select · esc back')}
+      footer={footerHint('↵ select · esc back')}
     >
       <Box flexDirection="column">
         <Text color={theme.dim}>The subdomain is not on Ethereum Mainnet yet. You can create it from here.</Text>
@@ -123,7 +123,7 @@ export const EnsSetupReviewScreen: React.FC<EnsSetupReviewScreenProps> = ({
   return (
     <Surface
       title={isSimple ? 'Create Simple ENS Name' : 'Create ENS Name'}
-      footer={footerHint('enter select · esc back')}
+      footer={footerHint('↵ select · esc back')}
     >
       {reusingExistingSubdomain ? (
         <Box marginBottom={1}>
@@ -173,7 +173,7 @@ export const EnsSetupBlockedScreen: React.FC<EnsSetupBlockedScreenProps> = ({
   return (
     <Surface
       title="ENS Setup Blocked"
-      footer={footerHint('enter select · esc back')}
+      footer={footerHint('↵ select · esc back')}
     >
       <Box flexDirection="column">
         <Text color={theme.accentError}>{manualReasonTitle(fallback.reason)}</Text>
@@ -240,7 +240,7 @@ export const UnlinkEnsReviewScreen: React.FC<UnlinkEnsReviewScreenProps> = ({
   return (
     <Surface
       title="Unlink ENS"
-      footer={footerHint('enter select · esc back')}
+      footer={footerHint('↵ select · esc back')}
     >
       <Box flexDirection="column">
         <EnsSetupRow label="ENS name" value={fullName} />
@@ -328,7 +328,7 @@ export const ReviewScreen: React.FC<ReviewScreenProps> = ({
       <Surface
         title="ENS Issue"
         subtitle={`${fullName} could not be verified on Ethereum mainnet.`}
-        footer={footerHint('enter select · esc back')}
+        footer={footerHint('↵ select · esc back')}
       >
         <Box flexDirection="column">
           <Text>
@@ -379,7 +379,7 @@ export const ReviewScreen: React.FC<ReviewScreenProps> = ({
     <Surface
       title={`Update ENS records for ${fullName}?`}
       subtitle={reviewSubtitle}
-      footer={footerHint('enter select · esc back')}
+      footer={footerHint('↵ select · esc back')}
     >
       <Box flexDirection="column">
         {currentEnsName || currentMode

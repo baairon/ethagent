@@ -58,7 +58,7 @@ export const CreateFlow: React.FC<CreateFlowProps> = ({
 
   if (step.kind === 'replace-confirm') {
     return (
-      <Surface title="Create a New Agent?" footer="enter selects · esc back">
+      <Surface title="Create a New Agent?" footer="↵ selects · esc back">
         <Select<'replace' | 'back'>
           options={[
             { value: 'back', label: 'Keep Current Agent', role: 'utility' },
@@ -77,7 +77,7 @@ export const CreateFlow: React.FC<CreateFlowProps> = ({
 
   if (step.kind === 'create-name') {
     return (
-      <Surface title="Name Your Agent" subtitle={indicator} footer="enter continues · esc back">
+      <Surface title="Name Your Agent" subtitle={indicator} footer="↵ continues · esc back">
         {step.error ? <Text color={theme.accentError}>{step.error}</Text> : null}
         <TextInput
           key="agent-name"
@@ -107,7 +107,7 @@ export const CreateFlow: React.FC<CreateFlowProps> = ({
 
   if (step.kind === 'create-custody') {
     return (
-      <Surface title="Pick Custody Mode" subtitle={indicator} footer="enter continues · esc back">
+      <Surface title="Pick Custody Mode" subtitle={indicator} footer="↵ continues · esc back">
         <Select<'simple' | 'advanced'>
           options={[
             { value: 'simple', label: 'Simple (recommended)', hint: 'One wallet signs' },
@@ -145,7 +145,7 @@ export const CreateFlow: React.FC<CreateFlowProps> = ({
       ...(importNotes && importNotes.length ? { importNotes } : {}),
     })
     return (
-      <Surface title="Import Existing Notes?" subtitle={indicator} footer="enter selects · esc back">
+      <Surface title="Import Existing Notes?" subtitle={indicator} footer="↵ selects · esc back">
         <Box flexDirection="column">
           <Text color={theme.textSubtle}>Found local notes not yet captured by any agent: {summary}.</Text>
           <Text color={theme.textSubtle}>Import folds them into this agent&apos;s MEMORY.md and the first encrypted snapshot.</Text>
@@ -181,7 +181,7 @@ export const CreateFlow: React.FC<CreateFlowProps> = ({
       <Surface
         title={`${step.resolution.network ? networkLabel(step.resolution.network).charAt(0).toUpperCase() + networkLabel(step.resolution.network).slice(1) : ''} Agent Registry`}
         subtitle={step.error ?? 'Paste the agent registry address for this network.'}
-        footer="enter continues · esc back"
+        footer="↵ continues · esc back"
       >
         <Text color={theme.dim}>RPC defaults to {step.resolution.defaultRpcUrl}</Text>
         <TextInput
@@ -224,7 +224,7 @@ export const CreateFlow: React.FC<CreateFlowProps> = ({
       inputKey="create-storage"
       title="Connect IPFS Storage"
       subtitle={step.error ?? undefined}
-      footer="enter continues · esc back"
+      footer="↵ continues · esc back"
       onSubmit={onStorageSubmit}
       onCancel={onBack}
     />

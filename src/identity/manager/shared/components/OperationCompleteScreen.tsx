@@ -12,7 +12,7 @@ type OperationCompleteScreenProps = {
 export const OperationCompleteScreen: React.FC<OperationCompleteScreenProps> = ({ message, onReturn }) => (
   <Surface
     title="Done"
-    footer={<Text color={theme.dim}>enter returns to menu</Text>}
+    footer={<Text color={theme.dim}>↵ returns to menu</Text>}
   >
     <Box flexDirection="column">
       <Text color={theme.text}>{message}</Text>

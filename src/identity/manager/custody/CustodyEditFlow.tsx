@@ -113,7 +113,7 @@ export const CustodyEditFlow: React.FC<CustodyEditFlowProps> = ({
     options.push({ value: 'back', label: 'Back', role: 'utility' })
     const notice = step.kind === 'custody-model' ? step.notice : undefined
     return (
-      <Surface title="Custody Mode" subtitle={subtitle} footer={footerHint('enter select · esc back')}>
+      <Surface title="Custody Mode" subtitle={subtitle} footer={footerHint('↵ select · esc back')}>
         {notice ? (
           <Box marginBottom={1}>
             <Text color={theme.accentPeriwinkle}>{notice}</Text>
@@ -186,7 +186,7 @@ export const CustodyEditFlow: React.FC<CustodyEditFlowProps> = ({
       <Surface
         title="Switch to Advanced"
         subtitle="Token goes into a Vault. Operators update onchain without your sig each time."
-        footer={footerHint('enter confirm · esc back')}
+        footer={footerHint('↵ confirm · esc back')}
       >
         <Box flexDirection="column">
           <Row label="Token" value={tokenLabel} />
@@ -224,7 +224,7 @@ export const CustodyEditFlow: React.FC<CustodyEditFlowProps> = ({
     <Surface
       title="Switch to Simple"
       subtitle="Withdraws token from Vault to owner wallet."
-      footer={footerHint('enter confirm · esc back')}
+      footer={footerHint('↵ confirm · esc back')}
     >
       <Box flexDirection="column">
         <Row label="Token" value={tokenLabel} />

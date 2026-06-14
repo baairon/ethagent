@@ -137,7 +137,7 @@ export const MenuScreen: React.FC<MenuScreenProps> = ({
         ) : null}
         {!identity ? (
           <Box marginBottom={1}>
-            <Text color={theme.textSubtle}>Create or link an agent identity to get started.</Text>
+            <Text color={theme.textSubtle}>Portable Ethereum identity for your AI agent.</Text>
           </Box>
         ) : null}
         <LazyMenu<Action>
@@ -161,7 +161,7 @@ export const MenuScreen: React.FC<MenuScreenProps> = ({
         />
         {!identity ? (
           <Box marginTop={1}>
-            <Text color={theme.dim}>esc to quit</Text>
+            <Text color={theme.dim}>↑↓ move · ↵ choose · esc quit</Text>
           </Box>
         ) : null}
       </Box>

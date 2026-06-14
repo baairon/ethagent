@@ -85,7 +85,7 @@ export function renderAdvancedEnsPhase({
       <Surface
         title="Agent Subdomain"
         subtitle={`Pick a subdomain label under ${rootName}.`}
-        footer={footerHint('enter next · esc back')}
+        footer={footerHint('↵ next · esc back')}
       >
         {phase.error ? (
           <Box flexDirection="column">

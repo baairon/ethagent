@@ -41,7 +41,7 @@ export const TokenTransferTargetScreen: React.FC<TokenTransferTargetScreenProps>
     <Surface
       title="Prepare Token Transfer"
       subtitle={<FlowTimeline steps={TRANSFER_STEPS} current={1} />}
-      footer={<Text color={theme.dim}>Enter Next · Esc Back</Text>}
+      footer={<Text color={theme.dim}>↵ Next · Esc Back</Text>}
     >
       <Box flexDirection="column">
         <StatusRow label="Token" value={tokenValue} />

@@ -4,118 +4,118 @@
   <rect x="0.5" y="0.5" width="831" height="319" rx="14" fill="none" stroke="#1b1e26" stroke-width="1"/>
   <text x="416" y="23" text-anchor="middle" font-family='ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace' font-size="13" fill="#7a8090">ethagent</text>
   <g font-family='ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace' font-size="16" fill="#dadce6">
-    <rect x="262.4" y="68" width="10.1" height="19" fill="#9aa0b0"/>
+    <rect x="262.4" y="68" width="10.1" height="22" fill="#9aa0b0"/>
     <rect x="272" y="68" width="10.1" height="11" fill="#9aa0b0"/>
     <rect x="281.6" y="68" width="10.1" height="11" fill="#9aa0b0"/>
     <rect x="300.8" y="68" width="10.1" height="11" fill="#9aa0b0"/>
-    <rect x="310.4" y="68" width="10.1" height="19" fill="#9aa0b0"/>
+    <rect x="310.4" y="68" width="10.1" height="22" fill="#9aa0b0"/>
     <rect x="320" y="68" width="10.1" height="11" fill="#9aa0b0"/>
-    <rect x="339.2" y="68" width="10.1" height="19" fill="#9aa0b0"/>
-    <rect x="358.4" y="68" width="10.1" height="19" fill="#9aa0b0"/>
-    <rect x="377.6" y="79" width="10.1" height="8" fill="#f3d8e0"/>
+    <rect x="339.2" y="68" width="10.1" height="22" fill="#9aa0b0"/>
+    <rect x="358.4" y="68" width="10.1" height="22" fill="#9aa0b0"/>
+    <rect x="377.6" y="79" width="10.1" height="11" fill="#f3d8e0"/>
     <rect x="387.2" y="68" width="10.1" height="11" fill="#f3dada"/>
-    <rect x="396.8" y="68" width="10.1" height="19" fill="#f3dcd5"/>
-    <rect x="416" y="68" width="10.1" height="19" fill="#f3e2cd"/>
+    <rect x="396.8" y="68" width="10.1" height="22" fill="#f3dcd5"/>
+    <rect x="416" y="68" width="10.1" height="22" fill="#f3e2cd"/>
     <rect x="425.6" y="68" width="10.1" height="11" fill="#f2e7cc"/>
     <rect x="435.2" y="68" width="10.1" height="11" fill="#f2ebca"/>
-    <rect x="454.4" y="68" width="10.1" height="19" fill="#e4edd2"/>
+    <rect x="454.4" y="68" width="10.1" height="22" fill="#e4edd2"/>
     <rect x="464" y="68" width="10.1" height="11" fill="#dbedd7"/>
     <rect x="473.6" y="68" width="10.1" height="11" fill="#d6ecde"/>
-    <rect x="492.8" y="68" width="10.1" height="19" fill="#d3e7ee"/>
-    <rect x="502.4" y="79" width="10.1" height="8" fill="#d4e3f3"/>
-    <rect x="521.6" y="68" width="10.1" height="19" fill="#dedaf1"/>
+    <rect x="492.8" y="68" width="10.1" height="22" fill="#d3e7ee"/>
+    <rect x="502.4" y="79" width="10.1" height="11" fill="#d4e3f3"/>
+    <rect x="521.6" y="68" width="10.1" height="22" fill="#dedaf1"/>
     <rect x="540.8" y="68" width="10.1" height="11" fill="#e8d7ea"/>
-    <rect x="550.4" y="68" width="10.1" height="19" fill="#eed7e5"/>
+    <rect x="550.4" y="68" width="10.1" height="22" fill="#eed7e5"/>
     <rect x="560" y="68" width="10.1" height="11" fill="#f3d8e0"/>
-    <rect x="262.4" y="90" width="10.1" height="19" fill="#5f636d"/>
-    <rect x="272" y="90" width="10.1" height="19" fill="#5f636d"/>
-    <rect x="281.6" y="101" width="10.1" height="8" fill="#5f636d"/>
-    <rect x="310.4" y="90" width="10.1" height="19" fill="#5f636d"/>
-    <rect x="339.2" y="90" width="10.1" height="19" fill="#5f636d"/>
+    <rect x="262.4" y="90" width="10.1" height="22" fill="#5f636d"/>
+    <rect x="272" y="90" width="10.1" height="22" fill="#5f636d"/>
+    <rect x="281.6" y="101" width="10.1" height="11" fill="#5f636d"/>
+    <rect x="310.4" y="90" width="10.1" height="22" fill="#5f636d"/>
+    <rect x="339.2" y="90" width="10.1" height="22" fill="#5f636d"/>
     <rect x="348.8" y="90" width="10.1" height="11" fill="#5f636d"/>
-    <rect x="358.4" y="90" width="10.1" height="19" fill="#5f636d"/>
-    <rect x="377.6" y="90" width="10.1" height="19" fill="#97868b"/>
+    <rect x="358.4" y="90" width="10.1" height="22" fill="#5f636d"/>
+    <rect x="377.6" y="90" width="10.1" height="22" fill="#97868b"/>
     <rect x="387.2" y="90" width="10.1" height="11" fill="#978787"/>
-    <rect x="396.8" y="90" width="10.1" height="19" fill="#978884"/>
-    <rect x="416" y="90" width="10.1" height="19" fill="#978c7f"/>
-    <rect x="425.6" y="101" width="10.1" height="8" fill="#968f7e"/>
-    <rect x="435.2" y="90" width="10.1" height="19" fill="#96927d"/>
-    <rect x="454.4" y="90" width="10.1" height="19" fill="#8d9382"/>
-    <rect x="464" y="90" width="10.1" height="19" fill="#889385"/>
-    <rect x="473.6" y="101" width="10.1" height="8" fill="#85928a"/>
-    <rect x="492.8" y="90" width="10.1" height="19" fill="#838f94"/>
+    <rect x="396.8" y="90" width="10.1" height="22" fill="#978884"/>
+    <rect x="416" y="90" width="10.1" height="22" fill="#978c7f"/>
+    <rect x="425.6" y="101" width="10.1" height="11" fill="#968f7e"/>
+    <rect x="435.2" y="90" width="10.1" height="22" fill="#96927d"/>
+    <rect x="454.4" y="90" width="10.1" height="22" fill="#8d9382"/>
+    <rect x="464" y="90" width="10.1" height="22" fill="#889385"/>
+    <rect x="473.6" y="101" width="10.1" height="11" fill="#85928a"/>
+    <rect x="492.8" y="90" width="10.1" height="22" fill="#838f94"/>
     <rect x="512" y="90" width="10.1" height="11" fill="#878a96"/>
-    <rect x="521.6" y="90" width="10.1" height="19" fill="#8a8795"/>
-    <rect x="550.4" y="90" width="10.1" height="19" fill="#94858e"/>
-    <text x="185.6" y="172" textLength="460.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#9aa0b0">Create or link an agent identity to get started.</text>
-    <text x="329.6" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f0eee8">&gt;</text>
-    <text x="348.8" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f3d8e0">C</text>
-    <text x="358.4" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f3dbd9">r</text>
-    <text x="368" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f3ded2">e</text>
-    <text x="377.6" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f3e2cd">a</text>
-    <text x="387.2" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f2e7cc">t</text>
-    <text x="396.8" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f2ecca">e</text>
-    <text x="416" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#dcedd7">N</text>
-    <text x="425.6" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#d6ebdf">e</text>
-    <text x="435.2" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#d4e8e9">w</text>
-    <text x="454.4" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#d8dff2">A</text>
-    <text x="464" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#dfd9f1">g</text>
-    <text x="473.6" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#e5d6ed">e</text>
-    <text x="483.2" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#ecd7e6">n</text>
-    <text x="492.8" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f3d8e0">t</text>
-    <text x="348.8" y="238" textLength="124.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Load Existing</text>
-    <text x="368" y="282" textLength="105.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#7a8090">esc to quit</text>
+    <rect x="521.6" y="90" width="10.1" height="22" fill="#8a8795"/>
+    <rect x="550.4" y="90" width="10.1" height="22" fill="#94858e"/>
+    <text x="204.8" y="172" textLength="432" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#9aa0b0">Portable Ethereum identity for your AI agent.</text>
+    <text x="339.2" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f0eee8">&gt;</text>
+    <text x="358.4" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f3d8e0">C</text>
+    <text x="368" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f3dbd9">r</text>
+    <text x="377.6" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f3ded2">e</text>
+    <text x="387.2" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f3e2cd">a</text>
+    <text x="396.8" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f2e7cc">t</text>
+    <text x="406.4" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f2ecca">e</text>
+    <text x="425.6" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#dcedd7">N</text>
+    <text x="435.2" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#d6ebdf">e</text>
+    <text x="444.8" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#d4e8e9">w</text>
+    <text x="464" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#d8dff2">A</text>
+    <text x="473.6" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#dfd9f1">g</text>
+    <text x="483.2" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#e5d6ed">e</text>
+    <text x="492.8" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#ecd7e6">n</text>
+    <text x="502.4" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f3d8e0">t</text>
+    <text x="358.4" y="238" textLength="124.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Load Existing</text>
+    <text x="281.6" y="282" textLength="278.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#7a8090">↑↓ move · ↵ choose · esc quit</text>
   </g>
   <defs>
-    <linearGradient id="wmShine" gradientUnits="userSpaceOnUse" x1="0" y1="68" x2="0" y2="109">
+    <linearGradient id="wmShine" gradientUnits="userSpaceOnUse" x1="0" y1="68" x2="0" y2="112">
       <stop offset="0" stop-color="#ffffff" stop-opacity="0.4"/>
       <stop offset="0.5" stop-color="#ffffff" stop-opacity="0"/>
     </linearGradient>
     <clipPath id="wmShineClip">
-      <rect x="262.4" y="68" width="10.1" height="19"/>
+      <rect x="262.4" y="68" width="10.1" height="22"/>
       <rect x="272" y="68" width="10.1" height="11"/>
       <rect x="281.6" y="68" width="10.1" height="11"/>
       <rect x="300.8" y="68" width="10.1" height="11"/>
-      <rect x="310.4" y="68" width="10.1" height="19"/>
+      <rect x="310.4" y="68" width="10.1" height="22"/>
       <rect x="320" y="68" width="10.1" height="11"/>
-      <rect x="339.2" y="68" width="10.1" height="19"/>
-      <rect x="358.4" y="68" width="10.1" height="19"/>
-      <rect x="377.6" y="79" width="10.1" height="8"/>
+      <rect x="339.2" y="68" width="10.1" height="22"/>
+      <rect x="358.4" y="68" width="10.1" height="22"/>
+      <rect x="377.6" y="79" width="10.1" height="11"/>
       <rect x="387.2" y="68" width="10.1" height="11"/>
-      <rect x="396.8" y="68" width="10.1" height="19"/>
-      <rect x="416" y="68" width="10.1" height="19"/>
+      <rect x="396.8" y="68" width="10.1" height="22"/>
+      <rect x="416" y="68" width="10.1" height="22"/>
       <rect x="425.6" y="68" width="10.1" height="11"/>
       <rect x="435.2" y="68" width="10.1" height="11"/>
-      <rect x="454.4" y="68" width="10.1" height="19"/>
+      <rect x="454.4" y="68" width="10.1" height="22"/>
       <rect x="464" y="68" width="10.1" height="11"/>
       <rect x="473.6" y="68" width="10.1" height="11"/>
-      <rect x="492.8" y="68" width="10.1" height="19"/>
-      <rect x="502.4" y="79" width="10.1" height="8"/>
-      <rect x="521.6" y="68" width="10.1" height="19"/>
+      <rect x="492.8" y="68" width="10.1" height="22"/>
+      <rect x="502.4" y="79" width="10.1" height="11"/>
+      <rect x="521.6" y="68" width="10.1" height="22"/>
       <rect x="540.8" y="68" width="10.1" height="11"/>
-      <rect x="550.4" y="68" width="10.1" height="19"/>
+      <rect x="550.4" y="68" width="10.1" height="22"/>
       <rect x="560" y="68" width="10.1" height="11"/>
-      <rect x="262.4" y="90" width="10.1" height="19"/>
-      <rect x="272" y="90" width="10.1" height="19"/>
-      <rect x="281.6" y="101" width="10.1" height="8"/>
-      <rect x="310.4" y="90" width="10.1" height="19"/>
-      <rect x="339.2" y="90" width="10.1" height="19"/>
+      <rect x="262.4" y="90" width="10.1" height="22"/>
+      <rect x="272" y="90" width="10.1" height="22"/>
+      <rect x="281.6" y="101" width="10.1" height="11"/>
+      <rect x="310.4" y="90" width="10.1" height="22"/>
+      <rect x="339.2" y="90" width="10.1" height="22"/>
       <rect x="348.8" y="90" width="10.1" height="11"/>
-      <rect x="358.4" y="90" width="10.1" height="19"/>
-      <rect x="377.6" y="90" width="10.1" height="19"/>
+      <rect x="358.4" y="90" width="10.1" height="22"/>
+      <rect x="377.6" y="90" width="10.1" height="22"/>
       <rect x="387.2" y="90" width="10.1" height="11"/>
-      <rect x="396.8" y="90" width="10.1" height="19"/>
-      <rect x="416" y="90" width="10.1" height="19"/>
-      <rect x="425.6" y="101" width="10.1" height="8"/>
-      <rect x="435.2" y="90" width="10.1" height="19"/>
-      <rect x="454.4" y="90" width="10.1" height="19"/>
-      <rect x="464" y="90" width="10.1" height="19"/>
-      <rect x="473.6" y="101" width="10.1" height="8"/>
-      <rect x="492.8" y="90" width="10.1" height="19"/>
+      <rect x="396.8" y="90" width="10.1" height="22"/>
+      <rect x="416" y="90" width="10.1" height="22"/>
+      <rect x="425.6" y="101" width="10.1" height="11"/>
+      <rect x="435.2" y="90" width="10.1" height="22"/>
+      <rect x="454.4" y="90" width="10.1" height="22"/>
+      <rect x="464" y="90" width="10.1" height="22"/>
+      <rect x="473.6" y="101" width="10.1" height="11"/>
+      <rect x="492.8" y="90" width="10.1" height="22"/>
       <rect x="512" y="90" width="10.1" height="11"/>
-      <rect x="521.6" y="90" width="10.1" height="19"/>
-      <rect x="550.4" y="90" width="10.1" height="19"/>
+      <rect x="521.6" y="90" width="10.1" height="22"/>
+      <rect x="550.4" y="90" width="10.1" height="22"/>
     </clipPath>
   </defs>
-  <rect x="262.4" y="68" width="307.7" height="41" fill="url(#wmShine)" clip-path="url(#wmShineClip)"/>
+  <rect x="262.4" y="68" width="307.7" height="44" fill="url(#wmShine)" clip-path="url(#wmShineClip)"/>
 </svg>

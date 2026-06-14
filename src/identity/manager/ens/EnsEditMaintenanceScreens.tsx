@@ -100,7 +100,7 @@ export function renderEnsMaintenancePhase({
       <Surface
         title="ENS Name"
         subtitle={subtitle}
-        footer={footerHint('enter select · esc back')}
+        footer={footerHint('↵ select · esc back')}
       >
         {validationError ? <Box marginBottom={1}><Text color={theme.accentError}>{validationError}</Text></Box> : null}
         <Box>
@@ -177,7 +177,7 @@ export function renderEnsMaintenancePhase({
       <Surface
         title="Cannot Delete Subdomain"
         subtitle={`Onchain check for ${phase.fullName} did not pass.`}
-        footer={footerHint('enter select · esc back')}
+        footer={footerHint('↵ select · esc back')}
       >
         <Box flexDirection="column" marginBottom={1}>
           <Text color={theme.accentError}>{phase.reason}</Text>
@@ -202,7 +202,7 @@ export function renderEnsMaintenancePhase({
       <Surface
         title="Delete ENS Subdomain"
         subtitle={`Remove ${plan.fullName} from ${plan.parentName}.`}
-        footer={footerHint('enter select · esc back')}
+        footer={footerHint('↵ select · esc back')}
       >
         <Box flexDirection="column" marginBottom={1}>
           <EnsSetupRow label="Subdomain" value={plan.fullName} />
@@ -256,7 +256,7 @@ export function renderEnsMaintenancePhase({
       <Surface
         title="Subdomain Deleted"
         subtitle={`${phase.fullName} is cleared onchain and unlinked from this token.`}
-        footer={footerHint('enter select · esc back')}
+        footer={footerHint('↵ select · esc back')}
       >
         <Box>
           <Select<'back'>

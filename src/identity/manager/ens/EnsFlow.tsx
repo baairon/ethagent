@@ -375,7 +375,7 @@ function isEditProfileStep(step: IdentityManagerEnsStep): step is StepOf<
 const EnsVaultGate: React.FC<{ onWithdraw: () => void; onBack: () => void }> = ({ onWithdraw, onBack }) => (
   <Surface
     title="ENS Name"
-    footer={<Text color={theme.dim}>Token is in the Vault · enter select · esc back</Text>}
+    footer={<Text color={theme.dim}>Token is in the Vault · ↵ select · esc back</Text>}
   >
     <Box marginBottom={1}>
       <Text color={theme.textSubtle}>The owner wallet must hold the token directly to sign the ENS setup transaction.</Text>

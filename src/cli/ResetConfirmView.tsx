@@ -33,7 +33,7 @@ export const ResetConfirmView: React.FC<{
         <Surface
           title="Reset ethagent?"
           subtitle="This only clears the current machine."
-          footer="enter select · esc cancel"
+          footer="↵ select · esc cancel"
           tone="error"
         >
           <Box flexDirection="column">

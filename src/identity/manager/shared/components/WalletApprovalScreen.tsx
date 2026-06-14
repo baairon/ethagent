@@ -15,7 +15,7 @@ type WalletApprovalScreenProps = {
   onCancel?: () => void
 }
 
-export const OPEN_BROWSER_HINT = 'Press enter to open in browser...'
+export const OPEN_BROWSER_HINT = 'Press ↵ to open in browser...'
 
 export const WalletApprovalScreen: React.FC<WalletApprovalScreenProps> = ({ title, subtitle, walletSession, label, onCancel }) => {
   useAppInput((_input, key) => {

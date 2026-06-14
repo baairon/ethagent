@@ -151,7 +151,7 @@ export const OperatorWalletsScreen: React.FC<OperatorWalletsScreenProps> = ({
       <Surface
         title="Operator Wallets"
         subtitle="Set up Advanced custody first."
-        footer={footerHint('enter select · esc back')}
+        footer={footerHint('↵ select · esc back')}
       >
         <Box flexDirection="column">
           {phase.kind === 'main' && phase.error ? <Text color={theme.accentError}>{phase.error}</Text> : null}
@@ -200,7 +200,7 @@ export const OperatorWalletsScreen: React.FC<OperatorWalletsScreenProps> = ({
     <Surface
       title="Operator Wallets"
       subtitle="Owner wallet controls this list."
-      footer={footerHint('enter select · esc back')}
+      footer={footerHint('↵ select · esc back')}
     >
       <Box flexDirection="column">
         <Text>

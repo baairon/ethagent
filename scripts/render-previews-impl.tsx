@@ -4,7 +4,7 @@
 // a fixed column width, captures the ANSI frame with ink-testing-library, and
 // paints it as a terminal window via ansiToSvg.
 //
-//   image.svg  – just the wordmark, transparent (no terminal window)
+//   image.svg  – the first-run panel (the README hero), in a terminal window
 //   menu.svg   – the main menu, in a terminal window
 //   skills.svg – the skills catalog, in a terminal window
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -25,7 +25,7 @@ const OUT_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "preview");
 mkdirSync(OUT_DIR, { recursive: true });
 
 const noop = () => {};
-const footer = <Text color={theme.dim}>enter select · esc back</Text>;
+const footer = <Text color={theme.dim}>↵ select · esc back</Text>;
 
 function save(name: string, node: React.ReactNode, opts: Partial<AnsiToSvgOptions> = {}): void {
   const { lastFrame, unmount } = render(node);

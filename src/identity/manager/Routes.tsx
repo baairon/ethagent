@@ -65,7 +65,7 @@ export const IdentityManagerRoutes: React.FC<{ controller: IdentityManagerContro
     openTokenTransferFlow,
   } = controller
 
-  const footer = <Text color={theme.dim}>enter select · esc back</Text>
+  const footer = <Text color={theme.dim}>↵ select · esc back</Text>
   const setRestoreFetchingStep = (next: Extract<Step, { kind: 'restore-fetching' }>, backStep: Step): void => {
     if (
       isSameLoadedAgent(identity, next.candidate)
