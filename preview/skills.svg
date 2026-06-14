@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="832" height="320" viewBox="0 0 832 320" style="max-width: 832px; width: 100%; height: auto;" role="img">
+<svg xmlns="http://www.w3.org/2000/svg" width="832" height="562" viewBox="0 0 832 562" style="max-width: 832px; width: 100%; height: auto;" role="img">
   <rect width="100%" height="100%" rx="14" fill="#030509"/>
-  <rect x="0.5" y="0.5" width="831" height="319" rx="14" fill="none" stroke="#1b1e26" stroke-width="1"/>
+  <rect x="0.5" y="0.5" width="831" height="561" rx="14" fill="none" stroke="#1b1e26" stroke-width="1"/>
   <text x="416" y="23" text-anchor="middle" font-family='ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace' font-size="13" fill="#7a8090">ethagent</text>
   <g font-family='ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace' font-size="16" fill="#dadce6">
     <rect x="262.4" y="68" width="10.1" height="19" fill="#9aa0b0"/>
@@ -47,24 +47,33 @@
     <rect x="512" y="90" width="10.1" height="11" fill="#878a96"/>
     <rect x="521.6" y="90" width="10.1" height="19" fill="#8a8795"/>
     <rect x="550.4" y="90" width="10.1" height="19" fill="#94858e"/>
-    <text x="185.6" y="172" textLength="460.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#9aa0b0">Create or link an agent identity to get started.</text>
-    <text x="329.6" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f0eee8">&gt;</text>
-    <text x="348.8" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f3d8e0">C</text>
-    <text x="358.4" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f3dbd9">r</text>
-    <text x="368" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f3ded2">e</text>
-    <text x="377.6" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f3e2cd">a</text>
-    <text x="387.2" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f2e7cc">t</text>
-    <text x="396.8" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f2ecca">e</text>
-    <text x="416" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#dcedd7">N</text>
-    <text x="425.6" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#d6ebdf">e</text>
-    <text x="435.2" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#d4e8e9">w</text>
-    <text x="454.4" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#d8dff2">A</text>
-    <text x="464" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#dfd9f1">g</text>
-    <text x="473.6" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#e5d6ed">e</text>
-    <text x="483.2" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#ecd7e6">n</text>
-    <text x="492.8" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f3d8e0">t</text>
-    <text x="348.8" y="238" textLength="124.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Load Existing</text>
-    <text x="368" y="282" textLength="105.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#7a8090">esc to quit</text>
+    <text x="204.8" y="172" textLength="57.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f8f6f2" font-weight="600">Skills</text>
+    <text x="204.8" y="194" textLength="249.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#7a8090">Public and private skills.</text>
+    <text x="204.8" y="238" textLength="96" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#9aa0b0">bairon.eth</text>
+    <text x="310.4" y="238" textLength="163.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#7a8090">· #45744 · base ·</text>
+    <text x="204.8" y="260" textLength="153.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f0eee8">agent.bairon.eth</text>
+    <text x="233.6" y="304" textLength="67.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#9aa0b0" font-weight="600">Catalog</text>
+    <text x="233.6" y="326" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f0eee8">&gt;</text>
+    <text x="252.8" y="326" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f3d8e0">c</text>
+    <text x="262.4" y="326" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f3ded1">a</text>
+    <text x="272" y="326" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f2e8cb">l</text>
+    <text x="281.6" y="326" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#e3edd3">e</text>
+    <text x="291.2" y="326" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#d5eae5">n</text>
+    <text x="300.8" y="326" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#d7e1f2">d</text>
+    <text x="310.4" y="326" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#e4d6ee">a</text>
+    <text x="320" y="326" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f3d8e0">r</text>
+    <text x="348.8" y="326" textLength="57.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#9aa0b0">Public</text>
+    <text x="252.8" y="348" textLength="57.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">coding</text>
+    <text x="329.6" y="348" textLength="182.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#7a8090">Private  ·  3 files</text>
+    <text x="252.8" y="370" textLength="48" lengthAdjust="spacingAndGlyphs" xml:space="preserve">email</text>
+    <text x="320" y="370" textLength="182.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#7a8090">Private  ·  2 files</text>
+    <text x="252.8" y="392" textLength="86.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">summarize</text>
+    <text x="358.4" y="392" textLength="172.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#7a8090">Public  ·  5 files</text>
+    <text x="252.8" y="414" textLength="96" lengthAdjust="spacingAndGlyphs" xml:space="preserve">web-search</text>
+    <text x="368" y="414" textLength="57.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#7a8090">Public</text>
+    <text x="252.8" y="458" textLength="172.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Open Skills Folder</text>
+    <text x="252.8" y="480" textLength="38.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Back</text>
+    <text x="204.8" y="524" textLength="220.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#7a8090">enter select · esc back</text>
   </g>
   <defs>
     <linearGradient id="wmShine" gradientUnits="userSpaceOnUse" x1="0" y1="68" x2="0" y2="109">

@@ -2,44 +2,6 @@ import React, { useEffect, useState } from 'react'
 import { Box, Text, useStdout } from 'ink'
 import { theme, gradientColor } from '../../../../ui/theme.js'
 
-export const LINES = [
-  '░░░░░░░╗░░░░░░░░╗░░╗  ░░╗ █████╗  ██████╗ ███████╗███╗   ██╗████████╗',
-  '░░╔════╝╚══░░╔══╝░░║  ░░║██╔══██╗██╔════╝ ██╔════╝████╗  ██║╚══██╔══╝',
-  '░░░░░╗     ░░║   ░░░░░░░║███████║██║  ███╗█████╗  ██╔██╗ ██║   ██║   ',
-  '░░╔══╝     ░░║   ░░╔══░░║██╔══██║██║   ██║██╔══╝  ██║╚██╗██║   ██║   ',
-  '░░░░░░░╗   ░░║   ░░║  ░░║██║  ██║╚██████╔╝███████╗██║ ╚████║   ██║   ',
-  '╚══════╝   ╚═╝   ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝ ╚══════╝╚═╝  ╚═══╝   ╚═╝   ',
-]
-
-export const SPLIT = 25
-
-export const LEFT_DECOR = [
-  '         ✦  ',
-  '   ⊹        ',
-  '            ',
-  '         .  ',
-  '            ',
-  ' ฅ^•ﻌ•マ    ',
-]
-
-export const RIGHT_DECOR = [
-  '  ˖    𐰁    ',
-  '            ',
-  '     𝗓      ',
-  '          ⊹ ',
-  '   ᶻ        ',
-  '            ',
-]
-
-const WORDMARK_WIDTH = Math.max(...LINES.map(line => line.length))
-
-export type WordmarkLayout = 'bare' | 'compact'
-
-export function wordmarkLayout(columns: number): WordmarkLayout {
-  if (columns >= WORDMARK_WIDTH) return 'bare'
-  return 'compact'
-}
-
 export const COMPACT_LINES = [
   '█▀▀ ▀█▀ █ █ ▄▀█ █▀▀ █▀▀ █▄ █ ▀█▀',
   '██▄  █  █▀█ █▀█ █▄█ ██▄ █ ▀█  █ ',
@@ -91,24 +53,7 @@ const CompactBanner: React.FC<{ columns: number }> = ({ columns }) => {
   )
 }
 
-const Banner: React.FC = () => (
-  <Box flexDirection="column">
-    {LINES.map((line, i) => {
-      const eth = line.slice(0, SPLIT)
-      const agent = line.slice(SPLIT)
-      const maxAgent = Math.max(1, agent.length - 1)
-      return (
-        <Text key={i}>
-          <Text color={theme.wordmarkEth}>{eth}</Text>
-          {[...agent].map((ch, j) => (
-            <Text key={j} color={gradientColor(j / maxAgent)}>{ch}</Text>
-          ))}
-        </Text>
-      )
-    })}
-  </Box>
-)
-
+// The compact block mark is the one universal wordmark, shown on every screen.
 export const Wordmark: React.FC = () => {
   const { stdout } = useStdout()
   const [columns, setColumns] = useState<number>(() => Math.floor(stdout?.columns ?? 80))
@@ -119,7 +64,5 @@ export const Wordmark: React.FC = () => {
     return () => { stdout.off('resize', handleResize) }
   }, [stdout])
 
-  const layout = wordmarkLayout(columns)
-  if (layout === 'compact') return <CompactBanner columns={columns} />
-  return <Banner />
+  return <CompactBanner columns={columns} />
 }

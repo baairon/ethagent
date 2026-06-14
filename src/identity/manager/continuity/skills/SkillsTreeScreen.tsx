@@ -24,6 +24,8 @@ interface SkillsTreeScreenProps {
   workingStatus?: ContinuityWorkingTreeStatus | null
   notice?: string
   editorOpened?: boolean
+  /** Pre-loaded tree (previews/tests): renders synchronously, skips the vault loader. */
+  initialTree?: SkillsTreeView
   footer: React.ReactNode
   onOpenSkill: (relativePath: string) => void
   onOpenFolder: () => void
@@ -36,15 +38,17 @@ export const SkillsTreeScreen: React.FC<SkillsTreeScreenProps> = ({
   workingStatus,
   notice,
   editorOpened,
+  initialTree,
   footer,
   onOpenSkill,
   onOpenFolder,
   onBack,
 }) => {
-  const [tree, setTree] = useState<SkillsTreeView | null>(null)
+  const [tree, setTree] = useState<SkillsTreeView | null>(initialTree ?? null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    if (initialTree) return
     let cancelled = false
     if (!identity) {
       setTree({ skills: [], supportingCounts: {} })
@@ -68,7 +72,7 @@ export const SkillsTreeScreen: React.FC<SkillsTreeScreenProps> = ({
       cancelled = true
       clearInterval(interval)
     }
-  }, [identity, editorOpened])
+  }, [identity, editorOpened, initialTree])
 
   const subtitle = notice ?? 'Public and private skills.'
   const isLoading = tree === null

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="832" height="320" viewBox="0 0 832 320" style="max-width: 832px; width: 100%; height: auto;" role="img">
+<svg xmlns="http://www.w3.org/2000/svg" width="832" height="540" viewBox="0 0 832 540" style="max-width: 832px; width: 100%; height: auto;" role="img">
   <rect width="100%" height="100%" rx="14" fill="#030509"/>
-  <rect x="0.5" y="0.5" width="831" height="319" rx="14" fill="none" stroke="#1b1e26" stroke-width="1"/>
+  <rect x="0.5" y="0.5" width="831" height="539" rx="14" fill="none" stroke="#1b1e26" stroke-width="1"/>
   <text x="416" y="23" text-anchor="middle" font-family='ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace' font-size="13" fill="#7a8090">ethagent</text>
   <g font-family='ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace' font-size="16" fill="#dadce6">
     <rect x="262.4" y="68" width="10.1" height="19" fill="#9aa0b0"/>
@@ -47,24 +47,46 @@
     <rect x="512" y="90" width="10.1" height="11" fill="#878a96"/>
     <rect x="521.6" y="90" width="10.1" height="19" fill="#8a8795"/>
     <rect x="550.4" y="90" width="10.1" height="19" fill="#94858e"/>
-    <text x="185.6" y="172" textLength="460.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#9aa0b0">Create or link an agent identity to get started.</text>
-    <text x="329.6" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f0eee8">&gt;</text>
-    <text x="348.8" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f3d8e0">C</text>
-    <text x="358.4" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f3dbd9">r</text>
-    <text x="368" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f3ded2">e</text>
-    <text x="377.6" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f3e2cd">a</text>
-    <text x="387.2" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f2e7cc">t</text>
-    <text x="396.8" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f2ecca">e</text>
-    <text x="416" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#dcedd7">N</text>
-    <text x="425.6" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#d6ebdf">e</text>
-    <text x="435.2" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#d4e8e9">w</text>
-    <text x="454.4" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#d8dff2">A</text>
-    <text x="464" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#dfd9f1">g</text>
-    <text x="473.6" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#e5d6ed">e</text>
-    <text x="483.2" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#ecd7e6">n</text>
-    <text x="492.8" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f3d8e0">t</text>
-    <text x="348.8" y="238" textLength="124.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Load Existing</text>
-    <text x="368" y="282" textLength="105.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#7a8090">esc to quit</text>
+    <text x="185.6" y="172" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f0eee8">&gt;</text>
+    <text x="204.8" y="172" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f3d8e0">P</text>
+    <text x="214.4" y="172" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f3dbd8">u</text>
+    <text x="224" y="172" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f3decf">b</text>
+    <text x="233.6" y="172" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f3e4cc">l</text>
+    <text x="243.2" y="172" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f2eacb">i</text>
+    <text x="252.8" y="172" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#eaeccf">c</text>
+    <text x="272" y="172" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#d6ebe0">P</text>
+    <text x="281.6" y="172" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#d4e7eb">r</text>
+    <text x="291.2" y="172" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#d4e3f3">o</text>
+    <text x="300.8" y="172" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#dcdcf1">f</text>
+    <text x="310.4" y="172" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#e3d6ef">i</text>
+    <text x="320" y="172" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#ebd7e7">l</text>
+    <text x="329.6" y="172" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f3d8e0">e</text>
+    <text x="636.8" y="172" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#8a8a9c">p</text>
+    <text x="204.8" y="194" textLength="124.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Soul &amp; Memory</text>
+    <text x="636.8" y="194" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#8a8a9c">m</text>
+    <text x="204.8" y="216" textLength="57.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Skills</text>
+    <text x="636.8" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#8a8a9c">s</text>
+    <text x="204.8" y="238" textLength="124.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Save Snapshot</text>
+    <text x="636.8" y="238" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#8a8a9c">a</text>
+    <text x="204.8" y="260" textLength="134.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Refetch Latest</text>
+    <text x="636.8" y="260" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#8a8a9c">r</text>
+    <text x="204.8" y="282" textLength="76.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">ENS Name</text>
+    <text x="636.8" y="282" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#8a8a9c">e</text>
+    <text x="204.8" y="304" textLength="115.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Token Values</text>
+    <text x="636.8" y="304" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#8a8a9c">v</text>
+    <text x="204.8" y="326" textLength="115.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Custody Mode</text>
+    <text x="636.8" y="326" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#8a8a9c">c</text>
+    <text x="204.8" y="348" textLength="153.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Prepare Transfer</text>
+    <text x="636.8" y="348" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#8a8a9c">t</text>
+    <text x="204.8" y="370" textLength="115.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Switch Agent</text>
+    <text x="636.8" y="370" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#8a8a9c">w</text>
+    <text x="204.8" y="392" textLength="86.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">New Agent</text>
+    <text x="636.8" y="392" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#8a8a9c">n</text>
+    <text x="204.8" y="414" textLength="115.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">IPFS Storage</text>
+    <text x="636.8" y="414" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#8a8a9c">i</text>
+    <text x="204.8" y="436" textLength="38.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Quit</text>
+    <text x="636.8" y="436" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#8a8a9c">q</text>
+    <text x="291.2" y="502" textLength="259.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#7a8090">#45744 · 0xA1E9…89CE · base</text>
   </g>
   <defs>
     <linearGradient id="wmShine" gradientUnits="userSpaceOnUse" x1="0" y1="68" x2="0" y2="109">
