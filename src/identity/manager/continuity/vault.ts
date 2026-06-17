@@ -28,6 +28,7 @@ import {
   encodeRotateAgentURI,
 } from '../../registry/vault.js'
 import {
+  prepareTransactionGasFee,
   requestBrowserWalletSignature,
   requestBrowserWalletSignatureAndTransaction,
   type WalletPurpose,
@@ -338,6 +339,12 @@ async function runOperatorWalletVaultPublish(args: {
         newURI: agentUri,
         vaultAddress,
       })
+      const gasFee = await prepareTransactionGasFee({
+        client: createErc8004PublicClient(step.registry),
+        account: getAddress(wallet.account),
+        to: vaultCall.to,
+        data: vaultCall.data,
+      })
 
       const backup: BackupMetadata = {
         cid: statePin.cid,
@@ -369,6 +376,7 @@ async function runOperatorWalletVaultPublish(args: {
       return {
         to: vaultCall.to,
         data: vaultCall.data,
+        ...gasFee,
         prepared: {
           nextIdentity,
           ...(markdownScaffold ? { markdownScaffold } : {}),

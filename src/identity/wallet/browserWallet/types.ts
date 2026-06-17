@@ -85,6 +85,9 @@ export type SignAndTransactionRequest<TPrepared> = {
     to: Address
     data: Hex
     value?: Hex
+    gas?: Hex
+    maxFeePerGas?: Hex
+    maxPriorityFeePerGas?: Hex
     prepared: TPrepared
   }>
 }

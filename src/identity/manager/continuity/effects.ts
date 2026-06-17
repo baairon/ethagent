@@ -31,6 +31,7 @@ import {
 } from '../../registry/erc8004.js'
 import { resolveValidatedPinataJwt, savePinataJwt } from '../../storage/pinataJwt.js'
 import {
+  prepareTransactionGasFee,
   requestBrowserWalletSignatureAndTransaction,
   type BrowserWalletSession,
   type BrowserWalletSignature,
@@ -304,9 +305,16 @@ async function runRebackupSigningInner(
           newURI: agentUri,
           vaultAddress: vaultRoute.vaultAddress,
         })
+        const gasFee = await prepareTransactionGasFee({
+          client: createErc8004PublicClient(step.registry),
+          account: getAddress(wallet.account),
+          to: vaultCall.to,
+          data: vaultCall.data,
+        })
         return {
           to: vaultCall.to,
           data: vaultCall.data,
+          ...gasFee,
           prepared: {
             ownerAddress: snapshotOwner,
             agentUri,
@@ -329,9 +337,20 @@ async function runRebackupSigningInner(
         agentId,
         newUri: agentUri,
       })
-      return {
+      const directCall = {
         to: step.registry.identityRegistryAddress,
         data: encodeSetAgentUri({ agentId, newUri: agentUri }),
+      }
+      const directGasFee = await prepareTransactionGasFee({
+        client: createErc8004PublicClient(step.registry),
+        account: getAddress(wallet.account),
+        to: directCall.to,
+        data: directCall.data,
+      })
+      return {
+        to: directCall.to,
+        data: directCall.data,
+        ...directGasFee,
         prepared: {
           ownerAddress: snapshotOwner,
           agentUri,

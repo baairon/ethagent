@@ -110,7 +110,14 @@ export async function requestBrowserWalletSignatureAndTransaction<TPrepared>(
         account: `0x${string}`
         message: string
         signature: `0x${string}`
-        tx: { to: `0x${string}`; data: `0x${string}`; value?: `0x${string}` }
+        tx: {
+          to: `0x${string}`
+          data: `0x${string}`
+          value?: `0x${string}`
+          gas?: `0x${string}`
+          maxFeePerGas?: `0x${string}`
+          maxPriorityFeePerGas?: `0x${string}`
+        }
         prepared: TPrepared
       }
     | null = null
@@ -150,6 +157,9 @@ export async function requestBrowserWalletSignatureAndTransaction<TPrepared>(
           to: next.to,
           data: next.data,
           ...(next.value ? { value: next.value } : {}),
+          ...(next.gas ? { gas: next.gas } : {}),
+          ...(next.maxFeePerGas ? { maxFeePerGas: next.maxFeePerGas } : {}),
+          ...(next.maxPriorityFeePerGas ? { maxPriorityFeePerGas: next.maxPriorityFeePerGas } : {}),
         },
         prepared: next.prepared,
       }

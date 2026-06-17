@@ -21,6 +21,7 @@ import { encodeRotateAgentURI } from '../../registry/vault.js'
 import { resolveValidatedPinataJwt, savePinataJwt } from '../../storage/pinataJwt.js'
 import {
   openBrowserWalletSession,
+  prepareTransactionGasFee,
   requestBrowserWalletSignatureAndTransaction,
   type WalletPurpose,
 } from '../../wallet/browserWallet.js'
@@ -188,9 +189,20 @@ async function runPublicProfileSigningInner(
         agentId,
         newUri: agentUri,
       })
-      return {
+      const directCall = {
         to: step.registry.identityRegistryAddress,
         data: encodeSetAgentUri({ agentId, newUri: agentUri }),
+      }
+      const gasFee = await prepareTransactionGasFee({
+        client: createErc8004PublicClient(step.registry),
+        account: getAddress(wallet.account),
+        to: directCall.to,
+        data: directCall.data,
+      })
+      return {
+        to: directCall.to,
+        data: directCall.data,
+        ...gasFee,
         prepared: {
           ownerAddress: snapshotOwner,
           agentUri,
@@ -305,11 +317,18 @@ async function runOperatorWalletVaultPublicProfileSave(args: {
       newURI: prepared.agentUri,
       vaultAddress,
     })
+    const gasFee = await prepareTransactionGasFee({
+      client: createErc8004PublicClient(step.registry),
+      account: getAddress(wallet.account),
+      to: vaultCall.to,
+      data: vaultCall.data,
+    })
     const vaultTx = await session.sendTransaction({
       chainId: step.registry.chainId,
       expectedAccount: wallet.account,
       to: vaultCall.to,
       data: vaultCall.data,
+      ...gasFee,
       purpose: 'rotate-agent-uri-vault-operator',
       flowId: 'public-profile-vault',
       flowStep: 2,
