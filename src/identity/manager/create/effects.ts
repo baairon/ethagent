@@ -33,6 +33,7 @@ import { registryConfigFromConfig, type RegistryResolution } from '../../registr
 import { resolveValidatedPinataJwt, savePinataJwt } from '../../storage/pinataJwt.js'
 import { setOwnerAddressField } from '../../identityCompat.js'
 import {
+  prepareTransactionGasFee,
   requestBrowserWalletSignatureAndTransaction,
 } from '../../wallet/browserWallet.js'
 import { initialAgentState, PREFLIGHT_AGENT_URI } from '../profile/identity.js'
@@ -190,9 +191,20 @@ export async function runCreateSigning(
       assertVerifiedPin(metadataPin)
       const metadataCid = metadataPin.cid
       const agentUri = `ipfs://${metadataCid}`
-      return {
+      const registerCall = {
         to: step.registry.identityRegistryAddress,
         data: encodeRegisterAgent({ agentURI: agentUri }),
+      }
+      const gasFee = await prepareTransactionGasFee({
+        client: createErc8004PublicClient(step.registry),
+        account: wallet.account,
+        to: registerCall.to,
+        data: registerCall.data,
+      })
+      return {
+        to: registerCall.to,
+        data: registerCall.data,
+        ...gasFee,
         prepared: {
           ownerAddress: wallet.account,
           agentUri,

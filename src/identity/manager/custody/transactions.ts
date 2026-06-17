@@ -228,11 +228,18 @@ async function runVaultUnwrapTransactionInner(args: {
     recipient: ownerAddress,
     vaultAddress,
   })
+  const gasFee = await prepareTransactionGasFee({
+    client: publicClient,
+    account: ownerAddress,
+    to: encoded.to,
+    data: encoded.data,
+  })
   const result = await sendBrowserWalletTransaction({
     chainId: registry.chainId,
     expectedAccount: ownerAddress,
     to: encoded.to,
     data: encoded.data,
+    ...gasFee,
     purpose: 'unwrap-agent-vault',
     onReady: args.callbacks.onWalletReady,
     ...(args.flowId ? { flowId: args.flowId } : {}),
@@ -296,11 +303,18 @@ async function runVaultWithdrawTransactionInner(args: {
     recipient,
     vaultAddress,
   })
+  const gasFee = await prepareTransactionGasFee({
+    client: publicClient,
+    account: recipient,
+    to: encoded.to,
+    data: encoded.data,
+  })
   const result = await sendBrowserWalletTransaction({
     chainId: registry.chainId,
     expectedAccount: recipient,
     to: encoded.to,
     data: encoded.data,
+    ...gasFee,
     purpose: 'withdraw-vault',
     onReady: args.callbacks.onWalletReady,
   })

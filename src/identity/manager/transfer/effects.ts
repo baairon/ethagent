@@ -25,7 +25,7 @@ import {
   withEthagentPointers,
 } from '../../registry/erc8004.js'
 import { resolveValidatedPinataJwt, savePinataJwt } from '../../storage/pinataJwt.js'
-import { openBrowserWalletSession } from '../../wallet/browserWallet.js'
+import { openBrowserWalletSession, prepareTransactionGasFee } from '../../wallet/browserWallet.js'
 import { resolveEnsAddress } from '../../ens/ensLookup.js'
 import type { Step } from '../reducer.js'
 import type { EffectCallbacks } from '../shared/effects/types.js'
@@ -232,16 +232,24 @@ export async function runTokenTransferSigning(
   })
 
   callbacks.onTokenTransferProgress?.(tokenTransferProgressForPhase('sender-transaction', ownerAddress, targetAddress))
+  const client = createErc8004PublicClient(step.registry)
+  const transferData = encodeSetAgentUri({ agentId, newUri: agentUri })
+  const gasFee = await prepareTransactionGasFee({
+    client,
+    account: ownerAddress,
+    to: step.registry.identityRegistryAddress,
+    data: transferData,
+  })
   const tx = await session.sendTransaction({
     chainId: step.registry.chainId,
     expectedAccount: ownerAddress,
     to: step.registry.identityRegistryAddress,
-    data: encodeSetAgentUri({ agentId, newUri: agentUri }),
+    data: transferData,
+    ...gasFee,
     purpose: 'publish-transfer-snapshot',
   })
 
   callbacks.onTokenTransferProgress?.(tokenTransferProgressForPhase('confirming', ownerAddress, targetAddress))
-  const client = createErc8004PublicClient(step.registry)
   await awaitConfirmedReceipt(client, tx.txHash, 'Token transfer URI publish', { kind: 'token-transfer', chainId: step.registry.chainId })
   const nextIdentity: EthagentIdentity = {
     ...step.identity,

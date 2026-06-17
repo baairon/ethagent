@@ -9,7 +9,7 @@ import {
   encodeSetMetadataOperator,
   readMetadataOperators,
 } from '../../../registry/vault.js'
-import { sendBrowserWalletTransaction } from '../../../wallet/browserWallet.js'
+import { prepareTransactionGasFee, sendBrowserWalletTransaction } from '../../../wallet/browserWallet.js'
 import {
   computeApprovalDiff,
   type ApprovalDiff,
@@ -102,11 +102,18 @@ export async function syncVaultMetadataOperatorsAfterOwnerSave(args: {
       approved: op.approved,
       vaultAddress,
     })
+    const gasFee = await prepareTransactionGasFee({
+      client: probeClient,
+      account: args.ownerAddress,
+      to: encoded.to,
+      data: encoded.data,
+    })
     const tx = await sendBrowserWalletTransaction({
       chainId: args.registry.chainId,
       expectedAccount: args.ownerAddress,
       to: encoded.to,
       data: encoded.data,
+      ...gasFee,
       onReady: args.callbacks.onWalletReady,
       purpose: 'sync-operator-vault',
     })

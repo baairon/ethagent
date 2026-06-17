@@ -10,7 +10,7 @@ import { encodeEnsRecordsTransaction, encodeEnsRegistryTransaction, readAddressR
 import type { AgentEnsRecordState, AgentEnsRecords, AgentRecordDiff } from '../../ens/agentRecords.js'
 import { changedRecords, clearedRecords, diffRecords } from '../../ens/agentRecords.js'
 import { namehash, getAddress } from 'viem'
-import { sendBrowserWalletTransaction, type BrowserWalletSession, type WalletPurpose } from '../../wallet/browserWallet.js'
+import { prepareTransactionGasFee, sendBrowserWalletTransaction, type BrowserWalletSession, type WalletPurpose } from '../../wallet/browserWallet.js'
 import type { EffectCallbacks } from '../shared/effects/types.js'
 function chainLabel(chainId: number): string {
   return supportedErc8004ChainForId(chainId)?.name ?? `chain ${chainId}`
@@ -66,12 +66,19 @@ export async function runUpdateEnsRecords(args: {
   })
   const tokenChainName = typeof args.tokenChainId === 'number' ? ensTokenChainName(args.tokenChainId) : undefined
   const purpose = args.purpose ?? 'update-ens-records'
+  const gasFee = await prepareTransactionGasFee({
+    client: publicClient,
+    account: args.ownerAddress,
+    to: encoded.resolverAddress,
+    data: encoded.data,
+  })
   if (args.session) {
     const result = await args.session.sendTransaction({
       chainId: 1,
       expectedAccount: args.ownerAddress,
       to: encoded.resolverAddress,
       data: encoded.data,
+      ...gasFee,
       purpose,
       ...(tokenChainName ? { tokenChainName } : {}),
       ...(args.flowId ? { flowId: args.flowId } : {}),
@@ -83,6 +90,7 @@ export async function runUpdateEnsRecords(args: {
     expectedAccount: args.ownerAddress,
     to: encoded.resolverAddress,
     data: encoded.data,
+    ...gasFee,
     purpose,
     onReady: args.callbacks.onWalletReady,
     ...(tokenChainName ? { tokenChainName } : {}),
@@ -125,12 +133,19 @@ export async function runEnsSetupRegistryTransaction(args: {
     purpose,
   })
   const tokenChainName = typeof args.tokenChainId === 'number' ? ensTokenChainName(args.tokenChainId) : undefined
+  const gasFee = await prepareTransactionGasFee({
+    client: publicClient,
+    account: args.setup.ownerAddress,
+    to: encoded.to,
+    data: encoded.data,
+  })
   if (args.session) {
     const result = await args.session.sendTransaction({
       chainId: 1,
       expectedAccount: args.setup.ownerAddress,
       to: encoded.to,
       data: encoded.data,
+      ...gasFee,
       purpose,
       ...(tokenChainName ? { tokenChainName } : {}),
       ...(args.flowId ? { flowId: args.flowId } : {}),
@@ -144,6 +159,7 @@ export async function runEnsSetupRegistryTransaction(args: {
     expectedAccount: args.setup.ownerAddress,
     to: encoded.to,
     data: encoded.data,
+    ...gasFee,
     purpose,
     onReady: args.callbacks.onWalletReady,
     ...(tokenChainName ? { tokenChainName } : {}),
@@ -176,12 +192,19 @@ export async function runEnsSetupRecordsTransaction(args: {
     purpose,
   })
   const tokenChainName = typeof args.tokenChainId === 'number' ? ensTokenChainName(args.tokenChainId) : undefined
+  const gasFee = await prepareTransactionGasFee({
+    client: publicClient,
+    account: freshSetup.ownerAddress,
+    to: encoded.to,
+    data: encoded.data,
+  })
   if (args.session) {
     const result = await args.session.sendTransaction({
       chainId: 1,
       expectedAccount: freshSetup.ownerAddress,
       to: encoded.to,
       data: encoded.data,
+      ...gasFee,
       purpose,
       ...(tokenChainName ? { tokenChainName } : {}),
       ...(args.flowId ? { flowId: args.flowId } : {}),
@@ -194,6 +217,7 @@ export async function runEnsSetupRecordsTransaction(args: {
     expectedAccount: freshSetup.ownerAddress,
     to: encoded.to,
     data: encoded.data,
+    ...gasFee,
     purpose,
     onReady: args.callbacks.onWalletReady,
     ...(tokenChainName ? { tokenChainName } : {}),
