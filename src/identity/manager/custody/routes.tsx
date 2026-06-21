@@ -169,7 +169,7 @@ export function renderCustodyStep({
       <Surface
         title="Advanced Custody Active"
         subtitle="Token held in its Vault. Operators rotate the URI onchain."
-        footer={<Text color={theme.dim}>↵ continues</Text>}
+        footer={<Text color={theme.dim}>↵ continue</Text>}
       >
         <Box flexDirection="column">
           {step.vaultAddress ? <Row label="Vault" value={shortAddress(step.vaultAddress)} /> : null}
@@ -192,7 +192,7 @@ export function renderCustodyStep({
       <Surface
         title="Simple Custody Active"
         subtitle="Token back in owner wallet."
-        footer={<Text color={theme.dim}>↵ continues</Text>}
+        footer={<Text color={theme.dim}>↵ continue</Text>}
       >
         <Box flexDirection="column">
           <Row label="Owner Wallet" value={shortAddress(ownerWallet)} />

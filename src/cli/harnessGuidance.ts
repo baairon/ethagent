@@ -1,21 +1,9 @@
 export type PortableInstructionOptions = {
-  /** Adapter/harness name this instruction is written for (e.g. 'codex', 'cursor'). */
   harness: string
-  /**
-   * Human description of where this harness keeps the soul/memory markers.
-   * Defaults to the managed block in the same instructions file.
-   */
   soulMemoryLocation?: string
-  /** Absolute path of the folder where this harness's skill files are mirrored. */
   skillsLocation?: string
 }
 
-/**
- * Harness-agnostic guidance injected into any harness that reads a per-session
- * instructions file. Teaches the agent the same portability rules the Claude Code
- * hooks enforce, without depending on a hook system: edit soul/memory inside the
- * ethagent markers, leave skills alone, and rely on background autosync.
- */
 export function buildPortableInstruction(opts: PortableInstructionOptions): string {
   const where =
     opts.soulMemoryLocation ??

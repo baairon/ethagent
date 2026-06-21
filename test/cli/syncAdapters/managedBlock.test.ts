@@ -28,11 +28,10 @@ test('a literal ethagent marker in soul/memory is neutralized, so the body round
     memory: '# MEMORY.md\n\nNote: ethagent bounds memory with <!-- ethagent:memory:end --> and keeps going after it\n',
   }
   const block = renderManagedBlock(context, 'guidance tail')
-  // only the real closing marker exists; the one in the body was defanged
   assert.equal((block.match(/<!-- ethagent:memory:end -->/g) ?? []).length, 1)
   const parsed = parseManagedContext(block)
   assert.match(parsed.memory ?? '', /Note: ethagent bounds memory/)
-  assert.match(parsed.memory ?? '', /keeps going after it/) // nothing dropped
+  assert.match(parsed.memory ?? '', /keeps going after it/)
 })
 
 async function seedVault(soulBody: string, memoryBody: string): Promise<void> {
@@ -325,7 +324,6 @@ test('reconcile pulls an edit made in the project MEMORY.md back into the vault'
     const context = { soul: '# SOUL.md\n\noriginal soul body\n', memory: '# MEMORY.md\n\noriginal memory body\n' }
     await claudeCodeAdapter.mirror([], context)
 
-    // Edit lands only in the project MEMORY.md managed block, never in CLAUDE.md.
     const projFile = projectMemoryPath()
     const edited = (await fs.readFile(projFile, 'utf8')).replace('original memory body', 'edited in project memory')
     await fs.writeFile(projFile, edited, 'utf8')

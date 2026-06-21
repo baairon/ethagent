@@ -60,7 +60,7 @@ export const IdentitySummary: React.FC<IdentitySummaryProps> = ({ identity, conf
     const tokenSegment = identity.agentId ? `#${identity.agentId}` : null
     const networkSegment = identity.agentId ? networkValue : null
     const ensSegment = ensStatus.kind === 'linked'
-      ? ensStatus.name
+      ? ensStatus.name === rawName ? null : ensStatus.name
       : ensStatus.kind === 'issue'
         ? ensStatus.name
         : null

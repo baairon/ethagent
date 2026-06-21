@@ -18,11 +18,6 @@ function expandHome(p: string): string {
   return p.startsWith('~') ? path.join(os.homedir(), p.slice(1)) : p
 }
 
-/**
- * The literal "any harness" escape hatch: arbitrary instruction-file paths the user
- * lists in ~/.ethagent/harnesses.json (a JSON array of paths or {path} objects) or in
- * the $ETHAGENT_HARNESS_FILES env var (path-delimiter or comma separated).
- */
 function readEnvTargets(): string[] {
   const out: string[] = []
   const env = process.env.ETHAGENT_HARNESS_FILES
@@ -55,7 +50,7 @@ async function readConfigFileTargets(): Promise<string[]> {
         if (typeof p === 'string' && p.trim()) out.push(path.resolve(expandHome(p.trim())))
       }
     }
-  } catch { /* no config file or malformed -> no configured targets */ }
+  } catch {}
   return out
 }
 
@@ -63,7 +58,6 @@ export async function readGenericTargets(): Promise<string[]> {
   return [...new Set([...readEnvTargets(), ...(await readConfigFileTargets())])]
 }
 
-/** Register a tool's instructions file in ~/.ethagent/harnesses.json (dedup). Returns the resolved path. */
 export async function addGenericTarget(rawPath: string): Promise<string> {
   const resolved = path.resolve(expandHome(rawPath.trim()))
   const configured = await readConfigFileTargets()
@@ -89,8 +83,6 @@ export const genericAdapter: SyncAdapter = {
     }
     return newest
   },
-  // One read per target so reconcile honors each target's newest edit; collapsing to the
-  // single newest target (as readManaged does) would let an edit in another target be lost.
   async readManagedCandidates(): Promise<ManagedRead[]> {
     const reads: ManagedRead[] = []
     for (const target of await readGenericTargets()) {

@@ -107,7 +107,7 @@ export function LazyMenu<T>({ rows, width = PANEL_WIDTH, onSubmit, onCancel }: P
         return (
           <React.Fragment key={i}>
             <Box flexDirection="row" {...(shortcut ? { width } : {})}>
-              <Text color={cursorColor}>{active ? '> ' : '  '}</Text>
+              <Text color={cursorColor}>{active ? '❯ ' : '  '}</Text>
               <Text>
                 {active && !disabled
                   ? chars.map((ch, ci) => (

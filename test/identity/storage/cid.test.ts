@@ -15,18 +15,18 @@ function cidV0(content: Uint8Array): string {
 
 function cidV1Sha256(content: Uint8Array): string {
   const multihash = new Uint8Array([0x12, 0x20, ...sha256(content)])
-  const cidBytes = new Uint8Array([0x01, 0x55, ...multihash]) // v1, raw codec
+  const cidBytes = new Uint8Array([0x01, 0x55, ...multihash])
   return 'b' + base32.encode(cidBytes).toLowerCase().replace(/=+$/, '')
 }
 
 function cidV1DagPb(content: Uint8Array): string {
   const multihash = new Uint8Array([0x12, 0x20, ...sha256(content)])
-  const cidBytes = new Uint8Array([0x01, 0x70, ...multihash]) // v1, dag-pb codec (Kubo/Pinata default)
+  const cidBytes = new Uint8Array([0x01, 0x70, ...multihash])
   return 'b' + base32.encode(cidBytes).toLowerCase().replace(/=+$/, '')
 }
 
 function cidV1Sha1(): string {
-  const multihash = new Uint8Array([0x11, 0x14, ...new Uint8Array(20)]) // sha1, 20-byte (fake) digest
+  const multihash = new Uint8Array([0x11, 0x14, ...new Uint8Array(20)])
   const cidBytes = new Uint8Array([0x01, 0x55, ...multihash])
   return 'b' + base32.encode(cidBytes).toLowerCase().replace(/=+$/, '')
 }
@@ -43,7 +43,6 @@ test('rejects tampered content for a raw-codec CIDv1', () => {
 })
 
 test('skips verification for a CIDv0 (always dag-pb; its digest is not sha256 of the raw bytes)', () => {
-  // ethagent pins dag-pb via Kubo; verifying sha256(content) would false-reject every fetch.
   assert.doesNotThrow(() => assertCidMatchesContent(cidV0(content), content))
   assert.doesNotThrow(() => assertCidMatchesContent(cidV0(content), tampered))
 })
@@ -59,6 +58,5 @@ test('skips verification for an unparseable CID rather than blocking', () => {
 })
 
 test('skips verification for a non-sha256 multihash', () => {
-  // sha1 digest cannot be recomputed here; verifier must skip, not throw, regardless of content
   assert.doesNotThrow(() => assertCidMatchesContent(cidV1Sha1(), tampered))
 })

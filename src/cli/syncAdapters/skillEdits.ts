@@ -21,19 +21,12 @@ async function readLastExtraHash(filePath: string): Promise<string | null> {
   }
 }
 
-/** Record the skill/guidance section ethagent just wrote, so a later harness edit is detectable. */
 export async function writeLastExtraHash(filePath: string, block: string): Promise<void> {
   try {
     await fs.writeFile(mirrorStatePath(filePath), `${JSON.stringify({ extraHash: hash(extractManagedExtra(block) ?? '') })}\n`, 'utf8')
-  } catch { /* state is best-effort */ }
+  } catch {}
 }
 
-/**
- * Skills are vault-authoritative (like Claude's read-only mirror), so a mirror overwrites
- * a harness's skill section. Before doing so, if the harness changed that section since
- * ethagent last wrote it, back the edit up to ~/.ethagent/skill-edits/ so nothing the
- * agent wrote is lost silently. Returns the backup path if one was made.
- */
 export async function preserveHarnessSkillEdits(filePath: string, harness: string): Promise<string | null> {
   let content: string
   try {
@@ -44,7 +37,7 @@ export async function preserveHarnessSkillEdits(filePath: string, harness: strin
   const extra = extractManagedExtra(content)
   if (!extra) return null
   const last = await readLastExtraHash(filePath)
-  if (last === null || hash(extra) === last) return null // first write, or unchanged since we wrote it
+  if (last === null || hash(extra) === last) return null
   try {
     const dir = path.join(getConfigDir(), 'skill-edits')
     await fs.mkdir(dir, { recursive: true })

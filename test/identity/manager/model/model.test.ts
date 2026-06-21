@@ -201,7 +201,7 @@ test('recovery confirm warns before overwriting dirty local continuity files', (
   assert.match(output, /SOUL\.md,[\s\S]*Skills/)
   assert.match(output, /Continuing replaces those files/)
   assert.match(output, /Overwrite Local Changes/)
-  assert.match(output, /Local snapshot is also ahead of onchain/)
+  assert.match(output, /Local snapshot is also ahead of\s+onchain/)
 })
 
 test('transfer snapshot view is perspective-aware', () => {

@@ -53,7 +53,6 @@ const CompactBanner: React.FC<{ columns: number }> = ({ columns }) => {
   )
 }
 
-// The compact block mark is the one universal wordmark, shown on every screen.
 export const Wordmark: React.FC = () => {
   const { stdout } = useStdout()
   const [columns, setColumns] = useState<number>(() => Math.floor(stdout?.columns ?? 80))

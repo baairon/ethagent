@@ -12,8 +12,6 @@ const HEAD_TIMEOUT_MS = 15_000
 const JWT_TIMEOUT_MS = 15_000
 const UPLOAD_TIMEOUT_MS = 120_000
 
-// Bound every network call so a slow or hung gateway can never block a flow forever,
-// while still composing with a caller-supplied AbortSignal.
 function withTimeout(ms: number, signal?: AbortSignal): { signal: AbortSignal; clear: () => void } {
   const controller = new AbortController()
   const onAbort = (): void => controller.abort(signal?.reason)

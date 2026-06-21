@@ -332,8 +332,6 @@ test('materializeSkillsTree with prune REFUSES to wipe all skills when the snaps
     await fs.mkdir(dir, { recursive: true, mode: 0o700 })
     await fs.writeFile(path.join(dir, 'SKILL.md'), '---\ndescription: local\nvisibility: public\n---\n\nbody\n', { mode: 0o600 })
 
-    // An undefined OR empty snapshot must NOT translate into deleting every local
-    // skill: a degenerate/corrupt/forged snapshot can never wipe the vault.
     await materializeSkillsTree(identity, undefined, { prune: true })
     await materializeSkillsTree(identity, {}, { prune: true })
 

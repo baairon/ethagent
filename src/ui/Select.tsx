@@ -1,9 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { Box, Text } from 'ink'
+import { Box, Text, useStdout } from 'ink'
 import { theme, PANEL_WIDTH, gradientColor } from './theme.js'
 import { useAppInput } from '../app/input/AppInputProvider.js'
 
 const CONTENT_WIDTH = PANEL_WIDTH - 4
+
+const SELECT_CHROME_ROWS = 17
+const MIN_VISIBLE = 4
 
 function fitHint(hint: string, budget: number): string {
   if (budget < 8) return ''
@@ -63,7 +66,16 @@ export function Select<T>({
     setIndex(start === -1 ? 0 : start)
   }, [optionsSignature, start])
 
-  const visibleCount = Math.max(1, maxVisible ?? options.length)
+  const { stdout } = useStdout()
+  const [termRows, setTermRows] = useState<number | undefined>(stdout?.rows)
+  useEffect(() => {
+    if (!stdout) return
+    const onResize = () => setTermRows(stdout.rows)
+    stdout.on('resize', onResize)
+    return () => { stdout.off('resize', onResize) }
+  }, [stdout])
+  const autoVisible = termRows ? Math.max(MIN_VISIBLE, termRows - SELECT_CHROME_ROWS) : options.length
+  const visibleCount = Math.max(1, maxVisible ?? autoVisible)
   const windowStart = Math.max(0, Math.min(
     index - Math.floor(visibleCount / 2),
     Math.max(0, options.length - visibleCount),
@@ -103,14 +115,14 @@ export function Select<T>({
     <Box flexDirection="column">
       {label ? <Text color={theme.dim}>{label}</Text> : null}
       {hasAbove ? (
-        <Text color={theme.dim}>{`^ ${windowStart} earlier item${windowStart === 1 ? '' : 's'}`}</Text>
+        <Text color={theme.dim}>{`↑ ${windowStart} earlier item${windowStart === 1 ? '' : 's'}`}</Text>
       ) : null}
       {visibleOptions.map((option, visibleIndex) => {
         const absoluteIndex = windowStart + visibleIndex
         const isActive = absoluteIndex === index
         const selectable = isSelectableOption(option)
         const disabled = !!option.disabled
-        const cursor = !selectable ? ' ' : isActive ? '>' : ' '
+        const cursor = !selectable ? ' ' : isActive ? '❯' : ' '
         const isSection = option.role === 'section' || option.role === 'group'
         const prefix = option.prefix && !isSection ? `${option.prefix} ` : ''
         const rowIndent = option.indent ?? (usesInlineSections ? isSection ? 1 : 3 : 0)
@@ -170,7 +182,7 @@ export function Select<T>({
         )
       })}
       {hasBelow ? (
-        <Text color={theme.dim}>{`v ${options.length - windowEnd} more item${options.length - windowEnd === 1 ? '' : 's'}`}</Text>
+        <Text color={theme.dim}>{`↓ ${options.length - windowEnd} more item${options.length - windowEnd === 1 ? '' : 's'}`}</Text>
       ) : null}
     </Box>
   )

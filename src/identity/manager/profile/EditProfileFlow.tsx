@@ -151,10 +151,10 @@ const EditProfileMenuStep: React.FC<{
       : '(no icon)'
 
   const dirty = step.name !== undefined || step.description !== undefined || step.imagePath !== undefined
-  const saveHint = dirty ? 'Publish public profile and update the token URI' : 'No changes to save'
+  const saveHint = dirty ? 'Review what gets published' : 'No changes to save'
 
   return (
-    <Surface title="Edit Profile" subtitle="Save publishes all fields together." footer={footerHint('↵ select · esc back')}>
+    <Surface title="Edit Profile" subtitle="Saving also snapshots your soul, memory, and skills onchain." footer={footerHint('↵ select · esc back')}>
       <Select<'name' | 'description' | 'image' | 'save' | 'back'>
         options={[
           { value: 'name', label: 'Name', hint: nameHint },
@@ -239,19 +239,18 @@ const EditProfileReviewStep: React.FC<{
   step: Extract<Step, { kind: 'edit-profile-review' }>
   onSave: () => void
   onBack: () => void
-}> = ({ step, onSave, onBack }) => {
-  const currentIcon = readIdentityStateString(step.identity.state, 'imageUrl')
+}> = ({ onSave, onBack }) => {
   return (
-    <Surface title="Review Public Profile" footer={footerHint('↵ save · esc back')}>
+    <Surface title="Review & Publish" subtitle="Publishing onchain:" footer={footerHint('↵ publish · esc back')}>
       <Box flexDirection="column">
-        <ReviewRow label="Name" value={step.name || '(unnamed)'} />
-        <ReviewRow label="Description" value={step.description || '(no description)'} />
-        <ReviewRow label="Agent Icon" value={describeDraftIcon(step.imagePath, currentIcon)} />
+        {['Name', 'Description', 'Agent icon', 'Soul, memory, and skills snapshot'].map(item => (
+          <Text key={item} color={theme.text}>{`· ${item}`}</Text>
+        ))}
       </Box>
       <Box marginTop={1}>
         <Select<'save' | 'back'>
           options={[
-            { value: 'save', label: 'Save Profile', hint: 'Publish and update URI' },
+            { value: 'save', label: 'Publish' },
             { value: 'back', label: 'Back', role: 'utility' },
           ]}
           hintLayout="inline"
@@ -260,22 +259,6 @@ const EditProfileReviewStep: React.FC<{
         />
       </Box>
     </Surface>
-  )
-}
-
-const ReviewRow: React.FC<{ label: string; value: string }> = ({ label, value }) => {
-  const lines = value.split('\n')
-  return (
-    <Box flexDirection="row">
-      <Box width={13} flexShrink={0}>
-        <Text color={theme.menuStatus}>{label}</Text>
-      </Box>
-      <Box flexDirection="column" flexGrow={1}>
-        {lines.map((line, i) => (
-          <Text key={i} color={theme.text}>{line || ' '}</Text>
-        ))}
-      </Box>
-    </Box>
   )
 }
 

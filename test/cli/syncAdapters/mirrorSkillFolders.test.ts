@@ -68,8 +68,6 @@ test('mirrorAsSkillFolders does not rewrite an unchanged managed skill (idempote
     const mirrored = path.join(harness, 'demo', 'SKILL.md')
     const firstMtime = (await fs.stat(mirrored)).mtimeMs
 
-    // A second identical mirror must leave the files untouched. If it rewrote them, the
-    // bumped mtime would re-fire the daemon's recursive watcher and spin a sync loop.
     const result = await mirrorAsSkillFolders(harness, [skill])
     assert.equal(result.count, 1)
     assert.equal((await fs.stat(mirrored)).mtimeMs, firstMtime)
@@ -88,9 +86,9 @@ test('a skill containing a Windows reserved-name file (nul.md) still mirrors (fi
     await fs.writeFile(path.join(vault, 'demo', 'nul.md'), 'reserved device name\n')
 
     const result = await mirrorAsSkillFolders(harness, [skill])
-    assert.equal(result.count, 1) // the skill mirrors; the reserved file does not abort it
+    assert.equal(result.count, 1)
     await fs.access(path.join(harness, 'demo', 'SKILL.md'))
-    await assert.rejects(fs.access(path.join(harness, 'demo', 'nul.md'))) // reserved-name file skipped
+    await assert.rejects(fs.access(path.join(harness, 'demo', 'nul.md')))
   } finally {
     await fs.rm(tmp, { recursive: true, force: true }).catch(() => null)
   }
@@ -104,7 +102,6 @@ test('mirrorAsSkillFolders rewrites SKILL.md frontmatter as strict-valid YAML (C
     const dir = path.join(vault, 'vscode-setup')
     await fs.mkdir(dir, { recursive: true })
     const description = 'Set it up in one shot: apply my "Dark" theme'
-    // Lenient (Claude-tolerated) frontmatter: an unquoted colon + quotes a strict parser rejects.
     await fs.writeFile(
       path.join(dir, 'SKILL.md'),
       `---\nname: vscode-setup\ndescription: ${description}\nvisibility: public\n---\n\nbody\n`,
@@ -120,8 +117,8 @@ test('mirrorAsSkillFolders rewrites SKILL.md frontmatter as strict-valid YAML (C
     await mirrorAsSkillFolders(harness, [skill])
 
     const mirrored = await fs.readFile(path.join(harness, 'vscode-setup', 'SKILL.md'), 'utf8')
-    assert.match(mirrored, /description: "/) // now a quoted YAML scalar
-    assert.equal(parseSkillFile(mirrored).frontmatter.description, description) // round-trips
+    assert.match(mirrored, /description: "/)
+    assert.equal(parseSkillFile(mirrored).frontmatter.description, description)
   } finally {
     await fs.rm(tmp, { recursive: true, force: true }).catch(() => null)
   }

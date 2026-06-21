@@ -41,7 +41,7 @@ export const TokenTransferTargetScreen: React.FC<TokenTransferTargetScreenProps>
     <Surface
       title="Prepare Token Transfer"
       subtitle={<FlowTimeline steps={TRANSFER_STEPS} current={1} />}
-      footer={<Text color={theme.dim}>↵ Next · Esc Back</Text>}
+      footer={<Text color={theme.dim}>↵ next · esc back</Text>}
     >
       <Box flexDirection="column">
         <StatusRow label="Token" value={tokenValue} />
@@ -115,7 +115,7 @@ export const TokenTransferSigningScreen: React.FC<TokenTransferSigningScreenProp
     <Surface
       title="Prepare Token Transfer"
       subtitle={<FlowTimeline steps={TRANSFER_STEPS} current={transferTimelineStep(phase)} />}
-      footer={<Text color={theme.dim}>Esc Back</Text>}
+      footer={<Text color={theme.dim}>esc back</Text>}
     >
       <Box flexDirection="column">
         <StatusRow label="Token" value={identity.agentId ? `#${identity.agentId}` : 'not created'} />

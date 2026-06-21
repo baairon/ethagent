@@ -80,7 +80,7 @@ async function reportLocalChanges(identity: EthagentIdentity): Promise<void> {
     const files = changedContinuitySnapshotFiles(status)
     const detail = files.length > 0 ? ` (${files.join(', ')})` : ''
     process.stdout.write(`ethagent: local changes detected${detail}, run 'ethagent' and Save Snapshot to back up\n`)
-  } catch { /* local-change notice is advisory; ignore status/read failures */ }
+  } catch {}
 }
 
 export async function reconcileSoulMemory(
@@ -94,9 +94,6 @@ export async function reconcileSoulMemory(
     statIfExists(ref.memoryPath),
   ])
 
-  // Gather every managed file as a separate candidate. Adapters with multiple managed files
-  // (the generic adapter's N targets) expose readManagedCandidates so each target's newest
-  // edit is considered; collapsing them to one read could silently drop a non-newest edit.
   const readsPerAdapter = await Promise.all(
     adapters.map(async adapter => {
       if (adapter.readManagedCandidates) return adapter.readManagedCandidates().catch(() => [])

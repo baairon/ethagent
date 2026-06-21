@@ -81,16 +81,16 @@ test('removeClaudeHooks strips ethagent hooks, keeps foreign hooks and keys, and
       JSON.stringify({ model: 'sonnet', hooks: { SessionStart: [{ hooks: [{ type: 'command', command: 'other-tool' }] }] } }),
       'utf8',
     )
-    await mergeClaudeHooks() // adds the three ethagent hooks alongside the foreign one
+    await mergeClaudeHooks()
 
     assert.equal(await removeClaudeHooks(), true)
-    assert.equal(await removeClaudeHooks(), false) // idempotent: nothing left to remove
+    assert.equal(await removeClaudeHooks(), false)
 
     const settings = JSON.parse(await fs.readFile(path.join(claudeDir, 'settings.json'), 'utf8'))
     const text = JSON.stringify(settings)
-    assert.equal(settings.model, 'sonnet') // unrelated keys preserved
-    assert.match(text, /other-tool/) // foreign hook preserved
-    assert.doesNotMatch(text, /ethagent/) // every ethagent hook removed
+    assert.equal(settings.model, 'sonnet')
+    assert.match(text, /other-tool/)
+    assert.doesNotMatch(text, /ethagent/)
   })
 })
 
@@ -103,12 +103,12 @@ test('removeClaudeHooks keeps a user hook that merely mentions ethagent (exact-m
       JSON.stringify({ hooks: { Stop: [{ hooks: [{ type: 'command', command: 'npx ethagent save' }] }] } }),
       'utf8',
     )
-    await mergeClaudeHooks() // installs the three ethagent hooks
-    await removeClaudeHooks() // must remove only those three, not the user's own Stop hook
+    await mergeClaudeHooks()
+    await removeClaudeHooks()
 
     const text = JSON.stringify(JSON.parse(await fs.readFile(path.join(claudeDir, 'settings.json'), 'utf8')))
-    assert.match(text, /npx ethagent save/) // user's own ethagent-mentioning hook preserved
-    assert.doesNotMatch(text, /--session-start/) // ethagent's installed hooks removed
+    assert.match(text, /npx ethagent save/)
+    assert.doesNotMatch(text, /--session-start/)
   })
 })
 
@@ -165,9 +165,9 @@ test('generic adapter exposes one managed read per target (no collapse, so no cr
     const a = path.join(home, 'a', 'AGENTS.md')
     const b = path.join(home, 'b', 'AGENTS.md')
     await withEnv('ETHAGENT_HARNESS_FILES', `${a},${b}`, async () => {
-      await genericAdapter.mirror([], context) // writes the managed block to both targets
+      await genericAdapter.mirror([], context)
       const candidates = (await genericAdapter.readManagedCandidates?.()) ?? []
-      assert.equal(candidates.length, 2) // each target is its own reconcile candidate
+      assert.equal(candidates.length, 2)
     })
   })
 })
@@ -226,13 +226,11 @@ test('daemon is disabled by ETHAGENT_NO_DAEMON and never spawns', async () => {
 
 test('daemon is single-instance: ensureDaemon is a no-op while a live pid file exists', async () => {
   await withHome(async () => {
-    // Point the pid file at this very process, which is by definition alive.
     writeDaemonPid()
     assert.equal(readDaemonPid(), process.pid)
     const status = daemonStatus()
     assert.equal(status.running, true)
     assert.equal(status.pid, process.pid)
-    // A daemon already appears to be running, so ensureDaemon must not spawn another.
     assert.equal(ensureDaemon(), false)
     clearDaemonPid()
     assert.equal(daemonStatus().running, false)

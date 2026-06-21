@@ -12,6 +12,6 @@ export async function runPreToolGuard(): Promise<number> {
     const memory = decideMemoryGuard(filePath, opts)
     const decision = memory.deny ? memory : decideSkillGuard(filePath, opts)
     if (decision.deny && decision.reason) writePreToolDeny(decision.reason)
-  } catch { /* on any guard failure, stay silent and allow the tool call */ }
+  } catch {}
   return 0
 }

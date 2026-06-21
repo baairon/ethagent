@@ -19,12 +19,6 @@ function stripFirstHeader(value: string): string {
   return value.replace(/^#[^\n]*\n/, '')
 }
 
-/**
- * Defang ethagent marker syntax in injected content so a body can never contain a real
- * start/end/soul/memory marker that would truncate or mis-splice the managed block. Rewrites
- * `<!-- ethagent:` to `<!-- ethagent `. Applied to soul, memory, and skill content alike.
- * A no-op for normal content (which never contains the marker syntax).
- */
 export function neutralizeManagedMarkers(text: string): string {
   return text.replace(/<!--\s*ethagent:/gi, '<!-- ethagent ')
 }
@@ -58,7 +52,7 @@ export function renderManagedBlock(context: SyncContext | undefined, extra?: str
 export async function injectManagedBlock(filePath: string, block: string): Promise<void> {
   await fs.mkdir(path.dirname(filePath), { recursive: true })
   let existing = ''
-  try { existing = await fs.readFile(filePath, 'utf8') } catch { /* file may not exist yet; start from empty */ }
+  try { existing = await fs.readFile(filePath, 'utf8') } catch {}
 
   let next: string
   const startIdx = existing.indexOf(START)
@@ -113,11 +107,6 @@ export function extractOutsideManaged(fileContent: string): string {
   return fileContent.trim()
 }
 
-/**
- * The skill/guidance portion of the managed block (everything after the soul/memory
- * sub-blocks). Used to detect when a harness edited its skills so the edit can be
- * preserved before a mirror overwrites it. Returns null when there is no managed block.
- */
 export function extractManagedExtra(fileContent: string): string | null {
   const startIdx = fileContent.indexOf(START)
   const endIdx = fileContent.indexOf(END)

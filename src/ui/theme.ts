@@ -43,7 +43,7 @@ export const theme = {
   textSubtle: '#9aa0b0',
 } as const
 
-export const PANEL_WIDTH = 48
+export const PANEL_WIDTH = 42
 
 export function gradientColor(t: number): string {
   const s = Math.max(0, Math.min(1, t)) * (palette.length - 1)

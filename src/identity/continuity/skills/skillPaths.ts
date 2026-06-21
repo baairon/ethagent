@@ -12,9 +12,6 @@ const RESERVED_WINDOWS_SEGMENTS = new Set([
 ])
 
 export function isReservedWindowsSegment(name: string): boolean {
-  // Windows reserves these device names with ANY extension (nul.md, con.txt, com1.json, ...),
-  // so compare the base name before the first dot, not the whole filename. Otherwise a file
-  // like nul.md slips through and fs.copyFile throws, aborting the entire skill mirror on Windows.
   const base = name.toLowerCase().split('.')[0] ?? ''
   return RESERVED_WINDOWS_SEGMENTS.has(base)
 }

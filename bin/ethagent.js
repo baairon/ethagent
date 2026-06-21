@@ -6,9 +6,6 @@ import { dirname, join } from 'node:path'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const cli = join(__dirname, '..', 'src', 'cli', 'main.tsx')
 
-// Only set the console code page for an interactive terminal; in the windowless daemon/hook
-// path there is no TTY and spawning cmd would flash a console. windowsHide keeps any child
-// from allocating a visible console window (grandchildren don't inherit it otherwise).
 if (process.platform === 'win32' && process.stdout.isTTY) {
   try { execFileSync('cmd', ['/c', 'chcp', '65001'], { stdio: 'ignore', windowsHide: true }) } catch {}
 }

@@ -1,32 +1,12 @@
-// Turn an ANSI-colored terminal frame (what ink renders) into a single
-// self-contained SVG that looks like a tidy terminal window. Pure string
-// work: no DOM, no external resources, safe for GitHub's README sanitizer.
-//
-// Ported from soundcli's scripts/ansi-to-svg.ts. The base is recolored to the
-// VS Code "Preferences Dark" terminal background (#030509) and given a dim
-// centered title so each frame reads as a real terminal window.
-//
-// Layout strategy: every styled run becomes its own <text> pinned to the
-// character grid with textLength + lengthAdjust, so the picture stays
-// grid-aligned no matter which monospace font the viewer resolves.
 
 export interface AnsiToSvgOptions {
-  /** Frame width in character cells; lines are padded/trimmed to this. */
   cols: number;
-  /** Terminal background. */
   bg?: string;
-  /** Optional window title, drawn dim and centered in the titlebar. */
   title?: string;
-  /** Cap rendered width (px); scales down on narrow viewports, never stretches wider. */
   maxWidth?: number;
-  /** Draw the terminal window chrome (bg, border, centered title). Off = transparent, text only. */
   chrome?: boolean;
-  /** Row pitch in px (default 22). Tighten it to close block-art line gaps. */
   lineHeight?: number;
-  /** Paint wordmark block glyphs as vector rects instead of text. Off = faithful
-   *  text glyphs; on = solid block rects (used for the wordmark in every preview). */
   solidBlocks?: boolean;
-  /** Margin around the content in px (default 32). Trim it to hug the mark. */
   pad?: number;
 }
 
@@ -51,16 +31,14 @@ const LINE_H = 22;
 const PAD = 32;
 const HEADER_H = 36;
 const RADIUS = 14;
-const ROW_GAP = 0; // vertical trim per solid-block row; 0 so the two wordmark rows connect seamlessly, matching soundcli's wordmark (its glyphs are plain text, so its rows have no seam)
-const BG = "#030509"; // VS Code "Preferences Dark" terminal.background
-const BORDER = "#1b1e26"; // soft hairline that reads on the near-black base
-const FG_DEFAULT = "#dadce6"; // ethagent theme.text
+const ROW_GAP = 0;
+const BG = "#030509";
+const BORDER = "#1b1e26";
+const FG_DEFAULT = "#dadce6";
 const DIM_OPACITY = 0.55;
 const FONT_STACK =
   'ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace';
 
-/** The 16 basic ANSI colors: accents warmed to sit well on the dark card,
- *  blacks/grays kept neutral so the near-black base stays colorless. */
 const PALETTE16 = [
   "#262626", "#ee7d92", "#86d6a2", "#f0c560",
   "#8fb4d8", "#c79bd8", "#7fc8c4", "#ece4da",
@@ -68,9 +46,6 @@ const PALETTE16 = [
   "#a9c8e8", "#d8b3e8", "#9adcd8", "#fff8ef",
 ];
 
-/** Wordmark block/box glyphs we paint as vector rects rather than <text>, so
- *  the block art tiles seamlessly instead of showing line-leading gaps between
- *  rows. Full-cell glyphs fill the whole cell; the half blocks fill half. */
 const FULL_CELL_GLYPHS = new Set([
   "█", "░", "▒", "▓",
   "║", "═", "╗", "╔", "╝", "╚", "╠", "╣", "╦", "╩", "╬",
@@ -93,7 +68,6 @@ function hex(n: number): string {
   return n.toString(16).padStart(2, "0");
 }
 
-/** xterm 256-color index to hex. */
 function color256(n: number): string {
   if (n < 16) return PALETTE16[n]!;
   if (n < 232) {
@@ -108,7 +82,6 @@ function color256(n: number): string {
   return `#${hex(gray)}${hex(gray)}${hex(gray)}`;
 }
 
-/** Apply one SGR parameter list (the numbers in ESC[...m) to a style. */
 function applySgr(style: Style, params: number[]): Style {
   const s = { ...style };
   if (params.length === 0) params = [0];
@@ -156,9 +129,7 @@ function sameStyle(a: Style, b: Style): boolean {
   );
 }
 
-/** Parse one line into styled runs; SGR state carries across lines. */
 function parseLine(line: string, state: { style: Style }, cols: number): Run[] {
-  // Drop any non-SGR control sequences (cursor moves etc.) defensively.
   const cleaned = line.replace(/\x1b\[[0-9;?]*[A-HJKSTfhilsu]/g, "");
   const parts = cleaned.split(/(\x1b\[[0-9;]*m)/);
   const runs: Run[] = [];
@@ -171,7 +142,7 @@ function parseLine(line: string, state: { style: Style }, cols: number): Run[] {
       state.style = applySgr(state.style, params);
       continue;
     }
-    const text = Array.from(part); // code points, one cell each in our glyph set
+    const text = Array.from(part);
     if (text.length === 0) continue;
     const last = runs[runs.length - 1];
     if (last && sameStyle(last.style, state.style) && last.col + Array.from(last.text).length === col) {
@@ -181,7 +152,6 @@ function parseLine(line: string, state: { style: Style }, cols: number): Run[] {
     }
     col += text.length;
   }
-  // Pad to the full width so inverse/bg runs at line end keep their footing.
   if (col < cols) {
     runs.push({ col, text: " ".repeat(cols - col), style: freshStyle() });
   }
@@ -199,10 +169,8 @@ export function ansiToSvg(frame: string, opts: AnsiToSvgOptions): string {
   const lineH = opts.lineHeight ?? LINE_H;
   const pad = opts.pad ?? PAD;
   const lines = frame.replace(/\r/g, "").split("\n");
-  // Drop a single trailing blank line (a frame ending in "\n" is common).
   if (lines.length > 0 && lines[lines.length - 1] === "") lines.pop();
 
-  // The hero (chrome off) is a transparent wordmark: no titlebar band.
   const headerH = chrome ? HEADER_H : 0;
   const width = cols * CHAR_W + pad * 2;
   const height = headerH + lines.length * lineH + pad * 2;
@@ -218,7 +186,6 @@ export function ansiToSvg(frame: string, opts: AnsiToSvgOptions): string {
     out.push(
       `  <rect x="0.5" y="0.5" width="${fmt(width - 1)}" height="${fmt(height - 1)}" rx="${RADIUS}" fill="none" stroke="${BORDER}" stroke-width="1"/>`,
     );
-    // Optional dim title so the frame reads as a terminal window.
     if (title) {
       out.push(
         `  <text x="${fmt(width / 2)}" y="23" text-anchor="middle" font-family='${FONT_STACK}' font-size="13" fill="#7a8090">${escapeXml(title)}</text>`,
@@ -229,7 +196,6 @@ export function ansiToSvg(frame: string, opts: AnsiToSvgOptions): string {
     `  <g font-family='${FONT_STACK}' font-size="${FONT_SIZE}" fill="${FG_DEFAULT}">`,
   );
 
-  // Geometry of the wordmark block rects, for the top-shine overlay below.
   const blockRects: Array<{ x: number; y: number; w: number; h: number }> = [];
   const state = { style: freshStyle() };
   lines.forEach((line, row) => {
@@ -241,8 +207,6 @@ export function ansiToSvg(frame: string, opts: AnsiToSvgOptions): string {
       const cells = Array.from(text);
       const paintsBox = st.inverse || st.bg !== null;
       if (!paintsBox) {
-        // Trim run-edge spaces (renderers may collapse them despite
-        // xml:space) and skip runs that were nothing but space.
         let start = 0;
         let end = cells.length;
         while (start < end && cells[start] === " ") start++;
@@ -255,10 +219,6 @@ export function ansiToSvg(frame: string, opts: AnsiToSvgOptions): string {
       const x = pad + col * CHAR_W;
       const w = n * CHAR_W;
       const fg = st.fg ?? FG_DEFAULT;
-      // Wordmark block art (opt-in): paint each ink cell as a rect in the run's
-      // color. Cells overlap ~0.5px horizontally so there are no vertical seams,
-      // while blocks that sit on a row boundary are trimmed by ROW_GAP so the
-      // bright top row and shaded bottom row read as gently separated.
       if (solidBlocks && !paintsBox) {
         const blockCells = Array.from(text);
         if (blockCells.length > 0 && blockCells.every(isBlockOrSpace) && blockCells.some(isInkBlock)) {
@@ -274,9 +234,6 @@ export function ansiToSvg(frame: string, opts: AnsiToSvgOptions): string {
             if (ch === UPPER_HALF) rh = half;
             else if (ch === LOWER_HALF) { ry = top + half; rh = half; }
             const rw = CHAR_W + 0.5;
-            // Full and lower-half blocks end on a row boundary; trim them by
-            // ROW_GAP for the subtle bright/shaded separation. Upper-half blocks
-            // end mid-cell, so they keep their height.
             const rhh = ch === UPPER_HALF ? rh : rh - ROW_GAP;
             out.push(
               `    <rect x="${fmt(rx)}" y="${fmt(ry)}" width="${fmt(rw)}" height="${fmt(rhh)}" fill="${fg}"${op}/>`,
@@ -286,9 +243,6 @@ export function ansiToSvg(frame: string, opts: AnsiToSvgOptions): string {
           continue;
         }
       }
-      // Vertical box-drawing glyphs are shorter than the line cell, which
-      // reads as a dashed rail. Draw them as full-height rects so borders
-      // and dividers connect seamlessly across rows.
       if (/^[│┃]+$/.test(text)) {
         const barW = text[0] === "┃" ? 2.8 : 1.4;
         for (let k = 0; k < n; k++) {
@@ -323,8 +277,6 @@ export function ansiToSvg(frame: string, opts: AnsiToSvgOptions): string {
   });
 
   out.push("  </g>");
-  // A soft top-down white highlight clipped to the wordmark blocks: a shine at
-  // the top. Lives in the top ~half of the wordmark and fades out.
   if (solidBlocks && blockRects.length > 0) {
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     for (const r of blockRects) {

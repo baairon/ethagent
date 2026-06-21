@@ -1,11 +1,6 @@
 import { loadConfig } from '../storage/config.js'
 import { continuityVaultRef } from '../identity/continuity/storage.js'
 
-/**
- * Prints this agent's continuity vault directory to stdout. Non-interactive and
- * side-effect-free so an agent/script can discover where skills, soul, and memory
- * physically live (the `skills/` subdir is the one place new skills belong).
- */
 export async function runVaultDir(): Promise<number> {
   const config = await loadConfig().catch(() => null)
   if (!config?.identity) {

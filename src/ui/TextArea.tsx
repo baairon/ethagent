@@ -140,7 +140,7 @@ export function TextArea({
           })}
         </Box>
       )}
-      <Box marginTop={1}>
+      <Box marginTop={1} justifyContent="center">
         <Text color={theme.dim}>ctrl+s save · ↵ newline · esc back</Text>
       </Box>
     </Box>

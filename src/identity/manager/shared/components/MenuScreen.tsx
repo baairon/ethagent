@@ -1,6 +1,6 @@
 import React from 'react'
 import { Box, Text } from 'ink'
-import { theme } from '../../../../ui/theme.js'
+import { theme, PANEL_WIDTH } from '../../../../ui/theme.js'
 import type { EthagentConfig, EthagentIdentity } from '../../../../storage/config.js'
 import { identityPerspective } from '../../custody/state.js'
 import { transferSnapshotView } from '../../transfer/state.js'
@@ -10,6 +10,8 @@ import { localChangeStatusView } from '../../continuity/state.js'
 import { LazyMenu, type LazyMenuRow } from './LazyMenu.js'
 
 import type { ContinuityWorkingTreeStatus } from '../../../continuity/storage.js'
+
+const MENU_SHORTCUT_COLUMN = PANEL_WIDTH - 4
 
 type MenuScreenProps = {
   config?: EthagentConfig
@@ -127,6 +129,9 @@ export const MenuScreen: React.FC<MenuScreenProps> = ({
   if (network) statusBits.push(network)
   if (perspective === 'operator') statusBits.push('operator')
 
+  const statusLine = statusBits.join(' · ')
+  const menuWidth = MENU_SHORTCUT_COLUMN
+
   return (
     <Box flexDirection="column" alignItems="center" paddingY={1}>
       <Box flexDirection="column" alignItems="center">
@@ -142,6 +147,7 @@ export const MenuScreen: React.FC<MenuScreenProps> = ({
         ) : null}
         <LazyMenu<Action>
           rows={rows}
+          width={menuWidth}
           onSubmit={choice => {
             if (choice === 'cancel') return onCancel()
             if (choice === 'public-profile') return onPublicProfile()
@@ -165,9 +171,9 @@ export const MenuScreen: React.FC<MenuScreenProps> = ({
           </Box>
         ) : null}
       </Box>
-      {statusBits.length > 0 ? (
+      {statusLine.length > 0 ? (
         <Box marginTop={2}>
-          <Text color={theme.menuStatus}>{statusBits.join(' · ')}</Text>
+          <Text color={theme.menuStatus}>{statusLine}</Text>
         </Box>
       ) : null}
     </Box>

@@ -29,6 +29,6 @@ export async function runSkillGuard(): Promise<number> {
     const filePath = hookFilePath(await readHookPayload())
     const decision = decideSkillGuard(filePath, { identityPresent: !!config?.identity })
     if (decision.deny && decision.reason) writePreToolDeny(decision.reason)
-  } catch { /* on any guard failure, stay silent and allow the tool call */ }
+  } catch {}
   return 0
 }

@@ -48,18 +48,13 @@ function groupHasCommand(groups: HookGroup[], command: string): boolean {
   return groups.some(g => Array.isArray(g.hooks) && g.hooks.some(h => h?.command === command))
 }
 
-/**
- * Idempotently merge ethagent's hooks into ~/.claude/settings.json so autosync works
- * even without the marketplace plugin. Never clobbers existing user hooks or other keys.
- * Returns true if the file was changed.
- */
 export async function mergeClaudeHooks(): Promise<boolean> {
   const settingsPath = claudeSettingsPath()
   let settings: Record<string, unknown> = {}
   try {
     const parsed = JSON.parse((await fs.readFile(settingsPath, 'utf8')).replace(/^﻿/, '')) as unknown
     if (parsed && typeof parsed === 'object') settings = parsed as Record<string, unknown>
-  } catch { /* missing or unparseable -> start from an empty settings object */ }
+  } catch {}
 
   const hooks = (settings.hooks && typeof settings.hooks === 'object' ? settings.hooks : {}) as Record<string, HookGroup[]>
   let changed = false
@@ -81,12 +76,6 @@ export async function mergeClaudeHooks(): Promise<boolean> {
   return true
 }
 
-/**
- * Remove ethagent's self-installed hooks from settings.json (the inverse of mergeClaudeHooks):
- * so `reset` leaves no orphaned automation, and installing the marketplace plugin after the
- * CLI ran does not double-fire. All other hooks and keys are left intact. Returns true if the
- * file changed.
- */
 export async function removeClaudeHooks(): Promise<boolean> {
   const settingsPath = claudeSettingsPath()
   let settings: Record<string, unknown>
@@ -107,8 +96,6 @@ export async function removeClaudeHooks(): Promise<boolean> {
     const kept: HookGroup[] = []
     for (const group of groups) {
       const list = Array.isArray(group.hooks) ? group.hooks : []
-      // Match only the exact commands we install, so a user's own hook that merely mentions
-      // ethagent (e.g. a Stop hook running `npx ethagent save`) is never silently removed.
       const filtered = list.filter(h => !(typeof h?.command === 'string' && ETHAGENT_HOOK_COMMANDS.has(h.command)))
       if (filtered.length !== list.length) changed = true
       if (filtered.length > 0) kept.push({ ...group, hooks: filtered })
@@ -138,7 +125,6 @@ function dirMentions(dir: string, needle: string, depth: number): boolean {
   return false
 }
 
-/** Best-effort detection of the ethagent Claude Code marketplace plugin install. */
 export function marketplacePluginInstalled(): boolean {
   return dirMentions(path.join(claudeDir(), 'plugins'), 'ethagent', 3)
 }
@@ -159,16 +145,6 @@ export async function projectMemoryMirrorsUnder(claudeRoot: string): Promise<str
   return mirrors
 }
 
-/**
- * Every project MEMORY.md this adapter mirrors into: all existing
- * projects/<slug>/memory/MEMORY.md files plus the current session's project path
- * (so a brand-new project's mirror is still created by the foreground, correctly
- * cwd'd, session). Enumerating the existing mirrors makes mirror/read/watch
- * cwd-independent: the long-lived daemon inherits a frozen cwd, so without this it
- * would keep writing only its original project's MEMORY.md and starve whichever
- * project the user actually moved to. The vault soul/memory is global to the agent,
- * so the same managed block is correct for every project mirror.
- */
 async function projectMemoryTargets(): Promise<string[]> {
   return [...new Set([...(await projectMemoryMirrorsUnder(claudeDir())), claudeProjectMemoryMdPath()])]
 }
@@ -181,9 +157,6 @@ export const claudeCodeAdapter = {
     return pathExists(claudeDir())
   },
   async bootstrap(): Promise<string[]> {
-    // The marketplace plugin is the gold-standard Claude Code path; when it is present
-    // it already wires the hooks, so do not also self-install (that would double-fire).
-    // Also strip any hooks a prior CLI run self-installed, so the two paths never overlap.
     if (marketplacePluginInstalled()) {
       const removed = await removeClaudeHooks()
       return [removed
@@ -198,9 +171,6 @@ export const claudeCodeAdapter = {
   async readManaged(): Promise<ManagedRead | null> {
     return readManagedContext(claudeMdPath())
   },
-  // One read per managed file (global CLAUDE.md + every project MEMORY.md) so
-  // reconcile honors each file's newest edit. Without this the project MEMORY.md is
-  // a write-only mirror target and edits landing there never reach the vault.
   async readManagedCandidates(): Promise<ManagedRead[]> {
     const reads: ManagedRead[] = []
     for (const target of [claudeMdPath(), ...(await projectMemoryTargets())]) {

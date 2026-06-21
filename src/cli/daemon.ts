@@ -39,7 +39,7 @@ export function pauseSync(): void {
 export function resumeSync(): void {
   try {
     fs.rmSync(syncPausedPath(), { force: true })
-  } catch { /* best-effort */ }
+  } catch {}
 }
 
 export function daemonDisabled(): boolean {
@@ -62,7 +62,6 @@ export function isPidAlive(pid: number): boolean {
     process.kill(pid, 0)
     return true
   } catch (err) {
-    // ESRCH = no such process; EPERM = exists but not signalable by us (still alive)
     return (err as NodeJS.ErrnoException).code === 'EPERM'
   }
 }
@@ -77,11 +76,6 @@ export function writeDaemonPid(): void {
   fs.writeFileSync(daemonPidPath(), `${process.pid}\n`, 'utf8')
 }
 
-/**
- * Atomically claim the single-instance slot for the current process. Uses an exclusive
- * create so two daemons starting at once can't both win; a stale pid file is taken over.
- * Returns false if another live daemon already holds the slot.
- */
 export function tryClaimDaemonPid(): boolean {
   fs.mkdirSync(getConfigDir(), { recursive: true })
   try {
@@ -102,13 +96,9 @@ export function tryClaimDaemonPid(): boolean {
 export function clearDaemonPid(): void {
   try {
     fs.rmSync(daemonPidPath(), { force: true })
-  } catch { /* best-effort */ }
+  } catch {}
 }
 
-/**
- * Start the background watcher if it is not already running and not disabled.
- * Single-instance is guaranteed by the pid file. Returns true if a daemon was spawned.
- */
 export function ensureDaemon(): boolean {
   if (daemonDisabled()) return false
   if (daemonStatus().running) return false
@@ -116,17 +106,12 @@ export function ensureDaemon(): boolean {
     fs.mkdirSync(getConfigDir(), { recursive: true })
     const out = fs.openSync(daemonLogPath(), 'a')
     const child = spawn(process.execPath, [binEntry(), 'watch', '--daemon'], {
-      // POSIX needs detached to leave the process group; on Windows detached forces the
-      // child to get its own (flashing) console window that windowsHide doesn't suppress,
-      // so omit it there. The daemon still outlives the parent on Windows and is re-ensured
-      // on the next CLI run / terminal open, so it stays effectively persistent.
       detached: process.platform !== 'win32',
       stdio: ['ignore', out, out],
       windowsHide: true,
     })
     child.unref()
-    // The child inherited the fd; the parent must close its copy or it leaks until exit.
-    try { fs.closeSync(out) } catch { /* already closed */ }
+    try { fs.closeSync(out) } catch {}
     return true
   } catch {
     return false
@@ -140,7 +125,7 @@ export function stopDaemon(): boolean {
     try {
       process.kill(pid, 'SIGTERM')
       stopped = true
-    } catch { /* already gone */ }
+    } catch {}
   }
   clearDaemonPid()
   return stopped

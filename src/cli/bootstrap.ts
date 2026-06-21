@@ -24,13 +24,9 @@ function stampState(): void {
   try {
     fs.mkdirSync(getConfigDir(), { recursive: true })
     fs.writeFileSync(statePath(), `${JSON.stringify({ version: BOOTSTRAP_VERSION })}\n`, 'utf8')
-  } catch { /* stamping is best-effort */ }
+  } catch {}
 }
 
-/**
- * Detect every harness, wire its automation (native hooks and/or instruction-file
- * injection), do an initial sync, and start the autosync daemon. Idempotent.
- */
 export async function runBootstrap(opts: { quiet?: boolean } = {}): Promise<number> {
   const config = await loadConfig()
   if (!config?.identity) {
@@ -51,7 +47,6 @@ export async function runBootstrap(opts: { quiet?: boolean } = {}): Promise<numb
 
   await runSync({ quiet: true })
   ensureDaemon()
-  // Drop a tiny shell-profile hook so the daemon also comes up when a fresh terminal opens.
   const autostart: AutostartResult = !daemonDisabled() ? installAutostart() : { installed: false, detail: '' }
   stampState()
 
@@ -76,10 +71,6 @@ export async function runBootstrap(opts: { quiet?: boolean } = {}): Promise<numb
   return 0
 }
 
-/**
- * Cheap idempotent ensure called on normal CLI invocations: full bootstrap when the
- * state stamp is missing or stale, otherwise just keep the daemon alive. Never throws.
- */
 export async function ensureBootstrapped(): Promise<void> {
   try {
     if (daemonDisabled()) return
@@ -90,5 +81,5 @@ export async function ensureBootstrapped(): Promise<void> {
     } else {
       await runBootstrap({ quiet: true })
     }
-  } catch { /* auto-ensure must never block the actual command */ }
+  } catch {}
 }

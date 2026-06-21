@@ -4,8 +4,6 @@ import os from 'node:os'
 import path from 'node:path'
 import { isSyncWorthyChange, keyPath } from '../../src/cli/watch.js'
 
-// Mirrors the daemon's real watch targets: the vault subtree is a "source" (any change
-// counts), and the exact harness instruction files are the only files we pull edits from.
 const vault = path.join(os.tmpdir(), 'ethagent-vault')
 const claudeDir = path.join(os.homedir(), '.claude')
 const codexDir = path.join(os.homedir(), '.codex')

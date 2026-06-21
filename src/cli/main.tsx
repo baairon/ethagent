@@ -148,25 +148,20 @@ async function main(): Promise<number> {
     printHelp()
     return 0
   }
-  // Hook flags must stay fast and side-effect-light; they wire nothing heavy here.
   if (flags.has('--sync-on-edit')) return runSyncOnEdit()
   if (flags.has('--session-start')) return runSessionStart()
   if (flags.has('--pretool-guard')) return runPreToolGuard()
   if (flags.has('--memory-guard')) return runMemoryGuard()
   if (flags.has('--skill-guard')) return runSkillGuard()
-  // The shell-profile hook fires this on terminal open: bring the daemon up, then exit fast.
   if (flags.has('--ensure-daemon')) { ensureDaemon(); return 0 }
 
-  // `watch` is the background sync engine ethagent spawns for itself; not a user command.
   if (argv[0] === 'watch') return runWatch(argv.slice(1))
 
   if (flags.has('--add')) return runAddTool(argv.filter(a => a !== '--add'))
   if (argv[0] === 'pause') return runPause()
   if (argv[0] === 'resume') return runResume()
-  // --vault-dir is a pure read of config (no tool-wiring, no daemon), so resolve it before bootstrap.
   if (flags.has('--vault-dir')) return runVaultDir()
 
-  // Normal invocations self-wire invisibly: set up tools (first run) and keep autosync alive.
   if (argv[0] !== 'reset') await ensureBootstrapped()
 
   if (flags.has('--status')) return runStatus(version)
@@ -186,7 +181,6 @@ async function main(): Promise<number> {
   }
 
   const exitCode = await renderHub(undefined)
-  // Creating an identity in the manager should wire your tools right away, not on the next run.
   await ensureBootstrapped()
   return exitCode
 }

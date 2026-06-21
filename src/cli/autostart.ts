@@ -5,19 +5,12 @@ import { binEntry } from './daemon.js'
 
 export type AutostartResult = { installed: boolean; detail: string }
 
-// A small, clearly-marked block that runs `--ensure-daemon` when a fresh shell opens,
-// so the background sync comes up on its own even when no harness has launched yet.
-// Markers let us upsert and remove the block idempotently without touching anything else.
 const BEGIN_MARK = '# >>> ethagent autosync >>>'
 const END_MARK = '# <<< ethagent autosync <<<'
 
-/** Profile files we drop the hook into, per platform. Pure (derived from home + platform). */
 export function shellProfilePaths(): string[] {
   const home = os.homedir()
   if (process.platform === 'win32') {
-    // PowerShell's $PROFILE follows the Documents known folder, which OneDrive Known Folder
-    // Move commonly redirects to <OneDrive>\Documents. Target both roots so the hook lands
-    // wherever PowerShell actually loads from (the plain ~\Documents is often NOT it).
     const docRoots = [path.join(home, 'Documents')]
     const oneDrive = process.env.OneDrive?.trim()
     if (oneDrive) docRoots.unshift(path.join(oneDrive, 'Documents'))
@@ -43,7 +36,6 @@ function psq(s: string): string {
   return `'${s.replace(/'/g, "''")}'`
 }
 
-/** POSIX shell hook (zsh/bash): launch `--ensure-daemon` in the background, silently. */
 export function renderShellHookBlock(node: string, entry: string): string {
   return [
     BEGIN_MARK,
@@ -53,11 +45,6 @@ export function renderShellHookBlock(node: string, entry: string): string {
   ].join('\n')
 }
 
-/**
- * PowerShell profile hook: launch `--ensure-daemon` with no console window at all.
- * Uses ProcessStartInfo with UseShellExecute=$false + CreateNoWindow=$true, which (unlike
- * Start-Process) never allocates a console, so opening a terminal causes no flash.
- */
 export function renderPwshHookBlock(node: string, entry: string): string {
   return [
     BEGIN_MARK,
@@ -81,7 +68,6 @@ function hookBlock(node: string, entry: string): string {
     : renderShellHookBlock(node, entry)
 }
 
-/** Strip any existing ethagent block (between the markers) from profile content. */
 function stripBlock(content: string): string {
   const out: string[] = []
   let inBlock = false
@@ -93,10 +79,9 @@ function stripBlock(content: string): string {
   return out.join('\n')
 }
 
-/** Write `block` into `file`, replacing any prior ethagent block. Returns false if unchanged. */
 function upsertBlock(file: string, block: string): boolean {
   let existing = ''
-  try { existing = fs.readFileSync(file, 'utf8') } catch { /* new file */ }
+  try { existing = fs.readFileSync(file, 'utf8') } catch {}
   const cleaned = stripBlock(existing).replace(/\s+$/, '')
   const next = (cleaned ? cleaned + '\n\n' : '') + block + '\n'
   if (next === existing) return false
@@ -110,10 +95,6 @@ function shortHome(p: string): string {
   return p.startsWith(home) ? '~' + p.slice(home.length) : p
 }
 
-/**
- * Add the shell-profile hook so the daemon comes up when a new terminal opens.
- * Idempotent: re-running replaces the block in place. Best-effort per profile file.
- */
 export function installAutostart(): AutostartResult {
   const node = process.execPath
   const entry = binEntry()
@@ -126,7 +107,7 @@ export function installAutostart(): AutostartResult {
         upsertBlock(file, block)
         writable = true
         targets.push(shortHome(file))
-      } catch { /* skip an unwritable profile */ }
+      } catch {}
     }
   } catch (err) {
     return { installed: false, detail: `autostart not configured: ${(err as Error).message}` }
@@ -136,7 +117,6 @@ export function installAutostart(): AutostartResult {
     : { installed: false, detail: 'no writable shell profile' }
 }
 
-/** Remove the shell-profile hook. Best-effort; safe to call when nothing is installed. */
 export function uninstallAutostart(): void {
   for (const file of shellProfilePaths()) {
     try {
@@ -145,6 +125,6 @@ export function uninstallAutostart(): void {
       if (cleaned !== existing) {
         fs.writeFileSync(file, cleaned.replace(/\n{3,}/g, '\n\n'), 'utf8')
       }
-    } catch { /* missing or unwritable -> nothing to remove */ }
+    } catch {}
   }
 }

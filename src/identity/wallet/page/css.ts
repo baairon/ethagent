@@ -4,16 +4,11 @@ export const WALLET_CSS = String.raw`
 *::after { box-sizing: border-box; }
 
 :root {
-  /* Monospace everywhere. JetBrains Mono is imported as a Google Font in
-     markup.ts, with a system mono fallback stack. */
   --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", SFMono-Regular, Menlo,
                Consolas, "DejaVu Sans Mono", "Liberation Mono", monospace;
   --font-ui: var(--font-mono);
   --font-display: var(--font-mono);
 
-  /* Solid pitch-black ladder: the page is pure black, the card sits a hair off
-     it, and the panels ("connecting wallet", message, error) lift once more.
-     Depth and the glass edge come from shadows + a white rim, not translucency. */
   --bg: #000000;
   --surface: #000000;
   --panel: #0a0a0c;
@@ -23,7 +18,6 @@ export const WALLET_CSS = String.raw`
   --line-soft: #161619;
   --line-strong: #2a2a30;
 
-  /* Glass rim-light: faint white edge highlights, layered over the borders. */
   --rim: rgba(255, 255, 255, 0.04);
   --rim-strong: rgba(255, 255, 255, 0.06);
 
@@ -382,9 +376,6 @@ main, .flow-title, .flow-subtitle, .status, .status-line, .status-hint, .flow-de
   transition: color 300ms var(--ease-standard);
 }
 
-/* The success / done terminal state drops the panel chrome entirely and shows a
-   clean unboxed glyph, so a finished action reads as a calm closing message
-   rather than another live input prompt. Cancelled keeps the panel (below). */
 .status[data-tone="success"] {
   background: transparent;
   border-color: transparent;
@@ -406,8 +397,6 @@ main, .flow-title, .flow-subtitle, .status, .status-line, .status-hint, .flow-de
   color: var(--fg);
 }
 
-/* Cancelled / aborted closes calmly with no glyph: just the text and its hint,
-   both flush to the panel's left edge. */
 .status[data-tone="cancelled"] .marker { display: none; }
 .status[data-tone="cancelled"] .status-hint { margin-left: 0; }
 
@@ -415,8 +404,6 @@ main, .flow-title, .flow-subtitle, .status, .status-line, .status-hint, .flow-de
   margin-left: 29px;
 }
 
-/* On a finished (terminal) screen, drop the message-detail panel and the footer
-   action row so nothing reads as still-actionable: just the closing message. */
 #card[data-phase="terminal"] .details,
 #card[data-phase="terminal"] .footer { display: none; }
 
@@ -452,9 +439,6 @@ main, .flow-title, .flow-subtitle, .status, .status-line, .status-hint, .flow-de
   animation: block-in 380ms var(--ease-out) both;
 }
 
-/* Trailing element (often .error-msg when there's no hint, e.g. a "Rejected"
-   error) keeps its bottom margin, which stacks onto the slot padding and leaves
-   a gap under the last line. Collapse it so every error variant sits tight. */
 #error-block-slot > :last-child { margin-bottom: 0; }
 
 .error-title {
@@ -539,8 +523,6 @@ main, .flow-title, .flow-subtitle, .status, .status-line, .status-hint, .flow-de
 
 .actions { display: inline-flex; align-items: center; gap: 14px; }
 
-/* Bare keyboard-hint buttons: no box chrome, just the boxed keycap + a muted
-   label. Keeps the footer light and terminal-like instead of two chunky slabs. */
 .shortcut {
   font-family: var(--font-ui);
   font-size: 11px;
@@ -574,7 +556,6 @@ main, .flow-title, .flow-subtitle, .status, .status-line, .status-hint, .flow-de
 .shortcut:disabled .key { color: var(--fg-5); border-color: var(--line); }
 .shortcut[hidden] { display: none; }
 
-/* Primary (retry) reads as primary through brighter text + keycap, not a fill. */
 .shortcut.primary { color: var(--fg); font-weight: 600; }
 .shortcut.primary:hover:not(:disabled) { color: var(--fg); }
 .shortcut.primary:hover:not(:disabled) .key { color: var(--fg); border-color: #3a3a42; background: var(--raise); }
@@ -602,9 +583,6 @@ main, .flow-title, .flow-subtitle, .status, .status-line, .status-hint, .flow-de
               transform 90ms var(--ease-out);
 }
 
-/* The esc/enter caps are real keys: layer the rim highlight with a soft drop so
-   they sit proud of the button. Scoped to the footer so the reused .key class on
-   the detail chips / message caption keeps its flat inset-only treatment. */
 .shortcut .key {
   box-shadow: 0 1px 0 var(--rim) inset,
               0 1px 1.5px rgba(0, 0, 0, 0.45);

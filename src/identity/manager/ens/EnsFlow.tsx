@@ -151,12 +151,15 @@ export const EnsFlow: React.FC<EnsFlowProps> = ({
           const carry = currentDrafts()
           const savedName = (editStep.identity.state as Record<string, unknown> | undefined)?.['name'] as string | undefined
           const savedDescription = (editStep.identity.state as Record<string, unknown> | undefined)?.['description'] as string | undefined
-          const updates: ProfileUpdates = {
+          onSetStep({
+            kind: 'edit-profile-review',
+            identity: editStep.identity,
+            registry: editStep.registry,
             name: carry.name ?? savedName ?? '',
             description: carry.description ?? savedDescription ?? '',
             ...(carry.imagePath !== undefined ? { imagePath: carry.imagePath } : {}),
-          }
-          onTriggerPublicProfileSave(editStep.returnTo ?? { kind: 'continuity-public' }, updates)
+            returnTo: editStep.returnTo,
+          })
         }}
         onNameSubmit={name => {
           if (editStep.kind !== 'edit-profile-name') return

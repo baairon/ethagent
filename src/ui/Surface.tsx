@@ -39,7 +39,7 @@ export const Surface: React.FC<SurfaceProps> = ({
         </Box>
         {children ? <Box flexDirection="column" marginTop={1}>{children}</Box> : null}
         {footer ? (
-          <Box marginTop={1}>
+          <Box marginTop={1} justifyContent="center">
             {typeof footer === 'string'
               ? <Text color={theme.menuStatus}>{footer}</Text>
               : footer}

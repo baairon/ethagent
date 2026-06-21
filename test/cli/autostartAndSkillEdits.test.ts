@@ -15,7 +15,7 @@ test('the POSIX shell hook launches --ensure-daemon in the background', () => {
   assert.match(block, /--ensure-daemon/)
   assert.match(block, /# >>> ethagent autosync >>>/)
   assert.match(block, /# <<< ethagent autosync <<</)
-  assert.match(block, /& \)$/m) // backgrounded so it never blocks the prompt
+  assert.match(block, /& \)$/m)
 })
 
 test('the PowerShell hook launches --ensure-daemon with no console window (no flash)', () => {
@@ -25,7 +25,7 @@ test('the PowerShell hook launches --ensure-daemon with no console window (no fl
   assert.match(block, /--ensure-daemon/)
   assert.match(block, /CreateNoWindow = \$true/)
   assert.match(block, /UseShellExecute = \$false/)
-  assert.doesNotMatch(block, /Start-Process/) // Start-Process can flash a console; we avoid it
+  assert.doesNotMatch(block, /Start-Process/)
 })
 
 test('installAutostart writes an idempotent, removable shell hook', async () => {
@@ -35,7 +35,7 @@ test('installAutostart writes an idempotent, removable shell hook', async () => 
     assert.ok(present.length >= 1, 'at least one profile should carry the hook')
 
     const firstContent = readFileSync(present[0]!, 'utf8')
-    installAutostart() // re-running must not duplicate the block
+    installAutostart()
     const secondContent = readFileSync(present[0]!, 'utf8')
     assert.equal(secondContent, firstContent)
     assert.equal((secondContent.match(/# >>> ethagent autosync >>>/g) ?? []).length, 1)
@@ -77,26 +77,25 @@ test('a harness edit to the skill section is preserved before the next mirror ov
     const ctx = { soul: '# SOUL.md\n\nsoul\n', memory: '# MEMORY.md\n\nmemory\n' }
     const editsDir = path.join(home, '.ethagent', 'skill-edits')
 
-    await adapter.mirror([skill], ctx) // first write + record state
+    await adapter.mirror([skill], ctx)
     assert.equal(await countFiles(editsDir), 0)
 
-    // The harness agent edits the skill body inside the instruction file.
     const edited = (await fs.readFile(file, 'utf8')).replace('original skill body', 'agent edited this skill')
     await fs.writeFile(file, edited, 'utf8')
 
-    await adapter.mirror([skill], ctx) // overwrites, but must preserve the edit first
+    await adapter.mirror([skill], ctx)
     assert.equal(await countFiles(editsDir), 1)
     const backups = await fs.readdir(editsDir)
     assert.match(await fs.readFile(path.join(editsDir, backups[0]!), 'utf8'), /agent edited this skill/)
 
-    await adapter.mirror([skill], ctx) // nothing changed since -> no new backup
+    await adapter.mirror([skill], ctx)
     assert.equal(await countFiles(editsDir), 1)
   })
 })
 
 test('shellProfilePaths targets the OneDrive Documents profile when redirected (Windows)', () => {
   if (process.platform !== 'win32') {
-    assert.ok(shellProfilePaths().some(p => p.endsWith('.bashrc'))) // posix: shell rc files, no OneDrive logic
+    assert.ok(shellProfilePaths().some(p => p.endsWith('.bashrc')))
     return
   }
   const prev = process.env.OneDrive
@@ -121,7 +120,6 @@ function hasNeedle(file: string, needle: string): boolean {
 test('an instruction-file harness gets the full skill folder (scripts) mirrored beside its instructions file, and cleanup removes it', async () => {
   await withHome(async home => {
     const file = path.join(home, '.tool', 'AGENTS.md')
-    // A realistic vault skill folder that bundles a script the skill body refers to.
     const vaultSkillDir = path.join(home, 'vault', 'media-dl')
     await fs.mkdir(path.join(vaultSkillDir, 'scripts'), { recursive: true })
     await fs.writeFile(path.join(vaultSkillDir, 'SKILL.md'), '---\nname: media-dl\ndescription: download media\n---\nrun scripts/download_media.py\n', 'utf8')
@@ -137,14 +135,12 @@ test('an instruction-file harness gets the full skill folder (scripts) mirrored 
 
     await adapter.mirror([skill], { soul: '# SOUL.md\n\ns\n', memory: '# MEMORY.md\n\nm\n' })
 
-    // The bundled script lands on disk next to the instructions file, where the agent can run it.
     const mirroredScript = path.join(home, '.tool', 'skills', 'media-dl', 'scripts', 'download_media.py')
     assert.equal(await readable(mirroredScript), true)
     const agentsMd = await fs.readFile(file, 'utf8')
-    assert.match(agentsMd, /\.tool[\\/]skills/) // guidance points at the mirrored skills folder
-    assert.match(agentsMd, /download media/) // the skill is still inlined for the agent to read
+    assert.match(agentsMd, /\.tool[\\/]skills/)
+    assert.match(agentsMd, /download media/)
 
-    // cleanup removes the mirror, never the vault source.
     await adapter.cleanup?.()
     assert.equal(await readable(mirroredScript), false)
     assert.equal(await readable(path.join(vaultSkillDir, 'scripts', 'download_media.py')), true)

@@ -23,7 +23,7 @@ function skillsLocationPhrase(identity?: EthagentIdentity | null): string {
   if (identity && identity.chainId && identity.identityRegistryAddress && (identity.agentId || identity.address)) {
     try {
       return `\`${continuityVaultRef(identity).skillsDir}\``
-    } catch { /* fall through to the generic phrase */ }
+    } catch {}
   }
   return "the `skills/` folder in this agent's ethagent vault (run `npx ethagent --vault-dir` to print its path)"
 }
@@ -31,10 +31,10 @@ function skillsLocationPhrase(identity?: EthagentIdentity | null): string {
 export async function runSessionStart(): Promise<number> {
   try {
     await runSync({ quiet: true })
-  } catch { /* sync is best-effort; never block session start on it */ }
+  } catch {}
   try {
     ensureDaemon()
-  } catch { /* keeping the autosync daemon alive is best-effort too */ }
+  } catch {}
   const identity = await loadConfig().then(c => c?.identity ?? null).catch(() => null)
   process.stdout.write(
     JSON.stringify({

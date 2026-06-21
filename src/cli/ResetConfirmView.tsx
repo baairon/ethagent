@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react'
-import { Box, Text, useApp, useStdout } from 'ink'
+import React from 'react'
+import { Box, Text, useApp } from 'ink'
 import { Surface } from '../ui/Surface.js'
 import { Select } from '../ui/Select.js'
 import { theme } from '../ui/theme.js'
@@ -11,15 +11,6 @@ export const ResetConfirmView: React.FC<{
   onDone: (confirmed: boolean) => void
 }> = ({ plan, onDone }) => {
   const { exit } = useApp()
-  const { stdout } = useStdout()
-  const [rows, setRows] = useState<number>(stdout?.rows ?? 24)
-
-  useEffect(() => {
-    if (!stdout) return
-    const onResize = () => setRows(stdout.rows ?? 24)
-    stdout.on('resize', onResize)
-    return () => { stdout.off('resize', onResize) }
-  }, [stdout])
 
   const finish = (confirmed: boolean) => {
     onDone(confirmed)
@@ -27,7 +18,7 @@ export const ResetConfirmView: React.FC<{
   }
 
   return (
-    <Box flexDirection="column" alignItems="center" justifyContent="center" width="100%" minHeight={rows}>
+    <Box flexDirection="column" alignItems="center" width="100%" marginTop={1}>
       <Wordmark />
       <Box flexDirection="column" marginTop={1} width="100%">
         <Surface
