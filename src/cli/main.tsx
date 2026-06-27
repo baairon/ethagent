@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import React, { useEffect, useState } from 'react'
-import { render, Box, Text, useApp } from 'ink'
+import { render, Box, Text, useApp, useStdout } from 'ink'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -71,6 +71,15 @@ const Root: React.FC<RootProps> = ({ setExit, initialConfig }) => {
       : { kind: 'loading' },
   )
   const { exit } = useApp()
+  const { stdout } = useStdout()
+  const [rows, setRows] = useState(() => stdout?.rows ?? 24)
+
+  useEffect(() => {
+    if (!stdout) return
+    const onResize = () => setRows(stdout.rows ?? 24)
+    stdout.on('resize', onResize)
+    return () => { stdout.off('resize', onResize) }
+  }, [stdout])
 
   useEffect(() => {
     if (phase.kind !== 'loading') return
@@ -82,10 +91,10 @@ const Root: React.FC<RootProps> = ({ setExit, initialConfig }) => {
   }, [phase.kind])
 
   if (phase.kind === 'loading') {
-    return <Box padding={1}><Spinner label="loading identity..." showElapsed={false} /></Box>
+    return <Box height={Math.max(1, rows - 1)} justifyContent="center" alignItems="center"><Spinner label="loading identity..." showElapsed={false} /></Box>
   }
   if (phase.kind === 'error') {
-    return <Box padding={1}><Text color={theme.accentError}>Error: {phase.message}</Text></Box>
+    return <Box height={Math.max(1, rows - 1)} justifyContent="center" alignItems="center"><Text color={theme.accentError}>Error: {phase.message}</Text></Box>
   }
 
   const mode = phase.config?.identity ? 'manage' : 'first-run'
@@ -108,7 +117,21 @@ const Root: React.FC<RootProps> = ({ setExit, initialConfig }) => {
   )
 }
 
+let altScreenActive = false
+function enterAltScreen(): void {
+  if (altScreenActive) return
+  altScreenActive = true
+  process.stdout.write('\x1b[?1049h\x1b[22;0t\x1b]0;ethagent\x07')
+  if (process.platform === 'win32') process.title = 'ethagent'
+}
+function leaveAltScreen(): void {
+  if (!altScreenActive) return
+  altScreenActive = false
+  process.stdout.write('\x1b[?25h\x1b[23;0t\x1b[?1049l')
+}
+
 async function renderHub(initialConfig: EthagentConfig | null | undefined): Promise<number> {
+  enterAltScreen()
   let exitCode = 0
   const instance = render(
     <KeybindingProvider>
@@ -131,6 +154,7 @@ async function renderHub(initialConfig: EthagentConfig | null | undefined): Prom
   } finally {
     process.removeListener('unhandledRejection', onUnhandledRejection)
     process.removeListener('uncaughtException', onUncaughtException)
+    leaveAltScreen()
   }
   return exitCode
 }
@@ -188,6 +212,7 @@ async function main(): Promise<number> {
 main()
   .then(code => process.exit(code))
   .catch(err => {
+    leaveAltScreen()
     process.stderr.write(`${(err as Error).message}\n`)
     process.exit(1)
   })

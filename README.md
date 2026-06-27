@@ -4,7 +4,7 @@
 
 You don't really own your AI agent. It lives on a platform you don't control, and it stays there the day you leave.
 
-`ethagent` gives it a portable identity instead: a token you hold in your wallet, not an account on someone else's server. Hold the token and you hold the agent.
+ethagent gives it a portable identity instead: a token you hold in your wallet, not an account on someone else's server. Hold the token and you hold the agent.
 
 Its soul, memory, and skills travel with it, encrypted and restored on any machine exactly as you left it. You hold the only key, so no host can read it and no platform can take it away.
 
@@ -26,7 +26,7 @@ A guided menu does the rest: name it and write who it is. When you're done, your
   <img src="preview/menu.svg" alt="ethagent main menu for a linked agent" width="100%">
 </p>
 
-**2. Use it anywhere.** That's the whole setup. ethagent wires itself into the AI tools you use, like Claude Code and Codex, on any machine or OS. Your agent follows you and keeps learning; you'll only reopen `ethagent` to hand-edit it or save a backup.
+**2. Use it anywhere.** That's the whole setup. ethagent wires itself into the AI tools you use, like Claude Code and Codex, on any machine or OS. Your agent follows you and keeps learning; you'll only reopen ethagent to hand-edit it or save a backup.
 
 Using Claude Code? Add the plugin for the richest experience. Paste these in one at a time:
 
@@ -56,7 +56,7 @@ Run `npx ethagent --add "<absolute path>"`, where `<absolute path>` is the file 
 - **Memory** (`MEMORY.md`): what it has learned about you, your preferences, and your projects, so context survives the move to a new machine.
 - **Skills:** the commands and know-how you teach it, encrypted in your vault. Private by default; make one public to share it.
 
-You grow these mostly by talking. Your agent updates its own soul and memory as you work, and you can ask it to write itself a skill. Changes sync everywhere automatically. Open `ethagent` to edit by hand, or choose **Save Snapshot** to back it up onchain.
+You grow these mostly by talking. Your agent updates its own soul and memory as you work, and you can ask it to write itself a skill. Changes sync everywhere automatically. Open ethagent to edit by hand, or choose **Save Snapshot** to back it up onchain.
 
 <p align="center">
   <img src="preview/skills.svg" alt="ethagent skills catalog: public and private skills" width="100%">
@@ -66,8 +66,8 @@ You grow these mostly by talking. Your agent updates its own soul and memory as 
 
 1. **Own it.** Your wallet holds an ERC-8004 token; that token, not a platform account, is the agent.
 2. **Configure it.** Shape its soul, memory, and skills. Optionally, give it an ENS name you own.
-3. **Save it.** `ethagent` encrypts everything on your machine, stores the encrypted copy on IPFS, and updates your token to point at it.
-4. **Restore it.** On any machine, `ethagent` finds your agent from your connected wallet, or by ENS name or token id. It reads the pointer, asks your wallet to sign, then fetches and decrypts the snapshot to rebuild it.
+3. **Save it.** ethagent encrypts everything on your machine, stores the encrypted copy on IPFS, and updates your token to point at it.
+4. **Restore it.** On any machine, ethagent finds your agent from your connected wallet, or by ENS name or token id. It reads the pointer, asks your wallet to sign, then fetches and decrypts the snapshot to rebuild it.
 
 ## Using your agent
 
@@ -75,7 +75,7 @@ Your agent follows you. ethagent wires itself into the tools you use, like Claud
 
 ## What stays private
 
-Everything is encrypted on your machine before it leaves: soul, memory, and skills. The keys come from a wallet signature `ethagent` never sees, so the network only ever holds a locked box that only your wallet can open. The one exception is what you choose to publish: a public skill's name and description appear on your token's card.
+Everything is encrypted on your machine before it leaves: soul, memory, and skills. The keys come from a wallet signature ethagent never sees, so the network only ever holds a locked box that only your wallet can open. The one exception is what you choose to publish: a public skill's name and description appear on your token's card.
 
 ## Custody
 
@@ -84,7 +84,7 @@ You choose how tightly the agent is held, and you can change it later.
 - **Simple.** One wallet owns the agent and signs every save. The default for solo use.
 - **Advanced.** Most people never need this. Your main wallet owns the agent and keeps it in a Vault. Approved "operator" wallets can save backups and publish updates without the main wallet signing each time. Only the owner can move or sell the agent, so operators can **never** take it.
 
-To move the agent to another wallet, stage a transfer snapshot in `ethagent`. Both wallets sign locally to re-encrypt your soul, memory, and skills for the new owner, so both must be on the same machine. Then transfer the token, and the new owner restores the agent exactly as you left it.
+To move the agent to another wallet, stage a transfer snapshot in ethagent. Both wallets sign locally to re-encrypt your soul, memory, and skills for the new owner, so both must be on the same machine. Then transfer the token, and the new owner restores the agent exactly as you left it.
 
 ## Architecture
 

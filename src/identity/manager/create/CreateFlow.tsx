@@ -11,7 +11,7 @@ import type { Step } from '../reducer.js'
 import { createStepNumber, CREATE_STEP_LABELS } from '../reducer.js'
 import { WalletApprovalScreen } from '../shared/components/WalletApprovalScreen.js'
 import { BusyScreen } from '../shared/components/BusyScreen.js'
-import { FlowTimeline } from '../shared/components/FlowTimeline.js'
+import { StepHeader } from '../shared/components/StepHeader.js'
 import { PinataJwtInput } from '../shared/components/PinataJwtInput.js'
 import type { BrowserWalletReady } from '../../wallet/browserWallet.js'
 
@@ -52,9 +52,10 @@ export const CreateFlow: React.FC<CreateFlowProps> = ({
   onMenu,
 }) => {
   const stepNum = createStepNumber(step)
-  const indicator = stepNum > 0
-    ? <FlowTimeline steps={[...CREATE_STEP_LABELS]} current={stepNum} />
-    : null
+  const header = (description?: React.ReactNode): React.ReactNode =>
+    stepNum > 0
+      ? <StepHeader steps={[...CREATE_STEP_LABELS]} current={stepNum} description={description} />
+      : description ?? null
 
   if (step.kind === 'replace-confirm') {
     return (
@@ -77,7 +78,7 @@ export const CreateFlow: React.FC<CreateFlowProps> = ({
 
   if (step.kind === 'create-name') {
     return (
-      <Surface title="Name Your Agent" subtitle={indicator} footer="↵ continue · esc back">
+      <Surface title="Name Your Agent" subtitle={header()} footer="↵ continue · esc back">
         {step.error ? <Text color={theme.accentError}>{step.error}</Text> : null}
         <TextInput
           key="agent-name"
@@ -93,7 +94,7 @@ export const CreateFlow: React.FC<CreateFlowProps> = ({
 
   if (step.kind === 'create-description') {
     return (
-      <Surface title="Describe Your Agent" subtitle={indicator}>
+      <Surface title="Describe Your Agent" subtitle={header()} footer="↵ continue · esc back">
         <TextArea
           key="agent-description"
           initialValue={step.description ?? ''}
@@ -107,11 +108,11 @@ export const CreateFlow: React.FC<CreateFlowProps> = ({
 
   if (step.kind === 'create-custody') {
     return (
-      <Surface title="Pick Custody Mode" subtitle={indicator} footer="↵ continue · esc back">
+      <Surface title="Pick Custody Mode" subtitle={header()} footer="↵ continue · esc back">
         <Select<'simple' | 'advanced'>
           options={[
-            { value: 'simple', label: 'Simple (recommended)', hint: 'One wallet signs' },
-            { value: 'advanced', label: 'Advanced', hint: 'Operators rotate URI' },
+            { value: 'simple', label: 'Simple (recommended)' },
+            { value: 'advanced', label: 'Advanced' },
           ]}
           hintLayout="inline"
           onSubmit={onCustodySubmit}
@@ -126,7 +127,7 @@ export const CreateFlow: React.FC<CreateFlowProps> = ({
       return (
         <BusyScreen
           title="Checking Existing Notes"
-          subtitle={indicator}
+          subtitle={header()}
           label="scanning for notes to import..."
           onCancel={onBack}
         />
@@ -145,7 +146,7 @@ export const CreateFlow: React.FC<CreateFlowProps> = ({
       ...(importNotes && importNotes.length ? { importNotes } : {}),
     })
     return (
-      <Surface title="Import Existing Notes?" subtitle={indicator} footer="↵ select · esc back">
+      <Surface title="Import Existing Notes?" subtitle={header()} footer="↵ select · esc back">
         <Box flexDirection="column">
           <Text color={theme.textSubtle}>Found local notes not yet captured by any agent: {summary}.</Text>
           <Text color={theme.textSubtle}>Import folds them into this agent&apos;s MEMORY.md and the first encrypted snapshot.</Text>
@@ -153,8 +154,8 @@ export const CreateFlow: React.FC<CreateFlowProps> = ({
         <Box marginTop={1}>
           <Select<'import' | 'skip'>
             options={[
-              { value: 'import', label: 'Import Into New Agent', hint: 'Adds them to MEMORY.md' },
-              { value: 'skip', label: 'Start Fresh', hint: 'Use blank scaffolding', role: 'utility' },
+              { value: 'import', label: 'Import Notes', hint: 'Adds to MEMORY.md' },
+              { value: 'skip', label: 'Start Fresh', hint: 'Blank scaffolding', role: 'utility' },
             ]}
             hintLayout="inline"
             onSubmit={choice => toPreflight(choice === 'import' ? candidates : undefined)}
@@ -169,7 +170,7 @@ export const CreateFlow: React.FC<CreateFlowProps> = ({
     return (
       <BusyScreen
         title="Getting Ready"
-        subtitle={indicator}
+        subtitle={header()}
         label="checking storage..."
         onCancel={onBack}
       />
@@ -180,7 +181,7 @@ export const CreateFlow: React.FC<CreateFlowProps> = ({
     return (
       <Surface
         title={`${step.resolution.network ? networkLabel(step.resolution.network).charAt(0).toUpperCase() + networkLabel(step.resolution.network).slice(1) : ''} Agent Registry`}
-        subtitle={step.error ?? 'Paste the agent registry address for this network.'}
+        subtitle={header(step.error ?? 'Paste the agent registry address for this network.')}
         footer="↵ continue · esc back"
       >
         <Text color={theme.dim}>RPC defaults to {step.resolution.defaultRpcUrl}</Text>
@@ -207,11 +208,11 @@ export const CreateFlow: React.FC<CreateFlowProps> = ({
     return (
       <WalletApprovalScreen
         title={isAdvanced ? 'Connect Owner Wallet' : 'Sign in Wallet'}
-        subtitle={
+        subtitle={header(
           isAdvanced
             ? 'Owner wallet controls the Vault. Operators configured after minting.'
-            : 'Signs backup and submits mint transaction.'
-        }
+            : 'Signs backup and submits mint transaction.',
+        )}
         walletSession={walletSession}
         label={isAdvanced ? 'waiting for owner wallet to mint...' : 'waiting for wallet to mint...'}
         onCancel={onBack}
@@ -223,7 +224,7 @@ export const CreateFlow: React.FC<CreateFlowProps> = ({
     <PinataJwtInput
       inputKey="create-storage"
       title="Connect IPFS Storage"
-      subtitle={step.error ?? undefined}
+      subtitle={header(step.error ?? 'Save a Pinata JWT so ethagent can pin encrypted state to IPFS.')}
       footer="↵ continue · esc back"
       onSubmit={onStorageSubmit}
       onCancel={onBack}

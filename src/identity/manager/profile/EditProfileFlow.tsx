@@ -113,7 +113,7 @@ export const EditProfileFlow: React.FC<EditProfileFlowProps> = ({
   const currentDescription = readIdentityStateString(step.identity.state, 'description')
   const draftDescription = step.description ?? currentDescription
   return (
-    <Surface title="Edit Description">
+    <Surface title="Edit Description" footer={footerHint('↵ save · esc back')}>
       <Text color={theme.menuStatus}>Saved: {currentDescription || '(no description)'}</Text>
       <Box marginTop={1}>
         <TextArea

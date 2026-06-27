@@ -5,7 +5,7 @@ import React from "react";
 import { render } from "ink-testing-library";
 import { Box, Text } from "ink";
 import { theme } from "../src/ui/theme.js";
-import { Wordmark } from "../src/identity/manager/shared/components/Wordmark.js";
+import { Logo } from "../src/identity/manager/shared/components/Logo.js";
 import { MenuScreen } from "../src/identity/manager/shared/components/MenuScreen.js";
 import { SkillsTreeScreen } from "../src/identity/manager/continuity/skills/SkillsTreeScreen.js";
 import { ansiToSvg, type AnsiToSvgOptions } from "./ansi-to-svg.js";
@@ -32,7 +32,7 @@ function save(name: string, node: React.ReactNode, opts: Partial<AnsiToSvgOption
 
 const withChrome = (screen: React.ReactNode): React.ReactNode => (
   <Box flexDirection="column" alignItems="center" width={COLS}>
-    <Wordmark />
+    <Logo />
     <Box flexDirection="column" marginTop={1} width="100%">
       {screen}
     </Box>

@@ -1,6 +1,6 @@
 {
   "name": "ethagent",
-  "version": "5.2.0",
+  "version": "5.3.0",
   "description": "Portable Ethereum identity for your AI agent. Its soul, memory, and skills live onchain via ERC-8004 + IPFS and snap back into any session.",
   "type": "module",
   "bin": {

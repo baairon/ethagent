@@ -3,7 +3,7 @@ import { Box, Text, useApp } from 'ink'
 import { Surface } from '../ui/Surface.js'
 import { Select } from '../ui/Select.js'
 import { theme } from '../ui/theme.js'
-import { Wordmark } from '../identity/manager/shared/components/Wordmark.js'
+import { Logo } from '../identity/manager/shared/components/Logo.js'
 import type { ResetPlan } from '../storage/reset.js'
 
 export const ResetConfirmView: React.FC<{
@@ -19,7 +19,7 @@ export const ResetConfirmView: React.FC<{
 
   return (
     <Box flexDirection="column" alignItems="center" width="100%" marginTop={1}>
-      <Wordmark />
+      <Logo />
       <Box flexDirection="column" marginTop={1} width="100%">
         <Surface
           title="Reset ethagent?"

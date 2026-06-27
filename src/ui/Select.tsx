@@ -4,7 +4,6 @@ import { theme, PANEL_WIDTH, gradientColor } from './theme.js'
 import { useAppInput } from '../app/input/AppInputProvider.js'
 
 const CONTENT_WIDTH = PANEL_WIDTH - 4
-
 const SELECT_CHROME_ROWS = 17
 const MIN_VISIBLE = 4
 

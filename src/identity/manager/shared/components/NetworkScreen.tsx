@@ -6,7 +6,7 @@ import { SELECTABLE_NETWORKS } from '../../../../storage/config.js'
 import { networkLabel, networkSubtitle } from '../model/network.js'
 
 type NetworkScreenProps = {
-  subtitle: string
+  subtitle: React.ReactNode
   footer: React.ReactNode
   onSelect: (network: SelectableNetwork) => void
   onCancel: () => void

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { Box, Text, useStdout } from 'ink'
-import { theme } from './theme.js'
+import { theme, PANEL_WIDTH } from './theme.js'
 import { useAppInput } from '../app/input/AppInputProvider.js'
 
 const DEFAULT_CHROME_WIDTH = 10
@@ -160,6 +160,6 @@ export function TextInput({
   )
 }
 
-export function textInputWrapWidth(columns: number, chromeWidth = DEFAULT_CHROME_WIDTH, maxWidth = 42): number {
+export function textInputWrapWidth(columns: number, chromeWidth = DEFAULT_CHROME_WIDTH, maxWidth = PANEL_WIDTH - 6): number {
   return Math.min(maxWidth, Math.max(1, Math.floor(columns) - Math.max(0, Math.floor(chromeWidth))))
 }

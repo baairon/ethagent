@@ -40,14 +40,8 @@ export function TextArea({
       onCancel?.()
       return
     }
-    if (key.ctrl && input === 's') {
-      onSubmit(val)
-      return
-    }
     if (key.return) {
-      const next = (val.slice(0, cur) + '\n' + val.slice(cur)).slice(0, maxLength)
-      setValue(next)
-      setCursor(cur + 1)
+      onSubmit(val)
       return
     }
     if (key.backspace || key.delete) {
@@ -140,9 +134,6 @@ export function TextArea({
           })}
         </Box>
       )}
-      <Box marginTop={1} justifyContent="center">
-        <Text color={theme.dim}>ctrl+s save · ↵ newline · esc back</Text>
-      </Box>
     </Box>
   )
 }

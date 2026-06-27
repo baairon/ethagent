@@ -4,88 +4,88 @@
   <rect x="0.5" y="0.5" width="831" height="539" rx="14" fill="none" stroke="#1b1e26" stroke-width="1"/>
   <text x="416" y="23" text-anchor="middle" font-family='ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace' font-size="13" fill="#7a8090">ethagent</text>
   <g font-family='ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace' font-size="16" fill="#dadce6">
-    <rect x="262.4" y="68" width="10.1" height="22" fill="#9aa0b0"/>
-    <rect x="272" y="68" width="10.1" height="11" fill="#9aa0b0"/>
-    <rect x="281.6" y="68" width="10.1" height="11" fill="#9aa0b0"/>
-    <rect x="300.8" y="68" width="10.1" height="11" fill="#9aa0b0"/>
-    <rect x="310.4" y="68" width="10.1" height="22" fill="#9aa0b0"/>
-    <rect x="320" y="68" width="10.1" height="11" fill="#9aa0b0"/>
-    <rect x="339.2" y="68" width="10.1" height="22" fill="#9aa0b0"/>
-    <rect x="358.4" y="68" width="10.1" height="22" fill="#9aa0b0"/>
-    <rect x="377.6" y="79" width="10.1" height="11" fill="#f3d8e0"/>
-    <rect x="387.2" y="68" width="10.1" height="11" fill="#f3dada"/>
-    <rect x="396.8" y="68" width="10.1" height="22" fill="#f3dcd5"/>
-    <rect x="416" y="68" width="10.1" height="22" fill="#f3e2cd"/>
-    <rect x="425.6" y="68" width="10.1" height="11" fill="#f2e7cc"/>
-    <rect x="435.2" y="68" width="10.1" height="11" fill="#f2ebca"/>
-    <rect x="454.4" y="68" width="10.1" height="22" fill="#e4edd2"/>
-    <rect x="464" y="68" width="10.1" height="11" fill="#dbedd7"/>
-    <rect x="473.6" y="68" width="10.1" height="11" fill="#d6ecde"/>
-    <rect x="492.8" y="68" width="10.1" height="22" fill="#d3e7ee"/>
-    <rect x="502.4" y="79" width="10.1" height="11" fill="#d4e3f3"/>
-    <rect x="521.6" y="68" width="10.1" height="22" fill="#dedaf1"/>
-    <rect x="540.8" y="68" width="10.1" height="11" fill="#e8d7ea"/>
-    <rect x="550.4" y="68" width="10.1" height="22" fill="#eed7e5"/>
-    <rect x="560" y="68" width="10.1" height="11" fill="#f3d8e0"/>
-    <rect x="262.4" y="90" width="10.1" height="22" fill="#5f636d"/>
-    <rect x="272" y="90" width="10.1" height="22" fill="#5f636d"/>
-    <rect x="281.6" y="101" width="10.1" height="11" fill="#5f636d"/>
-    <rect x="310.4" y="90" width="10.1" height="22" fill="#5f636d"/>
-    <rect x="339.2" y="90" width="10.1" height="22" fill="#5f636d"/>
-    <rect x="348.8" y="90" width="10.1" height="11" fill="#5f636d"/>
-    <rect x="358.4" y="90" width="10.1" height="22" fill="#5f636d"/>
-    <rect x="377.6" y="90" width="10.1" height="22" fill="#97868b"/>
-    <rect x="387.2" y="90" width="10.1" height="11" fill="#978787"/>
-    <rect x="396.8" y="90" width="10.1" height="22" fill="#978884"/>
-    <rect x="416" y="90" width="10.1" height="22" fill="#978c7f"/>
-    <rect x="425.6" y="101" width="10.1" height="11" fill="#968f7e"/>
-    <rect x="435.2" y="90" width="10.1" height="22" fill="#96927d"/>
-    <rect x="454.4" y="90" width="10.1" height="22" fill="#8d9382"/>
-    <rect x="464" y="90" width="10.1" height="22" fill="#889385"/>
-    <rect x="473.6" y="101" width="10.1" height="11" fill="#85928a"/>
-    <rect x="492.8" y="90" width="10.1" height="22" fill="#838f94"/>
-    <rect x="512" y="90" width="10.1" height="11" fill="#878a96"/>
-    <rect x="521.6" y="90" width="10.1" height="22" fill="#8a8795"/>
-    <rect x="550.4" y="90" width="10.1" height="22" fill="#94858e"/>
-    <text x="233.6" y="172" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f0eee8">❯</text>
-    <text x="252.8" y="172" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f3d8e0">P</text>
-    <text x="262.4" y="172" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f3dbd8">u</text>
-    <text x="272" y="172" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f3decf">b</text>
-    <text x="281.6" y="172" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f3e4cc">l</text>
-    <text x="291.2" y="172" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f2eacb">i</text>
-    <text x="300.8" y="172" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#eaeccf">c</text>
-    <text x="320" y="172" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#d6ebe0">P</text>
-    <text x="329.6" y="172" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#d4e7eb">r</text>
-    <text x="339.2" y="172" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#d4e3f3">o</text>
-    <text x="348.8" y="172" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#dcdcf1">f</text>
-    <text x="358.4" y="172" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#e3d6ef">i</text>
-    <text x="368" y="172" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#ebd7e7">l</text>
-    <text x="377.6" y="172" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f3d8e0">e</text>
-    <text x="588.8" y="172" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#8a8a9c">p</text>
-    <text x="252.8" y="194" textLength="124.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Soul &amp; Memory</text>
-    <text x="588.8" y="194" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#8a8a9c">m</text>
-    <text x="252.8" y="216" textLength="57.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Skills</text>
-    <text x="588.8" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#8a8a9c">s</text>
-    <text x="252.8" y="238" textLength="124.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Save Snapshot</text>
-    <text x="588.8" y="238" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#8a8a9c">a</text>
-    <text x="252.8" y="260" textLength="134.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Refetch Latest</text>
-    <text x="588.8" y="260" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#8a8a9c">r</text>
-    <text x="252.8" y="282" textLength="76.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">ENS Name</text>
-    <text x="588.8" y="282" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#8a8a9c">e</text>
-    <text x="252.8" y="304" textLength="115.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Token Values</text>
-    <text x="588.8" y="304" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#8a8a9c">v</text>
-    <text x="252.8" y="326" textLength="115.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Custody Mode</text>
-    <text x="588.8" y="326" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#8a8a9c">c</text>
-    <text x="252.8" y="348" textLength="153.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Prepare Transfer</text>
-    <text x="588.8" y="348" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#8a8a9c">t</text>
-    <text x="252.8" y="370" textLength="115.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Switch Agent</text>
-    <text x="588.8" y="370" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#8a8a9c">w</text>
-    <text x="252.8" y="392" textLength="86.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">New Agent</text>
-    <text x="588.8" y="392" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#8a8a9c">n</text>
-    <text x="252.8" y="414" textLength="115.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">IPFS Storage</text>
-    <text x="588.8" y="414" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#8a8a9c">i</text>
-    <text x="252.8" y="436" textLength="38.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Quit</text>
-    <text x="588.8" y="436" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#8a8a9c">q</text>
+    <rect x="262.4" y="68" width="10.1" height="22" fill="#d8e0f0"/>
+    <rect x="272" y="68" width="10.1" height="11" fill="#cbd5e8"/>
+    <rect x="281.6" y="68" width="10.1" height="11" fill="#bfcae0"/>
+    <rect x="300.8" y="68" width="10.1" height="11" fill="#a5b4cf"/>
+    <rect x="310.4" y="68" width="10.1" height="22" fill="#9cacc9"/>
+    <rect x="320" y="68" width="10.1" height="11" fill="#96a6c3"/>
+    <rect x="339.2" y="68" width="10.1" height="22" fill="#8a9ab8"/>
+    <rect x="358.4" y="68" width="10.1" height="22" fill="#7e8ead"/>
+    <rect x="377.6" y="79" width="10.1" height="11" fill="#ffffff"/>
+    <rect x="387.2" y="68" width="10.1" height="11" fill="#ffffff"/>
+    <rect x="396.8" y="68" width="10.1" height="22" fill="#fffff8"/>
+    <rect x="416" y="68" width="10.1" height="22" fill="#ffffe5"/>
+    <rect x="425.6" y="68" width="10.1" height="11" fill="#ffffdf"/>
+    <rect x="435.2" y="68" width="10.1" height="11" fill="#ffffd9"/>
+    <rect x="454.4" y="68" width="10.1" height="22" fill="#fdffe0"/>
+    <rect x="464" y="68" width="10.1" height="11" fill="#eaffe6"/>
+    <rect x="473.6" y="68" width="10.1" height="11" fill="#dfffec"/>
+    <rect x="492.8" y="68" width="10.1" height="22" fill="#d7f4fe"/>
+    <rect x="502.4" y="79" width="10.1" height="11" fill="#d6ebff"/>
+    <rect x="521.6" y="68" width="10.1" height="22" fill="#ded8fd"/>
+    <rect x="540.8" y="68" width="10.1" height="11" fill="#e9d0ee"/>
+    <rect x="550.4" y="68" width="10.1" height="22" fill="#efd0e4"/>
+    <rect x="560" y="68" width="10.1" height="11" fill="#f5d0da"/>
+    <rect x="262.4" y="90" width="10.1" height="22" fill="#7888a8"/>
+    <rect x="272" y="90" width="10.1" height="22" fill="#7484a4"/>
+    <rect x="281.6" y="101" width="10.1" height="11" fill="#71819f"/>
+    <rect x="310.4" y="90" width="10.1" height="22" fill="#667692"/>
+    <rect x="339.2" y="90" width="10.1" height="22" fill="#5b6b85"/>
+    <rect x="348.8" y="90" width="10.1" height="11" fill="#576781"/>
+    <rect x="358.4" y="90" width="10.1" height="22" fill="#54647c"/>
+    <rect x="377.6" y="90" width="10.1" height="22" fill="#f5d0da"/>
+    <rect x="387.2" y="90" width="10.1" height="11" fill="#f2d0cf"/>
+    <rect x="396.8" y="90" width="10.1" height="22" fill="#efcfc6"/>
+    <rect x="416" y="90" width="10.1" height="22" fill="#e8d0b5"/>
+    <rect x="425.6" y="101" width="10.1" height="11" fill="#e4d1b0"/>
+    <rect x="435.2" y="90" width="10.1" height="22" fill="#e1d3aa"/>
+    <rect x="454.4" y="90" width="10.1" height="22" fill="#c6cfaf"/>
+    <rect x="464" y="90" width="10.1" height="22" fill="#b6cdb3"/>
+    <rect x="473.6" y="101" width="10.1" height="11" fill="#adc8b7"/>
+    <rect x="492.8" y="90" width="10.1" height="22" fill="#a6bcc4"/>
+    <rect x="512" y="90" width="10.1" height="11" fill="#a6adc4"/>
+    <rect x="521.6" y="90" width="10.1" height="22" fill="#a9a5c1"/>
+    <rect x="550.4" y="90" width="10.1" height="22" fill="#b49cac"/>
+    <text x="214.4" y="172" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f0eee8">❯</text>
+    <text x="233.6" y="172" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f5d0da">P</text>
+    <text x="243.2" y="172" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f5d4cf">u</text>
+    <text x="252.8" y="172" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f5d7c4">b</text>
+    <text x="262.4" y="172" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f5ddbe">l</text>
+    <text x="272" y="172" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f4e4ba">i</text>
+    <text x="281.6" y="172" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#e6e7bf">c</text>
+    <text x="300.8" y="172" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#c7e5d6">P</text>
+    <text x="310.4" y="172" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#c5e0e6">r</text>
+    <text x="320" y="172" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#c7d9f0">o</text>
+    <text x="329.6" y="172" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#d0d0f0">f</text>
+    <text x="339.2" y="172" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#dac9ee">i</text>
+    <text x="348.8" y="172" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#e8cce4">l</text>
+    <text x="358.4" y="172" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f5d0da">e</text>
+    <text x="608" y="172" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#8a8a9c">p</text>
+    <text x="233.6" y="194" textLength="124.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Soul &amp; Memory</text>
+    <text x="608" y="194" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#8a8a9c">m</text>
+    <text x="233.6" y="216" textLength="57.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Skills</text>
+    <text x="608" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#8a8a9c">s</text>
+    <text x="233.6" y="238" textLength="124.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Save Snapshot</text>
+    <text x="608" y="238" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#8a8a9c">a</text>
+    <text x="233.6" y="260" textLength="134.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Refetch Latest</text>
+    <text x="608" y="260" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#8a8a9c">r</text>
+    <text x="233.6" y="282" textLength="76.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">ENS Name</text>
+    <text x="608" y="282" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#8a8a9c">e</text>
+    <text x="233.6" y="304" textLength="115.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Token Values</text>
+    <text x="608" y="304" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#8a8a9c">v</text>
+    <text x="233.6" y="326" textLength="115.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Custody Mode</text>
+    <text x="608" y="326" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#8a8a9c">c</text>
+    <text x="233.6" y="348" textLength="153.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Prepare Transfer</text>
+    <text x="608" y="348" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#8a8a9c">t</text>
+    <text x="233.6" y="370" textLength="115.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Switch Agent</text>
+    <text x="608" y="370" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#8a8a9c">w</text>
+    <text x="233.6" y="392" textLength="86.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">New Agent</text>
+    <text x="608" y="392" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#8a8a9c">n</text>
+    <text x="233.6" y="414" textLength="115.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">IPFS Storage</text>
+    <text x="608" y="414" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#8a8a9c">i</text>
+    <text x="233.6" y="436" textLength="38.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Quit</text>
+    <text x="608" y="436" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#8a8a9c">q</text>
     <text x="291.2" y="502" textLength="259.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#7a8090">#45744 · 0xA1E9…89CE · base</text>
   </g>
   <defs>

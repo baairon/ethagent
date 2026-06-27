@@ -22,6 +22,7 @@ import {
   runRestoreRegistrySubmit,
 } from './restore/restoreAdmin.js'
 import { MenuScreen } from './shared/components/MenuScreen.js'
+import { StepHeader } from './shared/components/StepHeader.js'
 import { CreateFlow } from './create/CreateFlow.js'
 import { RestoreFlow } from './restore/RestoreFlow.js'
 import { NetworkScreen } from './shared/components/NetworkScreen.js'
@@ -37,6 +38,7 @@ import {
 import { localChangeStatusView } from './continuity/state.js'
 import { IdentityManagerOperationalRoutes } from './OperationalRoutes.js'
 import type { IdentityManagerController } from './useController.js'
+import { CREATE_STEP_LABELS } from './reducer.js'
 import type { Step } from './reducer.js'
 
 export const IdentityManagerRoutes: React.FC<{ controller: IdentityManagerController }> = ({ controller }) => {
@@ -204,7 +206,7 @@ export const IdentityManagerRoutes: React.FC<{ controller: IdentityManagerContro
   if (step.kind === 'create-network') {
     return (
       <NetworkScreen
-        subtitle="Choose where to create this agent."
+        subtitle={<StepHeader steps={[...CREATE_STEP_LABELS]} current={3} description="Choose where to create this agent." />}
         footer={footer}
         onSelect={(network: SelectableNetwork) => {
           setStep({ kind: 'create-custody', name: step.name, description: step.description, network })

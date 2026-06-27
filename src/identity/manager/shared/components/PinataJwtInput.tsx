@@ -10,7 +10,7 @@ const PINATA_API_KEYS_URL = 'https://app.pinata.cloud/developers/api-keys'
 type PinataJwtInputProps = {
   inputKey: string
   title?: string
-  subtitle?: string
+  subtitle?: React.ReactNode
   footer: React.ReactNode
   onSubmit: (input: string) => void
   onCancel: () => void
