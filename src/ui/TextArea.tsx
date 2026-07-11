@@ -113,29 +113,46 @@ export function TextArea({
         <Box flexDirection="column">
           {lines.map((line, i) => {
             const active = i === cursorLine
-            return (
-              <Box key={i} flexDirection="row">
-                <Text color={theme.accentPeriwinkle}>{active ? '> ' : '  '}</Text>
+            const rows = chunkLine(line, displayWidth)
+            let cursorRow = -1
+            let cursorRowCol = 0
+            if (active) {
+              cursorRow = Math.floor(cursorCol / displayWidth)
+              while (cursorRow >= rows.length) rows.push('')
+              cursorRowCol = cursorCol - cursorRow * displayWidth
+            }
+            return rows.map((row, r) => (
+              <Box key={`${i}:${r}`} flexDirection="row">
+                <Text color={theme.accentPeriwinkle}>{active && r === cursorRow ? '> ' : '  '}</Text>
                 <Box width={displayWidth}>
-                  {active ? (
-                    <Text wrap="wrap">
-                      <Text color={theme.text}>{line.slice(0, cursorCol)}</Text>
+                  {active && r === cursorRow ? (
+                    <Text wrap="truncate-end">
+                      <Text color={theme.text}>{row.slice(0, cursorRowCol)}</Text>
                       <Text backgroundColor={theme.accentPeriwinkle} color="#0c0c1f">
-                        {line[cursorCol] ?? ' '}
+                        {row[cursorRowCol] ?? ' '}
                       </Text>
-                      <Text color={theme.text}>{line.slice(cursorCol + 1)}</Text>
+                      <Text color={theme.text}>{row.slice(cursorRowCol + 1)}</Text>
                     </Text>
                   ) : (
-                    <Text color={theme.text} wrap="wrap">{line || ' '}</Text>
+                    <Text color={theme.text} wrap="truncate-end">{row || ' '}</Text>
                   )}
                 </Box>
               </Box>
-            )
+            ))
           })}
         </Box>
       )}
     </Box>
   )
+}
+
+function chunkLine(line: string, width: number): string[] {
+  if (line.length === 0) return ['']
+  const rows: string[] = []
+  for (let start = 0; start < line.length; start += width) {
+    rows.push(line.slice(start, start + width))
+  }
+  return rows
 }
 
 function cursorToLineCol(val: string, cur: number): [number, number] {

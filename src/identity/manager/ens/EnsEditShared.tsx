@@ -15,16 +15,17 @@ import {
 } from '../custody/state.js'
 import { ensValidationReasonText } from './state.js'
 import { shortAddress } from '../shared/model/format.js'
+import { FieldRow } from '../shared/components/FieldRow.js'
 import { readValidationFromState } from './editCopy.js'
 import type { EnsEditProps } from './types.js'
 
 export const footerHint = (hint: string) => <Text color={theme.dim}>{hint}</Text>
 
-import { abbreviateHexBlobs } from './editCopy.js'
+import { abbreviateRecordValue } from './editCopy.js'
 
 export const renderRecordValue = (value: string) =>
   value
-    ? <Text color={theme.accentPeriwinkle}>{abbreviateHexBlobs(value)}</Text>
+    ? <Text color={theme.accentPeriwinkle}>{abbreviateRecordValue(value)}</Text>
     : <Text color={theme.dim}>Unset</Text>
 
 export function rootErrorMessage(
@@ -54,7 +55,7 @@ export function rootErrorMessage(
 
 export const EnsSetupRow: React.FC<{ label: string; value: string; muted?: boolean }> = ({ label, value, muted }) => (
   <Box flexDirection="row">
-    <Box width={16}>
+    <Box width={16} flexShrink={0}>
       <Text color={theme.dim}>{label}</Text>
     </Box>
     <Box flexShrink={1}>
@@ -69,17 +70,18 @@ export const EnsStatusBanner: React.FC<{ identity: EnsEditProps['identity']; noR
     const status = noRootEnsName
       ? 'Not Linked. This wallet does not own a root .eth ENS name.'
       : 'Not Linked. Choose a setup below.'
-    return <Text color={theme.dim}>Status: <Text color={theme.dim}>{status}</Text></Text>
+    return <FieldRow label="Status:" labelWidth={8} value={<Text color={theme.dim}>{status}</Text>} />
   }
   const validation = readValidationFromState(identity.state)
   if (validation?.ok) {
-    return <Text color={theme.dim}>Status: <Text color={theme.accentPeriwinkle}>linked, {ensName}</Text></Text>
+    return <FieldRow label="Status:" labelWidth={8} value={<Text color={theme.accentPeriwinkle}>linked, {ensName}</Text>} />
   }
   return (
-    <Text color={theme.dim}>
-      Status: <Text color={theme.accentError}>issue, {ensName}</Text>
-      <Text color={theme.dim}> ({ensValidationReasonText(validation?.reason)})</Text>
-    </Text>
+    <FieldRow
+      label="Status:"
+      labelWidth={8}
+      value={<Text color={theme.accentError}>issue, {ensName} ({ensValidationReasonText(validation?.reason)})</Text>}
+    />
   )
 }
 

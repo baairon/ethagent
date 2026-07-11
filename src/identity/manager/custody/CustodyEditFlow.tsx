@@ -13,6 +13,7 @@ import {
 } from './state.js'
 import { ensValidationReasonText, selectEnsStatus } from '../ens/state.js'
 import { shortAddress } from '../shared/model/format.js'
+import { FieldRow } from '../shared/components/FieldRow.js'
 import { lastBackupLabel } from '../profile/identity.js'
 import {
   type AgentReconciliation,
@@ -123,14 +124,15 @@ export const CustodyEditFlow: React.FC<CustodyEditFlowProps> = ({
           {(() => {
             const ensStatus = selectEnsStatus(identity)
             return (
-              <Text>
-                <Text color={theme.dim}>{'ENS'.padEnd(14)}</Text>
-                {ensStatus.kind === 'linked'
+              <FieldRow
+                label="ENS"
+                labelWidth={14}
+                value={ensStatus.kind === 'linked'
                   ? <Text color={theme.accentPeriwinkle}>{ensStatus.name}</Text>
                   : ensStatus.kind === 'issue'
                     ? <Text color={theme.accentError}>{ensStatus.name} ({ensValidationReasonText(ensStatus.reason)})</Text>
                     : <Text color={theme.dim}>Not Linked</Text>}
-              </Text>
+              />
             )
           })()}
           <Row label="Custody" value={modeLabel} />
@@ -140,7 +142,7 @@ export const CustodyEditFlow: React.FC<CustodyEditFlowProps> = ({
             <Row
               label="Operators"
               value={approvedOperatorCount > 1
-                ? `${approvedOperatorCount} authorized${activeOperator ? ` (active ${shortAddress(activeOperator)})` : ''}`
+                ? `${approvedOperatorCount} authorized`
                 : activeOperator
                   ? shortAddress(activeOperator)
                   : 'None Authorized'}
@@ -258,8 +260,5 @@ export const CustodyEditFlow: React.FC<CustodyEditFlowProps> = ({
 }
 
 const Row: React.FC<{ label: string; value: string; muted?: boolean }> = ({ label, value, muted }) => (
-  <Text>
-    <Text color={theme.dim}>{label.padEnd(14)}</Text>
-    <Text color={muted ? theme.dim : theme.text}>{value}</Text>
-  </Text>
+  <FieldRow label={label} labelWidth={14} value={value} valueColor={muted ? theme.dim : theme.text} />
 )

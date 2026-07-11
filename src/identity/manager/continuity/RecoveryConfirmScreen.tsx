@@ -71,10 +71,8 @@ export const RecoveryConfirmScreen: React.FC<RecoveryConfirmScreenProps> = ({ mo
 
 const OverwriteStatusLine: React.FC<{ status: LocalChangeStatusView; pendingPublish?: boolean }> = ({ status, pendingPublish }) => (
   <Box flexDirection="column">
-    <Text>
-      <Text color={theme.textSubtle}>Unsaved local changes detected: </Text>
-      <Text color={theme.accentError} bold>{status.files.length > 0 ? status.files.join(', ') : 'local files differ from saved snapshot'}</Text>
-    </Text>
+    <Text color={theme.textSubtle}>Unsaved local changes detected:</Text>
+    <Text color={theme.accentError} bold>{status.files.length > 0 ? status.files.join(', ') : 'local files differ from saved snapshot'}</Text>
     <Text color={theme.accentError}>
       Continuing replaces those files with the restored snapshot.
     </Text>
@@ -87,10 +85,10 @@ const OverwriteStatusLine: React.FC<{ status: LocalChangeStatusView; pendingPubl
 const SaveSnapshotStatusLine: React.FC<{ status: LocalChangeStatusView }> = ({ status }) => {
   if (status.hasLocalChanges) {
     return (
-      <Text>
-        <Text color={theme.textSubtle}>Local changes detected: </Text>
+      <Box flexDirection="column">
+        <Text color={theme.textSubtle}>Local changes detected:</Text>
         <Text color={theme.accentError} bold>{status.files.length > 0 ? status.files.join(', ') : 'local files differ from saved snapshot'}</Text>
-      </Text>
+      </Box>
     )
   }
 

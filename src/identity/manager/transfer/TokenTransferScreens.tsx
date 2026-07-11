@@ -13,6 +13,7 @@ import type { TokenTransferProgress } from '../shared/effects/types.js'
 import { readCustodyMode } from '../custody/state.js'
 import { shortAddress, shortCid } from '../shared/model/format.js'
 import { FlowTimeline } from '../shared/components/FlowTimeline.js'
+import { FieldRow } from '../shared/components/FieldRow.js'
 import { OPEN_BROWSER_HINT } from '../shared/components/WalletApprovalScreen.js'
 
 const TRANSFER_STEPS = ['Choose Receiver', 'Sender Signs', 'Receiver Signs', 'Sender Updates URI', 'Transfer Token']
@@ -49,7 +50,7 @@ export const TokenTransferTargetScreen: React.FC<TokenTransferTargetScreenProps>
         <StatusRow label="Sender" value={senderValue} />
         <Box marginTop={1} flexDirection="column">
           {custodyMode === 'advanced' ? (
-            <Text color={theme.textSubtle}>Advanced custody: sign as the owner wallet.</Text>
+            <Text color={theme.textSubtle}>Advanced custody: owner wallet signs.</Text>
           ) : null}
           <Text color={theme.textSubtle}>No token approval is requested.</Text>
         </Box>
@@ -208,10 +209,12 @@ type StatusRowProps = { label: string; value: string; tone?: 'ok' | 'warn'; emph
 const StatusRow: React.FC<StatusRowProps> = ({ label, value, tone, emphasize }) => {
   const color = emphasize ? theme.accentPeriwinkle : tone === 'ok' ? theme.text : tone === 'warn' ? theme.accentPeriwinkle : theme.text
   return (
-    <Text>
-      <Text color={theme.textSubtle}>{label.padEnd(12)} </Text>
-      <Text color={color} bold={emphasize}>{value}</Text>
-    </Text>
+    <FieldRow
+      label={label}
+      labelWidth={13}
+      labelColor={theme.textSubtle}
+      value={<Text color={color} bold={emphasize}>{value}</Text>}
+    />
   )
 }
 

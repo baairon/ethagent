@@ -210,7 +210,7 @@ export function renderEnsMaintenancePhase({
           <EnsSetupRow label="Owner wallet" value={shortAddress(plan.parentOwnerAddress)} />
           <EnsSetupRow
             label="Path"
-            value={plan.parentWrapped ? 'NameWrapper.setSubnodeRecord' : 'Registry.setSubnodeRecord'}
+            value={plan.parentWrapped ? 'NameWrapper' : 'Registry'}
           />
         </Box>
         <Box>

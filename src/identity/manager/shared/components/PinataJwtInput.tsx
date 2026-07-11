@@ -5,7 +5,7 @@ import { TextInput } from '../../../../ui/TextInput.js'
 import { theme } from '../../../../ui/theme.js'
 import { extractPinataJwt } from '../../../storage/ipfs.js'
 
-const PINATA_API_KEYS_URL = 'https://app.pinata.cloud/developers/api-keys'
+const PINATA_API_KEYS_URL = 'app.pinata.cloud/developers/api-keys'
 
 type PinataJwtInputProps = {
   inputKey: string
@@ -29,11 +29,10 @@ export const PinataJwtInput: React.FC<PinataJwtInputProps> = ({
     subtitle={subtitle ?? 'Save a Pinata JWT so ethagent can pin encrypted state to IPFS.'}
     footer={footer}
   >
-    <Text>
-      <Text color={theme.dim}>Paste your Pinata JWT. Get one at </Text>
-      <Text color={theme.accentPeriwinkle} underline>{PINATA_API_KEYS_URL}</Text>
-    </Text>
-    <Text color={theme.dim}>Saved encrypted on this device · used only for IPFS pinning</Text>
+    <Text color={theme.dim}>Paste your Pinata JWT. Get one at</Text>
+    <Text color={theme.accentPeriwinkle} underline>{PINATA_API_KEYS_URL}</Text>
+    <Text color={theme.dim}>Saved encrypted on this device.</Text>
+    <Text color={theme.dim}>Used only for IPFS pinning.</Text>
     <TextInput
       key={inputKey}
       isSecret

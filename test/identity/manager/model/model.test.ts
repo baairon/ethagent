@@ -33,6 +33,9 @@ import {
 import { localChangeStatusView } from '../../../../src/identity/manager/continuity/state.js'
 import { transferSnapshotView } from '../../../../src/identity/manager/transfer/state.js'
 
+const ANSI_RE = new RegExp(String.fromCharCode(27) + '\\[[0-9;]*m', 'g')
+const stripAnsi = (value: string): string => value.replace(ANSI_RE, '')
+
 test('identity manager formats insufficient-funds preflight errors for compact display', () => {
   const view = identityManagerErrorView(new RegisterAgentPreflightError({
     code: 'insufficient-funds',
@@ -175,7 +178,7 @@ test('recovery confirm warns before overwriting dirty local continuity files', (
     'MEMORY.md': 'memory-a',
     'agent-card.json': 'card-a',
   }
-  const output = renderToString(
+  const output = stripAnsi(renderToString(
     React.createElement(RecoveryConfirmScreen, {
       mode: 'refetch',
       footer: null,
@@ -195,7 +198,7 @@ test('recovery confirm warns before overwriting dirty local continuity files', (
         publishedContentHashes: published,
       },
     }),
-  )
+  ))
 
   assert.match(output, /Unsaved local changes detected/)
   assert.match(output, /SOUL\.md,[\s\S]*Skills/)
@@ -499,7 +502,7 @@ test('identityOwnerAddress prefers verified onchain owner and falls back to loca
 test('identity summary shows simple-mode owner and uses verified onchain owner as authoritative', () => {
   const localOwner = '0x000000000000000000000000000000000000dEaD'
   const onchainOwner = '0x000000000000000000000000000000000000bEEF'
-  const output = renderToString(React.createElement(IdentitySummary, {
+  const output = stripAnsi(renderToString(React.createElement(IdentitySummary, {
     identity: {
       address: localOwner,
       ownerAddress: localOwner,
@@ -508,7 +511,7 @@ test('identity summary shows simple-mode owner and uses verified onchain owner a
       state: { custodyMode: 'simple' },
     },
     onchainOwner,
-  }))
+  })))
 
   assert.match(output, /Owner\s+0x0000\.\.\.bEEF/)
   assert.doesNotMatch(output, /Owner\s+0x0000\.\.\.dEaD/)

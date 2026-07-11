@@ -189,14 +189,15 @@ function renderReconciliationBanner(r: AgentReconciliation, identity: EthagentId
       return (
         <>
           <Text color={theme.accentError} bold>Agent Unlinked</Text>
-          <Text color={theme.textSubtle}>{tokenLabel} was transferred. Local SOUL.md, MEMORY.md, and skills remain.</Text>
+          <Text color={theme.textSubtle}>{tokenLabel} was transferred.</Text>
+          <Text color={theme.textSubtle}>SOUL.md, MEMORY.md, and skills remain.</Text>
         </>
       )
     }
     return (
       <>
         <Text color={theme.accentError} bold>Agent Unlinked</Text>
-        <Text color={theme.textSubtle}>{tokenLabel} left without Prepare Transfer.</Text>
+        <Text color={theme.textSubtle}>Token left without Prepare Transfer.</Text>
       </>
     )
   }

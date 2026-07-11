@@ -20,8 +20,9 @@ import {
 } from '../custody/state.js'
 import { ensValidationReasonText } from './state.js'
 import { shortAddress } from '../shared/model/format.js'
+import { FieldRow } from '../shared/components/FieldRow.js'
 import {
-  abbreviateHexBlobs,
+  abbreviateRecordValue,
   manualReasonTitle,
   modeSwitchHeading,
 } from './editCopy.js'
@@ -59,14 +60,8 @@ export const SimpleEnsIssueScreen: React.FC<SimpleEnsIssueScreenProps> = ({
     >
       <Box flexDirection="column">
         <Text color={theme.dim}>The subdomain is not on Ethereum Mainnet yet. You can create it from here.</Text>
-        <Text>
-          <Text color={theme.dim}>{'Name'.padEnd(12)}</Text>
-          <Text color={theme.text} bold>{fullName}</Text>
-        </Text>
-        <Text>
-          <Text color={theme.dim}>{'Reason'.padEnd(12)}</Text>
-          <Text color={theme.accentError}>{reason}</Text>
-        </Text>
+        <FieldRow label="Name" labelWidth={12} value={<Text color={theme.text} bold>{fullName}</Text>} />
+        <FieldRow label="Reason" labelWidth={12} value={<Text color={theme.accentError}>{reason}</Text>} />
         {showDetail ? <Text color={theme.dim}>{validation.detail}</Text> : null}
       </Box>
       <Box marginTop={1}>
@@ -109,7 +104,6 @@ export const EnsSetupReviewScreen: React.FC<EnsSetupReviewScreenProps> = ({
 }) => {
   type Action = 'begin' | 'back'
   const isSimple = setup.mode === 'simple'
-  const signerLabel = isSimple ? 'Connected wallet' : 'Owner wallet'
   const createLabel = setup.registryAction === 'create-subdomain'
     ? 'Create Subdomain'
     : setup.registryAction === 'create-wrapped-subdomain'
@@ -136,7 +130,7 @@ export const EnsSetupReviewScreen: React.FC<EnsSetupReviewScreenProps> = ({
         <EnsSetupRow label="Parent root" value={setup.rootName} />
         <EnsSetupRow label="Subdomain label" value={setup.label} />
         <EnsSetupRow label="ENS network" value="Ethereum Mainnet" />
-        <EnsSetupRow label="Signer wallet" value={`${shortAddress(setup.ownerAddress)} (${signerLabel.toLowerCase()})`} />
+        <EnsSetupRow label="Signer wallet" value={`${shortAddress(setup.ownerAddress)} (${isSimple ? 'connected' : 'owner'})`} />
         <EnsSetupRow label="Registry action" value={createLabel} />
       </Box>
       <Box marginTop={1}>
@@ -255,10 +249,10 @@ export const UnlinkEnsReviewScreen: React.FC<UnlinkEnsReviewScreenProps> = ({
           <Box marginTop={1} flexDirection="column">
             <Text color={theme.textSubtle}>Will be cleared:</Text>
             {changedDiffs.map(diff => (
-              <Text key={diff.key}>
-                <Text color={theme.dim}>{`  ${abbreviateHexBlobs(diff.key)}  `}</Text>
-                <Text color={theme.accentPeriwinkle}>{abbreviateHexBlobs(diff.current)}</Text>
-              </Text>
+              <Box key={diff.key} flexDirection="column">
+                <Text color={theme.dim}>{`  ${abbreviateRecordValue(diff.key)}`}</Text>
+                <FieldRow label="" labelWidth={4} value={renderRecordValue(diff.current)} />
+              </Box>
             ))}
           </Box>
         )}
@@ -331,14 +325,8 @@ export const ReviewScreen: React.FC<ReviewScreenProps> = ({
         footer={footerHint('↵ select · esc back')}
       >
         <Box flexDirection="column">
-          <Text>
-            <Text color={theme.dim}>{'Name'.padEnd(12)}</Text>
-            <Text color={theme.text} bold>{fullName}</Text>
-          </Text>
-          <Text>
-            <Text color={theme.dim}>{'Reason'.padEnd(12)}</Text>
-            <Text color={theme.accentError}>{reason}</Text>
-          </Text>
+          <FieldRow label="Name" labelWidth={12} value={<Text color={theme.text} bold>{fullName}</Text>} />
+          <FieldRow label="Reason" labelWidth={12} value={<Text color={theme.accentError}>{reason}</Text>} />
           {showDetail
             ? <Text color={theme.dim}>{validation.detail}</Text>
             : null}
@@ -385,24 +373,19 @@ export const ReviewScreen: React.FC<ReviewScreenProps> = ({
         {currentEnsName || currentMode
           ? (
             <Box marginBottom={1} flexDirection="column">
-              <Text color={theme.dim}>Current: <Text color={currentEnsName ? theme.text : theme.dim}>{currentEnsName || 'None'}</Text></Text>
-              <Text color={theme.dim}>Next: <Text color={theme.text}>{fullName}</Text></Text>
+              <FieldRow label="Current:" labelWidth={9} value={currentEnsName || 'None'} valueColor={currentEnsName ? theme.text : theme.dim} />
+              <FieldRow label="Next:" labelWidth={9} value={fullName} />
             </Box>
             )
           : null}
         {recordsDiff.map(diff => (
-          <Text key={diff.key}>
-            <Text color={theme.dim}>{`- ${abbreviateHexBlobs(diff.key)}: `}</Text>
+          <Box key={diff.key} flexDirection="column">
+            <Text color={theme.dim}>{`- ${abbreviateRecordValue(diff.key)}`}</Text>
             {diff.changed
-              ? (
-                <>
-                  {renderRecordValue(diff.current)}
-                  <Text color={theme.dim}>{' → '}</Text>
-                  {renderRecordValue(diff.next)}
-                </>
-              )
-              : renderRecordValue(diff.next)}
-          </Text>
+              ? <FieldRow label="" labelWidth={2} value={renderRecordValue(diff.current)} />
+              : null}
+            <FieldRow label={diff.changed ? '→' : ''} labelWidth={2} value={renderRecordValue(diff.next)} />
+          </Box>
         ))}
         {!hasRecordChanges
           ? <Box marginTop={1}><Text color={theme.dim}>All ENS records already match. Link this ENS name to the token URI.</Text></Box>

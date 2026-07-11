@@ -1,6 +1,8 @@
 import React from 'react'
 import { Box, Text } from 'ink'
-import { theme } from '../../../../ui/theme.js'
+import { theme, PANEL_WIDTH } from '../../../../ui/theme.js'
+import { fitHint } from '../../../../ui/Select.js'
+import { FieldRow } from './FieldRow.js'
 import type { EthagentConfig, EthagentIdentity } from '../../../../storage/config.js'
 import {
   displayCustodyMode,
@@ -56,20 +58,24 @@ export const IdentitySummary: React.FC<IdentitySummaryProps> = ({ identity, conf
 
   if (compact) {
     const rawName = stateName || 'Active Agent'
-    const name = rawName.length > 16 ? `${rawName.slice(0, 15)}…` : rawName
     const tokenSegment = identity.agentId ? `#${identity.agentId}` : null
     const networkSegment = identity.agentId ? networkValue : null
+    const segmentsWidth = (tokenSegment ? tokenSegment.length + 3 : 0)
+      + (networkSegment ? networkSegment.length + 3 : 0)
+    const name = fitHint(rawName, Math.max(8, Math.min(16, PANEL_WIDTH - 4 - segmentsWidth)))
     const ensSegment = ensStatus.kind === 'linked'
       ? ensStatus.name === rawName ? null : ensStatus.name
       : ensStatus.kind === 'issue'
         ? ensStatus.name
         : null
+    const usedWidth = name.length + segmentsWidth
+    const ensText = ensSegment ? fitHint(ensSegment, PANEL_WIDTH - 4 - usedWidth - 3) : ''
     return (
       <Text>
         <Text color={theme.textSubtle}>{name}</Text>
         {tokenSegment ? <><Text color={theme.dim}> · </Text><Text color={theme.dim}>{tokenSegment}</Text></> : null}
         {networkSegment ? <><Text color={theme.dim}> · </Text><Text color={theme.dim}>{networkSegment}</Text></> : null}
-        {ensSegment ? <><Text color={theme.dim}> · </Text><Text color={ensStatus.kind === 'issue' ? theme.accentError : theme.accentPeriwinkle}>{ensSegment}</Text></> : null}
+        {ensText ? <><Text color={theme.dim}> · </Text><Text color={ensStatus.kind === 'issue' ? theme.accentError : theme.accentPeriwinkle}>{ensText}</Text></> : null}
       </Text>
     )
   }
@@ -115,7 +121,7 @@ export const IdentitySummary: React.FC<IdentitySummaryProps> = ({ identity, conf
         }
         const pendingCell = {
           label: 'Pending',
-          value: <Text color={theme.dim}>local ahead of onchain, owner rotates pointer</Text>,
+          value: <Text color={theme.dim}>local ahead of onchain</Text>,
         }
         return (
           <>
@@ -157,10 +163,7 @@ type SummaryCell = { label: string; value: React.ReactNode }
 const LEFT_LABEL_WIDTH = 12
 
 const SummaryCellLine: React.FC<{ cell: SummaryCell }> = ({ cell }) => (
-  <Text>
-    <Text color={theme.dim}>{cell.label.padEnd(LEFT_LABEL_WIDTH)}</Text>
-    {cell.value}
-  </Text>
+  <FieldRow label={cell.label} labelWidth={LEFT_LABEL_WIDTH} value={cell.value} />
 )
 
 const SummaryRow: React.FC<{ left: SummaryCell; right?: SummaryCell }> = ({ left, right }) => {
@@ -188,15 +191,10 @@ const TransferSnapshotStatus: React.FC<{ status: NonNullable<TransferSnapshotVie
   return (
     <Box flexDirection="column">
       <Text color={theme.accentPeriwinkle} bold>{title}</Text>
-      <Text>
-        <Text color={theme.dim}>{'Sender'.padEnd(12)}</Text>
-        <Text color={theme.text}>{shortAddress(status.sender)}</Text>
-      </Text>
-      <Text>
-        <Text color={theme.dim}>{'Receiver'.padEnd(12)}</Text>
-        <Text color={theme.text}>{receiverLabel}</Text>
-      </Text>
-      <Text color={theme.textSubtle}>{status.slotCount} decrypt slots · {detail}</Text>
+      <FieldRow label="Sender" labelWidth={12} value={<Text color={theme.text}>{shortAddress(status.sender)}</Text>} />
+      <FieldRow label="Receiver" labelWidth={12} value={<Text color={theme.text}>{receiverLabel}</Text>} />
+      <Text color={theme.textSubtle}>{status.slotCount} decrypt slots</Text>
+      <Text color={theme.textSubtle}>{detail}</Text>
     </Box>
   )
 }

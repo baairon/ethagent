@@ -9,6 +9,10 @@ export function abbreviateHexBlobs(input: string): string {
   })
 }
 
+export function abbreviateRecordValue(input: string): string {
+  return abbreviateHexBlobs(input).replace(/\bbaf[a-z2-7]{30,}/g, cid => `${cid.slice(0, 10)}...${cid.slice(-6)}`)
+}
+
 export type EnsLinkOptions = {
   mode: 'simple' | 'advanced'
   ownerAddress?: Address

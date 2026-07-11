@@ -16,6 +16,7 @@ import {
   type CustodyMode,
 } from '../custody/state.js'
 import { shortAddress } from '../shared/model/format.js'
+import { FieldRow } from '../shared/components/FieldRow.js'
 import {
   recordsDiffHasChanges,
   type EnsLinkOptions,
@@ -162,8 +163,8 @@ export function renderSimpleEnsPhase({
         {noOwnedNames
           ? (
               <Box marginTop={1} flexDirection="column">
-                <Text color={theme.dim}>This wallet does not own a parent <Text color={theme.text}>.eth</Text> name yet.</Text>
-                <Text color={theme.dim}>Register one at <Text color={theme.text}>{ENS_DOMAINS_URL}</Text>, then come back here.</Text>
+                <Text color={theme.dim}>No parent <Text color={theme.text}>.eth</Text> name on this wallet yet.</Text>
+                <Text color={theme.dim}>Register one at <Text color={theme.text}>app.ens.domains</Text> first.</Text>
               </Box>
             )
           : null}
@@ -285,7 +286,7 @@ export function renderSimpleEnsPhase({
         footer={footerHint('esc back')}
       >
         <Box flexDirection="column">
-          <Text color={theme.dim}>Name: <Text color={theme.text}>{phase.fullName}</Text></Text>
+          <FieldRow label="Name:" labelWidth={6} value={phase.fullName} />
         </Box>
         <Box marginTop={1}>
           <Spinner label="checking records..." />

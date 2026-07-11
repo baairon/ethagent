@@ -16,6 +16,7 @@ import {
 } from '../../continuity/envelope.js'
 import { requestBrowserWalletSignature, type BrowserWalletReady } from '../../wallet/browserWallet.js'
 import { FlowTimeline } from '../shared/components/FlowTimeline.js'
+import { FieldRow } from '../shared/components/FieldRow.js'
 import { OPEN_BROWSER_HINT } from '../shared/components/WalletApprovalScreen.js'
 import { readCustodyMode } from '../custody/state.js'
 import { shortAddress } from '../shared/model/format.js'
@@ -203,10 +204,7 @@ export const OperatorWalletsScreen: React.FC<OperatorWalletsScreenProps> = ({
       footer={footerHint('↵ select · esc back')}
     >
       <Box flexDirection="column">
-        <Text>
-          <Text color={theme.dim}>{'Owner Wallet'.padEnd(18)}</Text>
-          <Text color={theme.text}>{shortAddress(ownerAddress)}</Text>
-        </Text>
+        <FieldRow label="Owner Wallet" labelWidth={18} value={shortAddress(ownerAddress)} />
         <Box marginTop={1} flexDirection="column">
           <Text color={theme.dim}>Operator Wallets</Text>
           {records.length > 0
@@ -215,12 +213,18 @@ export const OperatorWalletsScreen: React.FC<OperatorWalletsScreenProps> = ({
                 const approved = record.verifiedAt ? `approved ${record.verifiedAt.slice(0, 10)}` : null
                 const meta = [isActive ? 'active' : null, approved].filter(Boolean).join(' · ')
                 return (
-                  <Text key={record.address}>
-                    <Text color={isActive ? theme.accentPeriwinkle : theme.text}>
-                      {shortAddress(record.address)}
-                    </Text>
-                    {meta ? <Text color={theme.dim}>{`  ${meta}`}</Text> : null}
-                  </Text>
+                  <Box key={record.address} flexDirection="row">
+                    <Box flexShrink={0}>
+                      <Text color={isActive ? theme.accentPeriwinkle : theme.text}>
+                        {shortAddress(record.address)}
+                      </Text>
+                    </Box>
+                    {meta ? (
+                      <Box flexShrink={1}>
+                        <Text color={theme.dim}>{`  ${meta}`}</Text>
+                      </Box>
+                    ) : null}
+                  </Box>
                 )
               })
             : <Text color={theme.dim}>No operator wallets saved.</Text>}
