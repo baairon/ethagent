@@ -33,7 +33,7 @@ export function startBrowserWalletServer<T>(args: {
 
     const server = http.createServer((req, res) => {
       void handleRequest(req, res).catch(err => {
-        respondJson(res, 500, { ok: false, error: (err as Error).message })
+        if (!res.headersSent) respondJson(res, 500, { ok: false, error: (err as Error).message })
       })
     })
 
@@ -43,7 +43,7 @@ export function startBrowserWalletServer<T>(args: {
 
     const handleRequest = async (req: http.IncomingMessage, res: http.ServerResponse): Promise<void> => {
       const url = new URL(req.url ?? '/', 'http://127.0.0.1')
-      if (req.method === 'POST' && !isAllowedWalletOrigin(req)) {
+      if (!isAllowedWalletOrigin(req)) {
         respondJson(res, 403, { ok: false, error: 'forbidden origin' })
         return
       }

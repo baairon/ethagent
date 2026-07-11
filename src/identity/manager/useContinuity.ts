@@ -36,6 +36,13 @@ const WORKING_STATUS_STEPS = new Set<string>([
   'restore-select-token',
 ])
 const WATCHED_VAULT_FILES = new Set<string>(['SOUL.md', 'MEMORY.md', 'agent-card.json'])
+const RECURSIVE_VAULT_WATCH = process.platform === 'win32' || process.platform === 'darwin'
+
+function isWatchedVaultPath(filename: string): boolean {
+  const normalized = filename.replace(/\\/g, '/')
+  if (WATCHED_VAULT_FILES.has(normalized)) return true
+  return normalized === 'skills' || normalized.startsWith('skills/')
+}
 
 type UseIdentityManagerContinuityArgs = {
   identity: EthagentIdentity | undefined
@@ -108,8 +115,8 @@ export function useIdentityManagerContinuity({
       }, 200)
     }
     try {
-      watcher = watch(continuityVaultRef(identity).dir, (_event, filename) => {
-        if (filename && !WATCHED_VAULT_FILES.has(String(filename))) return
+      watcher = watch(continuityVaultRef(identity).dir, { recursive: RECURSIVE_VAULT_WATCH }, (_event, filename) => {
+        if (filename && !isWatchedVaultPath(String(filename))) return
         schedule()
       })
       watcher.on('error', () => { try { watcher?.close() } catch {} })

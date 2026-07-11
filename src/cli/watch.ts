@@ -16,7 +16,13 @@ import {
 const DEBOUNCE_MS = 400
 const COOLDOWN_MS = 800
 const RESCAN_MS = 30_000
+const RESCAN_IDLE_MAX_MS = 300_000
 const RECURSIVE = process.platform === 'win32' || process.platform === 'darwin'
+
+export function nextRescanDelay(currentDelay: number, sawEventSinceRescan: boolean): number {
+  if (sawEventSinceRescan) return RESCAN_MS
+  return Math.min(Math.max(currentDelay, RESCAN_MS) * 2, RESCAN_IDLE_MAX_MS)
+}
 
 function logDaemon(message: string): void {
   try {
@@ -53,9 +59,9 @@ async function computeWatchTargets(): Promise<WatchTargets> {
     const ref = continuityVaultRef(config.identity)
     dirs.add(ref.dir)
     sourceKeys.push(keyPath(ref.dir))
-    const skillsDir = path.join(ref.dir, 'skills')
-    dirs.add(skillsDir)
     if (!RECURSIVE) {
+      const skillsDir = path.join(ref.dir, 'skills')
+      dirs.add(skillsDir)
       try {
         for (const entry of fs.readdirSync(skillsDir, { withFileTypes: true })) {
           if (entry.isDirectory()) dirs.add(path.join(skillsDir, entry.name))
@@ -112,6 +118,8 @@ export async function runWatch(argv: string[]): Promise<number> {
   let syncing = false
   let stopped = false
   let cooldownUntil = 0
+  let rescanDelay = RESCAN_MS
+  let sawEventSinceRescan = false
   const watched = new Map<string, fs.FSWatcher>()
   let sourceKeys: string[] = []
   let fileKeys = new Set<string>()
@@ -121,7 +129,7 @@ export async function runWatch(argv: string[]): Promise<number> {
 
   const cleanup = (): void => {
     stopped = true
-    if (rescan) clearInterval(rescan)
+    if (rescan) clearTimeout(rescan)
     if (timer) clearTimeout(timer)
     for (const watcher of watched.values()) { try { watcher.close() } catch {} }
     watched.clear()
@@ -133,6 +141,11 @@ export async function runWatch(argv: string[]): Promise<number> {
 
   const trigger = (): void => {
     if (stopped) return
+    sawEventSinceRescan = true
+    if (rescanDelay !== RESCAN_MS) {
+      rescanDelay = RESCAN_MS
+      scheduleRescan()
+    }
     if (timer) clearTimeout(timer)
     timer = setTimeout(() => { void run() }, DEBOUNCE_MS)
   }
@@ -177,8 +190,19 @@ export async function runWatch(argv: string[]): Promise<number> {
     }
   }
 
+  const scheduleRescan = (): void => {
+    if (stopped) return
+    if (rescan) clearTimeout(rescan)
+    rescan = setTimeout(() => {
+      const sawEvent = sawEventSinceRescan
+      sawEventSinceRescan = false
+      rescanDelay = nextRescanDelay(rescanDelay, sawEvent)
+      void syncWatchers().finally(scheduleRescan)
+    }, rescanDelay)
+  }
+
   await syncWatchers()
-  rescan = setInterval(() => { void syncWatchers() }, RESCAN_MS)
+  scheduleRescan()
 
   await run()
   if (!isDaemon) process.stdout.write('ethagent: watching for changes (ctrl-c to stop)\n')

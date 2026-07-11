@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Box, Text } from 'ink'
 import { theme, gradientColor, PANEL_WIDTH } from '../../../../ui/theme.js'
+import { fitHint } from '../../../../ui/Select.js'
 import { useAppInput } from '../../../../app/input/AppInputProvider.js'
 
 export type LazyMenuItem<T> = {
@@ -101,7 +102,8 @@ export function LazyMenu<T>({ rows, width = PANEL_WIDTH, onSubmit, onCancel }: P
         const shortcutColor = disabled ? theme.border : theme.menuShortcut
         const chars = row.label.split('')
         const shortcut = row.shortcut
-        const inline = row.inlineNote
+        const noteBudget = width - 2 - row.label.length - 2 - (shortcut ? shortcut.length + 2 : 0)
+        const inline = row.inlineNote ? fitHint(row.inlineNote, noteBudget) : ''
         const inlineWidth = inline ? inline.length + 2 : 0
         const pad = shortcut ? Math.max(2, width - (2 + row.label.length + inlineWidth + shortcut.length)) : 0
         return (

@@ -7,7 +7,7 @@ const CONTENT_WIDTH = PANEL_WIDTH - 4
 const SELECT_CHROME_ROWS = 17
 const MIN_VISIBLE = 4
 
-function fitHint(hint: string, budget: number): string {
+export function fitHint(hint: string, budget: number): string {
   if (budget < 8) return ''
   if (hint.length <= budget) return hint
   return `${hint.slice(0, budget - 1)}…`
@@ -142,15 +142,16 @@ export function Select<T>({
             : option.hintColor ?? theme.dim
         const subtextColor = disabled ? theme.border : option.subtextColor ?? theme.dim
         const bold = option.bold ?? (isSection || (isActive && selectable))
+        const label = fitHint(option.label, Math.max(8, CONTENT_WIDTH - rowIndent - prefix.length - 2))
         const inlineHint = Boolean(option.hint && hintLayout === 'inline' && !isSection)
         const belowHint = Boolean(option.hint && (!inlineHint || isSection))
         const inlineHintText = inlineHint
-          ? fitHint(option.hint ?? '', CONTENT_WIDTH - rowIndent - prefix.length - option.label.length - 4)
+          ? fitHint(option.hint ?? '', CONTENT_WIDTH - rowIndent - prefix.length - label.length - 4)
           : ''
         const belowHintText = belowHint
           ? fitHint(option.hint ?? '', CONTENT_WIDTH - rowIndent - 2)
           : ''
-        const showActiveGradient = isActive && selectable && !isSection && option.label.length > 0
+        const showActiveGradient = isActive && selectable && !isSection && label.length > 0
         return (
           <Box key={absoluteIndex} flexDirection="column">
             <Box flexDirection="row" marginLeft={rowIndent}>
@@ -158,12 +159,12 @@ export function Select<T>({
               {prefix ? <Text color={prefixColor}>{prefix}</Text> : null}
               {showActiveGradient ? (
                 <Text>
-                  {option.label.split('').map((ch, ci) => (
-                    <Text key={ci} color={rainbowColor(ci, option.label.length)}>{ch}</Text>
+                  {label.split('').map((ch, ci) => (
+                    <Text key={ci} color={rainbowColor(ci, label.length)}>{ch}</Text>
                   ))}
                 </Text>
               ) : (
-                <Text color={labelColor} bold={bold}>{option.label}</Text>
+                <Text color={labelColor} bold={bold}>{label}</Text>
               )}
               {inlineHint && inlineHintText ? <Text color={hintColor}>  {inlineHintText}</Text> : null}
             </Box>

@@ -18,8 +18,8 @@ type WalletApprovalScreenProps = {
 export const OPEN_BROWSER_HINT = 'Press ↵ to open in browser...'
 
 export const WalletApprovalScreen: React.FC<WalletApprovalScreenProps> = ({ title, subtitle, walletSession, label, onCancel }) => {
-  useAppInput((_input, key) => {
-    if (key.escape && onCancel) onCancel()
+  useAppInput((input, key) => {
+    if ((key.escape || (key.ctrl && input === 'c')) && onCancel) onCancel()
     if (key.return && walletSession?.url) {
       openExternalUrl(walletSession.url)
     }

@@ -88,8 +88,8 @@ export const TokenTransferSigningScreen: React.FC<TokenTransferSigningScreenProp
   walletSession,
   onCancel,
 }) => {
-  useAppInput((_input, key) => {
-    if (key.escape) onCancel()
+  useAppInput((input, key) => {
+    if (key.escape || (key.ctrl && input === 'c')) onCancel()
     if (key.return && walletSession?.url) {
       openExternalUrl(walletSession.url)
     }

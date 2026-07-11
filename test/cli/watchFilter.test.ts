@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import os from 'node:os'
 import path from 'node:path'
-import { isSyncWorthyChange, keyPath } from '../../src/cli/watch.js'
+import { isSyncWorthyChange, keyPath, nextRescanDelay } from '../../src/cli/watch.js'
 
 const vault = path.join(os.tmpdir(), 'ethagent-vault')
 const claudeDir = path.join(os.homedir(), '.claude')
@@ -40,4 +40,13 @@ test('dot-prefixed bookkeeping is ignored; an unknown filename is conservatively
   assert.equal(isSyncWorthyChange(vault, '.ethagent-sync.json', sourceKeys, fileKeys), false)
   assert.equal(isSyncWorthyChange(claudeDir, '.ethagent-mirror.json', sourceKeys, fileKeys), false)
   assert.equal(isSyncWorthyChange(vault, null, sourceKeys, fileKeys), true)
+})
+
+test('idle rescans back off toward the cap and snap back on activity', () => {
+  assert.equal(nextRescanDelay(30_000, false), 60_000)
+  assert.equal(nextRescanDelay(60_000, false), 120_000)
+  assert.equal(nextRescanDelay(240_000, false), 300_000)
+  assert.equal(nextRescanDelay(300_000, false), 300_000)
+  assert.equal(nextRescanDelay(300_000, true), 30_000)
+  assert.equal(nextRescanDelay(30_000, true), 30_000)
 })

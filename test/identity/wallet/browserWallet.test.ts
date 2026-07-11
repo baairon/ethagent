@@ -1,5 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import http from 'node:http'
 import { readFileSync } from 'node:fs'
 import { transformSync } from 'esbuild'
 import {
@@ -50,6 +51,66 @@ test('browser wallet bridge exposes a clean localhost wallet URL', async () => {
 
   const result = await walletPromise
   assert.match(result?.message ?? '', /cancelled/)
+})
+
+function getWithHost(url: string, host: string): Promise<{ status: number; body: string }> {
+  return new Promise((resolve, reject) => {
+    const target = new URL(url)
+    const req = http.request(
+      { hostname: target.hostname, port: target.port, path: '/', method: 'GET', headers: { host } },
+      res => {
+        let body = ''
+        res.on('data', chunk => { body += String(chunk) })
+        res.on('end', () => resolve({ status: res.statusCode ?? 0, body }))
+      },
+    )
+    req.on('error', reject)
+    req.end()
+  })
+}
+
+test('wallet page GET refuses non-loopback Host headers so the session token never leaks', async () => {
+  let resolveReady: (ready: { url: string }) => void
+  const readyPromise = new Promise<{ url: string }>(resolve => {
+    resolveReady = resolve
+  })
+  const walletPromise = requestBrowserWalletSignature({
+    chainId: 1,
+    message: 'ethagent host test',
+    timeoutMs: 5_000,
+    onReady: ready => resolveReady(ready),
+  }).then(
+    () => null,
+    err => err as Error,
+  )
+
+  const ready = await readyPromise
+  const rebound = await getWithHost(ready.url, 'evil.example')
+  assert.equal(rebound.status, 403)
+  assert.doesNotMatch(rebound.body, /sessionToken/)
+
+  const page = await fetch(ready.url).then(response => response.text())
+  const token = page.match(/"sessionToken":"([^"]+)"/)?.[1]
+  assert.ok(token, 'loopback GET must still serve the page')
+  await fetch(new URL('/cancel', ready.url), {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ sessionToken: token }),
+  })
+  const result = await walletPromise
+  assert.match(result?.message ?? '', /cancelled/)
+})
+
+test('wallet session page GET refuses non-loopback Host headers', async () => {
+  const session = await openBrowserWalletSession({})
+  try {
+    const rebound = await getWithHost(session.url, 'evil.example')
+    assert.equal(rebound.status, 403)
+    const ok = await fetch(session.url)
+    assert.equal(ok.status, 200)
+  } finally {
+    await session.close()
+  }
 })
 
 test('browser wallet page explains the wallet signature request', () => {
