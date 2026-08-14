@@ -1,3 +1,5 @@
+
+
 <p align="center">
   <img src="preview/image.svg" alt="ethagent first run panel" width="100%">
 </p>
@@ -116,6 +118,7 @@ Run with `npx ethagent`:
 | `ethagent` | Open the manager. |
 | `save` | Back up your agent onchain. |
 | `--add <path>` | Wire a tool by its instructions file. |
+| `--vault-dir` | Print the vault directory path (where soul, memory, and skills live). |
 | `pause` / `resume` | Pause or resume syncing. |
 | `--status` | Show your agent and detected tools. |
 | `reset` | Delete everything local. |
