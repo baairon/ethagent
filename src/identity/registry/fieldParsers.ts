@@ -21,8 +21,3 @@ export function numberField(input: Record<string, unknown> | null | undefined, k
   const value = input?.[key]
   return typeof value === 'number' && Number.isSafeInteger(value) && value > 0 ? value : undefined
 }
-
-export function booleanField(input: Record<string, unknown> | null | undefined, key: string): boolean | undefined {
-  const value = input?.[key]
-  return typeof value === 'boolean' ? value : undefined
-}

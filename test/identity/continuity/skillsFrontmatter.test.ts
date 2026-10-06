@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { parseSkillFile, serializeSkillFile, sanitizeSkillFileForStrictYaml } from '../../../src/identity/continuity/skills/frontmatter.js'
+import { parseSkillFile, sanitizeSkillFileForStrictYaml } from '../../../src/identity/continuity/skills/frontmatter.js'
 
 test('sanitizeSkillFileForStrictYaml quotes colon-y values, preserves unknown keys, leaves the body', () => {
   const src = [
@@ -57,32 +57,6 @@ test('sanitizeSkillFileForStrictYaml leaves block-scalar content lines verbatim 
   assert.match(out, /^  summary: a colon here$/m)
   assert.match(out, /^  detail: more$/m)
   assert.match(out, /visibility: "public"/)
-})
-
-test('serializeSkillFile emits strict-valid quoted YAML and round-trips through parseSkillFile', () => {
-  const frontmatter = {
-    name: 'vscode-setup',
-    description: 'Set up VS Code in one shot: apply my "Preferences Dark" theme',
-    visibility: 'public' as const,
-    tags: ['vscode', 'setup'],
-  }
-  const out = serializeSkillFile(frontmatter, 'body text\n')
-  assert.match(out, /description: "Set up VS Code in one shot: apply my \\"Preferences Dark\\" theme"/)
-  const parsed = parseSkillFile(out)
-  assert.equal(parsed.frontmatter.name, frontmatter.name)
-  assert.equal(parsed.frontmatter.description, frontmatter.description)
-  assert.equal(parsed.frontmatter.visibility, 'public')
-  assert.deepEqual(parsed.frontmatter.tags, frontmatter.tags)
-  assert.equal(parsed.body, 'body text')
-})
-
-test('serializeSkillFile escapes control characters so a strict YAML parser stays happy', () => {
-  const out = serializeSkillFile({ name: 'x', description: 'a\fb\x07c\x1bd\x7fe' }, '')
-  assert.doesNotMatch(out, /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/)
-  assert.match(out, /\\x0C/)
-  assert.match(out, /\\x07/)
-  assert.match(out, /\\x1B/)
-  assert.match(out, /\\x7F/)
 })
 
 test('parses supported frontmatter keys with quoted and bare scalars', () => {

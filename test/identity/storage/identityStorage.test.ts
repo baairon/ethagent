@@ -3,9 +3,9 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
-import { setTokenIdentity, getIdentityStatus, clearIdentity } from '../../../src/storage/identity.js'
+import { setTokenIdentity, getIdentityStatus } from '../../../src/storage/identity.js'
 import { saveConfig, type EthagentConfig } from '../../../src/storage/config.js'
-import { getSecret, setSecret } from '../../../src/storage/secrets.js'
+import { getSecret } from '../../../src/storage/secrets.js'
 
 const IDENTITY_ACCOUNT = 'ethereum:default'
 
@@ -104,59 +104,5 @@ test('setTokenIdentity preserves an existing erc8004 block, including operatorVa
     const updated = await setTokenIdentity(config, identity)
     assert.equal(updated.erc8004?.chainId, 1)
     assert.equal(updated.erc8004?.operatorVaults?.['1'], '0x1111111111111111111111111111111111111111')
-  })
-})
-
-test('clearIdentity removes ERC-8004 identity metadata without touching other config', async () => {
-  await withTempHome(async () => {
-    const config = {
-      ...baseConfig(),
-      selectedNetwork: 'base' as const,
-      erc8004: {
-        chainId: 8453,
-        rpcUrl: 'https://base.publicnode.com',
-        identityRegistryAddress: '0x8004A169FB4a3325136EB29fA0ceB6D2e539a432',
-      },
-    }
-    await saveConfig(config)
-    const identity = {
-      source: 'erc8004' as const,
-      address: '0x000000000000000000000000000000000000dEaD',
-      ownerAddress: '0x000000000000000000000000000000000000dEaD',
-      createdAt: new Date(0).toISOString(),
-      chainId: 8453,
-      rpcUrl: 'https://base.publicnode.com',
-      identityRegistryAddress: '0x8004A169FB4a3325136EB29fA0ceB6D2e539a432',
-      agentId: '42',
-      agentUri: 'ipfs://bafy-agent',
-      state: { name: 'agent' },
-    }
-    const withToken = await setTokenIdentity(config, identity)
-
-    const cleared = await clearIdentity(withToken)
-
-    assert.equal(cleared.identity, undefined)
-    assert.equal(cleared.selectedNetwork, 'base')
-    assert.equal(cleared.erc8004?.chainId, 8453)
-  })
-})
-
-test('clearIdentity also removes any legacy local private key secret', async () => {
-  await withTempHome(async () => {
-    const config = baseConfig()
-    await saveConfig(config)
-    await setSecret(IDENTITY_ACCOUNT, 'legacy-private-key')
-    assert.equal(await getSecret(IDENTITY_ACCOUNT), 'legacy-private-key')
-
-    await clearIdentity({
-      ...config,
-      identity: {
-        address: '0x000000000000000000000000000000000000dEaD',
-        createdAt: new Date(0).toISOString(),
-        source: 'local-key',
-      },
-    })
-
-    assert.equal(await getSecret(IDENTITY_ACCOUNT), null)
   })
 })

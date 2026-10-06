@@ -9,23 +9,22 @@ import {
 } from '../../continuity/storage.js'
 import { syncAgentCardManifest } from '../../continuity/skills/publicSkillsSync.js'
 import { recordPublishedContinuitySnapshot } from '../../continuity/snapshots.js'
-import { addToIpfs, DEFAULT_IPFS_API_URL, isPinataUploadUrl } from '../../storage/ipfs.js'
+import { addToIpfs, DEFAULT_IPFS_API_URL } from '../../storage/ipfs.js'
 import {
   createErc8004PublicClient,
   encodeSetAgentUri,
   preflightSetAgentUri,
   withEthagentPointers,
-  type Erc8004RegistryConfig,
 } from '../../registry/erc8004.js'
 import { encodeRotateAgentURI } from '../../registry/vault.js'
-import { resolveValidatedPinataJwt, savePinataJwt } from '../../storage/pinataJwt.js'
+import { savePinataJwt } from '../../storage/pinataJwt.js'
 import {
   openBrowserWalletSession,
   prepareTransactionGasFee,
   requestBrowserWalletSignatureAndTransaction,
   type WalletPurpose,
 } from '../../wallet/browserWallet.js'
-import type { ProfileUpdates, Step } from '../reducer.js'
+import type { Step } from '../reducer.js'
 import { acquireTxGuard, releaseTxGuard } from '../shared/txGuard.js'
 import type { EffectCallbacks } from '../shared/effects/types.js'
 import { awaitConfirmedReceipt } from '../shared/effects/receipts.js'
@@ -64,29 +63,6 @@ type PublicProfilePreparedTransaction = {
   agentCard: AgentCardMetadata
   identity: EthagentIdentity
   agentCardJson: string
-}
-
-export async function runPublicProfilePreflight(
-  identity: EthagentIdentity,
-  registry: Erc8004RegistryConfig,
-  callbacks: EffectCallbacks,
-  profileUpdates?: ProfileUpdates,
-  returnTo: Step = { kind: 'continuity-public' },
-  vaultAddress?: Address,
-): Promise<void> {
-  const apiUrl = DEFAULT_IPFS_API_URL
-  let jwt: string | undefined
-  try {
-    jwt = isPinataUploadUrl(apiUrl) ? await resolveValidatedPinataJwt() : undefined
-  } catch (err: unknown) {
-    callbacks.onStep({ kind: 'public-profile-storage', identity, registry, error: (err as Error).message, profileUpdates, returnTo, ...(vaultAddress ? { vaultAddress } : {}) })
-    return
-  }
-  if (isPinataUploadUrl(apiUrl) && !jwt) {
-    callbacks.onStep({ kind: 'public-profile-storage', identity, registry, profileUpdates, returnTo, ...(vaultAddress ? { vaultAddress } : {}) })
-    return
-  }
-  callbacks.onStep({ kind: 'public-profile-signing', identity, registry, pinataJwt: jwt, profileUpdates, returnTo, ...(vaultAddress ? { vaultAddress } : {}) })
 }
 
 export async function runPublicProfileSigning(

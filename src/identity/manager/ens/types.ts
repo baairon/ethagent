@@ -15,8 +15,6 @@ import type { Erc8004RegistryConfig } from '../../registry/erc8004.js'
 import type { AgentReconciliation } from '../shared/reconciliation/index.js'
 import type { EnsLinkOptions } from './editCopy.js'
 
-export type EnsIssueValidation = Extract<EnsValidation, { ok: false }>
-
 export type SimpleEnsPhase =
   | { kind: 'discovering'; mode?: 'simple' | 'advanced' }
   | { kind: 'pick-parent'; mode?: 'simple' | 'advanced'; error?: string }

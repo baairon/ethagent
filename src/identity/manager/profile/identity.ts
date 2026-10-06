@@ -1,9 +1,8 @@
-import type { EthagentConfig, EthagentIdentity } from '../../../storage/config.js'
-import { supportedErc8004ChainForId, type Erc8004AgentCandidate } from '../../registry/erc8004.js'
+import type { EthagentIdentity } from '../../../storage/config.js'
+import type { Erc8004AgentCandidate } from '../../registry/erc8004.js'
 import type { CustodyMode } from '../custody/state.js'
-import { formatDate, shortAddress, shortCid } from '../shared/model/format.js'
+import { formatDate } from '../shared/model/format.js'
 import { truncateEnd } from '../../../ui/text.js'
-import { chainSummaryRow } from '../shared/model/network.js'
 
 export const PREFLIGHT_AGENT_URI = 'ipfs://bafybeigdyrztma2dbfczw7q6ooozbxlqzyw5r7w4f3qw2axvvxqg3w6y7q'
 
@@ -33,16 +32,6 @@ export function tokenCandidateSelectLabel(
   return `${truncateEnd(tokenCandidateLabel(candidate), maxLength - suffix.length)}${suffix}`
 }
 
-export function tokenCandidateHint(candidate: Erc8004AgentCandidate): string {
-  const network = supportedErc8004ChainForId(candidate.chainId)?.name ?? `Chain ${candidate.chainId}`
-  const parts = [
-    candidate.name?.trim() ? `#${candidate.agentId.toString()}` : null,
-    network,
-    candidate.backup?.createdAt ? `saved ${formatDate(candidate.backup.createdAt)}` : null,
-  ].filter((part): part is string => Boolean(part))
-  return parts.join(' · ')
-}
-
 export function isCurrentAgentCandidate(
   identity: EthagentIdentity | undefined,
   candidate: Erc8004AgentCandidate,
@@ -60,32 +49,6 @@ export function isCurrentAgentCandidate(
     return false
   }
   return true
-}
-
-export function identitySummaryRows(
-  identity: EthagentIdentity | undefined,
-  config?: EthagentConfig,
-): Array<{
-  label: string
-  value: string
-  tone: 'ok' | 'dim'
-}> {
-  const backup = identity?.backup
-  const owner = identity?.ownerAddress ?? identity?.address
-  const ownerValue = owner ? shortAddress(owner) : 'not connected'
-  const tokenValue = identity?.agentId ? `#${identity.agentId}` : 'not created'
-  const chain = chainSummaryRow(config, identity)
-  const stateValue = backup?.cid ? shortCid(backup.cid) : 'not saved yet'
-  const cardValue = identity?.agentCard?.cid ? shortCid(identity.agentCard.cid) : 'not saved'
-  const iconValue = typeof identity?.state?.imageUrl === 'string' && identity.state.imageUrl.trim() ? 'attached' : 'not attached'
-  return [
-    { label: 'owner wallet', value: ownerValue, tone: identity ? 'ok' : 'dim' },
-    { label: 'token', value: tokenValue, tone: identity?.agentId ? 'ok' : 'dim' },
-    { label: 'network', value: chain.value, tone: chain.tone },
-    { label: 'state', value: stateValue, tone: backup ? 'ok' : 'dim' },
-    { label: 'card', value: cardValue, tone: identity?.agentCard?.cid ? 'ok' : 'dim' },
-    { label: 'icon', value: iconValue, tone: iconValue === 'attached' ? 'ok' : 'dim' },
-  ]
 }
 
 export function lastBackupLabel(identity?: EthagentIdentity): string {

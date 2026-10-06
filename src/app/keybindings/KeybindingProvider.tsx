@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react'
 import type { Key } from 'ink'
 import { useAppInput } from '../input/AppInputProvider.js'
 import type { Action, Binding, KeybindingContextName } from './types.js'
@@ -87,43 +87,4 @@ export function useKeybindingContext(): KeybindingContextValue {
   const ctx = useContext(Ctx)
   if (!ctx) throw new Error('Hook useKeybindingContext requires KeybindingProvider')
   return ctx
-}
-
-export function useOptionalKeybindingContext(): KeybindingContextValue | null {
-  return useContext(Ctx)
-}
-
-type UseKeybindingOptions = {
-  context?: KeybindingContextName
-  isActive?: boolean
-}
-
-export function useKeybinding(
-  action: Action,
-  handler: () => void,
-  options: UseKeybindingOptions = {},
-): void {
-  const ctx = useOptionalKeybindingContext()
-  const context = options.context ?? 'Global'
-  const isActive = options.isActive ?? true
-  const handlerRef = useRef(handler)
-  useEffect(() => { handlerRef.current = handler }, [handler])
-
-  useEffect(() => {
-    if (!ctx) return
-    const entry: HandlerEntry = {
-      handler: () => handlerRef.current(),
-      context,
-      isActive,
-    }
-    return ctx.register(action, entry)
-  }, [ctx, action, context, isActive])
-}
-
-export function useRegisterKeybindingContext(context: KeybindingContextName, isActive = true): void {
-  const ctx = useOptionalKeybindingContext()
-  useEffect(() => {
-    if (!ctx || !isActive) return
-    return ctx.activateContext(context)
-  }, [ctx, context, isActive])
 }
