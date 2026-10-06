@@ -69,6 +69,8 @@ export const OperatorWalletsScreen: React.FC<OperatorWalletsScreenProps> = ({
   const restoreAccessEpoch = readStateNumber(state, 'restoreAccessEpoch') ?? 0
   const records = normalizeApprovedOperatorWallets(state.approvedOperatorWallets)
   const [phase, setPhase] = React.useState<OperatorPhase>({ kind: 'main', notice, error })
+  const signingRef = React.useRef<AbortController | null>(null)
+  React.useEffect(() => () => signingRef.current?.abort(), [])
 
   React.useEffect(() => {
     setPhase(current => current.kind === 'main' ? { kind: 'main', notice, error } : current)
@@ -114,9 +116,13 @@ export const OperatorWalletsScreen: React.FC<OperatorWalletsScreenProps> = ({
     const token = restoreAccessToken(registry, identity.agentId)
     const nextEpoch = restoreAccessEpoch + 1
     setPhase({ kind: 'signing' })
+    signingRef.current?.abort()
+    const signing = new AbortController()
+    signingRef.current = signing
     requestBrowserWalletSignature({
       chainId: registry.chainId,
       purpose: 'operator-proof',
+      signal: signing.signal,
       messageForAccount: account => createWalletRestoreAccessChallenge({
         token,
         ownerAddress: ownerAddress,
@@ -143,6 +149,7 @@ export const OperatorWalletsScreen: React.FC<OperatorWalletsScreenProps> = ({
         restoreAccessKey,
       })
     }).catch((err: unknown) => {
+      if (signing.signal.aborted) return
       onWalletReady(null)
       setPhase({ kind: 'main', error: err instanceof Error ? err.message : String(err) })
     })
@@ -181,6 +188,7 @@ export const OperatorWalletsScreen: React.FC<OperatorWalletsScreenProps> = ({
         }
         walletSession={walletSession}
         onCancel={() => {
+          signingRef.current?.abort()
           onWalletReady(null)
           setPhase({ kind: 'main' })
         }}

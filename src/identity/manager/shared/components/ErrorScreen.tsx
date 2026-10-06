@@ -10,31 +10,31 @@ import type { Step } from '../../reducer.js'
 type ErrorScreenProps = {
   error: IdentityManagerErrorView
   back: Step
+  retry?: Step
   footer: React.ReactNode
-  closeLabel?: string
   onBack: (back: Step) => void
-  onClose: () => void
+  onRetry: (retry: Step) => void
 }
 
 export const ErrorScreen: React.FC<ErrorScreenProps> = ({
   error,
   back,
+  retry,
   footer,
-  closeLabel = 'Close',
   onBack,
-  onClose,
+  onRetry,
 }) => (
   <Surface title={error.title} tone="error" subtitle={error.detail} footer={footer}>
     {error.hint ? <Box marginBottom={1}><Paragraph color={theme.textSubtle}>{error.hint}</Paragraph></Box> : null}
-    <Select<'back' | 'close'>
+    <Select<'retry' | 'back'>
       options={[
-        { value: 'back', label: 'Back' },
-        { value: 'close', label: closeLabel, role: 'utility' },
+        ...(retry ? [{ value: 'retry' as const, label: 'Try Again' }] : []),
+        { value: 'back', label: 'Back', ...(retry ? { role: 'utility' as const } : {}) },
       ]}
       hintLayout="inline"
       onSubmit={choice => {
-        if (choice === 'back') onBack(back)
-        else onClose()
+        if (choice === 'retry' && retry) onRetry(retry)
+        else onBack(back)
       }}
       onCancel={() => onBack(back)}
     />

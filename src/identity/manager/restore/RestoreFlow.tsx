@@ -205,11 +205,12 @@ export const RestoreFlow: React.FC<RestoreFlowProps> = ({
   }
 
   if (step.kind === 'restore-fetching') {
+    const downloading = restoreProgress?.phase === 'downloading' ? restoreProgress : null
     return (
       <BusyScreen
         title={flowTitle}
-        subtitle="Downloading the encrypted snapshot from IPFS."
-        label="Downloading…"
+        subtitle={downloading?.detail ?? 'Finding the encrypted snapshot on IPFS.'}
+        label={downloading?.label ?? 'Downloading…'}
         onCancel={onBack}
       />
     )
@@ -249,7 +250,7 @@ function tokenCandidateOptions(
     const restorable = Boolean(candidate.backup?.cid)
     const hint = [
       candidate.name?.trim() ? `#${candidate.agentId.toString()}` : null,
-      restorable ? null : 'no snapshot',
+      restorable ? null : candidate.metadataError ? 'profile unreadable' : 'no snapshot',
     ].filter(Boolean).join(' · ')
     return { candidate, restorable, hint }
   })
@@ -285,7 +286,7 @@ function restoreNotFoundView(
   return {
     title: 'Agent Search Incomplete',
     subtitle: `The search on ${network} could not finish.`,
-    detail: '',
+    detail: step.detail ?? '',
   }
 }
 

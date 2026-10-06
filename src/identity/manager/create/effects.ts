@@ -124,6 +124,7 @@ export async function runCreateSigning(
     chainId: step.registry.chainId,
     messageForAccount: account => createContinuitySnapshotChallenge(account),
     onReady: callbacks.onWalletReady,
+    ...(callbacks.signal ? { signal: callbacks.signal } : {}),
     purpose: 'create-agent',
     prepareTransaction: async wallet => {
       await preflightRegisterAgent({

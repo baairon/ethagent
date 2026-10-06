@@ -27,6 +27,7 @@ import {
 export async function openBrowserWalletSession(args: {
   title?: string
   onReady?: ReadyHandler
+  signal?: AbortSignal
 } = {}): Promise<BrowserWalletSession> {
   const title = args.title ?? 'ethagent wallet session'
   const sseClients: Set<http.ServerResponse> = new Set()
@@ -44,7 +45,7 @@ export async function openBrowserWalletSession(args: {
 
   const failPending = (err: unknown): void => {
     if (!pending) return
-    clearTimeout(pending.timeout)
+    if (pending.timeout) clearTimeout(pending.timeout)
     pending.reject(err instanceof Error ? err : new Error(String(err)))
     pending = null
   }
@@ -113,7 +114,7 @@ export async function openBrowserWalletSession(args: {
         return
       }
       pending = null
-      clearTimeout(finished.timeout)
+      if (finished.timeout) clearTimeout(finished.timeout)
       respondJson(res, 200, { ok: true })
       return
     }
@@ -171,9 +172,9 @@ export async function openBrowserWalletSession(args: {
     const sessionToken = randomUUID()
     const payload = normalizeWalletPayloadPurpose(opts.payload)
     return new Promise<T>((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        failPending(new Error('Wallet Request Timed Out'))
-      }, opts.timeoutMs ?? 5 * 60_000)
+      const timeout = opts.timeoutMs
+        ? setTimeout(() => failPending(new Error('Wallet Request Timed Out')), opts.timeoutMs)
+        : undefined
       pending = {
         sessionToken,
         payload,
@@ -183,11 +184,28 @@ export async function openBrowserWalletSession(args: {
           resolve(opts.complete(body))
         },
         reject,
-        timeout,
+        ...(timeout ? { timeout } : {}),
       }
       pushEvent('prompt', { sessionToken, ...payload })
     })
   }
+
+  const close = async (): Promise<void> => {
+    if (closed) return
+    closed = true
+    args.signal?.removeEventListener('abort', onAbort)
+    if (pending) failPending(new Error('wallet request was cancelled'))
+    pushEvent('done', {})
+    await new Promise(resolve => setTimeout(resolve, SSE_DRAIN_MS))
+    for (const res of sseClients) {
+      try { res.end() } catch { }
+    }
+    sseClients.clear()
+    await new Promise<void>(resolve => server.close(() => resolve()))
+  }
+  const onAbort = (): void => { void close() }
+  if (args.signal?.aborted) onAbort()
+  else args.signal?.addEventListener('abort', onAbort, { once: true })
 
   return {
     url,
@@ -304,17 +322,6 @@ export async function openBrowserWalletSession(args: {
         },
       })
     },
-    close: async (): Promise<void> => {
-      if (closed) return
-      closed = true
-      if (pending) failPending(new Error('wallet session closed before request completed'))
-      pushEvent('done', {})
-      await new Promise(resolve => setTimeout(resolve, SSE_DRAIN_MS))
-      for (const res of sseClients) {
-        try { res.end() } catch { }
-      }
-      sseClients.clear()
-      await new Promise<void>(resolve => server.close(() => resolve()))
-    },
+    close,
   }
 }

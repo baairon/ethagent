@@ -132,7 +132,7 @@ export async function runTokenTransferSigning(
   const senderChallenge = createTransferContinuitySnapshotChallenge({ token, ownerAddress, targetAddress, role: 'sender' })
   const targetChallenge = createTransferContinuitySnapshotChallenge({ token, ownerAddress, targetAddress, role: 'receiver' })
 
-  const session = await openBrowserWalletSession({ onReady: callbacks.onWalletReady })
+  const session = await openBrowserWalletSession({ onReady: callbacks.onWalletReady, ...(callbacks.signal ? { signal: callbacks.signal } : {}) })
   try {
 
   callbacks.onTokenTransferProgress?.(tokenTransferProgressForPhase('sender-sign', ownerAddress, targetAddress))

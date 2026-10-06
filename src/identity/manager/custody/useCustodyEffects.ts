@@ -4,6 +4,7 @@ import { confirmAgentInVault } from '../../registry/vault.js'
 import { invalidateOwnershipCache } from '../shared/reconciliation/index.js'
 import type { ProfileUpdates } from '../reducer.js'
 import type { CustodyFlowDeps } from './types.js'
+import { scopeCallbacks } from '../shared/effects/types.js'
 import { humanOwnerAddress } from './helpers.js'
 import {
   runVaultDeployTransaction,
@@ -23,18 +24,22 @@ export function useCustodyTransactionEffects({
   useEffect(() => {
     if (step.kind !== 'custody-vault-deploy-tx') return
     let cancelled = false
+    const scope = scopeCallbacks(callbacks)
     if (!step.identity.agentId) {
       handleStepError(
         new Error('Cannot deploy Vault: agent token ID is missing'),
         { kind: 'custody-model', identity: step.identity, registry: step.registry, returnTo: step.returnTo },
       )
-      return () => { cancelled = true }
+      return () => {
+      cancelled = true
+      scope.cancel()
+    }
     }
     runVaultDeployTransaction({
       registry: step.registry,
       walletAddress: humanOwnerAddress(step.identity),
       agentId: BigInt(step.identity.agentId),
-      callbacks,
+      callbacks: scope.callbacks,
       flowId: 'advanced-custody',
     })
       .then(async ({ vaultAddress }) => {
@@ -52,17 +57,21 @@ export function useCustodyTransactionEffects({
         if (cancelled) return
         handleStepError(err, { kind: 'custody-model', identity: step.identity, registry: step.registry, returnTo: step.returnTo })
       })
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+      scope.cancel()
+    }
   }, [step])
 
   useEffect(() => {
     if (step.kind !== 'custody-vault-deposit-tx') return
     let cancelled = false
+    const scope = scopeCallbacks(callbacks)
     runVaultDepositTransaction({
       identity: step.identity,
       registry: step.registry,
       vaultAddress: step.vaultAddress,
-      callbacks,
+      callbacks: scope.callbacks,
       flowId: 'advanced-custody',
     })
       .then(async () => {
@@ -89,17 +98,21 @@ export function useCustodyTransactionEffects({
         if (cancelled) return
         handleStepError(err, { kind: 'custody-model', identity: step.identity, registry: step.registry, returnTo: step.returnTo })
       })
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+      scope.cancel()
+    }
   }, [step])
 
   useEffect(() => {
     if (step.kind !== 'custody-vault-withdraw-tx') return
     let cancelled = false
+    const scope = scopeCallbacks(callbacks)
     runVaultWithdrawTransaction({
       identity: step.identity,
       registry: step.registry,
       vaultAddress: step.vaultAddress,
-      callbacks,
+      callbacks: scope.callbacks,
       ...(step.agentId ? { agentId: BigInt(step.agentId) } : {}),
     })
       .then(({ recipient }) => {
@@ -120,12 +133,16 @@ export function useCustodyTransactionEffects({
         if (cancelled) return
         handleStepError(err, { kind: 'custody-model', identity: step.identity, registry: step.registry, returnTo: step.returnTo })
       })
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+      scope.cancel()
+    }
   }, [step])
 
   useEffect(() => {
     if (step.kind !== 'custody-vault-unwrap-tx') return
     let cancelled = false
+    const scope = scopeCallbacks(callbacks)
     const agentIds = step.agentIds && step.agentIds.length > 0
       ? step.agentIds
       : (step.identity.agentId ? [step.identity.agentId] : [])
@@ -137,7 +154,7 @@ export function useCustodyTransactionEffects({
             identity: step.identity,
             registry: step.registry,
             vaultAddress: step.vaultAddress,
-            callbacks,
+            callbacks: scope.callbacks,
             flowId: 'simple-custody',
             agentId: BigInt(agentIdStr),
           })
@@ -151,7 +168,10 @@ export function useCustodyTransactionEffects({
         handleStepError(err, { kind: 'custody-model', identity: step.identity, registry: step.registry, returnTo: step.returnTo })
       }
     })()
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+      scope.cancel()
+    }
   }, [step])
 }
 

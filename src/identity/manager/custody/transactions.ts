@@ -82,6 +82,7 @@ async function runVaultDeployTransactionInner(args: {
     maxPriorityFeePerGas: gasFee.maxPriorityFeePerGas,
     purpose: 'deploy-agent-vault',
     onReady: args.callbacks.onWalletReady,
+    ...(args.callbacks.signal ? { signal: args.callbacks.signal } : {}),
     ...(args.flowId ? { flowId: args.flowId } : {}),
   })
   args.callbacks.onWalletReady(null)
@@ -146,6 +147,7 @@ async function runVaultDepositTransactionInner(args: {
     maxPriorityFeePerGas: gasFee.maxPriorityFeePerGas,
     purpose: 'deposit-agent-vault',
     onReady: args.callbacks.onWalletReady,
+    ...(args.callbacks.signal ? { signal: args.callbacks.signal } : {}),
     ...(args.flowId ? { flowId: args.flowId } : {}),
   })
   args.callbacks.onWalletReady(null)
@@ -242,6 +244,7 @@ async function runVaultUnwrapTransactionInner(args: {
     ...gasFee,
     purpose: 'unwrap-agent-vault',
     onReady: args.callbacks.onWalletReady,
+    ...(args.callbacks.signal ? { signal: args.callbacks.signal } : {}),
     ...(args.flowId ? { flowId: args.flowId } : {}),
   })
   args.callbacks.onWalletReady(null)
@@ -317,6 +320,7 @@ async function runVaultWithdrawTransactionInner(args: {
     ...gasFee,
     purpose: 'withdraw-vault',
     onReady: args.callbacks.onWalletReady,
+    ...(args.callbacks.signal ? { signal: args.callbacks.signal } : {}),
   })
   args.callbacks.onWalletReady(null)
   await awaitConfirmedReceipt(

@@ -12,20 +12,26 @@ export function startBrowserWalletServer<T>(args: {
   title: string
   payload: Record<string, unknown>
   timeoutMs?: number
+  signal?: AbortSignal
   onReady?: ReadyHandler
   prepare?: (body: Record<string, unknown>) => Record<string, unknown>
   prepareTransaction?: (body: Record<string, unknown>) => Promise<Record<string, unknown>>
   complete: (body: Record<string, unknown>) => T
 }): Promise<T> {
   const sessionToken = randomUUID()
-  const timeoutMs = args.timeoutMs ?? 5 * 60_000
 
   return new Promise<T>((resolve, reject) => {
     let settled = false
+    const cancelled = (): Error => new Error('wallet request was cancelled')
+    const onAbort = (): void => {
+      fail(cancelled())
+      server.closeIdleConnections?.()
+    }
     const finish = (fn: () => void): void => {
       if (settled) return
       settled = true
-      clearTimeout(timer)
+      if (timer) clearTimeout(timer)
+      args.signal?.removeEventListener('abort', onAbort)
       server.close()
       fn()
     }
@@ -37,9 +43,14 @@ export function startBrowserWalletServer<T>(args: {
       })
     })
 
-    const timer = setTimeout(() => {
-      fail(new Error('Wallet Request Timed Out'))
-    }, timeoutMs)
+    const timer = args.timeoutMs
+      ? setTimeout(() => fail(new Error('Wallet Request Timed Out')), args.timeoutMs)
+      : undefined
+    if (args.signal?.aborted) {
+      fail(cancelled())
+      return
+    }
+    args.signal?.addEventListener('abort', onAbort, { once: true })
 
     const handleRequest = async (req: http.IncomingMessage, res: http.ServerResponse): Promise<void> => {
       const url = new URL(req.url ?? '/', 'http://127.0.0.1')

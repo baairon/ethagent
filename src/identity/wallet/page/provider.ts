@@ -11,13 +11,13 @@ try { window.dispatchEvent(new Event("eip6963:requestProvider")); } catch (_) { 
 export function ethereumProvider(): any { return activeEthereum || (window as any).ethereum || announcedEthereum; }
 export function noWalletError(): Error { return new Error("No wallet detected. Install a wallet and retry."); }
 
-export function waitForEthereumProvider(timeoutMs?: number): Promise<any> {
+export function waitForEthereumProvider(onWaiting?: () => void): Promise<any> {
   const existing = ethereumProvider();
   if (existing) return Promise.resolve(existing);
-  return new Promise((resolve, reject) => {
+  if (onWaiting) onWaiting();
+  return new Promise((resolve) => {
     let settled = false;
     const cleanup = () => {
-      clearTimeout(timer);
       clearInterval(interval);
       window.removeEventListener("ethereum#initialized", check);
       window.removeEventListener("eip6963:announceProvider", onAnnounce as EventListener);
@@ -30,7 +30,6 @@ export function waitForEthereumProvider(timeoutMs?: number): Promise<any> {
     };
     const check = () => { const provider = ethereumProvider(); if (provider) finish(() => resolve(provider)); };
     const onAnnounce = (event: any) => { rememberAnnouncedProvider(event); check(); };
-    const timer = setTimeout(() => finish(() => reject(noWalletError())), timeoutMs || WALLET_PROVIDER_WAIT_MS);
     const interval = setInterval(check, WALLET_PROVIDER_POLL_MS);
     window.addEventListener("ethereum#initialized", check);
     window.addEventListener("eip6963:announceProvider", onAnnounce as EventListener);

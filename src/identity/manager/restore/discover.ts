@@ -11,6 +11,8 @@ import type { RestorePurpose, Step } from '../reducer.js'
 import type { EffectCallbacks } from '../shared/effects/types.js'
 import { isAbortError, isAuthorizedOperatorAddress, requesterAddressFromHandle } from './helpers.js'
 import type { Address } from 'viem'
+import { networkFailureSentence } from '../shared/model/errors.js'
+import { asSentence } from '../../../ui/text.js'
 
 export async function runRestoreDiscover(
   step: Extract<Step, { kind: 'restore-discovering' }>,
@@ -28,17 +30,15 @@ export async function runRestoreDiscover(
     })
   } catch (err: unknown) {
     if (signal?.aborted || isAbortError(err)) return
-    callbacks.onStep({
-      kind: 'restore-not-found',
-      ownerHandle: step.ownerHandle,
-      registry: step.registry,
-      requesterAddress: requesterAddressFromHandle(step.ownerHandle),
-      reason: 'search-incomplete',
-      purpose: step.purpose,
-    })
+    callbacks.onStep(searchIncompleteStep(step, searchFailureDetail(err)))
     return
   }
   if (signal?.aborted) return
+  const unreadable = owned.find(candidate => candidate.metadataError)
+  if (unreadable && !owned.some(candidate => candidate.backup?.cid)) {
+    callbacks.onStep(searchIncompleteStep(step, asSentence(unreadable.metadataError ?? '')))
+    return
+  }
   if (owned.length === 0) {
     callbacks.onStep({
       kind: 'restore-recovery-input',
@@ -55,6 +55,26 @@ export async function runRestoreDiscover(
     requesterAddress: requesterAddressFromHandle(step.ownerHandle),
     purpose: step.purpose,
   }))
+}
+
+function searchIncompleteStep(
+  step: Extract<Step, { kind: 'restore-discovering' }>,
+  detail: string,
+): Extract<Step, { kind: 'restore-not-found' }> {
+  return {
+    kind: 'restore-not-found',
+    ownerHandle: step.ownerHandle,
+    registry: step.registry,
+    requesterAddress: requesterAddressFromHandle(step.ownerHandle),
+    reason: 'search-incomplete',
+    ...(detail ? { detail } : {}),
+    purpose: step.purpose,
+  }
+}
+
+function searchFailureDetail(err: unknown): string {
+  const message = err instanceof Error ? err.message : String(err)
+  return networkFailureSentence(err) ?? asSentence(message.split('\n')[0] ?? '')
 }
 
 export function restoreTokenSelectionStep(args: {
@@ -74,7 +94,7 @@ export function restoreTokenSelectionStep(args: {
     kind: 'restore-select-token',
     ownerHandle: args.ownerHandle,
     registry: args.registry,
-    candidates: restorable,
+    candidates: args.candidates.filter(candidate => candidate.backup?.cid || candidate.metadataError),
     requesterAddress: args.requesterAddress,
     purpose: args.purpose,
   }

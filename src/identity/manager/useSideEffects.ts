@@ -23,7 +23,7 @@ import {
   runUpdateEnsRecords,
 } from './ens/transactions.js'
 import { runRecoveryRefetch } from './restore/recovery.js'
-import type { EffectCallbacks } from './shared/effects/types.js'
+import { scopeCallbacks, type EffectCallbacks } from './shared/effects/types.js'
 import { useRestoreEffects } from './restore/useRestoreEffects.js'
 import {
   isStorageError,
@@ -42,7 +42,7 @@ type UseIdentityManagerSideEffectsArgs = {
   config: EthagentConfig | undefined
   callbacks: EffectCallbacks
   setStep: (step: Step) => void
-  handleStepError: (err: unknown, backStep: Step, softCancel?: Step) => void
+  handleStepError: (err: unknown, backStep: Step, softCancel?: Step, retry?: Step) => void
   triggerRebackup: TriggerRebackup
   setContinuityReady: (ready: boolean) => void
   onConfigChange?: (config: EthagentConfig) => void
@@ -111,8 +111,9 @@ export function useIdentityManagerSideEffects({
   useEffect(() => {
     if (step.kind !== 'create-signing') return
     let cancelled = false
+    const scope = scopeCallbacks(callbacks)
     const backStep: Step = { kind: 'create-network', name: step.name, description: step.description }
-    runCreateSigning(step, callbacks)
+    runCreateSigning(step, scope.callbacks)
       .catch((err: unknown) => {
         if (cancelled) return
         if (isRegistrationPreflightError(err)) {
@@ -134,7 +135,10 @@ export function useIdentityManagerSideEffects({
         }
         handleStepError(err, backStep)
       })
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+      scope.cancel()
+    }
   }, [step])
 
   useRestoreEffects({ step, config, callbacks, handleStepError })
@@ -142,7 +146,8 @@ export function useIdentityManagerSideEffects({
   useEffect(() => {
     if (step.kind !== 'rebackup-signing') return
     let cancelled = false
-    runRebackupSigning(step, callbacks)
+    const scope = scopeCallbacks(callbacks)
+    runRebackupSigning(step, scope.callbacks)
       .catch((err: unknown) => {
         if (cancelled) return
         if (isStorageError(err)) {
@@ -161,13 +166,17 @@ export function useIdentityManagerSideEffects({
         }
         handleStepError(err, step.returnTo ?? { kind: 'menu' })
       })
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+      scope.cancel()
+    }
   }, [step])
 
   useEffect(() => {
     if (step.kind !== 'public-profile-signing') return
     let cancelled = false
-    runPublicProfileSigning(step, callbacks)
+    const scope = scopeCallbacks(callbacks)
+    runPublicProfileSigning(step, scope.callbacks)
       .catch((err: unknown) => {
         if (cancelled) return
         if (isStorageError(err)) {
@@ -185,13 +194,17 @@ export function useIdentityManagerSideEffects({
         }
         handleStepError(err, step.returnTo ?? { kind: 'continuity-public' })
       })
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+      scope.cancel()
+    }
   }, [step])
 
   useEffect(() => {
     if (step.kind !== 'token-transfer-signing') return
     let cancelled = false
-    runTokenTransferSigning(step, callbacks)
+    const scope = scopeCallbacks(callbacks)
+    runTokenTransferSigning(step, scope.callbacks)
       .then(async result => {
         if (cancelled) return
         if (config) {
@@ -239,32 +252,40 @@ export function useIdentityManagerSideEffects({
         }
         handleStepError(err, targetReturn)
       })
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+      scope.cancel()
+    }
   }, [step])
 
   useEffect(() => {
     if (step.kind !== 'recovery-refetching') return
     let cancelled = false
-    runRecoveryRefetch(step.identity, step.registry, callbacks)
+    const scope = scopeCallbacks(callbacks)
+    runRecoveryRefetch(step.identity, step.registry, scope.callbacks)
       .then(() => {
         if (!cancelled) setContinuityReady(true)
       })
       .catch((err: unknown) => {
-        if (!cancelled) handleStepError(err, { kind: 'menu' })
+        if (!cancelled) handleStepError(err, { kind: 'menu' }, { kind: 'menu' }, step)
       })
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+      scope.cancel()
+    }
   }, [step])
 
   useEffect(() => {
     if (step.kind !== 'ens-records-tx') return
     let cancelled = false
+    const scope = scopeCallbacks(callbacks)
     const ownerAddress = (step.ownerAddress ?? step.identity.ownerAddress ?? step.identity.address) as `0x${string}`
     runUpdateEnsRecords({
       fullName: step.fullName,
       ownerAddress,
       records: step.records,
       currentRecords: step.currentRecords,
-      callbacks,
+      callbacks: scope.callbacks,
       clearRecords: step.clearRecords,
       purpose: step.clearRecords ? 'clear-ens-records' : undefined,
       tokenChainId: step.registry.chainId,
@@ -277,13 +298,17 @@ export function useIdentityManagerSideEffects({
         if (cancelled) return
         handleStepError(err, { kind: 'edit-profile-ens', identity: step.identity, registry: step.registry, returnTo: step.returnTo })
       })
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+      scope.cancel()
+    }
   }, [step])
 
   useEffect(() => {
     if (step.kind !== 'ens-setup-registry-tx') return
     let cancelled = false
-    runEnsSetupRegistryTransaction({ setup: step.setup, callbacks, tokenChainId: step.registry.chainId })
+    const scope = scopeCallbacks(callbacks)
+    runEnsSetupRegistryTransaction({ setup: step.setup, callbacks: scope.callbacks, tokenChainId: step.registry.chainId })
       .then(result => {
         if (cancelled) return
         setStep({
@@ -305,13 +330,17 @@ export function useIdentityManagerSideEffects({
           ...(step.setup.mode === 'advanced' ? { initialView: 'advanced' as const } : {}),
         })
       })
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+      scope.cancel()
+    }
   }, [step])
 
   useEffect(() => {
     if (step.kind !== 'ens-setup-records-tx') return
     let cancelled = false
-    runEnsSetupRecordsTransaction({ setup: step.setup, callbacks, tokenChainId: step.registry.chainId })
+    const scope = scopeCallbacks(callbacks)
+    runEnsSetupRecordsTransaction({ setup: step.setup, callbacks: scope.callbacks, tokenChainId: step.registry.chainId })
       .then(() => {
         if (cancelled) return
         const ensUpdates = step.setup.mode === 'advanced'
@@ -338,6 +367,9 @@ export function useIdentityManagerSideEffects({
           ...(step.setup.mode === 'advanced' ? { initialView: 'advanced' as const } : {}),
         })
       })
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+      scope.cancel()
+    }
   }, [step])
 }

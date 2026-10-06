@@ -385,6 +385,10 @@ With `--json`, every history command prints one line of ASCII-only JSON with `"s
 | --- | --- |
 | `ETHAGENT_OPERATOR_KEY` | The operator key for `save --operator` and `fetch`. Inject it from your OS keychain; never type it into a command. |
 | `PINATA_JWT` | IPFS storage credential, if you haven't set one up in the manager. |
+| `PINATA_GATEWAY_URL` | Your own IPFS gateway. Downloads try it before any other source. |
+| `ETHAGENT_IPFS_GATEWAYS` | Gateways to download from, separated by commas, in place of the built-in ones. |
+| `ETHAGENT_IPFS_ROUTERS` | Content routers that find more sources for a file, separated by commas. Leave it empty to turn that off. |
+| `ETHAGENT_HOSTS_FILE` | Where ethagent remembers how quickly each host answers, so the fastest is asked first. Defaults to `~/.ethagent/hosts.json`. Leave it empty to remember nothing. |
 | `ETHAGENT_HARNESS_FILES` | Extra instruction files to keep in sync, separated by commas. |
 | `ETHAGENT_NO_DAEMON` | Set to `1` to turn off background sync. |
 

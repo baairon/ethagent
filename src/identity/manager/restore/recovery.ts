@@ -26,6 +26,7 @@ import type { EffectCallbacks } from '../shared/effects/types.js'
 import { isContinuitySnapshotEnvelope, parseRestorableEnvelope } from './envelopes.js'
 import { restoreMessageForWallet } from './auth.js'
 import { type BackupMetadata, operatorStateFromCandidate, restorePublishedAgentCard } from './helpers.js'
+import { downloadProgress } from './progress.js'
 
 export async function runRecoveryRefetch(
   identity: EthagentIdentity,
@@ -39,12 +40,17 @@ export async function runRecoveryRefetch(
     ownerHandle: ownerAddress,
     tokenId: BigInt(identity.agentId),
     ipfsApiUrl: identity.backup?.ipfsApiUrl ?? DEFAULT_IPFS_API_URL,
+    ...(callbacks.signal ? { signal: callbacks.signal } : {}),
   })
   if (!candidate.backup?.cid) {
     throw new Error('The published agent does not have a recoverable encrypted snapshot')
   }
   const apiUrl = identity.backup?.ipfsApiUrl ?? DEFAULT_IPFS_API_URL
-  const raw = await catFromIpfs(apiUrl, candidate.backup.cid)
+  const raw = await catFromIpfs(apiUrl, candidate.backup.cid, fetch, {
+    ...(callbacks.signal ? { signal: callbacks.signal } : {}),
+    onProgress: progress => callbacks.onRestoreProgress?.(downloadProgress(progress)),
+  })
+  callbacks.onRestoreProgress?.(null)
   const envelope = parseRestorableEnvelope(raw)
   if (!isContinuitySnapshotEnvelope(envelope)) {
     throw new Error('This snapshot is in an unsupported envelope format and cannot be refetched here; use Switch Agent')
@@ -71,6 +77,7 @@ export async function runRecoveryRefetch(
       return restoreMessageForWallet(envelope, matched)
     },
     onReady: callbacks.onWalletReady,
+    ...(callbacks.signal ? { signal: callbacks.signal } : {}),
   })
   callbacks.onWalletReady(null)
   callbacks.onRestoreProgress?.({ phase: 'decrypting', label: 'Decrypting the snapshot…' })

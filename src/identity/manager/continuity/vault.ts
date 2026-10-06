@@ -137,6 +137,7 @@ export async function runOperatorWalletRebackup(args: {
       ...(challengePurpose ? { purpose: challengePurpose } : {}),
     }),
     onReady: callbacks.onWalletReady,
+    ...(callbacks.signal ? { signal: callbacks.signal } : {}),
     purpose,
     ...(expectedSigner ? { expectedAccount: expectedSigner } : {}),
   })
@@ -260,6 +261,7 @@ async function runOperatorWalletVaultPublish(args: {
       ...(challengePurpose ? { purpose: challengePurpose } : {}),
     }),
     onReady: callbacks.onWalletReady,
+    ...(callbacks.signal ? { signal: callbacks.signal } : {}),
     purpose: 'rotate-agent-uri-vault-operator',
     ...(step.profileUpdates?.custodyPhase === 'switch-advanced' ? { flowId: 'advanced-custody' } : {}),
     expectedAccount: expectedSigner,

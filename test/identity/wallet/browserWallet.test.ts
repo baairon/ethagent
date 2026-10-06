@@ -149,7 +149,8 @@ test('browser wallet page explains the wallet signature request', () => {
   assert.match(page, /TX_CLOSE_DELAY_MS = 1e4/)
   assert.match(page, /CANCEL_CLOSE_DELAY_MS = 1e4/)
   assert.match(page, /return to your terminal\. closing in " \+ seconds \+ "s\./i)
-  assert.match(page, /WALLET_PROVIDER_WAIT_MS = 3e3/)
+  assert.doesNotMatch(page, /WALLET_PROVIDER_WAIT_MS/)
+  assert.match(page, /Waiting for a wallet extension/)
   assert.match(page, /eip6963:requestProvider/)
   assert.doesNotMatch(page, /ethagent needs a wallet extension installed/)
   assert.match(page, /focus-visible/)
@@ -331,6 +332,62 @@ test('browser wallet page gives actionable revert guidance', () => {
   assert.match(page, /Use the expected wallet/)
   assert.match(page, /check ENS ownership/)
   assert.match(page, /Wallet Error/)
+})
+
+test('a wallet request ends when the caller cancels it, and its local server stops listening', async () => {
+  const controller = new AbortController()
+  let resolveReady!: (ready: { url: string }) => void
+  const readyPromise = new Promise<{ url: string }>(resolve => {
+    resolveReady = resolve
+  })
+  const walletPromise = requestBrowserWalletAccount({
+    signal: controller.signal,
+    onReady: ready => resolveReady(ready),
+  }).then(() => null, err => err as Error)
+
+  const ready = await readyPromise
+  const page = await fetch(ready.url)
+  assert.equal(page.status, 200, 'the approval page is up while the request is open')
+  await page.text()
+
+  controller.abort()
+  const err = await walletPromise
+  assert.match(err?.message ?? '', /cancelled/i)
+  await assert.rejects(fetch(ready.url), 'nothing is listening on the approval port any more')
+})
+
+test('a wallet request has no expiry of its own: it waits until approved or cancelled', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  const controller = new AbortController()
+  let settled = false
+  const readyPromise = new Promise<void>(resolve => {
+    void requestBrowserWalletAccount({ signal: controller.signal, onReady: () => resolve() })
+      .then(() => { settled = true }, () => { settled = true })
+  })
+  await readyPromise
+  t.mock.timers.tick(6 * 60 * 60 * 1000)
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(settled, false, 'six hours later the request is still open')
+  controller.abort()
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(settled, true)
+})
+
+test('an open wallet session ends when the caller cancels it', async () => {
+  const controller = new AbortController()
+  const session = await openBrowserWalletSession({ signal: controller.signal })
+  const pending = session.requestSignature({ chainId: 1, message: 'never signed' }).then(() => null, err => err as Error)
+  await new Promise(resolve => setImmediate(resolve))
+  controller.abort()
+  const err = await pending
+  assert.match(err?.message ?? '', /cancelled/i)
+  // The session tells an open wallet page it is done before it stops listening.
+  let listening = true
+  for (let attempt = 0; attempt < 200 && listening; attempt += 1) {
+    listening = await fetch(session.url).then(async response => { await response.text(); return true }, () => false)
+    if (listening) await new Promise(resolve => setTimeout(resolve, 25))
+  }
+  assert.equal(listening, false, 'the session server stops listening')
 })
 
 test('browser wallet timeout error is capitalized', async () => {

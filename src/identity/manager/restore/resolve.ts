@@ -6,6 +6,7 @@ import {
   type Erc8004AgentCandidate,
   type Erc8004RegistryConfig,
 } from '../../registry/erc8004.js'
+import { networkFailureSentence } from '../shared/model/errors.js'
 import { parseAgentTokenReference, readEthagentTextRecords } from '../../ens/ensLookup.js'
 import { AGENT_TOKEN_RECORD_KEY } from '../../ens/agentRecords.js'
 
@@ -61,7 +62,7 @@ export async function resolveAgentEnsToCandidate(
     })
     return { ok: true, candidate }
   } catch (err: unknown) {
-    return { ok: false, message: `Could not load agent token #${tokenRef.agentId.toString()}: ${err instanceof Error ? err.message : String(err)}` }
+    return { ok: false, message: tokenLoadFailure(tokenRef.agentId.toString(), err) }
   }
 }
 
@@ -99,6 +100,12 @@ export async function resolveAgentTokenIdToCandidate(
     })
     return { ok: true, candidate }
   } catch (err: unknown) {
-    return { ok: false, message: `Could not load agent token #${trimmed}: ${err instanceof Error ? err.message : String(err)}` }
+    return { ok: false, message: tokenLoadFailure(trimmed, err) }
   }
+}
+
+function tokenLoadFailure(tokenId: string, err: unknown): string {
+  const network = networkFailureSentence(err)
+  if (network) return `Could not load agent token #${tokenId}. ${network}`
+  return `Could not load agent token #${tokenId}: ${err instanceof Error ? err.message : String(err)}`
 }

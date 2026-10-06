@@ -118,7 +118,7 @@ export async function runSave(args: string[] = [], deps: RunSaveDeps = defaultDe
       if (!ready) return
       const sink = json ? stderr : stdout
       sink.write(`Approve this snapshot in your browser wallet tab: ${ready.url}\n`)
-      sink.write('Connect your wallet, sign one message, and approve one transaction (up to ~5 minutes)...\n')
+      sink.write('Connect your wallet, sign one message, and approve one transaction. This waits until you approve or cancel.\n')
       if (!noOpen) deps.openExternalUrl(ready.url)
     },
     onIdentityComplete: async (nextIdentity, message) => {

@@ -373,6 +373,7 @@ async function runRebackupSigningInner(
     : await requestBrowserWalletSignatureAndTransaction<RebackupPreparedTransaction>({
         ...requestSpec,
         onReady: callbacks.onWalletReady,
+        ...(callbacks.signal ? { signal: callbacks.signal } : {}),
       })
   const client = createErc8004PublicClient(step.registry)
   await awaitConfirmedReceipt(client, result.txHash as Hex, 'Agent URI rotation', { kind: step.vaultAddress ? 'rebackup-uri-vault' : 'rebackup-uri', chainId: step.registry.chainId })

@@ -27,6 +27,7 @@ export async function runRestoreConnectWallet(
 ): Promise<void> {
   const wallet = await requestBrowserWalletAccount({
     onReady: callbacks.onWalletReady,
+    ...(callbacks.signal ? { signal: callbacks.signal } : {}),
     purpose: 'connect-operator-wallet',
   })
   callbacks.onStep({ kind: 'restore-network', ownerHandle: wallet.account, purpose: step.purpose })

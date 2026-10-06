@@ -44,7 +44,6 @@ export const IdentityManagerOperationalRoutes: React.FC<IdentityManagerOperation
     custodyFlow,
     setStep,
     back,
-    closeManager,
     setWalletSession,
     triggerRebackup,
     triggerPublicProfileSave,
@@ -199,10 +198,10 @@ export const IdentityManagerOperationalRoutes: React.FC<IdentityManagerOperation
       <ErrorScreen
         error={step.error}
         back={step.back}
+        {...(step.retry ? { retry: step.retry } : {})}
         footer={footer}
-        closeLabel="Close"
         onBack={backStep => setStep(backStep)}
-        onClose={closeManager}
+        onRetry={retryStep => setStep(retryStep)}
       />
     )
   }

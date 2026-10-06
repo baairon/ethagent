@@ -14,7 +14,7 @@ import {
 import { createErc8004PublicClient } from './client.js'
 import { parseEthagentBackupPointer, parseEthagentOperatorsPointer, parseEthagentPublicDiscoveryPointer } from './metadata.js'
 import type { DiscoverOwnedAgentsAcrossSupportedNetworksArgs, DiscoverOwnedAgentsArgs, Erc8004AgentCandidate, Erc8004RegistryConfig, EthagentOperatorsPointer } from './types.js'
-import { loadAgentRegistrationWithRetry } from './uri.js'
+import { loadAgentRegistration } from './uri.js'
 import { cleanRpcError, mapWithConcurrency } from './utils.js'
 import { stringField } from '../fieldParsers.js'
 
@@ -33,10 +33,14 @@ export class AgentTokenIdRequiredError extends Error {
     registry: Erc8004RegistryConfig
     balance: bigint
     detail?: string
+    cause?: unknown
   }) {
     const chain = supportedErc8004ChainForId(args.registry.chainId)
     const label = chain?.network ?? chain?.name ?? `chain ${args.registry.chainId}`
-    super(`Automatic ${label} token ownership lookup could not enumerate this wallet's ERC-8004 token IDs.`)
+    super(
+      `Automatic ${label} token ownership lookup could not enumerate this wallet's ERC-8004 token IDs.`,
+      args.cause === undefined ? undefined : { cause: args.cause },
+    )
     this.name = 'AgentTokenIdRequiredError'
     this.ownerAddress = args.ownerAddress
     this.registry = args.registry
@@ -80,6 +84,7 @@ export async function discoverOwnedAgentBackups(args: DiscoverOwnedAgentsArgs): 
       tokenId,
     }).catch(err => {
       if (err instanceof TokenOwnerMismatchError) return null
+      if (err instanceof MetadataFetchError) return err.placeholder
       throw err
     })
     if (candidate) out.push(candidate)
@@ -148,28 +153,22 @@ async function findCandidateTokenIds(args: {
   fromBlock: bigint
 }): Promise<bigint[]> {
   const tokenIds = new Set<bigint>()
-  let balance: bigint | undefined
-  let attempt = 0
-  while (true) {
-    try {
-      balance = await args.publicClient.readContract({
-        address: args.registry.identityRegistryAddress,
-        abi: ERC8004_ABI,
-        functionName: 'balanceOf',
-        args: [args.ownerAddress],
-      }) as bigint
-      break
-    } catch (err: unknown) {
-      if (++attempt > 3) {
-        throw new AgentTokenIdRequiredError({
-          ownerAddress: args.ownerAddress,
-          registry: args.registry,
-          balance: 0n,
-          detail: cleanRpcError(err),
-        })
-      }
-      await new Promise(r => setTimeout(r, attempt * 1000))
-    }
+  let balance: bigint
+  try {
+    balance = await args.publicClient.readContract({
+      address: args.registry.identityRegistryAddress,
+      abi: ERC8004_ABI,
+      functionName: 'balanceOf',
+      args: [args.ownerAddress],
+    }) as bigint
+  } catch (err: unknown) {
+    throw new AgentTokenIdRequiredError({
+      ownerAddress: args.ownerAddress,
+      registry: args.registry,
+      balance: 0n,
+      detail: cleanRpcError(err),
+      cause: err,
+    })
   }
   if (balance === 0n) return []
 
@@ -203,6 +202,7 @@ async function findCandidateTokenIds(args: {
       registry: args.registry,
       balance,
       detail: cleanRpcError(err),
+      cause: err,
     })
   }
   if (BigInt(tokenIds.size) < balance) {
@@ -280,41 +280,23 @@ async function getTransferLogsAdaptive(args: {
   minBlockRange: bigint
 }): Promise<TransferLog[]> {
   const size = args.toBlock - args.fromBlock + 1n
-  let attempt = 0
-  while (true) {
-    try {
-      const logs = await args.publicClient.getLogs({
-        address: args.registry.identityRegistryAddress,
-        event: TRANSFER_EVENT,
-        args: { to: args.ownerAddress },
-        fromBlock: args.fromBlock,
-        toBlock: args.toBlock,
-      })
-      return logs as TransferLog[]
-    } catch (err: unknown) {
-      attempt++
-      const msg = err instanceof Error ? err.message.toLowerCase() : String(err).toLowerCase()
-      const isSizeLimit = msg.includes('limit') || msg.includes('range') || msg.includes('too many') || msg.includes('exceeds') || msg.includes('block count')
-      
-      if (!isSizeLimit && attempt <= 3) {
-        await new Promise(r => setTimeout(r, attempt * 1000))
-        continue
-      }
-      if (size <= args.minBlockRange) {
-        if (attempt <= 3) {
-          await new Promise(r => setTimeout(r, attempt * 1000))
-          continue
-        }
-        throw err
-      }
-      
-      const mid = args.fromBlock + size / 2n - 1n
-      const [newer, older] = await Promise.all([
-        getTransferLogsAdaptive({ ...args, fromBlock: mid + 1n, toBlock: args.toBlock }),
-        getTransferLogsAdaptive({ ...args, fromBlock: args.fromBlock, toBlock: mid })
-      ])
-      return [...newer, ...older]
-    }
+  try {
+    const logs = await args.publicClient.getLogs({
+      address: args.registry.identityRegistryAddress,
+      event: TRANSFER_EVENT,
+      args: { to: args.ownerAddress },
+      fromBlock: args.fromBlock,
+      toBlock: args.toBlock,
+    })
+    return logs as TransferLog[]
+  } catch (err: unknown) {
+    if (size <= args.minBlockRange) throw err
+    const mid = args.fromBlock + size / 2n - 1n
+    const [newer, older] = await Promise.all([
+      getTransferLogsAdaptive({ ...args, fromBlock: mid + 1n, toBlock: args.toBlock }),
+      getTransferLogsAdaptive({ ...args, fromBlock: args.fromBlock, toBlock: mid }),
+    ])
+    return [...newer, ...older]
   }
 }
 
@@ -325,16 +307,20 @@ class TokenOwnerMismatchError extends Error {
   }
 }
 
-class MetadataFetchError extends Error {
+export class MetadataFetchError extends Error {
   readonly tokenId: bigint
   readonly agentUri: string
   override readonly cause: unknown
-  constructor(tokenId: bigint, agentUri: string, cause: unknown) {
-    super(`failed to fetch agent metadata for token #${tokenId.toString()} at ${agentUri}: ${cause instanceof Error ? cause.message : String(cause)}`)
+  // Set when the chain alone proves the requester holds the token, so a wallet-wide
+  // search can still list it instead of failing on one unreadable profile.
+  readonly placeholder: Erc8004AgentCandidate | null
+  constructor(tokenId: bigint, agentUri: string, cause: unknown, placeholder: Erc8004AgentCandidate | null = null) {
+    super(`The profile for token #${tokenId.toString()} did not download. ${cause instanceof Error ? cause.message : String(cause)}`)
     this.name = 'MetadataFetchError'
     this.tokenId = tokenId
     this.agentUri = agentUri
     this.cause = cause
+    this.placeholder = placeholder
   }
 }
 
@@ -354,63 +340,49 @@ async function loadOwnedAgentCandidate(args: DiscoverOwnedAgentsArgs & {
   ownerAddress: Address
   tokenId: bigint
 }): Promise<Erc8004AgentCandidate> {
-  let attempt = 0
-  let currentOwner: Address | undefined
-  let agentUri: string | undefined
-  while (true) {
-    try {
-      if (!currentOwner) {
-        currentOwner = await args.publicClient.readContract({
-          address: args.identityRegistryAddress,
-          abi: ERC8004_ABI,
-          functionName: 'ownerOf',
-          args: [args.tokenId],
-        }) as Address
-      }
-      if (!agentUri) {
-        agentUri = await args.publicClient.readContract({
-          address: args.identityRegistryAddress,
-          abi: ERC8004_ABI,
-          functionName: 'tokenURI',
-          args: [args.tokenId],
-        }) as string
-      }
-      break
-    } catch (err: unknown) {
-      if (++attempt > 3) throw err
-      await new Promise(r => setTimeout(r, attempt * 1000))
-    }
-  }
+  const currentOwner = await args.publicClient.readContract({
+    address: args.identityRegistryAddress,
+    abi: ERC8004_ABI,
+    functionName: 'ownerOf',
+    args: [args.tokenId],
+  }) as Address
+  const agentUri = await args.publicClient.readContract({
+    address: args.identityRegistryAddress,
+    abi: ERC8004_ABI,
+    functionName: 'tokenURI',
+    args: [args.tokenId],
+  }) as string
 
   const tokenOwnerAddress = getAddress(currentOwner)
+  const vaultLevelOwner = await readVaultLevelOwner(args, tokenOwnerAddress)
   let loaded: { metadataCid?: string; registration: Record<string, unknown> }
   try {
-    loaded = await loadAgentRegistrationWithRetry(agentUri, {
+    loaded = await loadAgentRegistration(agentUri, {
       ipfsApiUrl: args.ipfsApiUrl ?? DEFAULT_IPFS_API_URL,
-      fetchImpl: args.fetchImpl,
+      ...(args.fetchImpl ? { fetchImpl: args.fetchImpl } : {}),
       ...(args.signal ? { signal: args.signal } : {}),
     })
   } catch (err: unknown) {
     if (args.signal?.aborted || (err instanceof Error && err.name === 'AbortError')) throw err
-    throw new MetadataFetchError(args.tokenId, agentUri, err)
+    const requester = args.ownerAddress.toLowerCase()
+    const holdsToken = tokenOwnerAddress.toLowerCase() === requester || vaultLevelOwner?.toLowerCase() === requester
+    throw new MetadataFetchError(args.tokenId, agentUri, err, holdsToken
+      ? {
+          tokenOwnerAddress,
+          ownerAddress: vaultLevelOwner ?? tokenOwnerAddress,
+          chainId: args.chainId,
+          rpcUrl: args.rpcUrl,
+          identityRegistryAddress: args.identityRegistryAddress,
+          agentId: args.tokenId,
+          agentUri,
+          registration: null,
+          metadataError: err instanceof Error ? err.message : String(err),
+        }
+      : null)
   }
   const parsed = parseEthagentBackupPointer(loaded.registration)
   const publicDiscovery = parseEthagentPublicDiscoveryPointer(loaded.registration)
   const operators = parseEthagentOperatorsPointer(loaded.registration)
-  let vaultLevelOwner: Address | undefined
-  try {
-    const status = await isAgentInVault({
-      client: args.publicClient,
-      vaultAddress: tokenOwnerAddress,
-      registry: args.identityRegistryAddress,
-      agentId: args.tokenId,
-    })
-    if (status.inVault && status.ownerAddress) {
-      vaultLevelOwner = status.ownerAddress
-    }
-  } catch {
-    vaultLevelOwner = undefined
-  }
   if (!isAuthorizedAgentLookupAddress({
     requesterAddress: args.ownerAddress,
     tokenOwnerAddress,
@@ -440,27 +412,36 @@ async function loadOwnedAgentCandidate(args: DiscoverOwnedAgentsArgs & {
   }
 }
 
+async function readVaultLevelOwner(
+  args: { publicClient: PublicClient; identityRegistryAddress: Address; tokenId: bigint },
+  tokenOwnerAddress: Address,
+): Promise<Address | undefined> {
+  try {
+    const status = await isAgentInVault({
+      client: args.publicClient,
+      vaultAddress: tokenOwnerAddress,
+      registry: args.identityRegistryAddress,
+      agentId: args.tokenId,
+    })
+    return status.inVault && status.ownerAddress ? status.ownerAddress : undefined
+  } catch {
+    return undefined
+  }
+}
+
 async function isCurrentTokenOwner(
   publicClient: PublicClient,
   registry: Address,
   tokenId: bigint,
   ownerAddress: Address,
 ): Promise<boolean> {
-  let attempt = 0
-  while (true) {
-    try {
-      const currentOwner = await publicClient.readContract({
-        address: registry,
-        abi: ERC8004_ABI,
-        functionName: 'ownerOf',
-        args: [tokenId],
-      }) as Address
-      return currentOwner.toLowerCase() === ownerAddress.toLowerCase()
-    } catch (err: unknown) {
-      if (++attempt > 3) throw err
-      await new Promise(r => setTimeout(r, attempt * 1000))
-    }
-  }
+  const currentOwner = await publicClient.readContract({
+    address: registry,
+    abi: ERC8004_ABI,
+    functionName: 'ownerOf',
+    args: [tokenId],
+  }) as Address
+  return currentOwner.toLowerCase() === ownerAddress.toLowerCase()
 }
 
 async function resolveOwnerAddressForSupportedLookup(

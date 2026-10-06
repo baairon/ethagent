@@ -67,6 +67,7 @@ export type Erc8004AgentCandidate = {
   publicDiscovery?: EthagentPublicDiscoveryPointer
   operators?: EthagentOperatorsPointer
   registration: Record<string, unknown> | null
+  metadataError?: string
 }
 
 export type DiscoverOwnedAgentsArgs = Erc8004RegistryConfig & {

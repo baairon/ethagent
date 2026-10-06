@@ -22,6 +22,7 @@ export async function requestBrowserWalletAccount(args: AccountRequest = {}): Pr
   return await startBrowserWalletServer<BrowserWalletAccount>({
     title: 'ethagent wallet connection',
     timeoutMs: args.timeoutMs,
+    ...(args.signal ? { signal: args.signal } : {}),
     onReady: args.onReady,
     payload: normalizeWalletPayloadPurpose({
       kind: 'account',
@@ -42,6 +43,7 @@ export async function requestBrowserWalletSignature(args: SignatureRequest): Pro
   return await startBrowserWalletServer<BrowserWalletSignature>({
     title: 'ethagent wallet signature',
     timeoutMs: args.timeoutMs,
+    ...(args.signal ? { signal: args.signal } : {}),
     onReady: args.onReady,
     payload: normalizeWalletPayloadPurpose({
       kind: 'sign',
@@ -74,6 +76,7 @@ export async function sendBrowserWalletTransaction(args: TransactionRequest): Pr
   return await startBrowserWalletServer<BrowserWalletTransaction>({
     title: 'ethagent wallet transaction',
     timeoutMs: args.timeoutMs,
+    ...(args.signal ? { signal: args.signal } : {}),
     onReady: args.onReady,
     payload: normalizeWalletPayloadPurpose({
       kind: 'transaction',
@@ -125,6 +128,7 @@ export async function requestBrowserWalletSignatureAndTransaction<TPrepared>(
   return await startBrowserWalletServer<BrowserWalletSignAndTransaction<TPrepared>>({
     title: 'ethagent wallet request',
     timeoutMs: args.timeoutMs,
+    ...(args.signal ? { signal: args.signal } : {}),
     onReady: args.onReady,
     payload: normalizeWalletPayloadPurpose({
       kind: 'sign-transaction',

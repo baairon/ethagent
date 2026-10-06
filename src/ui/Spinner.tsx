@@ -334,6 +334,7 @@ function restoreSpinnerTerms(value: string): string {
     .replace(/\buri\b/g, 'URI')
     .replace(/\burl\b/g, 'URL')
     .replace(/\bvault\b/g, 'Vault')
+    .replace(/\b(kb|mb|gb)\b/g, unit => unit.toUpperCase())
     .replace(/\bbase\b/g, 'Base')
     .replace(/\bethereum mainnet\b/g, 'Ethereum Mainnet')
     .replace(/\bethereum\b/g, 'Ethereum')

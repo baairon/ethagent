@@ -17,7 +17,7 @@ export async function awaitConfirmedReceipt(
     }).catch(() => null)
   }
   try {
-    const receipt = await client.waitForTransactionReceipt({ hash })
+    const receipt = await client.waitForTransactionReceipt({ hash, timeout: 0 })
     if (receipt.status !== 'success') {
       throw new Error(`${action} reverted onchain (tx ${hash}). Check the transaction on a block explorer for the revert reason.`)
     }
@@ -36,7 +36,7 @@ export async function awaitOptionalReceipt(
 ): Promise<void> {
   let receipt
   try {
-    receipt = await client.waitForTransactionReceipt({ hash })
+    receipt = await client.waitForTransactionReceipt({ hash, timeout: 0 })
   } catch {
     return
   }

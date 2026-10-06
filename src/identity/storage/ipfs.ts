@@ -1,33 +1,22 @@
 import { assertCidMatchesContent } from './cid.js'
+import { probeIpfs, readIpfs, type IpfsReadProgress } from './ipfsRead.js'
+import {
+  createAdaptiveFetch,
+  hostOf,
+  NetError,
+  readBody,
+  rto,
+  sleep,
+  withinBackoffCeiling,
+  type FetchLike as AdaptiveFetchLike,
+} from '../../net/adaptive.js'
 
 export const PINATA_UPLOAD_API_URL = 'https://uploads.pinata.cloud/v3/files'
 export const PINATA_AUTH_TEST_URL = 'https://api.pinata.cloud/data/testAuthentication'
-const DEFAULT_PINATA_GATEWAY_URL = 'https://gateway.pinata.cloud'
+const PINATA_FILES_URL = 'https://api.pinata.cloud/v3/files/public'
 export const DEFAULT_IPFS_API_URL = process.env.ETHAGENT_IPFS_API_URL?.trim() || PINATA_UPLOAD_API_URL
 
-export type FetchLike = (input: string | URL, init?: RequestInit) => Promise<Response>
-
-const CAT_TIMEOUT_MS = 30_000
-const HEAD_TIMEOUT_MS = 15_000
-const JWT_TIMEOUT_MS = 15_000
-const UPLOAD_TIMEOUT_MS = 120_000
-
-function withTimeout(ms: number, signal?: AbortSignal): { signal: AbortSignal; clear: () => void } {
-  const controller = new AbortController()
-  const onAbort = (): void => controller.abort(signal?.reason)
-  const timer = setTimeout(() => controller.abort(new Error(`request timed out after ${ms}ms`)), ms)
-  if (signal) {
-    if (signal.aborted) controller.abort(signal.reason)
-    else signal.addEventListener('abort', onAbort, { once: true })
-  }
-  return {
-    signal: controller.signal,
-    clear: (): void => {
-      clearTimeout(timer)
-      if (signal) signal.removeEventListener('abort', onAbort)
-    },
-  }
-}
+export type FetchLike = AdaptiveFetchLike
 
 export type IpfsAddResult = {
   cid: string
@@ -37,6 +26,11 @@ export type IpfsAddResult = {
 
 type IpfsOptions = {
   pinataJwt?: string
+}
+
+export type IpfsCatOptions = {
+  signal?: AbortSignal
+  onProgress?: (progress: IpfsReadProgress) => void
 }
 
 export class PinataUploadError extends Error {
@@ -75,22 +69,20 @@ export async function validatePinataJwt(
   fetchImpl: FetchLike = fetch,
 ): Promise<string> {
   const jwt = extractPinataJwt(input)
-  const t = withTimeout(JWT_TIMEOUT_MS)
   let response: Response
   try {
-    response = await fetchImpl(PINATA_AUTH_TEST_URL, {
+    response = await createAdaptiveFetch(fetchImpl)(PINATA_AUTH_TEST_URL, {
       method: 'GET',
       headers: {
         accept: 'application/json',
         Authorization: `Bearer ${jwt}`,
       },
-      signal: t.signal,
     })
-  } catch {
-    throw new Error('Could not validate Pinata JWT. Check your connection, then try again.')
-  } finally {
-    t.clear()
+  } catch (err: unknown) {
+    const reason = err instanceof NetError ? ` (${err.words})` : ''
+    throw new Error(`Could not reach Pinata to check the JWT${reason}. Check your connection, then try again.`)
   }
+  await response.body?.cancel().catch(() => {})
   if (response.status === 401 || response.status === 403) {
     throw new Error('Pinata rejected this JWT. Paste a valid Pinata JWT.')
   }
@@ -106,8 +98,56 @@ export async function addToIpfs(
   fetchImpl: FetchLike = fetch,
   options: IpfsOptions = {},
 ): Promise<IpfsAddResult> {
-  if (isPinataUploadUrl(apiUrl)) return addToPinata(apiUrl, content, fetchImpl, options)
+  if (isPinataUploadUrl(apiUrl)) return addFileToPinata(apiUrl, content, 'ethagent-agent-state.json', 'application/json', fetchImpl, options)
   return addFileToIpfs(apiUrl, content, 'ethagent-identity-backup.json', 'application/json', fetchImpl, options)
+}
+
+// The size of each piece handed to the socket. It sets how finely upload progress is
+// observed, so a slow link is told apart from a dead one. It limits nothing.
+const UPLOAD_PIECE_BYTES = 64 * 1024
+
+type Multipart = { body: ReadableStream<Uint8Array>; contentType: string; length: number }
+
+// Encodes the form once so its exact length is known and declared, then streams it in
+// pieces. The request stays a plain Content-Length upload on the wire.
+async function multipartBody(fields: Array<[string, string | Blob, string?]>): Promise<Multipart> {
+  const form = new FormData()
+  for (const [name, value, filename] of fields) {
+    if (typeof value === 'string') form.append(name, value)
+    else form.append(name, value, filename)
+  }
+  const encoded = new Response(form)
+  const contentType = encoded.headers.get('content-type') ?? 'multipart/form-data'
+  const bytes = new Uint8Array(await encoded.arrayBuffer())
+  let offset = 0
+  const body = new ReadableStream<Uint8Array>({
+    pull(sink) {
+      if (offset >= bytes.byteLength) {
+        sink.close()
+        return
+      }
+      const end = Math.min(bytes.byteLength, offset + UPLOAD_PIECE_BYTES)
+      sink.enqueue(bytes.subarray(offset, end))
+      offset = end
+    },
+  })
+  return { body, contentType, length: bytes.byteLength }
+}
+
+function fileBlob(content: string | Uint8Array, contentType: string): Blob {
+  const blobPart: BlobPart = typeof content === 'string'
+    ? content
+    : new Uint8Array(content).buffer as ArrayBuffer
+  return new Blob([blobPart], { type: contentType })
+}
+
+function streamedPost(headers: Record<string, string>, multipart: Multipart): RequestInit {
+  return {
+    method: 'POST',
+    headers: { ...headers, 'content-type': multipart.contentType, 'content-length': String(multipart.length) },
+    body: multipart.body,
+    duplex: 'half',
+  } as RequestInit & { duplex: 'half' }
 }
 
 export async function addFileToIpfs(
@@ -119,26 +159,16 @@ export async function addFileToIpfs(
   options: IpfsOptions = {},
 ): Promise<IpfsAddResult> {
   if (isPinataUploadUrl(apiUrl)) return addFileToPinata(apiUrl, content, filename, contentType, fetchImpl, options)
-  const body = new FormData()
-  const blobPart: BlobPart = typeof content === 'string'
-    ? content
-    : new Uint8Array(content).buffer as ArrayBuffer
-  const blob = new Blob([blobPart], { type: contentType })
-  body.append('file', blob, filename)
-  const t = withTimeout(UPLOAD_TIMEOUT_MS)
-  let response: Response
-  let data: { Hash?: string; Cid?: string; Name?: string }
-  try {
-    response = await fetchImpl(`${normalizeApiUrl(apiUrl)}/api/v0/add?pin=true`, {
-      method: 'POST',
-      body,
-      signal: t.signal,
-    })
-    if (!response.ok) throw new Error(`IPFS add failed: ${response.status} ${response.statusText}`)
-    data = await response.json() as { Hash?: string; Cid?: string; Name?: string }
-  } finally {
-    t.clear()
+  const multipart = await multipartBody([['file', fileBlob(content, contentType), filename]])
+  const response = await createAdaptiveFetch(fetchImpl)(
+    `${normalizeApiUrl(apiUrl)}/api/v0/add?pin=true`,
+    streamedPost({}, multipart),
+  )
+  if (!response.ok) {
+    await response.body?.cancel().catch(() => {})
+    throw new Error(`IPFS add failed: ${response.status} ${response.statusText}`)
   }
+  const data = await response.json() as { Hash?: string; Cid?: string; Name?: string }
   const cid = data.Hash ?? data.Cid
   if (!cid) throw new Error('IPFS add response did not include a CID')
   return { cid, pinVerified: true, provider: 'ipfs' }
@@ -148,41 +178,33 @@ export async function catFromIpfs(
   apiUrl: string,
   cid: string,
   fetchImpl: FetchLike = fetch,
-  options: { signal?: AbortSignal } = {},
+  options: IpfsCatOptions = {},
 ): Promise<Uint8Array> {
   if (isPinataUploadUrl(apiUrl)) {
-    const bytes = await catFromPinata(cid, fetchImpl, options.signal)
-    assertCidMatchesContent(cid, bytes)
-    return bytes
+    return readIpfs(cid, {
+      fetchImpl,
+      ...(options.signal ? { signal: options.signal } : {}),
+      ...(options.onProgress ? { onProgress: options.onProgress } : {}),
+    })
   }
   const arg = encodeURIComponent(cid.trim())
-  const t = withTimeout(CAT_TIMEOUT_MS, options.signal)
-  try {
-    const response = await fetchImpl(`${normalizeApiUrl(apiUrl)}/api/v0/cat?arg=${arg}`, {
-      method: 'POST',
-      signal: t.signal,
-    })
-    if (!response.ok) throw new Error(`IPFS cat failed: ${response.status} ${response.statusText}`)
-    const bytes = new Uint8Array(await response.arrayBuffer())
-    assertCidMatchesContent(cid, bytes)
-    return bytes
-  } finally {
-    t.clear()
+  const response = await createAdaptiveFetch(fetchImpl)(`${normalizeApiUrl(apiUrl)}/api/v0/cat?arg=${arg}`, {
+    method: 'POST',
+    ...(options.signal ? { signal: options.signal } : {}),
+  })
+  if (!response.ok) {
+    await response.body?.cancel().catch(() => {})
+    throw new Error(`IPFS cat failed: ${response.status} ${response.statusText}`)
   }
+  const host = hostOf(apiUrl)
+  const bytes = await readBody(response, received => options.onProgress?.({ bytes: received, host }))
+  assertCidMatchesContent(cid, bytes)
+  return bytes
 }
 
 function normalizeApiUrl(apiUrl: string): string {
   const trimmed = apiUrl.trim() || DEFAULT_IPFS_API_URL
   return trimmed.endsWith('/') ? trimmed.slice(0, -1) : trimmed
-}
-
-async function addToPinata(
-  apiUrl: string,
-  content: string | Uint8Array,
-  fetchImpl: FetchLike,
-  options: IpfsOptions,
-): Promise<IpfsAddResult> {
-  return addFileToPinata(apiUrl, content, 'ethagent-agent-state.json', 'application/json', fetchImpl, options)
 }
 
 async function addFileToPinata(
@@ -195,72 +217,57 @@ async function addFileToPinata(
 ): Promise<IpfsAddResult> {
   const jwt = pinataJwt(options)
   if (!jwt) throw new Error('IPFS storage credential is missing')
-  const body = new FormData()
-  const blobPart: BlobPart = typeof content === 'string'
-    ? content
-    : new Uint8Array(content).buffer as ArrayBuffer
-  const blob = new Blob([blobPart], { type: contentType })
-  body.append('network', 'public')
-  body.append('file', blob, filename)
-  const t = withTimeout(UPLOAD_TIMEOUT_MS)
-  let response: Response
-  let data: { data?: { cid?: string }; IpfsHash?: string; Hash?: string; Cid?: string }
-  try {
-    response = await fetchImpl(normalizeApiUrl(apiUrl), {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${jwt}`,
-      },
-      body,
-      signal: t.signal,
-    })
-    if (!response.ok) throw new PinataUploadError(response.status, response.statusText)
-    data = await response.json() as { data?: { cid?: string }; IpfsHash?: string; Hash?: string; Cid?: string }
-  } finally {
-    t.clear()
+  const multipart = await multipartBody([
+    ['network', 'public'],
+    ['file', fileBlob(content, contentType), filename],
+  ])
+  const response = await createAdaptiveFetch(fetchImpl)(
+    normalizeApiUrl(apiUrl),
+    streamedPost({ Authorization: `Bearer ${jwt}` }, multipart),
+  )
+  if (!response.ok) {
+    await response.body?.cancel().catch(() => {})
+    throw new PinataUploadError(response.status, response.statusText)
   }
+  const data = await response.json() as { data?: { cid?: string }; IpfsHash?: string; Hash?: string; Cid?: string }
   const cid = data.data?.cid ?? data.IpfsHash ?? data.Hash ?? data.Cid
   if (!cid) throw new Error('IPFS upload response did not include a CID')
-  const verified = await verifyCidReachable(cid, fetchImpl)
+  const verified = await confirmPinned(cid, jwt, fetchImpl)
   return { cid, pinVerified: verified, provider: 'pinata' }
 }
 
-async function verifyCidReachable(
-  cid: string,
-  fetchImpl: FetchLike,
-): Promise<boolean> {
-  const gateway = normalizeApiUrl(process.env.PINATA_GATEWAY_URL?.trim() || DEFAULT_PINATA_GATEWAY_URL)
-  const path = cid.trim().split('/').map(part => encodeURIComponent(part)).join('/')
-  const url = `${gateway}/ipfs/${path}`
-  for (const delayMs of [0, 1500]) {
-    if (delayMs > 0) await new Promise(resolve => setTimeout(resolve, delayMs))
-    const t = withTimeout(HEAD_TIMEOUT_MS)
-    try {
-      const response = await fetchImpl(url, { method: 'HEAD', signal: t.signal })
-      if (response.ok) return true
-    } catch {
-    } finally {
-      t.clear()
+async function pinataListsCid(cid: string, jwt: string, fetchImpl: FetchLike): Promise<boolean | null> {
+  try {
+    const response = await createAdaptiveFetch(fetchImpl)(`${PINATA_FILES_URL}?cid=${encodeURIComponent(cid)}&limit=1`, {
+      headers: { Authorization: `Bearer ${jwt}`, accept: 'application/json' },
+    })
+    if (!response.ok) {
+      await response.body?.cancel().catch(() => {})
+      return null
     }
+    const body = await response.json().catch(() => null) as { data?: { files?: Array<{ cid?: unknown }> } } | null
+    const files = body?.data?.files
+    if (!Array.isArray(files)) return null
+    return files.some(file => file?.cid === cid)
+  } catch {
+    return null
   }
-  return false
+}
+
+async function confirmPinned(cid: string, jwt: string, fetchImpl: FetchLike): Promise<boolean> {
+  const apiHost = hostOf(PINATA_FILES_URL)
+  for (let wait = rto(apiHost); ; wait *= 2) {
+    const listed = await pinataListsCid(cid, jwt, fetchImpl)
+    if (listed === true) return true
+    if (listed === null) break
+    if (!withinBackoffCeiling(wait * 2)) break
+    await sleep(wait)
+  }
+  return probeIpfs(cid, { fetchImpl })
 }
 
 function pinataJwt(options: IpfsOptions): string | undefined {
   return options.pinataJwt?.trim() || process.env.PINATA_JWT?.trim() || undefined
-}
-
-async function catFromPinata(cid: string, fetchImpl: FetchLike, signal?: AbortSignal): Promise<Uint8Array> {
-  const gateway = normalizeApiUrl(process.env.PINATA_GATEWAY_URL?.trim() || DEFAULT_PINATA_GATEWAY_URL)
-  const path = cid.trim().split('/').map(part => encodeURIComponent(part)).join('/')
-  const t = withTimeout(CAT_TIMEOUT_MS, signal)
-  try {
-    const response = await fetchImpl(`${gateway}/ipfs/${path}`, { signal: t.signal })
-    if (!response.ok) throw new Error(`IPFS fetch failed: ${response.status} ${response.statusText}`)
-    return new Uint8Array(await response.arrayBuffer())
-  } finally {
-    t.clear()
-  }
 }
 
 export function isPinataUploadUrl(apiUrl: string): boolean {

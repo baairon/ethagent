@@ -32,6 +32,7 @@ export async function runRestoreAuthorize(
     message: signatureRequest.message,
     purpose: signatureRequest.purpose,
     onReady: callbacks.onWalletReady,
+    ...(callbacks.signal ? { signal: callbacks.signal } : {}),
   })
   callbacks.onWalletReady(null)
   callbacks.onRestoreProgress?.({ phase: 'decrypting', label: 'Decrypting the snapshot…' })

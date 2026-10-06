@@ -53,7 +53,7 @@ export type Step =
   | { kind: 'restore-recovery-input'; ownerHandle: string; registry: Erc8004RegistryConfig; purpose?: RestorePurpose }
   | { kind: 'restore-ens-input'; ownerHandle: string; registry: Erc8004RegistryConfig; purpose?: RestorePurpose; busy?: boolean; error?: string }
   | { kind: 'restore-token-id-input'; ownerHandle: string; registry: Erc8004RegistryConfig; purpose?: RestorePurpose; busy?: boolean; error?: string }
-  | { kind: 'restore-not-found'; ownerHandle: string; registry: Erc8004RegistryConfig; requesterAddress?: string; reason: RestoreNotFoundReason; purpose?: RestorePurpose }
+  | { kind: 'restore-not-found'; ownerHandle: string; registry: Erc8004RegistryConfig; requesterAddress?: string; reason: RestoreNotFoundReason; detail?: string; purpose?: RestorePurpose }
   | { kind: 'restore-select-token'; ownerHandle: string; registry: Erc8004RegistryConfig; candidates: Erc8004AgentCandidate[]; requesterAddress?: string; purpose?: RestorePurpose }
   | RestoreFetchingStep
   | { kind: 'restore-authorizing'; cid: string; apiUrl: string; envelope: RestorableBackupEnvelope; candidate: Erc8004AgentCandidate; requesterAddress?: string; purpose?: RestorePurpose }
@@ -104,7 +104,7 @@ export type Step =
   | { kind: 'details' }
   | { kind: 'save-prompt'; back: Step }
   | { kind: 'busy'; label: string; title?: string }
-  | { kind: 'error'; error: IdentityManagerErrorView; back: Step }
+  | { kind: 'error'; error: IdentityManagerErrorView; back: Step; retry?: Step }
   | { kind: 'identity-unlinked'; identity: EthagentIdentity; registry: Erc8004RegistryConfig; onChainOwner?: string; back: Step }
 
 export type Action =

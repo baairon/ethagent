@@ -93,6 +93,7 @@ export async function runUpdateEnsRecords(args: {
     ...gasFee,
     purpose,
     onReady: args.callbacks.onWalletReady,
+    ...(args.callbacks.signal ? { signal: args.callbacks.signal } : {}),
     ...(tokenChainName ? { tokenChainName } : {}),
   })
   args.callbacks.onWalletReady(null)
@@ -162,6 +163,7 @@ export async function runEnsSetupRegistryTransaction(args: {
     ...gasFee,
     purpose,
     onReady: args.callbacks.onWalletReady,
+    ...(args.callbacks.signal ? { signal: args.callbacks.signal } : {}),
     ...(tokenChainName ? { tokenChainName } : {}),
   })
   args.callbacks.onWalletReady(null)
@@ -220,6 +222,7 @@ export async function runEnsSetupRecordsTransaction(args: {
     ...gasFee,
     purpose,
     onReady: args.callbacks.onWalletReady,
+    ...(args.callbacks.signal ? { signal: args.callbacks.signal } : {}),
     ...(tokenChainName ? { tokenChainName } : {}),
   })
   args.callbacks.onWalletReady(null)

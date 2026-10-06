@@ -122,6 +122,7 @@ async function runPublicProfileSigningInner(
     chainId: step.registry.chainId,
     messageForAccount: account => `Authorize public profile update for agent #${step.identity.agentId ?? 'unknown'} (${account})`,
     onReady: callbacks.onWalletReady,
+    ...(callbacks.signal ? { signal: callbacks.signal } : {}),
     purpose: profilePurpose,
     ...(expectedSigner ? { expectedAccount: expectedSigner } : {}),
     prepareTransaction: async wallet => {
@@ -279,7 +280,7 @@ async function runOperatorWalletVaultPublicProfileSave(args: {
   vaultAddress: Address
 }): Promise<void> {
   const { step, callbacks, snapshotOwner, walletAccess, challengePurpose, vaultAddress } = args
-  const session = await openBrowserWalletSession({ onReady: callbacks.onWalletReady })
+  const session = await openBrowserWalletSession({ onReady: callbacks.onWalletReady, ...(callbacks.signal ? { signal: callbacks.signal } : {}) })
   try {
     const wallet = await session.requestSignature({
       chainId: step.registry.chainId,

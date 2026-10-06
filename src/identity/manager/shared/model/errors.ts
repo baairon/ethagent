@@ -11,6 +11,9 @@ import {
 } from '../../../registry/vault.js'
 import { BrowserWalletError } from '../../../wallet/browserWallet.js'
 import { PinataUploadError } from '../../../storage/ipfs.js'
+import { IpfsReadError } from '../../../storage/ipfsRead.js'
+import { NetError } from '../../../../net/adaptive.js'
+import { RpcUnansweredError } from '../../../../net/rpc.js'
 import { TxGuardBusyError } from '../txGuard.js'
 import { shortAddress } from './format.js'
 
@@ -117,6 +120,34 @@ export function identityManagerErrorView(err: unknown): IdentityManagerErrorView
       hint: 'Check your Pinata account status at https://app.pinata.cloud, then try again.',
     }
   }
+  const ipfs = findCause(err, IpfsReadError)
+  if (ipfs) {
+    return {
+      title: 'IPFS Download Failed',
+      detail: ipfs.outcomes.length
+        ? `No source returned the file.\n${ipfs.outcomes.map(item => `${item.host}: ${item.outcome}`).join('\n')}`
+        : 'No IPFS source was available.',
+      hint: NETWORK_HINT,
+    }
+  }
+  const rpc = findCause(err, RpcUnansweredError)
+  if (rpc) {
+    return {
+      title: 'Chain Connection Failed',
+      detail: rpc.outcomes.length
+        ? `No RPC endpoint answered.\n${rpc.outcomes.map(item => `${item.host}: ${item.outcome}`).join('\n')}`
+        : 'No RPC endpoint is configured.',
+      hint: NETWORK_HINT,
+    }
+  }
+  const net = findCause(err, NetError)
+  if (net) {
+    return {
+      title: 'Connection Failed',
+      detail: `${net.host}: ${net.words}.`,
+      hint: NETWORK_HINT,
+    }
+  }
   const message = err instanceof Error ? err.message : String(err)
   if (/^owner wallet required:/i.test(message)) {
     return {
@@ -141,15 +172,44 @@ export function identityManagerErrorView(err: unknown): IdentityManagerErrorView
   }
   if (message === 'fetch failed') {
     return {
-      title: 'Storage Unavailable',
-      detail: 'Could not reach storage.',
-      hint: 'Check the connection, then try again.',
+      title: 'Connection Failed',
+      detail: 'The network request did not go through.',
+      hint: NETWORK_HINT,
     }
   }
   return {
     title: 'Identity Error',
     detail: capitalizeErrorText(message),
   }
+}
+
+const NETWORK_HINT = 'If a VPN is on, switch servers or pause it, then try again.'
+
+function findCause<T>(err: unknown, type: abstract new (...args: never[]) => T): T | null {
+  let current: unknown = err
+  for (let depth = 0; depth < 6 && current; depth += 1) {
+    if (current instanceof type) return current
+    current = (current as { cause?: unknown }).cause
+  }
+  return null
+}
+
+// A network failure as one paragraph, for screens that explain it inline next to an
+// input or a menu. Null when the error is not a network failure.
+export function networkFailureSentence(err: unknown): string | null {
+  const ipfs = findCause(err, IpfsReadError)
+  if (ipfs) {
+    const sources = ipfs.outcomes.map(item => `${item.host} ${item.outcome}`).join(', ')
+    return `No IPFS source returned the file${sources ? ` (${sources})` : ''}. ${NETWORK_HINT}`
+  }
+  const rpc = findCause(err, RpcUnansweredError)
+  if (rpc) {
+    const endpoints = rpc.outcomes.map(item => `${item.host} ${item.outcome}`).join(', ')
+    return `No RPC endpoint answered${endpoints ? ` (${endpoints})` : ''}. ${NETWORK_HINT}`
+  }
+  const net = findCause(err, NetError)
+  if (net) return `${net.host}: ${net.words}. ${NETWORK_HINT}`
+  return null
 }
 
 export function pinataErrorText(err: unknown): string {

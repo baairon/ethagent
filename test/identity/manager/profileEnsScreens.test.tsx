@@ -56,6 +56,38 @@ function frame(node: React.ReactElement): string[] {
   }
 }
 
+// Keypress tests wait on what the screen shows, never on a fixed delay, so a busy
+// machine slows them down instead of failing them.
+async function until(check: () => boolean, what: string): Promise<void> {
+  for (let attempt = 0; attempt < 400; attempt += 1) {
+    if (check()) return
+    await new Promise(resolve => setTimeout(resolve, 5))
+  }
+  assert.fail(`timed out waiting for ${what}`)
+}
+
+function cursorRow(lastFrame: () => string | undefined): string {
+  return stripAnsi(lastFrame() ?? '').split('\n').find(line => line.includes('❯')) ?? ''
+}
+
+// A key typed the instant a frame appears can still reach the previous render's key
+// handler. One timer turn after the frame lets React attach the new one first.
+const handlersAttached = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 20))
+
+async function moveCursorTo(
+  stdin: { write: (data: string) => void },
+  lastFrame: () => string | undefined,
+  labels: string[],
+): Promise<void> {
+  await until(() => cursorRow(lastFrame).includes(labels[0]!), `the cursor on ${labels[0]}`)
+  await handlersAttached()
+  for (const label of labels.slice(1)) {
+    stdin.write('j')
+    await until(() => cursorRow(lastFrame).includes(label), `the cursor on ${label}`)
+    await handlersAttached()
+  }
+}
+
 type ProfileStep = React.ComponentProps<typeof EditProfileFlow>['step']
 
 function iconScreen(step: ProfileStep, onIconSubmit: (iconPath?: string) => void = noop): string[] {
@@ -114,7 +146,7 @@ test('icon screen drops Remove Icon once removal is already pending', () => {
 
 test('Undo Change clears the pending icon and returns to the edit menu with other drafts', async () => {
   const steps: Step[] = []
-  const { stdin, unmount } = render(
+  const { stdin, lastFrame, unmount } = render(
     <TerminalSizeProvider columns={54}>
       <EnsFlow
         step={{
@@ -137,14 +169,9 @@ test('Undo Change clears the pending icon and returns to the edit menu with othe
     </TerminalSizeProvider>,
   )
   try {
-    const tick = () => new Promise(resolve => setTimeout(resolve, 20))
-    await tick()
-    for (let i = 0; i < 3; i += 1) {
-      stdin.write('j')
-      await tick()
-    }
+    await moveCursorTo(stdin, lastFrame, ['Choose a File', 'Enter a URL or Path', 'Remove Icon', 'Undo Change'])
     stdin.write('\r')
-    await tick()
+    await until(() => steps.length > 0, 'the step after Undo Change')
     const menu = steps.at(-1)
     assert.ok(menu && menu.kind === 'edit-profile-menu', 'undo returns to the edit menu')
     if (menu?.kind !== 'edit-profile-menu') return
@@ -213,13 +240,11 @@ test('ens home Delete Subdomain runs the delete preflight for the current name',
     onEnsUnlink: noop,
     onEnsRecordsUpdate: noop,
   })
-  const { stdin, unmount } = render(<TerminalSizeProvider columns={54}>{screen}</TerminalSizeProvider>)
+  const { stdin, lastFrame, unmount } = render(<TerminalSizeProvider columns={54}>{screen}</TerminalSizeProvider>)
   try {
-    await new Promise(resolve => setTimeout(resolve, 20))
-    stdin.write('j')
-    await new Promise(resolve => setTimeout(resolve, 20))
+    await moveCursorTo(stdin, lastFrame, ['Unlink Name', 'Delete Subdomain'])
     stdin.write('\r')
-    await new Promise(resolve => setTimeout(resolve, 20))
+    await until(() => seen.length > 0, 'the delete preflight')
     assert.deepEqual(seen, ['agent.owner1.eth'])
   } finally {
     unmount()

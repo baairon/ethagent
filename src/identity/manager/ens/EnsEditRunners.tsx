@@ -32,12 +32,14 @@ export const DeleteSubdomainTxRunner: React.FC<{
   const [confirming, setConfirming] = React.useState(false)
   React.useEffect(() => {
     let cancelled = false
+    const request = new AbortController()
     sendBrowserWalletTransaction({
       chainId: mainnet.id,
       expectedAccount: ownerAddress,
       to: plan.transaction.to,
       data: plan.transaction.data,
       purpose: 'delete-ens-subdomain',
+      signal: request.signal,
       onReady: ready => { if (!cancelled) onWalletReady(ready) },
     })
       .then(async result => {
@@ -56,7 +58,10 @@ export const DeleteSubdomainTxRunner: React.FC<{
         }
         onError(err instanceof Error ? err.message : String(err))
       })
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+      request.abort()
+    }
   }, [])
   return (
     <WalletApprovalScreen

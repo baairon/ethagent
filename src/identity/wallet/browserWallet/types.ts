@@ -46,6 +46,7 @@ export type SignatureRequest = {
   message?: string
   messageForAccount?: (account: Address) => string
   timeoutMs?: number
+  signal?: AbortSignal
   onReady?: ReadyHandler
   purpose?: WalletPurpose
   flowId?: string
@@ -63,6 +64,7 @@ export type TransactionRequest = {
   maxFeePerGas?: Hex
   maxPriorityFeePerGas?: Hex
   timeoutMs?: number
+  signal?: AbortSignal
   onReady?: ReadyHandler
   purpose?: WalletPurpose
   flowId?: string
@@ -76,6 +78,7 @@ export type SignAndTransactionRequest<TPrepared> = {
   message?: string
   messageForAccount?: (account: Address) => string
   timeoutMs?: number
+  signal?: AbortSignal
   onReady?: ReadyHandler
   purpose?: WalletPurpose
   flowId?: string
@@ -94,6 +97,7 @@ export type SignAndTransactionRequest<TPrepared> = {
 
 export type AccountRequest = {
   timeoutMs?: number
+  signal?: AbortSignal
   onReady?: ReadyHandler
   purpose?: WalletPurpose
   flowId?: string
@@ -186,5 +190,5 @@ export type PendingPrompt = {
   prepareTransaction?: (body: Record<string, unknown>) => Promise<Record<string, unknown>>
   resolve: (body: Record<string, unknown>) => void
   reject: (err: unknown) => void
-  timeout: NodeJS.Timeout
+  timeout?: NodeJS.Timeout
 }

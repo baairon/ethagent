@@ -6,6 +6,7 @@ import type { Step } from '../../reducer.js'
 export type IdentityCompletionSource = 'create' | 'restore' | 'update'
 
 export type EffectCallbacks = {
+  signal?: AbortSignal
   onStep: (step: Step) => void
   onWalletReady: (session: BrowserWalletReady | null) => void
   onIdentityComplete: (identity: EthagentIdentity, message: string, source?: IdentityCompletionSource) => Promise<void>
@@ -20,8 +21,26 @@ export type CreateProgress = {
 }
 
 export type RestoreProgress = {
-  phase: 'decrypting' | 'writing' | 'finishing'
+  phase: 'downloading' | 'decrypting' | 'writing' | 'finishing'
   label: string
+  detail?: string
+}
+
+export type EffectScope = {
+  callbacks: EffectCallbacks
+  signal: AbortSignal
+  cancel: () => void
+}
+
+// Gives one step's work its own cancel signal, so leaving the screen closes
+// any wallet approval server or download that step started.
+export function scopeCallbacks(callbacks: EffectCallbacks): EffectScope {
+  const controller = new AbortController()
+  return {
+    callbacks: { ...callbacks, signal: controller.signal },
+    signal: controller.signal,
+    cancel: () => controller.abort(),
+  }
 }
 
 export type TokenTransferProgress = {

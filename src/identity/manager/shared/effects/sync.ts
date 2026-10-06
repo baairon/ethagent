@@ -116,6 +116,7 @@ export async function syncVaultMetadataOperatorsAfterOwnerSave(args: {
       data: encoded.data,
       ...gasFee,
       onReady: args.callbacks.onWalletReady,
+      ...(args.callbacks.signal ? { signal: args.callbacks.signal } : {}),
       purpose: 'sync-operator-vault',
     })
     args.callbacks.onWalletReady(null)

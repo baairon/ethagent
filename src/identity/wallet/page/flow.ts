@@ -43,7 +43,12 @@ function closeSoon(delayMs?: number): void {
 
 async function ensureWallet(): Promise<string> {
   setState("connecting");
-  const provider = await waitForEthereumProvider();
+  let waited = false;
+  const provider = await waitForEthereumProvider(() => {
+    waited = true;
+    setState("waiting-wallet");
+  });
+  if (waited) setState("connecting");
   setActiveEthereum(provider);
   const accounts = await provider.request({ method: "eth_requestAccounts" });
   const account = accounts && accounts[0];

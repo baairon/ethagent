@@ -103,7 +103,7 @@ test('fetch caches a decrypted snapshot with its agent card, and reports locked 
     const fetchImpl = fakeFetch(new Map([[cid, envelopeBytes], [cardCid, cardBytes]]))
     const identity = { address: f.ownerAddress, chainId: 1, identityRegistryAddress: ENVELOPE_REGISTRY.identityRegistryAddress, agentId: '42' } as EthagentIdentity
     const entry = { cid, agentCardCid: cardCid, createdAt: '2026-01-01T00:00:00.000Z' }
-    const deps = { apiUrl: 'https://uploads.pinata.cloud/v3/files', fetchImpl, retries: 0 }
+    const deps = { apiUrl: 'https://uploads.pinata.cloud/v3/files', fetchImpl }
     const first = await fetchSnapshotIntoStore(identity, entry, { ...deps, signer: localKeySigner(f.operatorKey) })
     assert.equal(first.status, 'cached')
     const again = await fetchSnapshotIntoStore(identity, entry, { ...deps, signer: localKeySigner(f.operatorKey) })
@@ -134,7 +134,6 @@ test('fetch reports a busy store as an error outcome instead of throwing', async
     const outcome = await fetchSnapshotIntoStore(identity, { cid, createdAt: '2026-01-01T00:00:00.000Z' }, {
       apiUrl: 'https://uploads.pinata.cloud/v3/files',
       fetchImpl: fakeFetch(new Map([[cid, envelopeBytes]])),
-      retries: 0,
       lockWaitMs: 0,
       signer: localKeySigner(f.operatorKey),
     })
@@ -152,9 +151,9 @@ test('fetch rejects a body that does not match its CID', async () => {
     const fetchImpl = fakeFetch(new Map([[cid, Buffer.from('{"tampered":true}')]]))
     const identity = { address: f.ownerAddress, chainId: 1, identityRegistryAddress: ENVELOPE_REGISTRY.identityRegistryAddress, agentId: '42' } as EthagentIdentity
     const outcome = await fetchSnapshotIntoStore(identity, { cid, createdAt: '2026-01-01T00:00:00.000Z' }, {
-      apiUrl: 'https://uploads.pinata.cloud/v3/files', fetchImpl, retries: 0, signer: localKeySigner(f.operatorKey),
+      apiUrl: 'https://uploads.pinata.cloud/v3/files', fetchImpl, signer: localKeySigner(f.operatorKey),
     })
     assert.equal(outcome.status, 'error')
-    assert.match(outcome.error ?? '', /does not match its CID/)
+    assert.match(outcome.error ?? '', /returned the wrong bytes/)
   })
 })

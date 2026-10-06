@@ -215,12 +215,12 @@ export function useIdentityManagerController({
     onCreateProgress: setCreateProgress,
   }
 
-  const handleStepError = (err: unknown, backStep: Step, softCancel: Step = backStep): void => {
+  const handleStepError = (err: unknown, backStep: Step, softCancel: Step = backStep, retry?: Step): void => {
     if (isWalletCancelled(err)) {
       setStep(softCancel)
       return
     }
-    setStep({ kind: 'error', error: identityManagerErrorView(err), back: backStep })
+    setStep({ kind: 'error', error: identityManagerErrorView(err), back: backStep, ...(retry ? { retry } : {}) })
   }
 
   const guardOwnership = async (

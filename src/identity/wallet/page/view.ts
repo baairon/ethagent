@@ -63,6 +63,7 @@ export function flowCopy(): FlowCopy { return FLOW_COPY[config.kind] || FLOW_COP
 
 export function tabTitleForState(state: string): string {
   if (state === "connecting") return STATE_TITLES.connecting;
+  if (state === "waiting-wallet") return "Waiting for Wallet";
   if (state === "approve-sign") return STATE_TITLES.approveSign;
   if (state === "preparing-transaction") return STATE_TITLES.preparingTransaction;
   if (state === "approve-transaction") return STATE_TITLES.approveTransaction;

@@ -66,6 +66,9 @@ export function setState(state: string, payload?: any): void {
     case "connecting":
       setStatus("·", "Connecting to your wallet...", "Open your wallet if needed.", true);
       break;
+    case "waiting-wallet":
+      setStatus("·", "Waiting for a wallet extension...", "Install or unlock a wallet in this browser. This page keeps listening.", true);
+      break;
     case "approve":
       if (config.kind === "account") {
         const copy = accountCopy();

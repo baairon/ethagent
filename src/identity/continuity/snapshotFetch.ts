@@ -19,22 +19,7 @@ export type FetchDeps = {
   apiUrl: string
   fetchImpl?: FetchLike
   signer?: ChallengeSigner
-  retries?: number
-  retryDelayMs?: number
   lockWaitMs?: number
-}
-
-async function withRetries<T>(fn: () => Promise<T>, retries: number, delayMs: number): Promise<T> {
-  let lastError: unknown
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    try {
-      return await fn()
-    } catch (err) {
-      lastError = err
-      if (attempt < retries) await new Promise(resolve => setTimeout(resolve, delayMs * (attempt + 1)))
-    }
-  }
-  throw lastError
 }
 
 export async function fetchSnapshotIntoStore(
@@ -49,14 +34,12 @@ export async function fetchSnapshotIntoStore(
   if (existing?.kind === 'locked' && !opts.retryLocked) {
     return { cid, status: 'locked', reason: existing.reason, ...(existing.slots ? { slots: existing.slots } : {}) }
   }
-  const retries = deps.retries ?? 3
-  const delay = deps.retryDelayMs ?? 1500
   const fetchImpl = deps.fetchImpl ?? fetch
   const lock = { waitMs: deps.lockWaitMs ?? 5000 }
   const storeError = (err: unknown): FetchOutcome => ({ cid, status: 'error', error: err instanceof Error ? err.message : String(err) })
   let envelope: ReturnType<typeof parseRestorableEnvelope>
   try {
-    const raw = await withRetries(() => catFromIpfs(deps.apiUrl, cid, fetchImpl), retries, delay)
+    const raw = await catFromIpfs(deps.apiUrl, cid, fetchImpl)
     envelope = parseRestorableEnvelope(raw)
   } catch (err) {
     return { cid, status: 'error', error: err instanceof Error ? err.message : String(err) }
@@ -91,7 +74,7 @@ export async function fetchSnapshotIntoStore(
   let agentCard: string | undefined
   if (entry.agentCardCid) {
     try {
-      const bytes = await withRetries(() => catFromIpfs(deps.apiUrl, entry.agentCardCid!, fetchImpl), retries, delay)
+      const bytes = await catFromIpfs(deps.apiUrl, entry.agentCardCid, fetchImpl)
       agentCard = Buffer.from(bytes).toString('utf8')
     } catch {
       agentCard = undefined

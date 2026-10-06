@@ -17,6 +17,7 @@ export {
   discoverOwnedAgentBackupByTokenId,
   discoverOwnedAgentBackups,
   discoverOwnedAgentBackupsAcrossSupportedNetworks,
+  MetadataFetchError,
 } from './erc8004/discovery.js'
 export {
   parseEthagentBackupPointer,
