@@ -158,8 +158,8 @@ The foundation is built on open standards, so your agent is never tied to one ap
 | Find the vault | `ethagent --vault-dir` |
 | See the Vault, its build, and who may do what | `ethagent custody`, or `ethagent custody --verify` to simulate each permission |
 | Check the agent's ENS name | `ethagent ens` |
-| Point the agent at another ENS name | `ethagent ens agent.yourname.eth`, then again with `--yes` |
-| Change the name's text records | `ethagent ens --set url=https://example.com --clear description`, then again with `--yes` |
+| Point the agent at another ENS name | `ethagent ens <name>`, then again with `--yes` |
+| Change the name's text records | `ethagent ens --set <key>=<value> --clear <key>`, then again with `--yes` |
 | Unlink the ENS name | `ethagent ens --unlink`, then again with `--yes` |
 | Sign ENS changes with the operator key | `keychain exec ethagent -- ethagent ens <args> --operator` |
 
@@ -189,7 +189,7 @@ Run any of these with `npx ethagent`. Commands marked interactive need a termina
 | `ens [--json]` | The linked name, its records, the two-way check, the resolver, who controls the name, and whether the operator key could sign for it. | Goes online |
 | `ens <name> [--operator] [--yes] [--json]` | Point the agent at a name: create it under a parent the signer controls, write the agent records, clear them on the old name, then publish the name. Previews until `--yes`. | Opens your wallet |
 | `ens --unlink [--operator] [--yes] [--json]` | Clear the agent records on the linked name, then publish it unlinked. Previews until `--yes`. | Opens your wallet |
-| `ens --set k=v --clear k [--operator] [--yes] [--json]` | Write every record change in one transaction. No save needed. Previews until `--yes`. | Opens your wallet, or none with `--operator` |
+| `ens --set <key>=<value> --clear <key> [--operator] [--yes] [--json]` | Write every record change in one transaction. No save needed. Previews until `--yes`. | Opens your wallet, or none with `--operator` |
 | `--version`, `--help` | Version, or the full command list. Every history and onchain command also takes `--help`. | Read-only |
 
 ### Saving
@@ -220,7 +220,7 @@ Run any of these with `npx ethagent`. Commands marked interactive need a termina
 `ethagent custody` and `ethagent ens` work without the manager.
 
 - **Previews.** ENS changes preview by default. They list every transaction, simulate the ones that can run now from the signer, and send nothing. Rerun with `--yes` to send.
-- **Signers.** ENS transactions are signed in your browser wallet, in one tab for the whole change. With `--operator`, the operator key signs them with no popup instead. Run it as `keychain exec ethagent -- ethagent ens ... --operator`.
+- **Signers.** ENS transactions are signed in your browser wallet, in one tab for the whole change. With `--operator`, the operator key signs them with no popup instead. Run it as `keychain exec ethagent -- ethagent ens <args> --operator`.
 - **What the operator key may do.** It only writes text records and creates subnames under a parent it controls. It never sets `addr` on an existing name and never changes ownership.
 - **Publishing.** Changing or unlinking the name always ends with one owner-signed save. A stolen operator key therefore can't point your agent at a name it registered. Local state takes the new name only after that save lands.
 - **Control check.** Before anything is sent, the command refuses unless the signer controls the name: as its owner, its NameWrapper owner, or a delegate approved on its resolver.

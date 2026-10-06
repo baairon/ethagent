@@ -43,7 +43,7 @@ import {
   type HistoryDeps,
 } from '../history/shared.js'
 
-export const ENS_USAGE = 'ethagent ens [<name> | --unlink | --set key=value... --clear key...] [--operator] [--yes] [--no-open] [--json]'
+export const ENS_USAGE = 'ethagent ens [<name> | --unlink | --set <key>=<value>... --clear <key>...] [--operator] [--yes] [--no-open] [--json]'
 
 const HELP = [
   `usage: ${ENS_USAGE}`,
@@ -57,12 +57,13 @@ const HELP = [
   '                                   publish the name in one owner-signed save.',
   '  ethagent ens --unlink            clear the agent records on the linked name, then publish',
   '                                   the unlinked state in one owner-signed save.',
-  '  ethagent ens --set k=v --clear k write every record change on the linked name in one',
+  '  ethagent ens --set <key>=<value> --clear <key>',
+  '                                   write every record change on the linked name in one',
   '                                   resolver multicall. No save is needed.',
   '',
   'Writes preview first and send nothing without --yes. ENS transactions are signed by the',
   'browser wallet, or with --operator by the operator key (run through `keychain exec ethagent',
-  '-- ethagent ens ... --operator`, which injects ' + OPERATOR_KEY_ENV + '). The operator key only',
+  '-- ethagent ens <args> --operator`, which injects ' + OPERATOR_KEY_ENV + '). The operator key only',
   'writes text records and creates subnames under a parent it controls. Publishing a name',
   'change always needs the owner wallet.',
   '',
@@ -110,7 +111,7 @@ function parseMode(values: Record<string, unknown>, positionals: string[]): Mode
     const set: Record<string, string> = {}
     for (const entry of sets) {
       const eq = entry.indexOf('=')
-      if (eq <= 0) throw new HistoryError(2, `--set expects key=value, got: ${entry}`)
+      if (eq <= 0) throw new HistoryError(2, `--set expects <key>=<value>, got: ${entry}`)
       set[entry.slice(0, eq).trim()] = entry.slice(eq + 1)
     }
     for (const key of clears) {
@@ -129,7 +130,7 @@ function chooseSigner(deps: HistoryDeps, operator: boolean, owner: Address): Sig
   if (!operator) return { kind: 'browser', address: owner, role: 'owner wallet' }
   const key = deps.operatorKey
   if (!key || (!key.ok && key.reason === 'missing')) {
-    throw new HistoryError(3, 'No operator key available.', `Run this through \`keychain exec ethagent -- ethagent ens ... --operator\`, which injects ${OPERATOR_KEY_ENV}.`)
+    throw new HistoryError(3, 'No operator key available.', `Run this through \`keychain exec ethagent -- ethagent ens <args> --operator\`, which injects ${OPERATOR_KEY_ENV}.`)
   }
   if (!key.ok) throw new HistoryError(2, INVALID_OPERATOR_KEY_MESSAGE)
   return { kind: 'operator', address: getAddress(key.address), role: 'operator key', key: key.key }

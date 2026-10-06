@@ -224,7 +224,7 @@ export async function planEnsSwap(args: {
   const newName = normalizeEthDomain(args.newName)
   const parts = splitSubdomainName(newName)
   if (!parts) {
-    throw new EnsPlanRefusal(`${args.newName} is not an agent subdomain.`, 'Agent names are subdomains such as agent.yourname.eth.')
+    throw new EnsPlanRefusal(`${args.newName} is not an agent subdomain.`, 'An agent name is a subdomain: one label under a .eth name.')
   }
   const oldName = args.oldName ? normalizeEthDomain(args.oldName) : null
   if (oldName === newName) {
