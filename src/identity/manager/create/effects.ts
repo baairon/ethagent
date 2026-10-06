@@ -1,4 +1,4 @@
-import type { Address, Hex } from 'viem'
+import type { Address, Hex, Log } from 'viem'
 import type { EthagentConfig, EthagentIdentity, SelectableNetwork } from '../../../storage/config.js'
 import { saveConfig } from '../../../storage/config.js'
 import {
@@ -226,7 +226,7 @@ export async function runCreateSigning(
   const receipt = await awaitConfirmedReceipt(client, result.txHash, 'Agent registration', { kind: 'register', chainId: step.registry.chainId })
   callbacks.onCreateProgress?.({ phase: 'writing', label: 'Writing soul, memory, and skills…' })
   const registered = registeredAgentFromReceipt({
-    logs: receipt.logs.map(log => ({ address: log.address, topics: [...log.topics] as Hex[], data: log.data })),
+    logs: receipt.logs.map((log: Log) => ({ address: log.address, topics: [...log.topics] as Hex[], data: log.data })),
     identityRegistryAddress: step.registry.identityRegistryAddress,
     ownerAddress: result.prepared.ownerAddress,
     fallbackAgentURI: result.prepared.agentUri,

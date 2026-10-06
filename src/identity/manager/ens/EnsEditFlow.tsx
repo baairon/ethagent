@@ -2,9 +2,7 @@ import React from 'react'
 import { getAddress, type Address } from 'viem'
 import type { BrowserWalletReady } from '../../wallet/browserWallet.js'
 import {
-  AGENT_TOKEN_RECORD_KEY,
   buildAgentEnsRecords,
-  buildEnsip25Key,
   diffRecords,
   recordsFromTextMap,
 } from '../../ens/agentRecords.js'
@@ -19,7 +17,7 @@ import {
   preflightEnsRoot,
   preflightEnsSetup,
 } from '../../ens/ensAutomation.js'
-import { SUPPORTED_ERC8004_CHAINS } from '../../registry/erc8004.js'
+import { agentEnsRecordKeys } from './records.js'
 import {
   readCustodyMode,
   readIdentityStateString,
@@ -85,8 +83,6 @@ export const EnsEditFlow: React.FC<EnsEditProps> = ({
     setPhase({ kind: 'discovering', mode: targetMode })
     discoverOwnedEnsNameDetails(ownerAddress, {
       signal: controller.signal,
-      budgetMs: 30_000,
-      rpcTimeoutMs: 8_000,
     })
       .then(result => {
         if (controller.signal.aborted) return
@@ -173,16 +169,7 @@ export const EnsEditFlow: React.FC<EnsEditProps> = ({
         if (waiting(phaseRef.current)) runSimpleCreatePreflight(fullName)
         return
       }
-      const readKeys = identity.agentId
-        ? [
-            ...SUPPORTED_ERC8004_CHAINS.map(chain => buildEnsip25Key({
-              chainId: chain.chainId,
-              identityRegistryAddress: registry.identityRegistryAddress,
-              agentId: identity.agentId!,
-            })),
-            AGENT_TOKEN_RECORD_KEY,
-          ]
-        : []
+      const readKeys = agentEnsRecordKeys(registry.identityRegistryAddress, identity.agentId)
       const currentText = validation.ok && readKeys.length > 0
         ? await readEthagentTextRecords(fullName, readKeys)
         : {}
@@ -272,16 +259,7 @@ export const EnsEditFlow: React.FC<EnsEditProps> = ({
     setValidationError(null)
     setPhase({ kind: 'unlink-loading', fullName })
     const waiting = (current: EnsPhase) => current.kind === 'unlink-loading' && current.fullName === fullName
-    const readKeys = identity.agentId
-      ? [
-          ...SUPPORTED_ERC8004_CHAINS.map(chain => buildEnsip25Key({
-            chainId: chain.chainId,
-            identityRegistryAddress: registry.identityRegistryAddress,
-            agentId: identity.agentId!,
-          })),
-          AGENT_TOKEN_RECORD_KEY,
-        ]
-      : []
+    const readKeys = agentEnsRecordKeys(registry.identityRegistryAddress, identity.agentId)
     readEthagentTextRecords(fullName, readKeys)
       .then(currentText => {
         const currentRecords = recordsFromTextMap(currentText)

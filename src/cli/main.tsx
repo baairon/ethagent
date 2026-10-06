@@ -25,6 +25,7 @@ import { ensureDaemon } from './daemon.js'
 import { runWatch } from './watch.js'
 import { runAddTool, runPause, runResume } from './prefs.js'
 import { HISTORY_COMMANDS } from './history/commands.js'
+import { ONCHAIN_COMMANDS } from './onchain/commands.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -60,6 +61,16 @@ function printHelp(): void {
     '  ethagent checkpoint [label] save a local checkpoint',
     '  ethagent rollback <ref>     restore past bytes (preview, then --yes)',
     '  ethagent forget <ref>       erase local history (preview, then --yes)',
+    '',
+    'onchain identity (add --json for machine output, --help for details):',
+    '  ethagent custody [--verify] Vault, build, holder, and operators; --verify simulates permissions',
+    '  ethagent ens                the linked ENS name, its records, and who controls it',
+    '  ethagent ens <name>         point the agent at a name (preview, then --yes)',
+    '  ethagent ens --unlink       clear the agent records and unlink (preview, then --yes)',
+    '  ethagent ens --set <key>=<value> --clear <key>',
+    '                              change text records (preview, then --yes)',
+    '  ethagent ens <args> --operator',
+    '                              sign the ENS transactions with the operator key (via keychain exec)',
     '',
     '  ethagent --version          print version',
     '  ethagent --help             print this help',
@@ -182,6 +193,10 @@ async function main(): Promise<number> {
   if (argv[0] && HISTORY_COMMANDS.has(argv[0])) {
     const { runHistoryCommand } = await import('./history/index.js')
     return runHistoryCommand(argv[0], argv.slice(1))
+  }
+  if (argv[0] && ONCHAIN_COMMANDS.has(argv[0])) {
+    const { runOnchainCommand } = await import('./onchain/index.js')
+    return runOnchainCommand(argv[0], argv.slice(1))
   }
   if (flags.has('--version') || flags.has('-v')) {
     process.stdout.write(`ethagent ${version}\n`)

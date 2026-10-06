@@ -12,6 +12,7 @@ Most of these run in a separate terminal because they need a wallet or a TTY, bu
 - `npx ethagent --vault-dir` prints this agent's vault directory (where soul, memory, and the `skills/` folder live). Read-only and safe to run yourself.
 - `npx ethagent reset` deletes the local identity, vault, history, and saved secrets (the IPFS storage credential is kept), and disconnects every tool. It asks to confirm in a terminal, so it hangs inside a session unless you pass `--yes`. Run it only when the user explicitly asks.
 - `npx ethagent status`, `history`, `show`, `diff`, `fetch`, `checkpoint`, `rollback`, and `forget` manage continuity history headlessly. See "Continuity history" below.
+- `npx ethagent custody` and `npx ethagent ens` inspect and manage the onchain identity headlessly. See "Onchain identity" below.
 
 To rebuild the agent on a new machine, the user runs `npx ethagent`; it restores the identity from an ENS name or ERC-8004 token id, then asks the wallet to sign.
 
@@ -51,6 +52,15 @@ Every save, restore, and refetch also keeps the exact bytes of soul, memory, ski
 - `rollback <ref> [--file PATH]` puts past bytes back into the vault and harness. Run it only when the user asks. It previews by default; show the preview, then rerun with `--yes`. It takes a checkpoint first, so `rollback --undo --yes` reverses it. It never touches the chain; run `ethagent save` afterwards only if the user wants that state published. `agent-card.json` is derived and cannot be rolled back.
 - `forget <ref> [--file PATH] | --all` erases local plaintext history (leak repair). Run it only when the user asks; it previews by default and needs `--yes`. With `--file`, that exact content is removed from every snapshot and checkpoint and is never cached again. The encrypted copies on IPFS are not affected.
 - Exit codes: 0 ok, 1 failure, 2 usage or ambiguous ref, 3 not cached or no key (the JSON `hint` names the fix), 4 partial or inconsistent. `diff` returns 0 either way and reports `identical`.
+
+Onchain identity:
+
+Both commands take `--json` (same `schema: 1` envelope) and `--help`.
+
+- `custody` (read-only, safe anytime) shows the custody mode, the Vault address and its build, whether it holds the agent token, the Vault-level owner, and the approved operators. `custody --verify` also simulates with `eth_call`, sending nothing: the owner withdrawing, the owner changing an operator, the operator rotating the agent URI, and the operator and a stranger being refused. It exits 4 when a result differs from what the Vault should do. Withdrawing, depositing, and changing operators stay in `npx ethagent`.
+- `ens` (read-only, safe anytime) shows the linked name, its live records, the two-way check, the resolver, who controls the name, and whether the operator key could sign for it.
+- `ens <name>`, `ens --unlink`, and `ens --set <key>=<value> --clear <key>` change ENS. Without `--yes` they only preview: they list every transaction, simulate the ones that can run now, and send nothing (JSON `applied: false`). You may run previews yourself. Anything with `--yes` sends transactions and costs gas, so it stays the user's to run; show them the preview and the command.
+- ENS transactions are signed in the browser wallet by default, or by the operator key with `--operator` (run through `keychain exec ethagent -- ethagent ens <args> --operator`; exit 3 without a key, 2 for an invalid one). The operator key only writes text records and creates subnames under a parent it controls. Publishing a name change (`ens <name>`, `ens --unlink`) always ends with one owner-signed save in the browser.
 
 Recipes: "what changed in my memory since a date" is `diff at:YYYY-MM-DD working --file MEMORY.md --sections`; "when did this rule appear" is `history --file MEMORY.md --sections --json`; "undo that memory edit" is `rollback latest --file MEMORY.md`, then `--yes` once the user confirms; "backfill history" is `fetch --all` with a key.
 

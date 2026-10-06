@@ -5,7 +5,7 @@ import {
   validateErc8004TokenOwner,
   type Erc8004RegistryConfig,
 } from '../../../../registry/erc8004.js'
-import { isAgentInVault, resolveConfiguredVaultAddress } from '../../../../registry/vault.js'
+import { isAgentInVault, resolveConfiguredVaultAddress, vaultBuildForCode, type VaultBuild } from '../../../../registry/vault.js'
 import type { EthagentConfig, EthagentIdentity } from '../../../../../storage/config.js'
 import { readVaultAddressField } from '../../../../identityCompat.js'
 import { readCustodyMode } from '../../../custody/state.js'
@@ -95,6 +95,7 @@ export async function runReconciliation(
     custody: custody.kind,
     agentUri: agentUri.kind,
     vault: vault.kind,
+    ...(vault.kind === 'confirmed' ? { vaultBuild: { id: vault.build.id, label: vault.build.label, hasHeldAgent: vault.build.hasHeldAgent } } : {}),
     workingTree: workingTree.kind,
     rpc,
     driftCount: 0,
@@ -225,8 +226,12 @@ async function probeAgentUri(args: {
   }
 }
 
-type VaultProbe = { kind: 'confirmed' | 'missing' | 'unset' | 'unknown' }
+type VaultProbe =
+  | { kind: 'confirmed'; build: VaultBuild }
+  | { kind: 'missing' | 'unrecognized' | 'unset' | 'unknown' }
 
+// Code at the address is not enough: the probe names the build, so an unknown contract
+// reads as unrecognized instead of confirmed.
 async function probeVault(args: {
   client: PublicClient
   vaultAddress?: Address
@@ -235,7 +240,8 @@ async function probeVault(args: {
   try {
     const code = await args.client.getBytecode({ address: args.vaultAddress })
     if (!code || code === '0x') return { kind: 'missing' }
-    return { kind: 'confirmed' }
+    const build = vaultBuildForCode(code)
+    return build ? { kind: 'confirmed', build } : { kind: 'unrecognized' }
   } catch {
     return { kind: 'unknown' }
   }
@@ -264,7 +270,7 @@ function computeDriftCount(r: AgentReconciliation): number {
   if (r.token === 'unlinked') n++
   if (r.custody === 'mid-flow-uri-pending') n++
   if ((r.agentUri === 'local-newer' || r.agentUri === 'chain-newer') && r.custody !== 'mid-flow-uri-pending') n++
-  if (r.vault === 'missing') n++
+  if (r.vault === 'missing' || r.vault === 'unrecognized') n++
   if (r.workingTree === 'dirty') n++
   return n
 }

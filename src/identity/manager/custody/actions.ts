@@ -3,7 +3,7 @@ import { createErc8004PublicClient } from '../../registry/erc8004.js'
 import { discoverPriorVaultFromTokenOwner, isAgentInVault } from '../../registry/vault.js'
 import type { ProfileUpdates, Step } from '../reducer.js'
 import { isCustodyEditStep } from './CustodyEditFlow.js'
-import { resolveVaultAddress } from './transactions.js'
+import { findReusableDeployedVault, resolveVaultAddress } from './transactions.js'
 import type { CustodyFlowDeps } from './types.js'
 import { humanOwnerAddress } from './helpers.js'
 
@@ -63,8 +63,27 @@ export function createCustodyFlowActions({
             })
             return
           }
-        } catch {
-          void 0
+          const reusable = await findReusableDeployedVault({
+            registry,
+            agentId: BigInt(currentStep.identity.agentId ?? '0'),
+            owner: expectedOwnerForDiscovery,
+          })
+          if (reusable) {
+            setStep({
+              kind: 'custody-vault-deposit-tx',
+              identity: currentStep.identity,
+              registry,
+              vaultAddress: reusable,
+              profileUpdates: withVaultProfileUpdates(profileUpdates, reusable),
+              returnTo,
+            })
+            return
+          }
+        } catch (err: unknown) {
+          // An unanswered read is not "no Vault yet": deploying on it could strand the
+          // token's existing Vault, so the error is shown and the user can retry.
+          handleStepError(err, { kind: 'custody-model', identity: currentStep.identity, registry, returnTo })
+          return
         }
         setStep({
           kind: 'custody-vault-deploy-tx',
@@ -108,15 +127,7 @@ export function createCustodyFlowActions({
           returnTo,
         })
       } catch (err: unknown) {
-        setStep({
-          kind: 'custody-vault-deposit-tx',
-          identity: currentStep.identity,
-          registry,
-          vaultAddress,
-          profileUpdates: withVaultProfileUpdates(profileUpdates, vaultAddress),
-          returnTo,
-        })
-        void err
+        handleStepError(err, { kind: 'custody-model', identity: currentStep.identity, registry, returnTo })
       }
     })()
   }

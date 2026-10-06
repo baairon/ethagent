@@ -165,6 +165,7 @@ test('ENS record update preflights resolver transaction before opening wallet', 
       publicClient: {
         readContract: async (call: { functionName: string }) => {
           if (call.functionName === 'resolver') return '0x0000000000000000000000000000000000001234'
+          if (call.functionName === 'text') return ''
           throw new Error(`unexpected read: ${call.functionName}`)
         },
         estimateGas: async (call: { account: string }) => {

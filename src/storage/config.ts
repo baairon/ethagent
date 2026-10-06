@@ -64,6 +64,7 @@ const IdentitySchema = z.object({
       'vault-deposit',
       'vault-unwrap',
       'vault-withdraw',
+      'ens',
     ]),
     chainId: z.number().int().positive(),
     submittedAt: z.string(),

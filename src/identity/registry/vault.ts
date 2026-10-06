@@ -12,7 +12,17 @@ export {
   assertVaultBytecode,
   formatVaultBytecodeMismatchDetail,
 } from './vault/bytecode.js'
-export type { AssertVaultBytecodeClient } from './vault/bytecode.js'
+export type { AssertVaultBytecodeClient, VaultCheckPacing } from './vault/bytecode.js'
+export {
+  CURRENT_VAULT_BUILD,
+  FIRST_COMMITTED_VAULT_BUILD,
+  PRE_RELEASE_VAULT_BUILD_HASH,
+  knownVaultBuilds,
+  vaultBuildForCode,
+  vaultBuildForHash,
+} from './vault/builds.js'
+export type { VaultBuild } from './vault/builds.js'
+export { describeVaultRevert, vaultRevertName } from './vault/errors.js'
 export {
   encodeDepositAgent,
   encodeRotateAgentURI,
@@ -29,15 +39,14 @@ export {
   confirmAgentWithdrawnFromVault,
   confirmAgentInVault,
   discoverPriorVaultFromTokenOwner,
-  discoverVaultedTokens,
   isAgentInVault,
+  isNotAContractAnswer,
   readMetadataOperators,
 } from './vault/read.js'
 export type {
   ConfirmAgentWithdrawnArgs,
   DiscoverPriorVaultArgs,
   DiscoverPriorVaultClient,
-  DiscoverVaultedTokensArgs,
   IsAgentInVaultArgs,
   VaultReadClient,
   ReadMetadataOperatorsArgs,

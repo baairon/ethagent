@@ -60,47 +60,7 @@ export function renderCustodyStep({
       />
     )
   }
-  if (step.kind === 'custody-vault-withdraw-pick-token') {
-    const activeId = step.identity.agentId
-    const options = step.tokens.map(t => ({
-      value: t.agentId,
-      label: `Token #${t.agentId}`,
-      ...(activeId && t.agentId === activeId ? { hint: 'This agent' } : {}),
-    }))
-    return (
-      <Surface
-        title="Choose a Token to Withdraw"
-        subtitle={`${step.tokens.length} tokens are in this Vault on ${networkName(step.registry.chainId)}. The one you pick returns to your owner wallet.`}
-        footer={<Text color={theme.dim}>↵ select · esc back</Text>}
-      >
-        <Box>
-          <Select<string>
-            options={[
-              ...options,
-              { value: 'cancel', label: 'Back', role: 'utility' },
-            ]}
-            hintLayout="inline"
-            onSubmit={choice => {
-              if (choice === 'cancel') {
-                setStep({ kind: 'custody-model', identity: step.identity, registry: step.registry, returnTo: step.returnTo })
-                return
-              }
-              setStep({
-                kind: 'custody-vault-withdraw-tx',
-                identity: step.identity,
-                registry: step.registry,
-                vaultAddress: step.vaultAddress,
-                agentId: choice,
-                returnTo: step.returnTo,
-                ...(step.returnContext ? { returnContext: step.returnContext } : {}),
-              })
-            }}
-            onCancel={() => setStep({ kind: 'custody-model', identity: step.identity, registry: step.registry, returnTo: step.returnTo })}
-          />
-        </Box>
-      </Surface>
-    )
-  }
+
   if (step.kind === 'custody-vault-withdraw-done') {
     const onReturnToVault = () => {
       setStep({

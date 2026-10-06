@@ -1,9 +1,11 @@
 import { getAddress, type Address } from 'viem'
 import type { EthagentIdentity } from '../../../../storage/config.js'
 import {
+  blockTimeMsForChain,
   createErc8004PublicClient,
   type Erc8004RegistryConfig,
 } from '../../../registry/erc8004.js'
+import { pacedConfirm, PacedTimeoutError } from '../../../../net/paced.js'
 import {
   VAULT_ABI,
   encodeSetMetadataOperator,
@@ -26,11 +28,11 @@ import { captureSnapshot } from '../../../continuity/snapshotCapture.js'
 import type { EffectCallbacks } from './types.js'
 import { awaitConfirmedReceipt } from './receipts.js'
 
-export function resolverSyncWarningMessage(err: unknown): string {
+export function operatorSyncWarningMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err)
 }
 
-export function appendResolverSyncWarning(message: string, warning: string | null): string {
+export function appendOperatorSyncWarning(message: string, warning: string | null): string {
   if (!warning) return message
   return `${message}\n\nWarning: ${warning}`
 }
@@ -41,12 +43,30 @@ export async function syncVaultOperatorsAfterOwnerSave(args: {
   registry: Erc8004RegistryConfig
   vaultAddress?: Address
   callbacks: EffectCallbacks
+  // The save follows a deposit. Each deposit starts a new operator epoch on the Vault,
+  // which wipes every approval, so operators that local state still lists are approved
+  // again even though the local diff is empty.
+  afterDeposit?: boolean
 }): Promise<void> {
   const beforeState = (args.beforeIdentity.state ?? {}) as Record<string, unknown>
   const afterState = (args.afterIdentity.state ?? {}) as Record<string, unknown>
   const before = normalizeApprovedOperatorWallets(beforeState.approvedOperatorWallets)
   const after = normalizeApprovedOperatorWallets(afterState.approvedOperatorWallets)
-  const diff = computeApprovalDiff(before, after)
+  let diff = computeApprovalDiff(before, after)
+  if (args.afterDeposit && args.vaultAddress && args.afterIdentity.agentId && after.length > 0) {
+    const onchain = await readMetadataOperators({
+      client: createErc8004PublicClient(args.registry),
+      vaultAddress: getAddress(args.vaultAddress),
+      registry: getAddress(args.registry.identityRegistryAddress),
+      agentId: BigInt(args.afterIdentity.agentId),
+      candidates: after.map(record => getAddress(record.address)),
+    })
+    const added = new Map(diff.added.map(address => [address.toLowerCase(), address]))
+    for (const [address, approved] of Object.entries(onchain)) {
+      if (!approved) added.set(address.toLowerCase(), getAddress(address))
+    }
+    diff = { added: [...added.values()], removed: diff.removed }
+  }
   if (diff.added.length === 0 && diff.removed.length === 0) return
 
   const ownerAddressRaw = readOwnerAddressField(afterState) ?? args.afterIdentity.ownerAddress ?? args.afterIdentity.address
@@ -77,17 +97,14 @@ export async function syncVaultMetadataOperatorsAfterOwnerSave(args: {
   const registryAddress = getAddress(args.registry.identityRegistryAddress)
   const vaultAddress = getAddress(args.vaultAddress)
   const probeClient = createErc8004PublicClient(args.registry)
-  let depositor: Address | undefined
-  try {
-    depositor = await probeClient.readContract({
-      address: vaultAddress,
-      abi: VAULT_ABI,
-      functionName: 'agentOwner',
-      args: [registryAddress, agentId],
-    }) as Address
-  } catch {
-    depositor = undefined
-  }
+  // An unanswered read surfaces: skipping the sync on it would leave operators that
+  // local state lists as approved without an onchain approval.
+  const depositor = await probeClient.readContract({
+    address: vaultAddress,
+    abi: VAULT_ABI,
+    functionName: 'agentOwner',
+    args: [registryAddress, agentId],
+  }) as Address
   if (!depositor || depositor.toLowerCase() !== args.ownerAddress.toLowerCase()) return
 
   const operations: Array<{ operator: Address; approved: boolean }> = []
@@ -123,33 +140,40 @@ export async function syncVaultMetadataOperatorsAfterOwnerSave(args: {
     await awaitConfirmedReceipt(probeClient, tx.txHash, 'Vault operator sync')
   }
 
-  const VERIFY_MAX_ATTEMPTS = 5
-  const VERIFY_DELAY_MS = 1500
   let lastMismatch: { op: typeof operations[number]; observed: boolean } | undefined
-  for (let attempt = 0; attempt < VERIFY_MAX_ATTEMPTS; attempt++) {
-    if (attempt > 0) await new Promise(resolve => setTimeout(resolve, VERIFY_DELAY_MS))
-    const final = await readMetadataOperators({
-      client: probeClient,
-      vaultAddress,
-      registry: registryAddress,
-      agentId,
-      candidates: operations.map(o => o.operator),
-    })
-    lastMismatch = undefined
-    for (const op of operations) {
-      const observed = Boolean(final[op.operator])
-      if (observed !== op.approved) {
-        lastMismatch = { op, observed }
-        break
-      }
-    }
-    if (!lastMismatch) return
-  }
-  if (lastMismatch) {
+  try {
+    await pacedConfirm(
+      'The operator change',
+      async () => {
+        const final = await readMetadataOperators({
+          client: probeClient,
+          vaultAddress,
+          registry: registryAddress,
+          agentId,
+          candidates: operations.map(o => o.operator),
+        })
+        lastMismatch = undefined
+        for (const op of operations) {
+          const observed = Boolean(final[op.operator])
+          if (observed !== op.approved) {
+            lastMismatch = { op, observed }
+            return { done: false, observed: `${op.operator} ${observed ? 'approved' : 'not approved'}` }
+          }
+        }
+        return { done: true, value: undefined }
+      },
+      {
+        blockTimeMs: blockTimeMsForChain(args.registry.chainId),
+        ...(args.callbacks.signal ? { signal: args.callbacks.signal } : {}),
+      },
+    )
+  } catch (err: unknown) {
+    if (!(err instanceof PacedTimeoutError) || !lastMismatch) throw err
+    const mismatch: { op: typeof operations[number]; observed: boolean } = lastMismatch
     throw new Error(
-      lastMismatch.op.approved
-        ? `Vault operator authorization didn't land for ${lastMismatch.op.operator}. Your wallet may have rejected the inner transaction; retry the save to apply it.`
-        : `Vault operator revocation didn't land for ${lastMismatch.op.operator}. Your wallet may have rejected the inner transaction; retry the save to apply it.`,
+      mismatch.op.approved
+        ? `Vault operator authorization didn't land for ${mismatch.op.operator}. Your wallet may have rejected the inner transaction; retry the save to apply it.`
+        : `Vault operator revocation didn't land for ${mismatch.op.operator}. Your wallet may have rejected the inner transaction; retry the save to apply it.`,
     )
   }
 }

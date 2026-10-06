@@ -197,6 +197,7 @@ function renderReconciliationBanner(r: AgentReconciliation, identity: EthagentId
   if (r.custody !== 'mid-flow-uri-pending' && r.agentUri === 'local-newer') lines.push('Your newest snapshot is not onchain yet.')
   if (r.custody !== 'mid-flow-uri-pending' && r.agentUri === 'chain-newer') lines.push('Newer snapshot onchain. Use Refetch Latest.')
   if (r.vault === 'missing') lines.push('The Vault contract was not found.')
+  if (r.vault === 'unrecognized') lines.push('The Vault address holds code that is not a known Vault build.')
   if (lines.length === 0) return null
   return (
     <>

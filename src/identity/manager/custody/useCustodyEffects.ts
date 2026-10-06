@@ -7,6 +7,8 @@ import type { CustodyFlowDeps } from './types.js'
 import { scopeCallbacks } from '../shared/effects/types.js'
 import { humanOwnerAddress } from './helpers.js'
 import {
+  receiptPacing,
+  recordDeployedVault,
   runVaultDeployTransaction,
   runVaultDepositTransaction,
   runVaultUnwrapTransaction,
@@ -41,6 +43,7 @@ export function useCustodyTransactionEffects({
       agentId: BigInt(step.identity.agentId),
       callbacks: scope.callbacks,
       flowId: 'advanced-custody',
+      onDeployed: vaultAddress => recordDeployedVault(step.registry.chainId, vaultAddress),
     })
       .then(async ({ vaultAddress }) => {
         if (cancelled) return
@@ -74,7 +77,7 @@ export function useCustodyTransactionEffects({
       callbacks: scope.callbacks,
       flowId: 'advanced-custody',
     })
-      .then(async () => {
+      .then(async ({ receiptBlock }) => {
         if (cancelled) return
         invalidateOwnershipCache()
         refreshReconciliation()
@@ -85,6 +88,7 @@ export function useCustodyTransactionEffects({
           vaultAddress: step.vaultAddress,
           registry: step.registry.identityRegistryAddress,
           agentId: BigInt(step.identity.agentId ?? '0'),
+          pacing: receiptPacing(step.registry, probeClient, receiptBlock, scope.callbacks.signal),
         })
         if (cancelled) return
         if (status.ownerAddress.toLowerCase() !== expectedOwner.toLowerCase()) {

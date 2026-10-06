@@ -110,6 +110,7 @@ export function applyOperatorProfileState(
     clearOwnerAddressField(state)
     delete state.approvedOperatorWallets
     delete state.activeOperatorAddress
+    clearVaultAddressField(state)
     if (profile.restoreAccessEpoch !== undefined) {
       state.restoreAccessEpoch = profile.restoreAccessEpoch
     }

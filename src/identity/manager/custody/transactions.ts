@@ -8,16 +8,20 @@ import {
   VAULT_ABI,
   VAULT_DEPLOY_BYTECODE,
   assertVaultBytecode,
+  VaultBytecodeMismatchError,
 } from '../../registry/vault.js'
 import {
+  blockTimeMsForChain,
   createErc8004PublicClient,
   type Erc8004RegistryConfig,
 } from '../../registry/erc8004.js'
-import type { EthagentIdentity } from '../../../storage/config.js'
+import { describeVaultRevert, isNotAContractAnswer, type VaultBuild, type VaultCheckPacing } from '../../registry/vault.js'
+import { loadConfig, saveConfigWithMerge, setConfiguredVaultAddress, type EthagentIdentity } from '../../../storage/config.js'
 import { readVaultAddressField, readOwnerAddressField } from '../../identityCompat.js'
 import { prepareTransactionGasFee, sendBrowserWalletTransaction } from '../../wallet/browserWallet.js'
 import { acquireTxGuard, releaseTxGuard, type TxGuardKind } from '../shared/txGuard.js'
 import { awaitConfirmedReceipt } from '../shared/effects/receipts.js'
+import { invalidateOwnershipCache } from '../shared/reconciliation/agentReconciliation/ownership.js'
 import type { EffectCallbacks } from '../shared/effects/types.js'
 import { readCustodyMode } from './state.js'
 
@@ -32,12 +36,59 @@ export function resolveVaultAddress(
   return resolveConfiguredVaultAddress(operatorVaults, identity.chainId)
 }
 
+// Saves a freshly deployed Vault's address as soon as the deploy receipt names it, so
+// a retry after a failed check or a closed screen reuses it instead of deploying again.
+export async function recordDeployedVault(chainId: number, vaultAddress: Address): Promise<void> {
+  await saveConfigWithMerge(current => {
+    if (!current) throw new Error('Cannot record the new Vault: no ethagent config is saved')
+    return setConfiguredVaultAddress(current, chainId, getAddress(vaultAddress))
+  })
+}
+
+// A Vault recorded by an earlier deploy that this token can still go into. The Vault
+// binds its registry and token at deploy time, and only the simulated deposit can tell
+// which token that is, so a refusal there means "deploy a new one". Unanswered reads
+// surface as errors.
+export async function findReusableDeployedVault(args: {
+  registry: Erc8004RegistryConfig
+  agentId: bigint
+  owner: Address
+}): Promise<Address | undefined> {
+  const config = await loadConfig()
+  const recorded = config?.erc8004?.operatorVaults?.[String(args.registry.chainId)]
+  if (!recorded) return undefined
+  const vaultAddress = getAddress(recorded)
+  const client = createErc8004PublicClient(args.registry)
+  let build: VaultBuild
+  try {
+    build = await assertVaultBytecode(client, vaultAddress, undefined, { blockTimeMs: blockTimeMsForChain(args.registry.chainId) })
+  } catch (err: unknown) {
+    if (err instanceof VaultBytecodeMismatchError) return undefined
+    throw err
+  }
+  try {
+    await assertVaultCanAcceptAgent({ registry: args.registry, vaultAddress, agentId: args.agentId, build, owner: args.owner, client })
+  } catch (err: unknown) {
+    if (err instanceof VaultRefusedDepositError) return undefined
+    throw err
+  }
+  return vaultAddress
+}
+
+export class VaultRefusedDepositError extends Error {
+  constructor(message: string, options?: { cause?: unknown }) {
+    super(message, options)
+    this.name = 'VaultRefusedDepositError'
+  }
+}
+
 async function withTxGuard<T>(kind: TxGuardKind, fn: () => Promise<T>): Promise<T> {
   acquireTxGuard(kind)
   try {
     return await fn()
   } finally {
     releaseTxGuard(kind)
+    invalidateOwnershipCache()
   }
 }
 
@@ -46,8 +97,11 @@ export async function runVaultDeployTransaction(args: {
   walletAddress: Address
   agentId: bigint
   callbacks: EffectCallbacks
-  publicClient?: Pick<PublicClient, 'waitForTransactionReceipt' | 'getBytecode'>
+  publicClient?: Pick<PublicClient, 'waitForTransactionReceipt' | 'getBytecode' | 'getBlockNumber'>
   flowId?: string
+  // Called as soon as the deploy receipt names the new Vault, before its code is
+  // checked, so a retry after a failed check reuses this Vault instead of deploying again.
+  onDeployed?: (vaultAddress: Address) => Promise<void> | void
 }): Promise<{ txHash: Hex; vaultAddress: Address }> {
   return withTxGuard('vault-deploy', () => runVaultDeployTransactionInner(args))
 }
@@ -57,8 +111,9 @@ async function runVaultDeployTransactionInner(args: {
   walletAddress: Address
   agentId: bigint
   callbacks: EffectCallbacks
-  publicClient?: Pick<PublicClient, 'waitForTransactionReceipt' | 'getBytecode'>
+  publicClient?: Pick<PublicClient, 'waitForTransactionReceipt' | 'getBytecode' | 'getBlockNumber'>
   flowId?: string
+  onDeployed?: (vaultAddress: Address) => Promise<void> | void
 }): Promise<{ txHash: Hex; vaultAddress: Address }> {
   const walletAddress = getAddress(args.walletAddress)
   const registryAddress = getAddress(args.registry.identityRegistryAddress)
@@ -92,7 +147,8 @@ async function runVaultDeployTransactionInner(args: {
     throw new Error('Vault deploy receipt is missing contractAddress; the transaction was not a contract creation')
   }
   const vaultAddress = getAddress(receipt.contractAddress)
-  await assertVaultBytecode(client, vaultAddress, result.txHash)
+  await args.onDeployed?.(vaultAddress)
+  await assertVaultBytecode(client, vaultAddress, result.txHash, receiptPacing(args.registry, client, receipt.blockNumber, args.callbacks.signal))
   return { txHash: result.txHash, vaultAddress }
 }
 
@@ -102,7 +158,7 @@ export async function runVaultDepositTransaction(args: {
   vaultAddress: Address
   callbacks: EffectCallbacks
   flowId?: string
-}): Promise<{ txHash: string }> {
+}): Promise<{ txHash: string; receiptBlock: bigint; build: VaultBuild }> {
   return withTxGuard('vault-deposit', () => runVaultDepositTransactionInner(args))
 }
 
@@ -112,17 +168,23 @@ async function runVaultDepositTransactionInner(args: {
   vaultAddress: Address
   callbacks: EffectCallbacks
   flowId?: string
-}): Promise<{ txHash: string }> {
+}): Promise<{ txHash: string; receiptBlock: bigint; build: VaultBuild }> {
   const { identity, registry, vaultAddress } = args
   if (!identity.agentId) {
     throw new Error('Cannot deposit token to Vault: agent token ID is missing')
   }
-  await assertVaultBytecode(createErc8004PublicClient(registry), vaultAddress)
+  const readClient = createErc8004PublicClient(registry)
+  const build = await assertVaultBytecode(readClient, vaultAddress, undefined, {
+    blockTimeMs: blockTimeMsForChain(registry.chainId),
+    ...(args.callbacks.signal ? { signal: args.callbacks.signal } : {}),
+  })
   const tokenOwner = getAddress(identity.ownerAddress ?? identity.address)
   await assertVaultCanAcceptAgent({
     registry,
     vaultAddress,
     agentId: BigInt(identity.agentId),
+    build,
+    owner: tokenOwner,
   })
   const encoded = encodeDepositAgent({
     registry: getAddress(registry.identityRegistryAddress),
@@ -152,39 +214,99 @@ async function runVaultDepositTransactionInner(args: {
   })
   args.callbacks.onWalletReady(null)
   const depositClient = createErc8004PublicClient(registry)
-  await awaitConfirmedReceipt(
+  const receipt = await awaitConfirmedReceipt(
     depositClient,
     result.txHash as Hex,
     'Vault deposit',
     { kind: 'vault-deposit', chainId: registry.chainId },
   )
-  return { txHash: result.txHash }
+  return { txHash: result.txHash, receiptBlock: receipt.blockNumber, build }
 }
 
-async function assertVaultCanAcceptAgent(args: {
+export function receiptPacing(
+  registry: Pick<Erc8004RegistryConfig, 'chainId'>,
+  client: Partial<Pick<PublicClient, 'getBlockNumber'>>,
+  receiptBlock: bigint | undefined,
+  signal?: AbortSignal,
+): VaultCheckPacing {
+  const getBlockNumber = client.getBlockNumber?.bind(client)
+  return {
+    blockTimeMs: blockTimeMsForChain(registry.chainId),
+    ...(receiptBlock !== undefined && getBlockNumber ? { receiptBlock, getBlockNumber: () => getBlockNumber() } : {}),
+    ...(signal ? { signal } : {}),
+  }
+}
+
+const ERC721_SAFE_TRANSFER_SIM_ABI = [{
+  type: 'function',
+  name: 'safeTransferFrom',
+  stateMutability: 'nonpayable',
+  inputs: [
+    { name: 'from', type: 'address' },
+    { name: 'to', type: 'address' },
+    { name: 'tokenId', type: 'uint256' },
+  ],
+  outputs: [],
+}] as const
+
+const ZERO = '0x0000000000000000000000000000000000000000'
+
+// Checks the Vault can take this token before the wallet is asked. Builds with
+// heldAgent() say what they hold; on every build agentOwner for this token must be
+// empty. Then the deposit itself is simulated from the owner, which is the check every
+// build agrees on. Failed reads surface as errors; they never count as "accept".
+export async function assertVaultCanAcceptAgent(args: {
   registry: Erc8004RegistryConfig
   vaultAddress: Address
   agentId: bigint
+  build: VaultBuild
+  owner: Address
+  client?: Pick<PublicClient, 'readContract' | 'simulateContract'>
 }): Promise<void> {
-  const client = createErc8004PublicClient(args.registry)
-  let held: readonly [Address, bigint, Address]
-  try {
-    held = await client.readContract({
-      address: getAddress(args.vaultAddress),
+  const client = args.client ?? createErc8004PublicClient(args.registry)
+  const vault = getAddress(args.vaultAddress)
+  const expectedRegistry = getAddress(args.registry.identityRegistryAddress)
+  if (args.build.hasHeldAgent) {
+    const held = await client.readContract({
+      address: vault,
       abi: VAULT_ABI,
       functionName: 'heldAgent',
     }) as readonly [Address, bigint, Address]
-  } catch {
-    return
+    const [heldRegistry, heldAgentId, heldOwner] = held
+    if (heldOwner && heldOwner.toLowerCase() !== ZERO) {
+      const sameAgent = heldRegistry.toLowerCase() === expectedRegistry.toLowerCase() && heldAgentId === args.agentId
+      if (sameAgent) {
+        throw new VaultRefusedDepositError(`Vault ${vault} already holds ERC-8004 token #${args.agentId.toString()}. Publish the pending update instead of depositing again.`)
+      }
+      throw new VaultRefusedDepositError(`Vault ${vault} already holds ERC-8004 token #${heldAgentId.toString()} for registry ${getAddress(heldRegistry)}. Deploy a fresh vault for this agent.`)
+    }
+  } else {
+    const owner = await client.readContract({
+      address: vault,
+      abi: VAULT_ABI,
+      functionName: 'agentOwner',
+      args: [expectedRegistry, args.agentId],
+    }) as Address
+    if (owner && owner.toLowerCase() !== ZERO) {
+      throw new VaultRefusedDepositError(`Vault ${vault} already holds ERC-8004 token #${args.agentId.toString()}. Publish the pending update instead of depositing again.`)
+    }
   }
-  const [heldRegistry, heldAgentId, heldOwner] = held
-  if (!heldOwner || heldOwner.toLowerCase() === '0x0000000000000000000000000000000000000000') return
-  const expectedRegistry = getAddress(args.registry.identityRegistryAddress)
-  const sameAgent = heldRegistry.toLowerCase() === expectedRegistry.toLowerCase() && heldAgentId === args.agentId
-  if (sameAgent) {
-    throw new Error(`Vault ${getAddress(args.vaultAddress)} already holds ERC-8004 token #${args.agentId.toString()}. Publish the pending update instead of depositing again.`)
+  try {
+    await client.simulateContract({
+      account: getAddress(args.owner),
+      address: expectedRegistry,
+      abi: [...ERC721_SAFE_TRANSFER_SIM_ABI, ...VAULT_ABI.filter(item => item.type === 'error')],
+      functionName: 'safeTransferFrom',
+      args: [getAddress(args.owner), vault, args.agentId],
+    })
+  } catch (err: unknown) {
+    if (!isNotAContractAnswer(err)) throw err
+    const reason = describeVaultRevert(err)
+    throw new VaultRefusedDepositError(
+      `A simulated deposit into Vault ${vault} was refused${reason ? `: ${reason}` : ''}. Nothing was sent.`,
+      { cause: err },
+    )
   }
-  throw new Error(`Vault ${getAddress(args.vaultAddress)} already holds ERC-8004 token #${heldAgentId.toString()} for registry ${getAddress(heldRegistry)}. Deploy a fresh vault for this agent.`)
 }
 
 export async function runVaultUnwrapTransaction(args: {
@@ -248,7 +370,7 @@ async function runVaultUnwrapTransactionInner(args: {
     ...(args.flowId ? { flowId: args.flowId } : {}),
   })
   args.callbacks.onWalletReady(null)
-  await awaitConfirmedReceipt(
+  const receipt = await awaitConfirmedReceipt(
     publicClient,
     result.txHash as Hex,
     'Vault unwrap',
@@ -260,6 +382,7 @@ async function runVaultUnwrapTransactionInner(args: {
     registry: getAddress(registry.identityRegistryAddress),
     agentId: targetAgentId,
     recipient: ownerAddress,
+    pacing: receiptPacing(registry, publicClient, receipt.blockNumber, args.callbacks.signal),
   })
   return { txHash: result.txHash }
 }
@@ -323,7 +446,7 @@ async function runVaultWithdrawTransactionInner(args: {
     ...(args.callbacks.signal ? { signal: args.callbacks.signal } : {}),
   })
   args.callbacks.onWalletReady(null)
-  await awaitConfirmedReceipt(
+  const receipt = await awaitConfirmedReceipt(
     publicClient,
     result.txHash as Hex,
     'Vault withdraw',
@@ -335,6 +458,7 @@ async function runVaultWithdrawTransactionInner(args: {
     registry: getAddress(registry.identityRegistryAddress),
     agentId: targetAgentId,
     recipient,
+    pacing: receiptPacing(registry, publicClient, receipt.blockNumber, args.callbacks.signal),
   })
   return { txHash: result.txHash, recipient }
 }

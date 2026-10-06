@@ -102,12 +102,6 @@ export function logBlockRangeForChain(chainId: number): bigint {
   return chain.logBlockRange
 }
 
-export function minLogBlockRangeForChain(chainId: number): bigint {
-  const chain = supportedErc8004ChainForId(chainId)
-  if (!chain) return 2_000n
-  return chain.kind === 'l2' ? chain.logBlockRange : chain.logBlockRange / 2n || 1n
-}
-
 export function rpcUrlsForClient(args: Pick<Erc8004RegistryConfig, 'chainId' | 'rpcUrl'>): string[] {
   const chain = supportedErc8004ChainForId(args.chainId)
   return uniqueStrings([
@@ -123,6 +117,11 @@ export function chainForId(chainId: number): Chain | undefined {
     case base.id:    return base
     default:         return undefined
   }
+}
+
+// The chain's own block time, the natural pause before looking again for a change.
+export function blockTimeMsForChain(chainId: number): number {
+  return chainForId(chainId)?.blockTime ?? mainnet.blockTime ?? 12_000
 }
 
 function chainEntry(

@@ -1,5 +1,6 @@
 export {
   DEFAULT_ERC8004_CHAIN_ID,
+  blockTimeMsForChain,
   DEFAULT_ERC8004_IDENTITY_REGISTRY_ADDRESS,
   DEFAULT_ETHEREUM_RPC_URL,
   MissingRegistryAddressError,
