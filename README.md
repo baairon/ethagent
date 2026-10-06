@@ -24,11 +24,13 @@ You'll need an Ethereum wallet, the one that holds and unlocks your agent. Day-t
 
 A guided menu does the rest: name it and write who it is. When you're done, your wallet signs once to put it onchain.
 
+Prefer no menu? `ethagent create --name <text> --network <network>` does the same headlessly, previewing first and minting with `--yes`. Every menu action has a command like this; see [Setting up and moving an agent](#setting-up-and-moving-an-agent).
+
 <p align="center">
   <img src="preview/menu.svg" alt="ethagent main menu for a linked agent" width="100%">
 </p>
 
-**2. Use it anywhere.** That's the whole setup. ethagent wires itself into the AI tools you use, on any machine or OS, and your agent follows you and keeps learning. After this you rarely open the menu again: only to edit something by hand, change custody, or restore on a new machine. [Underneath](#underneath) shows what runs in the meantime.
+**2. Use it anywhere.** That's the whole setup. ethagent wires itself into the AI tools you use, on any machine or OS, and your agent follows you and keeps learning. After this you rarely open the menu again: only to edit something by hand, change custody, or restore on a new machine, and each of those has a headless command too. [Underneath](#underneath) shows what runs in the meantime.
 
 If a tool wasn't picked up, `npx ethagent --status` lists the ones ethagent keeps in sync. Open the missing tool and paste this to its agent:
 
@@ -162,6 +164,17 @@ The foundation is built on open standards, so your agent is never tied to one ap
 | Change the name's text records | `ethagent ens --set <key>=<value> --clear <key>`, then again with `--yes` |
 | Unlink the ENS name | `ethagent ens --unlink`, then again with `--yes` |
 | Sign ENS changes with the operator key | `keychain exec ethagent -- ethagent ens <args> --operator` |
+| Set up IPFS storage | `ethagent storage --set`, with the Pinata JWT on stdin |
+| Create an agent | `ethagent create --name <text> --network <network>`, then again with `--yes` |
+| List the agents a wallet holds | `ethagent restore --owner <address>` |
+| Restore an agent on a new machine | `ethagent restore <token-id> --network <network>`, then again with `--yes` |
+| Restore with the operator key, no browser | `keychain exec ethagent -- ethagent restore <token-id> --network <network> --operator --yes` |
+| Pull the newest onchain snapshot into the vault | `ethagent restore`, then again with `--yes` |
+| Change the public name, description, or image | `ethagent profile --name <text> --description <text> --image <path>`, then again with `--yes` |
+| Switch to Advanced custody | `ethagent custody --advanced`, then again with `--yes` |
+| Switch back to Simple custody | `ethagent custody --simple`, then again with `--yes` |
+| Approve the operator key as an operator | `keychain exec ethagent -- ethagent custody --add-operator --operator`, then again with `--yes` |
+| Prepare the agent for a new owner | `ethagent transfer <address>`, then again with `--yes` |
 
 ### Commands
 
@@ -169,7 +182,7 @@ Run any of these with `npx ethagent`. Commands marked interactive need a termina
 
 | Command | What it does | Effect |
 | --- | --- | --- |
-| `ethagent` | Open the manager: create, restore, edit, custody, ENS, transfer. | Interactive |
+| `ethagent` | Open the manager: create, restore, edit, custody, ENS, transfer. Each also has a command below. | Interactive |
 | `save [--json] [--no-open] [--operator]` | Back up your agent onchain. See [Saving](#saving). | Opens your wallet |
 | `--add <path>` | Connect a tool by the instructions file it loads every session. Adds one marked ethagent block to that file and a `skills` folder beside it, keeps both in sync, and leaves the rest of the file alone. | Writes that file |
 | `pause` / `resume` | Stop or restart background sync. | Local |
@@ -184,12 +197,21 @@ Run any of these with `npx ethagent`. Commands marked interactive need a termina
 | `checkpoint [label] [--json]` | Record the vault as it is right now. | Writes history |
 | `rollback <ref> [--yes] [--json]` | Put past bytes back. Previews until `--yes`. | Writes the vault |
 | `forget <ref> [--yes] [--json]` | Erase versions from local history. Previews until `--yes`. | Deletes history |
+| `storage [--set \| --forget] [--json]` | Where snapshots are pinned and whether a credential is set. `--set` saves a Pinata JWT read from stdin; `--forget` removes it after a preview. | Read-only; `--set` and `--forget` write secrets |
+| `create --name <text> --network <network> [--advanced] [--import] [--yes] [--json]` | Mint a new agent with its first snapshot. `--advanced` continues into a Vault in the same tab. Previews until `--yes`. | Opens your wallet |
+| `restore [<token-id> \| <name>] [--network <network>] [--operator] [--yes] [--json]` | Rebuild an agent on this machine, or with no target pull the newest onchain snapshot into the vault. Previews until `--yes`. | Opens your wallet, or none with `--operator` |
+| `restore --owner <address\|name> [--json]` | List the agents a wallet holds or operates. | Goes online |
+| `profile [--name <text>] [--description <text>] [--image <path\|url\|none>] [--operator] [--yes] [--json]` | Show the public profile, or change it and publish in one save. Previews until `--yes`. | Opens your wallet, or none with `--operator` |
 | `custody [--json]` | Custody mode, the Vault and its build, whether it holds the token, the Vault-level owner, and the approved operators. | Goes online |
 | `custody --verify [--json]` | Also simulates, sending nothing: the owner withdrawing and changing an operator, the operator rotating the agent URI, and the operator and a stranger being refused. Exits 4 on a mismatch. | Goes online |
 | `ens [--json]` | The linked name, its records, the two-way check, the resolver, who controls the name, and whether the operator key could sign for it. | Goes online |
 | `ens <name> [--operator] [--yes] [--json]` | Point the agent at a name: create it under a parent the signer controls, write the agent records, clear them on the old name, then publish the name. Previews until `--yes`. | Opens your wallet |
 | `ens --unlink [--operator] [--yes] [--json]` | Clear the agent records on the linked name, then publish it unlinked. Previews until `--yes`. | Opens your wallet |
 | `ens --set <key>=<value> --clear <key> [--operator] [--yes] [--json]` | Write every record change in one transaction. No save needed. Previews until `--yes`. | Opens your wallet, or none with `--operator` |
+| `custody --advanced [--yes] [--json]` | Deploy a Vault (or reuse one), deposit the token, and save. Previews until `--yes`. | Opens your wallet |
+| `custody --simple [--yes] [--json]` | Revoke the Vault's operators, withdraw the token, and save. Previews until `--yes`. | Opens your wallet |
+| `custody --add-operator [<address>] \| --remove-operator <address> \| --activate-operator <address> [--operator] [--yes] [--json]` | Manage operators; the owner approves the change and the Vault approvals follow. Previews until `--yes`. | Opens your wallet |
+| `transfer <address\|name> [--yes] [--json]` | Re-encrypt the agent for a new owner and publish it; you then send the token yourself. Previews until `--yes`. | Opens your wallet |
 | `--version`, `--help` | Version, or the full command list. Every history and onchain command also takes `--help`. | Read-only |
 
 ### Saving
@@ -217,14 +239,27 @@ Run any of these with `npx ethagent`. Commands marked interactive need a termina
 
 ### Onchain identity
 
-`ethagent custody` and `ethagent ens` work without the manager.
+`ethagent custody` and `ethagent ens` work without the manager. See also [Setting up and moving an agent](#setting-up-and-moving-an-agent).
 
 - **Previews.** ENS changes preview by default. They list every transaction, simulate the ones that can run now from the signer, and send nothing. Rerun with `--yes` to send.
 - **Signers.** ENS transactions are signed in your browser wallet, in one tab for the whole change. With `--operator`, the operator key signs them with no popup instead. Run it as `keychain exec ethagent -- ethagent ens <args> --operator`.
 - **What the operator key may do.** It only writes text records and creates subnames under a parent it controls. It never sets `addr` on an existing name and never changes ownership.
 - **Publishing.** Changing or unlinking the name always ends with one owner-signed save. A stolen operator key therefore can't point your agent at a name it registered. Local state takes the new name only after that save lands.
 - **Control check.** Before anything is sent, the command refuses unless the signer controls the name: as its owner, its NameWrapper owner, or a delegate approved on its resolver.
-- **Custody writes.** Withdrawing, depositing, and changing operators stay in the manager.
+
+### Setting up and moving an agent
+
+`create`, `restore`, `profile`, `transfer`, `storage`, and the custody changes run without the manager too. Everything the manager can do now has a command.
+
+- **Previews.** Anything that signs or sends previews first: every signature and transaction, who signs it, and what can be simulated now. Nothing happens without `--yes`.
+- **One tab.** Each command runs all its wallet prompts in one browser tab. `--no-open` prints the link instead of opening it.
+- **Resuming.** Custody changes are planned from the chain each run. A run that stops part way, for example a cancelled prompt after the Vault was deployed, says what landed (exit 4, or 3 when cancelled), and running the same command again finishes the rest.
+- **Restore and the operator key.** `restore --operator` decrypts with the operator key through its slot in the snapshot. Nothing opens in the browser, so an agent can restore itself on a new machine. The owner must have saved once since that operator was approved. Whatever the vault held is checkpointed first, and `ethagent rollback --undo --yes` puts it back.
+- **Approving the operator key.** `custody --add-operator --operator` has the injected key sign its own proof locally, so only the owner approves in the browser.
+- **Profile with the operator key.** `profile --operator` works in Advanced custody with a linked ENS name and the key approved as an operator. Otherwise it says what is missing.
+- **Simple custody revokes first.** `custody --simple` revokes every operator the Vault still approves before withdrawing the token, so leftover approvals can't outlive the switch.
+- **Transfers.** `transfer` re-encrypts the agent for the receiver, with both wallets signing in the same browser. ethagent never moves the token: send it yourself afterwards, and the receiver runs `ethagent restore <token-id>`.
+- **Storage.** `storage --set` reads the JWT from stdin, never from an argument.
 
 ### History commands
 
@@ -400,13 +435,13 @@ With `--json`, every history and onchain command prints one line of ASCII-only J
 | `1` | Failed: unknown ref, missing path, or a store error. |
 | `2` | Usage error, or a ref that matches more than one thing. |
 | `3` | The snapshot isn't cached here or there's no key to open it, `--operator` ran without an injected operator key, or the wallet approval was cancelled. |
-| `4` | Partly done, or `status --verify` or `custody --verify` found a mismatch. |
+| `4` | Partly done (a custody change or `create --advanced` that stopped after something landed; run it again to finish), or `status --verify` or `custody --verify` found a mismatch. |
 
 ### Environment variables
 
 | Variable | Effect |
 | --- | --- |
-| `ETHAGENT_OPERATOR_KEY` | The operator key for `save --operator`, `fetch`, and `ens --operator`. Inject it from your OS keychain; never type it into a command. |
+| `ETHAGENT_OPERATOR_KEY` | The operator key for `save --operator`, `fetch`, `restore --operator`, `profile --operator`, `custody --add-operator --operator`, and `ens --operator`. Inject it from your OS keychain; never type it into a command. |
 | `ETHAGENT_RPC_URL` | The RPC endpoint asked first for the agent's network. Use one that keeps history when the public endpoints can't reach back far enough for a wallet search. |
 | `ETHAGENT_IPFS_API_URL` | Where snapshots are uploaded, in place of Pinata. |
 | `PINATA_JWT` | IPFS storage credential, if you haven't set one up in the manager. |

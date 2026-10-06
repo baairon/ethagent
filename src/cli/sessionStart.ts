@@ -19,8 +19,9 @@ export function buildSessionStartContext(identity?: EthagentIdentity | null): st
     'Every save is also kept locally byte for byte: `npx ethagent status`, `history`, `show`, and `diff` (add `--json`) ' +
     'are read-only and safe to run anytime; run `rollback` or `forget` only when the user asks, preview first, and see ' +
     '`npx ethagent <command> --help` for usage. ' +
-    '`npx ethagent custody` and `npx ethagent ens` (with `--json`) show the Vault and the ENS name and are safe to run; ' +
-    'ENS changes preview without `--yes`, and anything with `--yes` stays the user\'s to run.'
+    '`npx ethagent custody`, `ens`, `profile`, and `storage` (with `--json`) show the onchain identity and are safe to run. ' +
+    '`create`, `restore`, `profile`, `custody`, `ens`, and `transfer` preview their changes without `--yes`; anything with ' +
+    '`--yes` stays the user\'s to run, except `restore --operator --yes` when the user asks you to restore or refresh the agent.'
   )
 }
 

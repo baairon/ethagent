@@ -19,7 +19,7 @@ export function buildPortableInstruction(opts: PortableInstructionOptions): stri
     'put its folder in the vault skills dir (NOT this read-only mirror): run `npx ethagent --vault-dir` to print the vault ' +
     "path, then create or edit the `<name>/SKILL.md` folder inside its `skills/` subdir. Past snapshots are kept locally " +
     'byte for byte; `npx ethagent status --json` and `npx ethagent diff --json` show what changed. ' +
-    '`npx ethagent custody --json` and `npx ethagent ens --json` show the onchain identity; ENS changes preview ' +
-    "without `--yes`, and anything with `--yes` is the user's to run."
+    '`npx ethagent custody --json`, `ens --json`, and `profile --json` show the onchain identity; `create`, `restore`, ' +
+    "`profile`, `custody`, `ens`, and `transfer` preview without `--yes`, and anything with `--yes` is the user's to run."
   )
 }
