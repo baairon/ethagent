@@ -2,7 +2,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { atomicWriteText } from '../../../storage/atomicWrite.js'
 import type { EthagentIdentity } from '../../../storage/config.js'
-import type { ContinuityFiles, ContinuitySkillsTree } from '../envelope.js'
+import type { ContinuitySkillsTree } from '../envelope.js'
 import {
   loadSkillsTree,
   materializeSkillsTree,

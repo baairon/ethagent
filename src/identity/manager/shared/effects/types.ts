@@ -11,6 +11,12 @@ export type EffectCallbacks = {
   onIdentityComplete: (identity: EthagentIdentity, message: string, source?: IdentityCompletionSource) => Promise<void>
   onRestoreProgress?: (progress: RestoreProgress | null) => void
   onTokenTransferProgress?: (progress: TokenTransferProgress | null) => void
+  onCreateProgress?: (progress: CreateProgress | null) => void
+}
+
+export type CreateProgress = {
+  phase: 'confirming' | 'writing'
+  label: string
 }
 
 export type RestoreProgress = {

@@ -1,7 +1,6 @@
 import { getAddress, type Address } from 'viem'
 import type { EthagentIdentity } from '../../../storage/config.js'
 import {
-  createWalletRestoreAccessChallenge,
   serializeContinuitySnapshotEnvelope,
   type WalletChallengePurpose,
 } from '../../continuity/envelope.js'

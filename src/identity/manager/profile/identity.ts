@@ -1,7 +1,8 @@
 import type { EthagentConfig, EthagentIdentity } from '../../../storage/config.js'
 import { supportedErc8004ChainForId, type Erc8004AgentCandidate } from '../../registry/erc8004.js'
-import { readCustodyMode, type CustodyMode } from '../custody/state.js'
+import type { CustodyMode } from '../custody/state.js'
 import { formatDate, shortAddress, shortCid } from '../shared/model/format.js'
+import { truncateEnd } from '../../../ui/text.js'
 import { chainSummaryRow } from '../shared/model/network.js'
 
 export const PREFLIGHT_AGENT_URI = 'ipfs://bafybeigdyrztma2dbfczw7q6ooozbxlqzyw5r7w4f3qw2axvvxqg3w6y7q'
@@ -26,8 +27,10 @@ export function tokenCandidateLabel(candidate: Erc8004AgentCandidate): string {
 export function tokenCandidateSelectLabel(
   candidate: Erc8004AgentCandidate,
   current = false,
+  maxLength = Number.POSITIVE_INFINITY,
 ): string {
-  return `${tokenCandidateLabel(candidate)}${current ? ' (current)' : ''}`
+  const suffix = current ? ' (current)' : ''
+  return `${truncateEnd(tokenCandidateLabel(candidate), maxLength - suffix.length)}${suffix}`
 }
 
 export function tokenCandidateHint(candidate: Erc8004AgentCandidate): string {

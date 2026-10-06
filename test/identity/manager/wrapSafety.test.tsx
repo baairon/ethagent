@@ -210,6 +210,7 @@ test('ens home keeps a wrapped problem red and offers Check Again', () => {
     runDiscovery: noop,
     runCheckAgain: noop,
     runUnlinkEnsLoading: noop,
+    runDeleteSubdomainPreflight: noop,
     onBack: noop,
     onEnsUnlink: noop,
     onEnsRecordsUpdate: noop,

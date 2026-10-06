@@ -7,6 +7,8 @@ import { TextInput } from '../../../ui/TextInput.js'
 import { Spinner } from '../../../ui/Spinner.js'
 import { Paragraph } from '../../../ui/Paragraph.js'
 import { theme } from '../../../ui/theme.js'
+import { useContentWidth } from '../../../ui/layout.js'
+import { asSentence } from '../../../ui/text.js'
 import { normalizeErc8004RegistryConfig } from '../../registry/erc8004.js'
 import {
   isCurrentAgentCandidate,
@@ -19,6 +21,7 @@ import type { Step } from '../reducer.js'
 import { WalletApprovalScreen } from '../shared/components/WalletApprovalScreen.js'
 import { BusyScreen } from '../shared/components/BusyScreen.js'
 import type { BrowserWalletReady } from '../../wallet/browserWallet.js'
+import type { Erc8004AgentCandidate } from '../../registry/erc8004.js'
 import type { EthagentConfig } from '../../../storage/config.js'
 import { restoreSignatureRequestForStep } from './auth.js'
 import type { RestoreProgress } from '../shared/effects/types.js'
@@ -58,6 +61,7 @@ export const RestoreFlow: React.FC<RestoreFlowProps> = ({
   onPickRecoveryMethod,
   onBack,
 }) => {
+  const contentWidth = useContentWidth()
   const purpose = 'purpose' in step ? step.purpose ?? 'restore' : 'restore'
   const isSwitch = purpose === 'switch'
   const flowTitle = isSwitch ? 'Switch Agent' : 'Restore Agent'
@@ -67,10 +71,11 @@ export const RestoreFlow: React.FC<RestoreFlowProps> = ({
     return (
       <Surface
         title={`${networkName(resolution.chainId)} Agent Registry`}
-        subtitle={step.error ? `Lookup failed: ${step.error}` : 'Paste the agent registry address for this network.'}
+        subtitle="Paste the agent registry address for this network."
         footer={footerHint('↵ continue · esc back')}
       >
-        <Box marginBottom={1}><Text color={theme.dim}>RPC defaults to {resolution.defaultRpcUrl}</Text></Box>
+        {step.error ? <Box marginBottom={1}><Paragraph color={theme.accentError}>{asSentence(`Lookup failed: ${step.error}`)}</Paragraph></Box> : null}
+        <Box marginBottom={1}><Paragraph color={theme.dim}>{`RPC defaults to ${resolution.defaultRpcUrl}`}</Paragraph></Box>
         <TextInput
           initialValue={config?.erc8004?.identityRegistryAddress ?? ''}
           placeholder="0x registry address"
@@ -180,16 +185,7 @@ export const RestoreFlow: React.FC<RestoreFlowProps> = ({
       >
         <Select<string>
           options={[
-            ...step.candidates.map(candidate => {
-              const current = isSwitch && isCurrentAgentCandidate(config?.identity, candidate)
-              const restorable = Boolean(candidate.backup?.cid)
-              return {
-                value: candidate.agentId.toString(),
-                label: tokenCandidateSelectLabel(candidate, current),
-                hint: restorable ? `#${candidate.agentId.toString()}` : `#${candidate.agentId.toString()} · no snapshot`,
-                disabled: !restorable,
-              }
-            }),
+            ...tokenCandidateOptions(step.candidates, contentWidth, candidate => isSwitch && isCurrentAgentCandidate(config?.identity, candidate)),
             { value: '__spacer__', role: 'section' as const, label: '' },
             { value: '__ens__', label: 'Enter ENS Name' },
             { value: '__token-id__', label: 'Enter Token ID' },
@@ -242,6 +238,29 @@ export const RestoreFlow: React.FC<RestoreFlowProps> = ({
   }
 
   return null
+}
+
+function tokenCandidateOptions(
+  candidates: Erc8004AgentCandidate[],
+  contentWidth: number,
+  isCurrent: (candidate: Erc8004AgentCandidate) => boolean,
+): Array<{ value: string; label: string; hint?: string; disabled: boolean }> {
+  const rows = candidates.map(candidate => {
+    const restorable = Boolean(candidate.backup?.cid)
+    const hint = [
+      candidate.name?.trim() ? `#${candidate.agentId.toString()}` : null,
+      restorable ? null : 'no snapshot',
+    ].filter(Boolean).join(' · ')
+    return { candidate, restorable, hint }
+  })
+  const widestHint = Math.max(0, ...rows.map(row => row.hint.length))
+  const labelBudget = Math.max(16, contentWidth - 4 - widestHint)
+  return rows.map(({ candidate, restorable, hint }) => ({
+    value: candidate.agentId.toString(),
+    label: tokenCandidateSelectLabel(candidate, isCurrent(candidate), labelBudget),
+    ...(hint ? { hint } : {}),
+    disabled: !restorable,
+  }))
 }
 
 function restoreNotFoundView(

@@ -7,7 +7,6 @@ import type {
 } from '../../ens/agentRecords.js'
 import type { EnsValidation } from '../../ens/ensLookup.js'
 import type {
-  EnsRegistryAction,
   EnsSetupBlockedPlan,
   EnsSetupPlan,
   EnsSubdomainDeletePlan,
@@ -45,7 +44,6 @@ export type DeleteSubdomainPhase =
   | { kind: 'delete-subdomain-confirm'; plan: EnsSubdomainDeletePlan }
   | { kind: 'delete-subdomain-blocked'; fullName: string; reason: string }
   | { kind: 'delete-subdomain-tx'; plan: EnsSubdomainDeletePlan }
-  | { kind: 'delete-subdomain-done'; fullName: string }
 
 export type EnsPhase =
   | { kind: 'mode-select' }

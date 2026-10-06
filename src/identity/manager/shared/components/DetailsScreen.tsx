@@ -68,10 +68,10 @@ export const DetailsScreen: React.FC<DetailsScreenProps> = ({
         <FieldList fields={[
           network ? { label: 'Network', value: network } : null,
           { label: 'Custody', value: displayCustodyMode(readCustodyMode(identity.state)) },
-          { label: 'Last Saved', value: lastSaved === 'never' ? 'Never' : lastSaved, ...(lastSaved === 'never' ? { valueColor: theme.dim } : {}) },
+          { label: 'Last saved', value: lastSaved === 'never' ? 'Never' : lastSaved, ...(lastSaved === 'never' ? { valueColor: theme.dim } : {}) },
           hasPendingPublish(identity) ? { label: 'Pending', value: 'Saved locally, not yet onchain' } : null,
           onchainOwner && owner && onchainOwner.toLowerCase() !== owner.toLowerCase()
-            ? { label: 'Onchain Owner', value: shortAddress(onchainOwner), valueColor: theme.accentError }
+            ? { label: 'Onchain owner', value: shortAddress(onchainOwner), valueColor: theme.accentError }
             : null,
           transfer
             ? {

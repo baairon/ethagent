@@ -16,6 +16,7 @@ import {
   runRebackupPreflight,
 } from './continuity/effects.js'
 import type {
+  CreateProgress,
   EffectCallbacks,
   IdentityCompletionSource,
   RestoreProgress,
@@ -54,6 +55,7 @@ export function useIdentityManagerController({
   const [walletSession, setWalletSession] = useState<BrowserWalletReady | null>(null)
   const [restoreProgress, setRestoreProgress] = useState<RestoreProgress | null>(null)
   const [tokenTransferProgress, setTokenTransferProgress] = useState<TokenTransferProgress | null>(null)
+  const [createProgress, setCreateProgress] = useState<CreateProgress | null>(null)
   const [jwtSaved, setJwtSaved] = useState<boolean>(false)
   const [copyNotice, setCopyNotice] = useState<string | null>(null)
   const canRebackup = Boolean(identity?.agentId && (identity?.identityRegistryAddress || config?.erc8004?.identityRegistryAddress))
@@ -68,6 +70,9 @@ export function useIdentityManagerController({
   }, [step.kind])
   useEffect(() => {
     if (step.kind !== 'token-transfer-signing') setTokenTransferProgress(null)
+  }, [step.kind])
+  useEffect(() => {
+    if (step.kind !== 'create-signing') setCreateProgress(null)
   }, [step.kind])
 
   useEffect(() => {
@@ -114,26 +119,31 @@ export function useIdentityManagerController({
     resolveRegistryForIdentityFromConfig(target, config)
 
   const completeTokenIdentity = async (nextIdentity: EthagentIdentity, message: string, source?: IdentityCompletionSource): Promise<void> => {
-    if (mode === 'first-run' || !config) {
-      setFirstRunIdentity(nextIdentity)
-      const registry = registryFromIdentity(nextIdentity)
+    if (mode === 'first-run' || !config || source === 'create') {
+      const registry = registryFromIdentity(nextIdentity) ?? resolveRegistryForIdentity(nextIdentity)
       const custodyMode = readCustodyMode(nextIdentity.state)
 
-      const seedConfig: EthagentConfig = {
-        version: 2,
-        firstSeenAt: new Date().toISOString(),
-        identity: { ...nextIdentity, source: 'erc8004' },
-        ...(registry
-          ? {
-              erc8004: {
-                chainId: registry.chainId,
-                rpcUrl: registry.rpcUrl,
-                identityRegistryAddress: registry.identityRegistryAddress,
-              },
-            }
-          : {}),
+      let persisted: EthagentConfig
+      if (mode === 'first-run' || !config) {
+        setFirstRunIdentity(nextIdentity)
+        const seedConfig: EthagentConfig = {
+          version: 2,
+          firstSeenAt: new Date().toISOString(),
+          identity: { ...nextIdentity, source: 'erc8004' },
+          ...(registry
+            ? {
+                erc8004: {
+                  chainId: registry.chainId,
+                  rpcUrl: registry.rpcUrl,
+                  identityRegistryAddress: registry.identityRegistryAddress,
+                },
+              }
+            : {}),
+        }
+        persisted = await setTokenIdentity(seedConfig, nextIdentity)
+      } else {
+        persisted = await setTokenIdentity(config, nextIdentity)
       }
-      const persisted = await setTokenIdentity(seedConfig, nextIdentity)
       onConfigChange?.(persisted)
 
       if (source === 'create' && custodyMode === 'advanced' && registry) {
@@ -202,6 +212,7 @@ export function useIdentityManagerController({
     onIdentityComplete: completeTokenIdentity,
     onRestoreProgress: setRestoreProgress,
     onTokenTransferProgress: setTokenTransferProgress,
+    onCreateProgress: setCreateProgress,
   }
 
   const handleStepError = (err: unknown, backStep: Step, softCancel: Step = backStep): void => {
@@ -302,7 +313,7 @@ export function useIdentityManagerController({
   })
 
   const finishFirstRunIdentity = (): void => {
-    if (!firstRunIdentity) {
+    if (!firstRunIdentity && !config?.identity) {
       onComplete({ kind: 'cancel' })
       return
     }
@@ -369,6 +380,7 @@ export function useIdentityManagerController({
     walletSession,
     restoreProgress,
     tokenTransferProgress,
+    createProgress,
     jwtSaved,
     copyNotice,
     canRebackup,

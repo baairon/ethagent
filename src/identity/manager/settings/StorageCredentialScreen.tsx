@@ -1,5 +1,5 @@
 import React from 'react'
-import { Box } from 'ink'
+import { Box, Text } from 'ink'
 import { Surface } from '../../../ui/Surface.js'
 import { Select } from '../../../ui/Select.js'
 import { Paragraph } from '../../../ui/Paragraph.js'
@@ -35,8 +35,8 @@ export const StorageCredentialScreen: React.FC<StorageCredentialScreenProps> = (
       <PinataJwtInput
         inputKey="storage-credential-input"
         title="IPFS Storage"
-        subtitle={step.error ?? 'Snapshots are pinned to IPFS through your own Pinata account.'}
-        footer={footer}
+        {...(step.error ? { error: step.error } : {})}
+        footer={<Text color={theme.dim}>↵ save · esc back</Text>}
         onSubmit={onSubmit}
         onCancel={onCancel}
       />

@@ -8,7 +8,6 @@ import { BusyScreen } from '../shared/components/BusyScreen.js'
 import { FieldList } from '../shared/components/FieldRow.js'
 import { shortAddress } from '../shared/model/format.js'
 import { networkName } from '../shared/model/network.js'
-import type { Step } from '../reducer.js'
 import type { CustodyFlowDeps } from './types.js'
 import { humanOwnerAddress } from './helpers.js'
 

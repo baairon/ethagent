@@ -34,7 +34,7 @@ export async function preflightEnsRoot(args: EnsRootPreflightArgs): Promise<EnsR
     return { ok: false, reason: 'lookup-failed', detail: err instanceof Error ? err.message : String(err) }
   }
   if (isZero(rootOwner)) {
-    return { ok: false, reason: 'root-not-owned', detail: `${rootName} does not have an ENS manager on Ethereum mainnet` }
+    return { ok: false, reason: 'root-not-owned', detail: `${rootName} does not have an ENS manager on Ethereum Mainnet` }
   }
   const parentWrapped = sameAddress(rootOwner, ENS_NAME_WRAPPER_ADDRESS_MAINNET)
   let ownerAddress: Address

@@ -94,7 +94,7 @@ test('identityManagerReducer: top-level identity subviews back to manager', () =
   assert.equal(identityManagerReducer({ kind: 'continuity-private' }, { type: 'back', from: { kind: 'continuity-private' } }).kind, 'menu')
   assert.equal(identityManagerReducer({ kind: 'rebackup-confirm', back: { kind: 'menu' } }, { type: 'back', from: { kind: 'rebackup-confirm', back: { kind: 'menu' } } }).kind, 'menu')
   assert.equal(identityManagerReducer({ kind: 'recovery-refetch-confirm', back: { kind: 'menu' } }, { type: 'back', from: { kind: 'recovery-refetch-confirm', back: { kind: 'menu' } } }).kind, 'menu')
-  assert.equal(identityManagerReducer({ kind: 'storage-credential-input' }, { type: 'back', from: { kind: 'storage-credential-input' } }).kind, 'menu')
+  assert.equal(identityManagerReducer({ kind: 'storage-credential' }, { type: 'back', from: { kind: 'storage-credential' } }).kind, 'menu')
 })
 
 test('identityManagerReducer: continuity overwrite confirm backs to its restore source', () => {
@@ -128,8 +128,8 @@ test('identityManagerReducer: continuity overwrite confirm backs to its restore 
 test('identityManagerReducer: edit profile back preserves identity and registry', () => {
   const state: Step = { kind: 'edit-profile-description', identity, registry, name: 'pip', description: 'line one\nline two', imagePath: 'ipfs://icon.png', returnTo: { kind: 'continuity-public' } }
   const next = identityManagerReducer(state, { type: 'back', from: state })
-  assert.equal(next.kind, 'edit-profile-name')
-  if (next.kind === 'edit-profile-name') {
+  assert.equal(next.kind, 'edit-profile-menu')
+  if (next.kind === 'edit-profile-menu') {
     assert.equal(next.identity.address, identity.address)
     assert.equal(next.registry.chainId, registry.chainId)
     assert.equal(next.name, 'pip')
@@ -139,29 +139,37 @@ test('identityManagerReducer: edit profile back preserves identity and registry'
   }
 })
 
-test('identityManagerReducer: profile draft survives back through review and icon steps', () => {
-  const review: Step = {
-    kind: 'edit-profile-review',
-    identity,
-    registry,
+test('identityManagerReducer: every profile field steps back to the edit menu with drafts intact', () => {
+  const drafts = {
     name: 'draft name',
     description: 'first line\nsecond line',
     imagePath: 'https://example.com/icon.webp',
-    returnTo: { kind: 'continuity-public' },
+    returnTo: { kind: 'continuity-public' } as Step,
   }
-  const icon = identityManagerReducer(review, { type: 'back', from: review })
-  assert.equal(icon.kind, 'edit-profile-image')
-  if (icon.kind !== 'edit-profile-image') return
-  assert.equal(icon.name, 'draft name')
-  assert.equal(icon.description, 'first line\nsecond line')
-  assert.equal(icon.imagePath, 'https://example.com/icon.webp')
+  const fields: Step[] = [
+    { kind: 'edit-profile-name', identity, registry, ...drafts },
+    { kind: 'edit-profile-description', identity, registry, ...drafts },
+    { kind: 'edit-profile-image', identity, registry, ...drafts },
+    { kind: 'edit-profile-review', identity, registry, ...drafts },
+  ]
+  for (const field of fields) {
+    const menu = identityManagerReducer(field, { type: 'back', from: field })
+    assert.equal(menu.kind, 'edit-profile-menu', `${field.kind} must return to the edit menu`)
+    if (menu.kind !== 'edit-profile-menu') return
+    assert.equal(menu.name, 'draft name')
+    assert.equal(menu.description, 'first line\nsecond line')
+    assert.equal(menu.imagePath, 'https://example.com/icon.webp')
+    assert.deepEqual(menu.returnTo, { kind: 'continuity-public' })
+  }
+})
 
-  const description = identityManagerReducer(icon, { type: 'back', from: icon })
-  assert.equal(description.kind, 'edit-profile-description')
-  if (description.kind !== 'edit-profile-description') return
-  assert.equal(description.name, 'draft name')
-  assert.equal(description.description, 'first line\nsecond line')
-  assert.equal(description.imagePath, 'https://example.com/icon.webp')
+test('identityManagerReducer: storage credential sub-screens step back to the storage screen', () => {
+  for (const kind of ['storage-credential-input', 'storage-credential-forget-confirm'] as const) {
+    const from: Step = { kind }
+    assert.deepEqual(identityManagerReducer(from, { type: 'back', from }), { kind: 'storage-credential' })
+  }
+  const storage: Step = { kind: 'storage-credential' }
+  assert.deepEqual(identityManagerReducer(storage, { type: 'back', from: storage }), { kind: 'menu' })
 })
 
 test('identityManagerReducer: ens-records-tx back returns to edit-profile-ens', () => {

@@ -219,8 +219,11 @@ export async function runCreateSigning(
       }
     },
   })
+  callbacks.onWalletReady(null)
+  callbacks.onCreateProgress?.({ phase: 'confirming', label: 'Confirming the transaction…' })
   const client = createErc8004PublicClient(step.registry)
   const receipt = await awaitConfirmedReceipt(client, result.txHash, 'Agent registration', { kind: 'register', chainId: step.registry.chainId })
+  callbacks.onCreateProgress?.({ phase: 'writing', label: 'Writing soul, memory, and skills…' })
   const registered = registeredAgentFromReceipt({
     logs: receipt.logs.map(log => ({ address: log.address, topics: [...log.topics] as Hex[], data: log.data })),
     identityRegistryAddress: step.registry.identityRegistryAddress,
@@ -261,7 +264,7 @@ export async function runCreateSigning(
     privateFiles: result.prepared.continuityFiles,
     agentCard: result.prepared.agentCardJson,
   }, { source: 'save', createdAt: backup.createdAt, agentCardCid: result.prepared.agentCard.cid })
-  await callbacks.onIdentityComplete(nextIdentity, `ERC-8004 agent registered · #${registered.agentId.toString()}`, 'create')
+  await callbacks.onIdentityComplete(nextIdentity, `Agent created as token #${registered.agentId.toString()}.`, 'create')
 }
 
 export async function runRegistrySubmit(

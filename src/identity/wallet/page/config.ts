@@ -31,14 +31,6 @@ export const FLOW_COPY: Record<string, FlowCopy> = {
 
 export const TRANSACTION_TITLES: Record<string, string> = {
   "register-agent": "Mint Agent Token",
-  "create-agent": "Create Agent",
-  "update-ens-records": "Submit With ENS Controller Wallet",
-  "clear-ens-records": "Submit With ENS Controller Wallet",
-  "create-simple-ens-subdomain": "Submit With Connected Wallet",
-  "set-simple-ens-records": "Submit With Connected Wallet",
-  "create-agent-ens-subdomain": "Owner Wallet Required",
-  "set-agent-ens-records": "Owner Wallet Required",
-  "publish-transfer-snapshot": "Sender Wallet: Publish Snapshot",
 };
 
 export function transactionPurposeTitle(): string {

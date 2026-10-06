@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react'
 import { Box, Text } from 'ink'
 import { theme } from './theme.js'
 import { contentWidthFor, useTerminalColumns } from './layout.js'
-import { wrapWords } from './text.js'
+import { charAt, cleanTypedText, nextCharBoundary, prevCharBoundary, wrapWords } from './text.js'
 import { useAppInput } from '../app/input/AppInputProvider.js'
 
 const DEFAULT_CHROME_WIDTH = 10
@@ -85,7 +85,7 @@ export function TextInput({
         onNavigateLeft()
         return
       }
-      setCursor(Math.max(0, cur - 1))
+      setCursor(prevCharBoundary(val, cur))
       return
     }
     if (key.rightArrow) {
@@ -93,13 +93,14 @@ export function TextInput({
         submitValue(onNavigateRight)
         return
       }
-      setCursor(Math.min(val.length, cur + 1))
+      setCursor(nextCharBoundary(val, cur))
       return
     }
     if (key.backspace || key.delete) {
       if (cur === 0) return
-      setValue(val.slice(0, cur - 1) + val.slice(cur))
-      setCursor(cur - 1)
+      const from = prevCharBoundary(val, cur)
+      setValue(val.slice(0, from) + val.slice(cur))
+      setCursor(from)
       if (error) setError(null)
       return
     }
@@ -121,7 +122,7 @@ export function TextInput({
       return
     }
     if (input) {
-      const clean = input.replace(/[\r\n]/g, '')
+      const clean = cleanTypedText(input, false)
       if (clean) {
         const cleanCursor = Math.max(0, Math.min(cur, val.length))
         const next = (val.slice(0, cleanCursor) + clean + val.slice(cleanCursor)).slice(0, maxLength)
@@ -134,6 +135,7 @@ export function TextInput({
 
   const display = isSecret ? '*'.repeat(value.length) : value
   const showPlaceholder = value.length === 0 && placeholder
+  const view = inputViewport(display, Math.min(cursor, display.length), wrapWidth)
 
   return (
     <Box flexDirection="column">
@@ -148,9 +150,9 @@ export function TextInput({
             </Text>
           ) : (
             <Text color={theme.text} wrap="truncate-end">
-              {display.slice(0, cursor)}
-              <Text backgroundColor={theme.accentPeriwinkle} color="#0c0c1f">{display[cursor] ?? ' '}</Text>
-              {display.slice(cursor + 1)}
+              {view.before}
+              <Text backgroundColor={theme.accentPeriwinkle} color="#0c0c1f">{view.under}</Text>
+              {view.after}
             </Text>
           )}
         </Box>
@@ -158,6 +160,19 @@ export function TextInput({
       {error ? <Text color={theme.accentError}>{wrapWords(error, contentWidthFor(columns)).join('\n')}</Text> : null}
     </Box>
   )
+}
+
+export function inputViewport(text: string, cursor: number, width: number): { before: string; under: string; after: string } {
+  const room = Math.max(2, Math.floor(width))
+  const under = charAt(text, cursor) || ' '
+  const tail = text.slice(cursor + (cursor < text.length ? under.length : 0))
+  if (text.length < room) return { before: text.slice(0, cursor), under, after: tail }
+  let from = cursor > room - 2 ? cursor - (room - 2) : 0
+  if (from > 0 && /[\udc00-\udfff]/.test(text.charAt(from))) from += 1
+  const head = from > 0 ? `…${text.slice(from, cursor)}` : text.slice(0, cursor)
+  const left = room - head.length - 1
+  const after = tail.length <= left ? tail : left > 0 ? `${tail.slice(0, left - 1)}…` : ''
+  return { before: head, under, after }
 }
 
 export function textInputWrapWidth(columns: number, chromeWidth = DEFAULT_CHROME_WIDTH, maxWidth = contentWidthFor(columns) - 2): number {

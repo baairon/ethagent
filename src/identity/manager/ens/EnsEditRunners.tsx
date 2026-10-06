@@ -11,6 +11,7 @@ import {
   type BrowserWalletReady,
 } from '../../wallet/browserWallet.js'
 import { WalletApprovalScreen } from '../shared/components/WalletApprovalScreen.js'
+import { isWalletCancelled } from '../shared/utils.js'
 
 export const EscCancel: React.FC<{ onCancel: () => void }> = ({ onCancel }) => {
   useAppInput((_input, key) => {
@@ -26,37 +27,44 @@ export const DeleteSubdomainTxRunner: React.FC<{
   onWalletReady: (session: BrowserWalletReady | null) => void
   onDeleted: () => void
   onError: (msg: string) => void
-}> = ({ plan, ownerAddress, walletSession, onWalletReady, onDeleted, onError }) => {
-  const startedRef = React.useRef(false)
+  onCancel: () => void
+}> = ({ plan, ownerAddress, walletSession, onWalletReady, onDeleted, onError, onCancel }) => {
+  const [confirming, setConfirming] = React.useState(false)
   React.useEffect(() => {
-    if (startedRef.current) return
-    startedRef.current = true
+    let cancelled = false
     sendBrowserWalletTransaction({
       chainId: mainnet.id,
       expectedAccount: ownerAddress,
       to: plan.transaction.to,
       data: plan.transaction.data,
       purpose: 'delete-ens-subdomain',
-      onReady: ready => onWalletReady(ready),
+      onReady: ready => { if (!cancelled) onWalletReady(ready) },
     })
       .then(async result => {
+        if (cancelled) return
         onWalletReady(null)
-        const client = createMainnetClient()
-        await client.waitForTransactionReceipt({ hash: result.txHash })
-        onDeleted()
+        setConfirming(true)
+        await createMainnetClient().waitForTransactionReceipt({ hash: result.txHash })
+        if (!cancelled) onDeleted()
       })
       .catch((err: unknown) => {
+        if (cancelled) return
         onWalletReady(null)
+        if (isWalletCancelled(err)) {
+          onCancel()
+          return
+        }
         onError(err instanceof Error ? err.message : String(err))
       })
+    return () => { cancelled = true }
   }, [])
   return (
     <WalletApprovalScreen
       title={`Delete ${plan.fullName}`}
       subtitle="Approve one transaction on Ethereum Mainnet. It needs gas."
-      walletSession={walletSession}
-      label="Waiting for your wallet…"
-      onCancel={() => onError('Subdomain deletion cancelled.')}
+      walletSession={confirming ? null : walletSession}
+      label={confirming ? 'Confirming the deletion…' : 'Waiting for your wallet…'}
+      {...(confirming ? {} : { onCancel })}
     />
   )
 }

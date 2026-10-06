@@ -44,7 +44,7 @@ export function rebackupCompletionMessage(
   identity: EthagentIdentity,
   ensOk?: boolean,
 ): string {
-  if (!profileUpdates) return 'Backup Saved'
+  if (!profileUpdates) return 'Snapshot saved.'
   const baseState = (identity.state ?? {}) as Record<string, unknown>
   const currentEns = typeof baseState.ensName === 'string' ? baseState.ensName.trim() : ''
   const ensTouched = typeof profileUpdates.ensName === 'string'
@@ -55,13 +55,13 @@ export function rebackupCompletionMessage(
     || profileUpdates.approvedOperatorWallets !== undefined
     || profileUpdates.activeOperatorAddress !== undefined
     || profileUpdates.restoreAccessEpoch !== undefined
-  if (operatorFieldsTouched && !ensTouched && !profileFieldsTouched) return 'Operator Wallets Updated'
+  if (operatorFieldsTouched && !ensTouched && !profileFieldsTouched) return 'Operator wallets updated.'
   if (ensTouched && !profileFieldsTouched) {
     const next = (profileUpdates.ensName ?? '').trim()
-    if (!next && currentEns) return 'ENS Unlinked'
-    if (next) return ensOk === false ? 'ENS Issue' : 'ENS Linked'
-    return 'ENS Updated'
+    if (!next && currentEns) return 'ENS name unlinked.'
+    if (next) return ensOk === false ? `${next} is saved, but it needs attention. Open ENS Name to check it.` : `${next} is linked to your agent.`
+    return 'ENS name updated.'
   }
-  if (profileFieldsTouched) return 'Profile Updated'
-  return 'Backup Saved'
+  if (profileFieldsTouched) return 'Profile published.'
+  return 'Snapshot saved.'
 }

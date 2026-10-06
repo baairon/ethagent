@@ -135,5 +135,11 @@ export async function runRestoreAuthorize(
       ...(step.candidate.publicDiscovery?.agentCardCid ? { agentCardCid: step.candidate.publicDiscovery.agentCardCid } : {}),
     })
   }
-  await callbacks.onIdentityComplete(nextIdentity, `ERC-8004 agent restored · #${step.candidate.agentId.toString()}`, 'restore')
+  const restoredName = step.candidate.name?.trim()
+  const tokenLabel = `token #${step.candidate.agentId.toString()}`
+  await callbacks.onIdentityComplete(
+    nextIdentity,
+    `${restoredName ? `${restoredName} (${tokenLabel})` : `Agent ${tokenLabel}`} is ready on this machine.`,
+    'restore',
+  )
 }

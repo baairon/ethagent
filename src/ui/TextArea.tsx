@@ -2,6 +2,16 @@ import React, { useState, useRef } from 'react'
 import { Box, Text } from 'ink'
 import { theme } from './theme.js'
 import { contentWidthFor, useTerminalColumns } from './layout.js'
+import {
+  charAt,
+  cleanTypedText,
+  layoutTextRows,
+  moveAcrossRows,
+  nextCharBoundary,
+  prevCharBoundary,
+  rowIndexAt,
+  type TextRow,
+} from './text.js'
 import { useAppInput } from '../app/input/AppInputProvider.js'
 
 type TextAreaProps = {
@@ -19,15 +29,17 @@ export function TextArea({
   onSubmit,
   onCancel,
 }: TextAreaProps) {
-  const [value, setValue] = useState(initialValue)
-  const [cursor, setCursor] = useState(initialValue.length)
+  const [value, setValue] = useState(() => cleanTypedText(initialValue, true))
+  const [cursor, setCursor] = useState(() => cleanTypedText(initialValue, true).length)
   const columns = useTerminalColumns()
+  const displayWidth = textAreaWidth(columns)
+  const rows = layoutTextRows(value, displayWidth - 1)
 
-  const stateRef = useRef({ value, cursor })
-  stateRef.current = { value, cursor }
+  const stateRef = useRef({ value, cursor, rows })
+  stateRef.current = { value, cursor, rows }
 
   useAppInput((input, key) => {
-    const { value: val, cursor: cur } = stateRef.current
+    const { value: val, cursor: cur, rows: layout } = stateRef.current
 
     if (key.escape || (key.ctrl && input === 'c')) {
       onCancel?.()
@@ -39,24 +51,25 @@ export function TextArea({
     }
     if (key.backspace || key.delete) {
       if (cur === 0) return
-      setValue(val.slice(0, cur - 1) + val.slice(cur))
-      setCursor(cur - 1)
+      const from = prevCharBoundary(val, cur)
+      setValue(val.slice(0, from) + val.slice(cur))
+      setCursor(from)
       return
     }
     if (key.leftArrow) {
-      setCursor(Math.max(0, cur - 1))
+      setCursor(prevCharBoundary(val, cur))
       return
     }
     if (key.rightArrow) {
-      setCursor(Math.min(val.length, cur + 1))
+      setCursor(nextCharBoundary(val, cur))
       return
     }
     if (key.upArrow) {
-      setCursor(moveCursorUp(val, cur))
+      setCursor(moveAcrossRows(layout, cur, -1))
       return
     }
     if (key.downArrow) {
-      setCursor(moveCursorDown(val, cur))
+      setCursor(moveAcrossRows(layout, cur, 1))
       return
     }
     if (key.ctrl && input === 'u') {
@@ -76,108 +89,68 @@ export function TextArea({
     }
     if (key.ctrl || key.meta || key.tab) return
     if (input) {
-      const clean = input.replace(/\r/g, '')
+      const clean = cleanTypedText(input, true)
       if (clean) {
         const next = (val.slice(0, cur) + clean + val.slice(cur)).slice(0, maxLength)
         setValue(next)
-        setCursor(cur + clean.length)
+        setCursor(Math.min(next.length, cur + clean.length))
       }
     }
   })
 
-  const displayWidth = Math.min(contentWidthFor(columns) - 2, Math.max(20, columns - 6))
-  const [cursorLine, cursorCol] = cursorToLineCol(value, cursor)
-  const lines = value.split('\n')
-  const showPlaceholder = value.length === 0
+  if (value.length === 0) {
+    return (
+      <Box flexDirection="row">
+        <Text color={theme.accentPeriwinkle}>{'> '}</Text>
+        <Box width={displayWidth}>
+          <Text wrap="truncate-end">
+            <Text backgroundColor={theme.accentPeriwinkle} color="#0c0c1f">{' '}</Text>
+            <Text color={theme.dim}>{placeholder ?? ''}</Text>
+          </Text>
+        </Box>
+      </Box>
+    )
+  }
 
+  const activeRow = rowIndexAt(rows, cursor)
   return (
     <Box flexDirection="column">
-      {showPlaceholder ? (
-        <Box flexDirection="row">
-          <Text color={theme.accentPeriwinkle}>{'> '}</Text>
+      {rows.map((row, index) => (
+        <Box key={`${row.start}:${index}`} flexDirection="row">
+          <Text color={theme.accentPeriwinkle}>{index === activeRow ? '> ' : '  '}</Text>
           <Box width={displayWidth}>
-            <Text>
-              <Text backgroundColor={theme.accentPeriwinkle} color="#0c0c1f">{' '}</Text>
-              <Text color={theme.dim}>{placeholder ?? ''}</Text>
-            </Text>
+            {index === activeRow
+              ? <CursorRow value={value} row={row} cursor={cursor} width={displayWidth} />
+              : <Text color={theme.text} wrap="truncate-end">{value.slice(row.start, row.end) || ' '}</Text>}
           </Box>
         </Box>
-      ) : (
-        <Box flexDirection="column">
-          {lines.map((line, i) => {
-            const active = i === cursorLine
-            const rows = chunkLine(line, displayWidth)
-            let cursorRow = -1
-            let cursorRowCol = 0
-            if (active) {
-              cursorRow = Math.floor(cursorCol / displayWidth)
-              while (cursorRow >= rows.length) rows.push('')
-              cursorRowCol = cursorCol - cursorRow * displayWidth
-            }
-            return rows.map((row, r) => (
-              <Box key={`${i}:${r}`} flexDirection="row">
-                <Text color={theme.accentPeriwinkle}>{active && r === cursorRow ? '> ' : '  '}</Text>
-                <Box width={displayWidth}>
-                  {active && r === cursorRow ? (
-                    <Text wrap="truncate-end">
-                      <Text color={theme.text}>{row.slice(0, cursorRowCol)}</Text>
-                      <Text backgroundColor={theme.accentPeriwinkle} color="#0c0c1f">
-                        {row[cursorRowCol] ?? ' '}
-                      </Text>
-                      <Text color={theme.text}>{row.slice(cursorRowCol + 1)}</Text>
-                    </Text>
-                  ) : (
-                    <Text color={theme.text} wrap="truncate-end">{row || ' '}</Text>
-                  )}
-                </Box>
-              </Box>
-            ))
-          })}
-        </Box>
-      )}
+      ))}
     </Box>
   )
 }
 
-function chunkLine(line: string, width: number): string[] {
-  if (line.length === 0) return ['']
-  const rows: string[] = []
-  for (let start = 0; start < line.length; start += width) {
-    rows.push(line.slice(start, start + width))
+const CursorRow: React.FC<{ value: string; row: TextRow; cursor: number; width: number }> = ({ value, row, cursor, width }) => {
+  const visible = value.slice(row.start, row.end)
+  if (cursor < row.end) {
+    const at = cursor - row.start
+    const under = charAt(value, cursor)
+    return (
+      <Text wrap="truncate-end">
+        <Text color={theme.text}>{visible.slice(0, at)}</Text>
+        <Text backgroundColor={theme.accentPeriwinkle} color="#0c0c1f">{under}</Text>
+        <Text color={theme.text}>{visible.slice(at + under.length)}</Text>
+      </Text>
+    )
   }
-  return rows
+  const gap = Math.max(0, Math.min(cursor - row.end, width - visible.length - 1))
+  return (
+    <Text wrap="truncate-end">
+      <Text color={theme.text}>{visible}{' '.repeat(gap)}</Text>
+      <Text backgroundColor={theme.accentPeriwinkle} color="#0c0c1f">{' '}</Text>
+    </Text>
+  )
 }
 
-function cursorToLineCol(val: string, cur: number): [number, number] {
-  const lines = val.split('\n')
-  let remaining = cur
-  for (let i = 0; i < lines.length; i++) {
-    const len = lines[i]!.length
-    if (remaining <= len) return [i, remaining]
-    remaining -= len + 1
-  }
-  const last = lines.length - 1
-  return [last, lines[last]!.length]
-}
-
-function moveCursorUp(val: string, cur: number): number {
-  const lines = val.split('\n')
-  const [lineIdx, colIdx] = cursorToLineCol(val, cur)
-  if (lineIdx === 0) return cur
-  const prevLine = lines[lineIdx - 1]!
-  const newCol = Math.min(colIdx, prevLine.length)
-  let pos = 0
-  for (let i = 0; i < lineIdx - 1; i++) pos += lines[i]!.length + 1
-  return pos + newCol
-}
-
-function moveCursorDown(val: string, cur: number): number {
-  const lines = val.split('\n')
-  const [lineIdx, colIdx] = cursorToLineCol(val, cur)
-  if (lineIdx >= lines.length - 1) return cur
-  const nextLine = lines[lineIdx + 1]!
-  const newCol = Math.min(colIdx, nextLine.length)
-  let pos = 0
-  for (let i = 0; i <= lineIdx; i++) pos += lines[i]!.length + 1
-  return pos + newCol
+export function textAreaWidth(columns: number): number {
+  return Math.min(contentWidthFor(columns) - 2, Math.max(20, columns - 6))
 }

@@ -144,7 +144,6 @@ export const IdentityManagerOperationalRoutes: React.FC<IdentityManagerOperation
     return (
       <RebackupStorageScreen
         step={step}
-        footer={footer}
         onSubmit={async input => {
           try {
             await runRebackupStorageSubmit(input, step, callbacks)
@@ -161,7 +160,6 @@ export const IdentityManagerOperationalRoutes: React.FC<IdentityManagerOperation
     return (
       <RebackupStorageScreen
         step={step}
-        footer={footer}
         onSubmit={async input => {
           try {
             await runPublicProfileStorageSubmit(input, step, callbacks)

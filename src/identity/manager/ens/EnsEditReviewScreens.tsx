@@ -4,7 +4,7 @@ import { Surface } from '../../../ui/Surface.js'
 import { Select } from '../../../ui/Select.js'
 import { Paragraph } from '../../../ui/Paragraph.js'
 import { theme } from '../../../ui/theme.js'
-import { plural } from '../../../ui/text.js'
+import { asSentence, plural } from '../../../ui/text.js'
 import type { AgentRecordDiff } from '../../ens/agentRecords.js'
 import type { EnsValidation } from '../../ens/ensLookup.js'
 import type {
@@ -104,7 +104,7 @@ export const EnsSetupBlockedScreen: React.FC<EnsSetupBlockedScreenProps> = ({
   const title = manualReasonTitle(fallback.reason)
   return (
     <Surface title={`Can't Set Up ${fallback.fullName}`} subtitle={title} footer={FOOTER} tone="error">
-      {fallback.detail && fallback.detail !== title ? <Paragraph color={theme.dim}>{fallback.detail}</Paragraph> : null}
+      {fallback.detail && asSentence(fallback.detail) !== title ? <Paragraph color={theme.dim}>{asSentence(fallback.detail)}</Paragraph> : null}
       {fallback.mode === 'advanced' ? (
         <Box marginTop={fallback.detail ? 1 : 0}>
           <Paragraph color={theme.textSubtle}>The owner wallet signs the ENS records and must hold the token during setup. Afterwards the token can go back into the Vault. Operator wallets never control the name.</Paragraph>

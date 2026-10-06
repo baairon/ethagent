@@ -2,6 +2,7 @@ import React from 'react'
 import { Box, Text } from 'ink'
 import { Surface } from '../../../../ui/Surface.js'
 import { TextInput } from '../../../../ui/TextInput.js'
+import { Paragraph } from '../../../../ui/Paragraph.js'
 import { theme } from '../../../../ui/theme.js'
 import { extractPinataJwt } from '../../../storage/ipfs.js'
 
@@ -11,7 +12,8 @@ type PinataJwtInputProps = {
   inputKey: string
   title?: string
   subtitle?: React.ReactNode
-  footer: React.ReactNode
+  error?: string
+  footer?: React.ReactNode
   onSubmit: (input: string) => void
   onCancel: () => void
 }
@@ -20,6 +22,7 @@ export const PinataJwtInput: React.FC<PinataJwtInputProps> = ({
   inputKey,
   title,
   subtitle,
+  error,
   footer,
   onSubmit,
   onCancel,
@@ -27,8 +30,9 @@ export const PinataJwtInput: React.FC<PinataJwtInputProps> = ({
   <Surface
     title={title ?? 'Connect IPFS Storage'}
     subtitle={subtitle ?? 'Snapshots are pinned to IPFS through your own Pinata account.'}
-    footer={footer}
+    footer={footer ?? <Text color={theme.dim}>↵ continue · esc back</Text>}
   >
+    {error ? <Box marginBottom={1}><Paragraph color={theme.accentError}>{error}</Paragraph></Box> : null}
     <Text color={theme.dim}>Paste a Pinata JWT from <Text color={theme.accentPeriwinkle} underline>{PINATA_API_KEYS_URL}</Text></Text>
     <Text color={theme.dim}>It is saved encrypted on this device and only used for pinning.</Text>
     <Box marginTop={1}>

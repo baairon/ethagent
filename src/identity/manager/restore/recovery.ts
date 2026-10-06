@@ -139,7 +139,7 @@ export async function runRecoveryRefetch(
   await syncAgentCardManifest(nextIdentity).catch(() => null)
   const { pushVaultSoulMemoryToHarness } = await import('../../../cli/sync.js')
   await pushVaultSoulMemoryToHarness(nextIdentity).catch(() => undefined)
-  await recordPublishedContinuitySnapshot({ identity: nextIdentity, label: 'Refetched Latest Snapshot From Onchain' }).catch(() => null)
+  await recordPublishedContinuitySnapshot({ identity: nextIdentity, label: 'refetched latest onchain snapshot' }).catch(() => null)
   await captureSnapshot(nextIdentity, candidate.backup.cid, {
     privateFiles: payload.files,
     agentCard: agentCardRestored,
@@ -153,5 +153,5 @@ export async function runRecoveryRefetch(
     const contentHashes = await localContinuitySnapshotContentHashes(nextIdentity)
     await updatePublishedContinuitySnapshotContentHashes(nextIdentity, candidate.backup.cid, contentHashes).catch(() => null)
   }
-  await callbacks.onIdentityComplete(nextIdentity, 'Latest Published Snapshot Restored From Onchain', 'update')
+  await callbacks.onIdentityComplete(nextIdentity, 'Latest snapshot restored from onchain.', 'update')
 }

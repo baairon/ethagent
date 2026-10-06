@@ -5,7 +5,7 @@ import {
   buildEnsip25Key,
   diffRecords,
 } from '../agentRecords.js'
-import { normalizeEthDomain, splitSubdomainName } from '../ensLookup.js'
+import { normalizeEthDomain } from '../ensLookup.js'
 import { validateErc8004TokenOwner } from '../../registry/erc8004.js'
 import {
   ENS_NAME_WRAPPER_ADDRESS_MAINNET,
@@ -97,7 +97,7 @@ export async function preflightEnsSetup(args: EnsSetupPreflightArgs): Promise<En
       fullName,
       operatorAddress,
       reason: 'root-not-owned',
-      detail: `${rootName} does not have an ENS manager on Ethereum mainnet`,
+      detail: `${rootName} does not have an ENS manager on Ethereum Mainnet`,
     })
   }
   const parentWrapped = sameAddress(rootOwner, ENS_NAME_WRAPPER_ADDRESS_MAINNET)

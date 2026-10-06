@@ -313,6 +313,7 @@ export const EnsEditFlow: React.FC<EnsEditProps> = ({
     runDiscovery,
     runCheckAgain,
     runUnlinkEnsLoading,
+    runDeleteSubdomainPreflight,
     onBack,
     onEnsUnlink,
     onEnsRecordsUpdate,

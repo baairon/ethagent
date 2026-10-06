@@ -196,13 +196,10 @@ function backStep(from: Step): Step {
     case 'edit-profile-menu':
       return from.returnTo ?? { kind: 'continuity-public' }
     case 'edit-profile-name':
-      return { kind: 'edit-profile-menu', identity: from.identity, registry: from.registry, name: from.name, description: from.description, imagePath: from.imagePath, returnTo: from.returnTo }
     case 'edit-profile-description':
-      return { kind: 'edit-profile-name', identity: from.identity, registry: from.registry, name: from.name, description: from.description, imagePath: from.imagePath, returnTo: from.returnTo }
     case 'edit-profile-image':
-      return { kind: 'edit-profile-description', identity: from.identity, registry: from.registry, name: from.name, description: from.description, imagePath: from.imagePath, returnTo: from.returnTo }
     case 'edit-profile-review':
-      return { kind: 'edit-profile-image', identity: from.identity, registry: from.registry, name: from.name, description: from.description, imagePath: from.imagePath, returnTo: from.returnTo }
+      return { kind: 'edit-profile-menu', identity: from.identity, registry: from.registry, name: from.name, description: from.description, imagePath: from.imagePath, returnTo: from.returnTo }
     case 'edit-profile-ens':
       return from.returnTo ?? { kind: 'menu' }
     case 'ens-records-tx':
@@ -242,9 +239,10 @@ function backStep(from: Step): Step {
     case 'token-transfer-ready':
       return from.returnTo ?? { kind: 'menu' }
     case 'storage-credential':
+      return { kind: 'menu' }
     case 'storage-credential-input':
     case 'storage-credential-forget-confirm':
-      return { kind: 'menu' }
+      return { kind: 'storage-credential' }
     case 'save-prompt':
       return from.back
     case 'error':

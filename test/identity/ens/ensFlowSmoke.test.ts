@@ -42,8 +42,8 @@ test('setup-facing wallet copy uses owner/operator wallet language', () => {
 
   assert.match(walletPage, /Owner Wallet Required/)
   assert.match(walletPage, /Operator Wallet Required/)
-  assert.match(walletPage, /Sign With Owner Wallet/)
-  assert.match(walletPage, /Sign With Operator Wallet/)
+  assert.match(walletPage, /Sign with your owner wallet/)
+  assert.match(walletPage, /Sign with your operator wallet/)
   assert.match(restoreFlow, /Agent Search Incomplete/)
   assert.doesNotMatch(visibleCopy, /Agent lookup is taking too long/)
 })
@@ -124,14 +124,14 @@ test('vaulted public profile saves do not require Ethereum Mainnet ENS writes', 
   assert.match(vaultFlow, /rotate-agent-uri-vault-operator/)
   assert.doesNotMatch(vaultFlow, /publishOperatorProfileEnsRecord/)
   assert.doesNotMatch(vaultFlow, /runUpdateEnsRecords/)
-  assert.match(vaultFlow, /Profile updated\. ERC-8004 metadata published through the Vault\./)
+  assert.match(vaultFlow, /Profile published through the Vault\./)
 })
 
 test('public profile completion feedback starts capitalized', () => {
   const publicProfile = readFileSync('src/identity/manager/profile/effects.ts', 'utf8')
 
-  assert.doesNotMatch(publicProfile, /'profile updated/)
-  assert.match(publicProfile, /'Profile updated/)
+  assert.doesNotMatch(publicProfile, /'profile published/)
+  assert.match(publicProfile, /'Profile published/)
 })
 
 test('operator profile updates never write to ENS', () => {

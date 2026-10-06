@@ -24,7 +24,7 @@ type StorageRoutesProps = {
 }
 
 export const StorageRoutes: React.FC<StorageRoutesProps> = ({ controller, footer }) => {
-  const { step, jwtSaved, setStep, setJwtSaved, setCopyNotice, back } = controller
+  const { step, jwtSaved, setStep, setJwtSaved, back } = controller
 
   if (!isStorageStep(step)) return null
 
@@ -38,15 +38,13 @@ export const StorageRoutes: React.FC<StorageRoutesProps> = ({ controller, footer
       onConfirmForget={async () => {
         await clearPinataJwt().catch(() => {})
         setJwtSaved(false)
-        setCopyNotice('IPFS storage credential removed.')
-        setStep({ kind: 'menu' })
+        setStep({ kind: 'storage-credential' })
       }}
       onSubmit={async input => {
         try {
           await savePinataJwt(input)
           setJwtSaved(true)
-          setCopyNotice('IPFS storage credential saved.')
-          setStep({ kind: 'menu' })
+          setStep({ kind: 'storage-credential' })
         } catch (err: unknown) {
           setStep({ kind: 'storage-credential-input', error: (err as Error).message })
         }

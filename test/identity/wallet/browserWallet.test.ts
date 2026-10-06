@@ -192,7 +192,7 @@ test('browser wallet page supports the single signature and transaction flow', (
   assert.match(page, /post\("\/prepare-transaction"/)
   assert.match(page, /approve-sign/)
   assert.match(page, /approve-transaction/)
-  assert.match(page, /Saving Snapshot/)
+  assert.match(page, /Saving snapshot/)
   assert.doesNotMatch(page, /this tab will close after you can read the hash/)
 })
 
@@ -249,7 +249,7 @@ test('browser wallet page explains operator-wallet restore proof without token a
   })
 
   assert.match(page, /Operator Wallet Required/)
-  assert.match(page, /Sign With Operator Wallet/)
+  assert.match(page, /Sign with your operator wallet/)
   assert.match(page, /Creates restore access/)
   assert.match(page, /No token approval/)
 })
@@ -264,7 +264,7 @@ test('browser wallet page clearly requests owner wallet for restore signatures',
   })
 
   assert.match(page, /Owner Wallet Required/)
-  assert.match(page, /Sign With Owner Wallet/)
+  assert.match(page, /Sign with your owner wallet/)
   assert.match(page, /Decrypts this snapshot/)
   assert.match(page, /0x0+c01d/)
 })
@@ -279,7 +279,7 @@ test('browser wallet page clearly requests operator wallet for restore signature
   })
 
   assert.match(page, /Operator Wallet Required/)
-  assert.match(page, /Sign With Operator Wallet/)
+  assert.match(page, /Sign with your operator wallet/)
   assert.match(page, /Decrypts this snapshot/)
 })
 
@@ -295,8 +295,8 @@ test('browser wallet page explains ENS record clearing on Ethereum mainnet', () 
     },
   })
 
-  assert.match(page, /Submit With ENS Controller Wallet/)
-  assert.match(page, /Submit With ENS Controller Wallet/)
+  assert.match(page, /Submit with your ENS controller wallet/)
+  assert.match(page, /Submit with your ENS controller wallet/)
   assert.match(page, /Ethereum Mainnet/)
   assert.match(page, /eth_sendTransaction/)
 })
@@ -310,7 +310,7 @@ test('browser wallet page explains owner-signed operator wallet list', () => {
   })
 
   assert.match(page, /Owner Wallet Required/)
-  assert.match(page, /Sign With Owner Wallet/)
+  assert.match(page, /Sign with your owner wallet/)
   assert.match(page, /operator wallet access/)
   assert.match(page, /No token approval/)
 })
@@ -491,7 +491,7 @@ test('wallet page splits snapshot saves into owner/operator/connected variants a
   assert.match(wallet, /"update-profile-connected":/)
   assert.doesNotMatch(wallet, /"update-snapshot":\s*{/)
   assert.doesNotMatch(wallet, /"update-profile":\s*{/)
-  assert.doesNotMatch(wallet, /"Sign With Wallet"/)
+  assert.doesNotMatch(wallet, /"Sign with your wallet"/)
 })
 
 test('wallet page throws instead of silently rendering a generic prompt for unknown purposes', () => {
@@ -500,7 +500,7 @@ test('wallet page throws instead of silently rendering a generic prompt for unkn
   assert.match(wallet, /refusing to render generic wallet prompt/)
 })
 
-test('operator-wallet snapshot save renders Sign With Operator Wallet copy', () => {
+test('operator-wallet snapshot save asks the operator wallet to sign', () => {
   const page = __testWalletPage('ethagent wallet request', 'hidden-token', {
     kind: 'sign-transaction',
     chainIdHex: '0x2105',
@@ -509,11 +509,11 @@ test('operator-wallet snapshot save renders Sign With Operator Wallet copy', () 
   })
 
   assert.match(page, /Operator Wallet: Save Snapshot/)
-  assert.match(page, /Sign With Operator Wallet/)
-  assert.doesNotMatch(page, /Sign With Wallet/)
+  assert.match(page, /Sign with your operator wallet/)
+  assert.doesNotMatch(page, /Sign with your wallet/)
 })
 
-test('owner-required snapshot save renders Sign With Owner Wallet copy', () => {
+test('owner-required snapshot save asks the owner wallet to sign', () => {
   const page = __testWalletPage('ethagent wallet request', 'hidden-token', {
     kind: 'sign-transaction',
     chainIdHex: '0x2105',
@@ -522,10 +522,10 @@ test('owner-required snapshot save renders Sign With Owner Wallet copy', () => {
   })
 
   assert.match(page, /Owner Wallet Required/)
-  assert.match(page, /Sign With Owner Wallet/)
+  assert.match(page, /Sign with your owner wallet/)
 })
 
-test('simple-mode snapshot save renders Sign With Connected Wallet copy', () => {
+test('simple-mode snapshot save asks the connected wallet to sign', () => {
   const page = __testWalletPage('ethagent wallet request', 'hidden-token', {
     kind: 'sign-transaction',
     chainIdHex: '0x2105',
@@ -534,7 +534,7 @@ test('simple-mode snapshot save renders Sign With Connected Wallet copy', () => 
   })
 
   assert.match(page, /Save Snapshot/)
-  assert.match(page, /Sign With Connected Wallet/)
+  assert.match(page, /Sign with your connected wallet/)
 })
 
 test('browser wallet session keeps one localhost URL across multiple prompts', async () => {

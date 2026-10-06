@@ -43,7 +43,6 @@ import {
 } from '../shared/effects/sync.js'
 import {
   assertSnapshotSaveSignerAuthorized,
-  createContinuityEnvelopeForSave,
   expectedAccountForSnapshotSave,
   operatorsPointerFromState,
   ownerAddressForSnapshotSave,
@@ -356,7 +355,7 @@ async function runOperatorWalletVaultPublicProfileSave(args: {
 
     await callbacks.onIdentityComplete(
       nextIdentity,
-      'Profile updated. ERC-8004 metadata published through the Vault.',
+      'Profile published through the Vault.',
       'update',
     )
   } finally {

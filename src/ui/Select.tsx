@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { Box, Text, useStdout } from 'ink'
 import { theme, gradientColor } from './theme.js'
 import { useContentWidth } from './layout.js'
-import { wrapWords } from './text.js'
+import { truncateEnd, wrapWords } from './text.js'
 import { useAppInput } from '../app/input/AppInputProvider.js'
 
 const SELECT_CHROME_ROWS = 17
@@ -44,15 +44,16 @@ function isSectionOption<T>(option: SelectOption<T>): boolean {
   return option.role === 'section' || option.role === 'group'
 }
 
-function optionLabelText<T>(option: SelectOption<T>): string {
-  return option.prefix && !isSectionOption(option) ? `${option.prefix} ${option.label}` : option.label
+function optionLabelText<T>(option: SelectOption<T>, contentWidth: number): string {
+  const text = option.prefix && !isSectionOption(option) ? `${option.prefix} ${option.label}` : option.label
+  return truncateEnd(text, contentWidth - (option.indent ?? 0) - CURSOR_WIDTH)
 }
 
 function inlineHintColumn<T>(options: Array<SelectOption<T>>, contentWidth: number): number {
   let column = 0
   for (const option of options) {
     if (!option.hint || isSectionOption(option)) continue
-    const start = (option.indent ?? 0) + CURSOR_WIDTH + optionLabelText(option).length + HINT_GAP
+    const start = (option.indent ?? 0) + CURSOR_WIDTH + optionLabelText(option, contentWidth).length + HINT_GAP
     if (start + option.hint.length <= contentWidth) column = Math.max(column, start)
   }
   return column
@@ -151,7 +152,7 @@ export function Select<T>({
         const disabled = !!option.disabled
         const highlighted = isActive && selectable
         const cursor = highlighted ? '❯' : ' '
-        const labelText = optionLabelText(option)
+        const labelText = optionLabelText(option, contentWidth)
         const labelColor = highlighted
           ? theme.accentPeriwinkle
           : option.labelColor ?? (disabled ? theme.dim : theme.text)

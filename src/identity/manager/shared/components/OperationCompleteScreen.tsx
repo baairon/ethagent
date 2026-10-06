@@ -1,5 +1,5 @@
 import React from 'react'
-import { Box } from 'ink'
+import { Box, Text } from 'ink'
 import { Surface } from '../../../../ui/Surface.js'
 import { Select } from '../../../../ui/Select.js'
 import { Paragraph } from '../../../../ui/Paragraph.js'
@@ -11,7 +11,7 @@ type OperationCompleteScreenProps = {
 }
 
 export const OperationCompleteScreen: React.FC<OperationCompleteScreenProps> = ({ message, onReturn }) => (
-  <Surface title="Done">
+  <Surface title="Done" footer={<Text color={theme.dim}>↵ continue</Text>}>
     <Paragraph color={theme.text}>{message}</Paragraph>
     <Box marginTop={1}>
       <Select<'menu'>

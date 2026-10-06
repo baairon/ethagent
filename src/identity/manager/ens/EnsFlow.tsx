@@ -170,10 +170,6 @@ export const EnsFlow: React.FC<EnsFlowProps> = ({
         }}
         onIconSubmit={iconPath => {
           if (editStep.kind !== 'edit-profile-image') return
-          if (iconPath === undefined) {
-            menuFromDrafts(currentDrafts())
-            return
-          }
           menuFromDrafts({ ...currentDrafts(), imagePath: iconPath })
         }}
         onIconPick={() => {
@@ -262,7 +258,6 @@ export const EnsFlow: React.FC<EnsFlowProps> = ({
           })
         }}
         onBack={onBack}
-        onMenu={() => onSetStep(step.returnTo ?? { kind: 'continuity-public' })}
         onBackToEditMenu={() => menuFromDrafts(currentDrafts())}
       />
     )

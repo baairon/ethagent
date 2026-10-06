@@ -38,7 +38,7 @@ export async function preflightDeleteSubdomain(args: EnsSubdomainDeletePreflight
     return { ok: false, reason: 'lookup-failed', detail: err instanceof Error ? err.message : String(err) }
   }
   if (isZero(parentOwner)) {
-    return { ok: false, reason: 'parent-not-owned', detail: `${parts.parent} does not have an ENS manager on Ethereum mainnet` }
+    return { ok: false, reason: 'parent-not-owned', detail: `${parts.parent} does not have an ENS manager on Ethereum Mainnet` }
   }
   const parentWrapped = sameAddress(parentOwner, ENS_NAME_WRAPPER_ADDRESS_MAINNET)
   let parentOwnerAddress: Address
@@ -61,7 +61,7 @@ export async function preflightDeleteSubdomain(args: EnsSubdomainDeletePreflight
     return { ok: false, reason: 'lookup-failed', detail: err instanceof Error ? err.message : String(err) }
   }
   if (isZero(childOwner)) {
-    return { ok: false, reason: 'subdomain-missing', detail: `${fullName} is already cleared on Ethereum mainnet` }
+    return { ok: false, reason: 'subdomain-missing', detail: `${fullName} is already cleared on Ethereum Mainnet` }
   }
   const transaction = parentWrapped
     ? encodeDeleteSubnodeWrapped(parts.parent, parts.label)

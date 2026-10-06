@@ -15,6 +15,7 @@ import { BusyScreen } from '../shared/components/BusyScreen.js'
 import { StepHeader } from '../shared/components/StepHeader.js'
 import { PinataJwtInput } from '../shared/components/PinataJwtInput.js'
 import type { BrowserWalletReady } from '../../wallet/browserWallet.js'
+import type { CreateProgress } from '../shared/effects/types.js'
 
 type CreateFlowProps = {
   step: Extract<Step, {
@@ -30,6 +31,7 @@ type CreateFlowProps = {
       | 'create-storage'
   }>
   walletSession: BrowserWalletReady | null
+  createProgress: CreateProgress | null
   onSetStep: (step: Step) => void
   onNameSubmit: (name: string) => void
   onDescriptionSubmit: (name: string, description: string) => void
@@ -43,6 +45,7 @@ type CreateFlowProps = {
 export const CreateFlow: React.FC<CreateFlowProps> = ({
   step,
   walletSession,
+  createProgress,
   onSetStep,
   onNameSubmit,
   onDescriptionSubmit,
@@ -113,7 +116,7 @@ export const CreateFlow: React.FC<CreateFlowProps> = ({
 
   if (step.kind === 'create-custody') {
     return (
-      <Surface title="Pick Custody Mode" subtitle={header('Simple suits most agents. You can switch later.')} footer="↵ select · esc back">
+      <Surface title="Choose Custody Mode" subtitle={header('Simple suits most agents. You can switch later.')} footer="↵ select · esc back">
         <Select<'simple' | 'advanced'>
           options={[
             { value: 'simple', label: 'Simple', hint: 'Your wallet holds the token' },
@@ -184,9 +187,10 @@ export const CreateFlow: React.FC<CreateFlowProps> = ({
     return (
       <Surface
         title={`${networkName(step.resolution.chainId)} Agent Registry`}
-        subtitle={header(step.error ?? 'Paste the agent registry address for this network.')}
+        subtitle={header('Paste the agent registry address for this network.')}
         footer="↵ continue · esc back"
       >
+        {step.error ? <Box marginBottom={1}><Paragraph color={theme.accentError}>{step.error}</Paragraph></Box> : null}
         <Box marginBottom={1}><Paragraph color={theme.dim}>{`RPC defaults to ${step.resolution.defaultRpcUrl}`}</Paragraph></Box>
         <TextInput
           key={`create-registry-${step.resolution.network}`}
@@ -208,6 +212,15 @@ export const CreateFlow: React.FC<CreateFlowProps> = ({
 
   if (step.kind === 'create-signing') {
     const isAdvanced = step.custodyMode === 'advanced'
+    if (createProgress) {
+      return (
+        <BusyScreen
+          title="Create Your Agent"
+          subtitle={header('Your wallet sent the transaction. Keep this window open while it confirms.')}
+          label={createProgress.label}
+        />
+      )
+    }
     return (
       <WalletApprovalScreen
         title="Create Your Agent"
@@ -227,8 +240,8 @@ export const CreateFlow: React.FC<CreateFlowProps> = ({
     <PinataJwtInput
       inputKey="create-storage"
       title="Connect IPFS Storage"
-      subtitle={header(step.error ?? 'Snapshots are pinned to IPFS through your own Pinata account.')}
-      footer="↵ continue · esc back"
+      subtitle={header('Snapshots are pinned to IPFS through your own Pinata account.')}
+      {...(step.error ? { error: step.error } : {})}
       onSubmit={onStorageSubmit}
       onCancel={onBack}
     />

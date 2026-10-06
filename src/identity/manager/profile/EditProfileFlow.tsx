@@ -40,7 +40,6 @@ type EditProfileFlowProps = {
   onEnsSetup: (setup: EnsSetupPlan) => void
   onManageOperatorWalletAccess: () => void
   onBack: () => void
-  onMenu: () => void
   onBackToEditMenu: () => void
 }
 
@@ -62,7 +61,6 @@ export const EditProfileFlow: React.FC<EditProfileFlowProps> = ({
   onEnsSetup,
   onManageOperatorWalletAccess,
   onBack,
-  onMenu,
   onBackToEditMenu,
 }) => {
   if (step.kind === 'edit-profile-menu') {
@@ -72,7 +70,7 @@ export const EditProfileFlow: React.FC<EditProfileFlowProps> = ({
   if (step.kind === 'edit-profile-name') {
     const currentName = step.name ?? readIdentityStateString(step.identity.state, 'name')
     return (
-      <Surface title="Edit Name" subtitle={`Published now: ${readIdentityStateString(step.identity.state, 'name') || 'not set'}`} footer={footerHint('↵ save · esc back')}>
+      <Surface title="Edit Name" subtitle={`Published name: ${readIdentityStateString(step.identity.state, 'name') || 'not set'}`} footer={footerHint('↵ save · esc back')}>
         <TextInput
           key="edit-profile-name"
           initialValue={currentName}
@@ -86,7 +84,7 @@ export const EditProfileFlow: React.FC<EditProfileFlowProps> = ({
   }
 
   if (step.kind === 'edit-profile-image') {
-    return <AgentIconStep step={step} onIconSubmit={onIconSubmit} onIconPick={onIconPick} onBack={onBack} onMenu={onBackToEditMenu} />
+    return <AgentIconStep step={step} onIconSubmit={onIconSubmit} onIconPick={onIconPick} onBack={onBackToEditMenu} />
   }
 
   if (step.kind === 'edit-profile-review') {
@@ -144,7 +142,7 @@ const EditProfileMenuStep: React.FC<{
   const nameHint = edited(step.name !== undefined, draftName || 'Not set')
   const hintBudget = contentWidth - 'Publish Profile'.length - 4 - (step.description !== undefined ? ' · edited'.length : 0)
   const descriptionHint = edited(step.description !== undefined, previewText(draftDescription || 'Not set', hintBudget))
-  const iconHint = edited(step.imagePath !== undefined, savedIcon || step.imagePath !== undefined ? draftIcon : 'None')
+  const iconHint = edited(step.imagePath !== undefined, draftIcon)
 
   const dirty = step.name !== undefined || step.description !== undefined || step.imagePath !== undefined
   const saveHint = dirty ? 'Review first' : 'No changes yet'
@@ -178,11 +176,10 @@ const AgentIconStep: React.FC<{
   onIconSubmit: (iconPath?: string) => void
   onIconPick: () => void
   onBack: () => void
-  onMenu: () => void
-}> = ({ step, onIconSubmit, onIconPick, onBack, onMenu }) => {
+}> = ({ step, onIconSubmit, onIconPick, onBack }) => {
   const [entryMode, setEntryMode] = React.useState(false)
   const currentIcon = readIdentityStateString(step.identity.state, 'imageUrl')
-  const selectedIcon = describeDraftIcon(step.imagePath, currentIcon)
+  const draft = step.imagePath
 
   if (entryMode) {
     return (
@@ -198,35 +195,38 @@ const AgentIconStep: React.FC<{
     )
   }
 
+  type IconAction = 'choose' | 'enter' | 'remove' | 'undo' | 'back'
+  const options: Array<{ value: IconAction; label: string; hint?: string; role?: 'utility' }> = [
+    { value: 'choose', label: 'Choose a File', hint: 'Opens the file picker' },
+    { value: 'enter', label: 'Enter a URL or Path' },
+  ]
+  if (currentIcon && draft !== 'delete') options.push({ value: 'remove', label: 'Remove Icon' })
+  if (draft !== undefined) options.push({ value: 'undo', label: 'Undo Change', hint: currentIcon ? 'Keep the published icon' : 'Keep no icon' })
+  options.push({ value: 'back', label: 'Back', role: 'utility' })
+
   return (
-    <Surface title="Edit Icon" subtitle={`Icon: ${selectedIcon === '(no icon)' ? 'none yet' : selectedIcon}`} footer={footerHint('↵ select · esc back')}>
+    <Surface title="Edit Icon" subtitle={iconStatusLine(draft, currentIcon)} footer={footerHint('↵ select · esc back')}>
       {step.error ? <Box marginBottom={1}><Paragraph color={theme.accentError}>{step.error}</Paragraph></Box> : null}
-      <Box>
-        <Select<'choose' | 'enter' | 'skip' | 'delete' | 'back'>
-          options={[
-            { value: 'choose', label: 'Choose a File', hint: 'Opens the file picker' },
-            { value: 'enter', label: 'Enter a URL or Path', hint: 'https, ipfs, or a local image' },
-            ...(currentIcon
-              ? [
-                  { value: 'skip' as const, label: 'Keep Current Icon' },
-                  { value: 'delete' as const, label: 'Remove Icon' },
-                ]
-              : []),
-            { value: 'back', label: 'Back', role: 'utility' },
-          ]}
-          hintLayout="inline"
-          onSubmit={choice => {
-            if (choice === 'choose') return onIconPick()
-            if (choice === 'enter') { setEntryMode(true); return }
-            if (choice === 'delete') return onIconSubmit('delete')
-            if (choice === 'skip') return onIconSubmit(undefined)
-            return onMenu()
-          }}
-          onCancel={onMenu}
-        />
-      </Box>
+      <Select<IconAction>
+        options={options}
+        hintLayout="inline"
+        onSubmit={choice => {
+          if (choice === 'choose') return onIconPick()
+          if (choice === 'enter') { setEntryMode(true); return }
+          if (choice === 'remove') return onIconSubmit('delete')
+          if (choice === 'undo') return onIconSubmit(undefined)
+          return onBack()
+        }}
+        onCancel={onBack}
+      />
     </Surface>
   )
+}
+
+function iconStatusLine(draft: string | undefined, currentIcon: string): string {
+  if (draft === 'delete') return 'Publishing removes the current icon.'
+  if (draft) return `New icon: ${iconFileName(draft)}. Publish to apply it.`
+  return currentIcon ? `Published icon: ${iconFileName(currentIcon)}` : 'No icon yet.'
 }
 
 const EditProfileReviewStep: React.FC<{
@@ -260,9 +260,17 @@ const EditProfileReviewStep: React.FC<{
 }
 
 function describeDraftIcon(imagePath: string | undefined, currentIcon: string): string {
-  if (imagePath === 'delete') return 'Remove current icon'
-  if (imagePath) return shortIconReference(imagePath)
-  return currentIcon ? shortIconReference(currentIcon) : '(no icon)'
+  if (imagePath === 'delete') return 'Removed'
+  if (imagePath) return iconFileName(imagePath)
+  return currentIcon ? iconFileName(currentIcon) : 'None'
+}
+
+function iconFileName(value: string): string {
+  const trimmed = value.trim()
+  const withoutQuery = trimmed.replace(/[?#].*$/, '')
+  const name = withoutQuery.split(/[\\/]/).filter(Boolean).at(-1) ?? trimmed
+  const base = /^[a-z][a-z0-9+.-]*:$/i.test(name) || name.length > 40 ? shortIconReference(trimmed) : name
+  return base.length > 40 ? `${base.slice(0, 24)}…${base.slice(-15)}` : base
 }
 
 function shortIconReference(value: string): string {

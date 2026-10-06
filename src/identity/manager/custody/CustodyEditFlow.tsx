@@ -74,7 +74,6 @@ export const CustodyEditFlow: React.FC<CustodyEditFlowProps> = ({
     const onChainCustody = reconciliation?.custody
     const midFlow = onChainCustody === 'mid-flow-uri-pending'
     const isAdvanced = onChainCustody === 'advanced' || midFlow || custodyMode === 'advanced'
-    const vaultHolds = onChainCustody === 'advanced' || midFlow
     const subtitle = midFlow
       ? 'Advanced custody setup is unfinished. Resume it or cancel it.'
       : isAdvanced
@@ -150,7 +149,7 @@ export const CustodyEditFlow: React.FC<CustodyEditFlowProps> = ({
                     ...(!activeOperator && approvedOperatorCount === 0 ? { valueColor: theme.dim } : {}),
                   }
                 : null,
-              { label: 'Last Saved', value: lastBackup === 'never' ? 'Never' : lastBackup, ...(lastBackup === 'never' ? { valueColor: theme.dim } : {}) },
+              { label: 'Last saved', value: lastBackup === 'never' ? 'Never' : lastBackup, ...(lastBackup === 'never' ? { valueColor: theme.dim } : {}) },
             ]} />
           )
         })()}

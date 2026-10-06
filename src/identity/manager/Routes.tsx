@@ -10,6 +10,9 @@ import { copyToClipboard } from '../../utils/clipboard.js'
 import { DEFAULT_IPFS_API_URL } from '../storage/ipfs.js'
 import { chainIdForNetwork, erc8004ConfigForSupportedChain, type Erc8004AgentCandidate } from '../registry/erc8004.js'
 import { shortAddress } from './shared/model/format.js'
+import { networkName } from './shared/model/network.js'
+import { FieldList } from './shared/components/FieldRow.js'
+import { readIdentityStateString } from './custody/state.js'
 import { canRestoreCandidate } from './restore/discover.js'
 import {
   resolveAgentEnsToCandidate,
@@ -45,7 +48,6 @@ import type { Step } from './reducer.js'
 export const IdentityManagerRoutes: React.FC<{ controller: IdentityManagerController }> = ({ controller }) => {
   const {
     config,
-    onComplete,
     onConfigChange,
     identity,
     reconciliation,
@@ -53,6 +55,7 @@ export const IdentityManagerRoutes: React.FC<{ controller: IdentityManagerContro
     walletSession,
     restoreProgress,
     tokenTransferProgress,
+    createProgress,
     copyNotice,
     canRebackup,
     callbacks,
@@ -81,14 +84,24 @@ export const IdentityManagerRoutes: React.FC<{ controller: IdentityManagerContro
   }
 
   if (step.kind === 'first-run-ens-prompt') {
-    const tokenLabel = step.identity.agentId ? `Token #${step.identity.agentId}` : 'Your agent'
+    const restored = step.origin === 'restore'
+    const agentName = readIdentityStateString(step.identity.state, 'name')
+    const owner = step.identity.ownerAddress ?? step.identity.address
     return (
       <Surface
-        title={step.origin === 'restore' ? 'Agent Restored' : 'Agent Created'}
-        subtitle={`${tokenLabel} is live.`}
+        title={restored ? 'Agent Restored' : 'Agent Created'}
+        subtitle={restored ? 'Its soul, memory, and skills are on this machine.' : 'Your agent is live onchain.'}
         footer={footer}
       >
-        <Paragraph color={theme.textSubtle}>Want an ENS name for it? It is optional. The token id already makes your agent restorable.</Paragraph>
+        <FieldList fields={[
+          agentName ? { label: 'Name', value: agentName, valueColor: theme.accentPeriwinkle } : null,
+          step.identity.agentId ? { label: 'Token', value: `#${step.identity.agentId}` } : null,
+          { label: 'Network', value: networkName(step.registry.chainId) },
+          owner ? { label: 'Owner', value: shortAddress(owner) } : null,
+        ]} />
+        <Box marginTop={1}>
+          <Paragraph color={theme.textSubtle}>An ENS name is optional. The token id already makes your agent restorable.</Paragraph>
+        </Box>
         <Box marginTop={1}>
           <Select<'ens' | 'later'>
             options={[
@@ -162,6 +175,7 @@ export const IdentityManagerRoutes: React.FC<{ controller: IdentityManagerContro
       <CreateFlow
         step={step}
         walletSession={walletSession}
+        createProgress={createProgress}
         onSetStep={setStep}
         onNameSubmit={name => setStep({ kind: 'create-description', name })}
         onDescriptionSubmit={(name, description) => setStep({ kind: 'create-network', name, description })}
@@ -202,6 +216,7 @@ export const IdentityManagerRoutes: React.FC<{ controller: IdentityManagerContro
   if (step.kind === 'create-network') {
     return (
       <NetworkScreen
+        title="Choose a Network"
         subtitle={<StepHeader steps={[...CREATE_STEP_LABELS]} current={3} description="Choose where to create this agent." />}
         footer={footer}
         onSelect={(network: SelectableNetwork) => {
@@ -215,6 +230,7 @@ export const IdentityManagerRoutes: React.FC<{ controller: IdentityManagerContro
   if (step.kind === 'restore-network') {
     return (
       <NetworkScreen
+        title={step.purpose === 'switch' ? 'Switch Agent' : 'Restore Agent'}
         subtitle="Choose a network to search for your agents."
         footer={footer}
         onSelect={(network: SelectableNetwork) => {

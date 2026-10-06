@@ -69,19 +69,19 @@ export function tabTitleForState(state: string): string {
   if (state === "error") return STATE_TITLES.error;
   if (state === "cancelled") return STATE_TITLES.cancelled;
   if (state === "approve") {
-    if (config.kind === "account") return accountCopy().text;
+    if (config.kind === "account") return FLOW_COPY.account!.tabTitle;
     if (config.kind === "sign") return STATE_TITLES.approveSign;
     return STATE_TITLES.approveTransaction;
   }
   if (state === "submitting") {
     if (config.kind === "account") return STATE_TITLES.connecting;
-    if (config.kind === "sign") return "Verifying signature";
-    return "Confirming transaction";
+    if (config.kind === "sign") return "Verifying Signature";
+    return "Confirming Transaction";
   }
   if (state === "done") {
-    if (config.kind === "account") return "Wallet connected";
-    if (config.kind === "sign") return "Message signed";
-    return "Transaction submitted";
+    if (config.kind === "account") return "Wallet Connected";
+    if (config.kind === "sign") return "Message Signed";
+    return "Transaction Submitted";
   }
   return flowCopy().tabTitle || STATE_TITLES.default;
 }

@@ -6,7 +6,9 @@ import { Select } from '../../../ui/Select.js'
 import { Spinner } from '../../../ui/Spinner.js'
 import { Paragraph } from '../../../ui/Paragraph.js'
 import { theme } from '../../../ui/theme.js'
+import { asSentence } from '../../../ui/text.js'
 import type { BrowserWalletReady } from '../../wallet/browserWallet.js'
+import { splitSubdomainName } from '../../ens/ensLookup.js'
 import { type CustodyMode } from '../custody/state.js'
 import { shortAddress } from '../shared/model/format.js'
 import { FieldList } from '../shared/components/FieldRow.js'
@@ -41,6 +43,7 @@ type MaintenanceScreenProps = {
   runDiscovery: () => void
   runCheckAgain: () => void
   runUnlinkEnsLoading: (fullName: string) => void
+  runDeleteSubdomainPreflight: (fullName: string) => void
   onBack: () => void
   onEnsUnlink: EnsEditProps['onEnsUnlink']
   onEnsRecordsUpdate: EnsEditProps['onEnsRecordsUpdate']
@@ -62,6 +65,7 @@ export function renderEnsMaintenancePhase({
   runDiscovery,
   runCheckAgain,
   runUnlinkEnsLoading,
+  runDeleteSubdomainPreflight,
   onBack,
   onEnsUnlink,
   onEnsRecordsUpdate,
@@ -69,8 +73,9 @@ export function renderEnsMaintenancePhase({
   const home = () => setPhase({ kind: 'mode-select' })
 
   if (phase.kind === 'mode-select') {
-    type EnsAction = 'link' | 'check' | 'unlink' | 'back'
+    type EnsAction = 'link' | 'check' | 'unlink' | 'delete' | 'back'
     const ens = selectEnsStatus(identity)
+    const deletable = Boolean(currentEnsName && splitSubdomainName(currentEnsName))
     const needsCustodySetup = savedCustodyMode === 'advanced' && !savedOwnerAddress
     const subtitle = !currentEnsName
       ? 'Name your agent under a .eth you own.'
@@ -81,6 +86,7 @@ export function renderEnsMaintenancePhase({
       ? [
           ...(ens.kind === 'issue' ? [{ value: 'check' as const, label: 'Check Again' }] : []),
           { value: 'unlink', label: 'Unlink Name', hint: 'You keep the name' },
+          ...(deletable ? [{ value: 'delete' as const, label: 'Delete Subdomain', hint: 'Removes it onchain' }] : []),
         ]
       : [{
           value: 'link',
@@ -109,6 +115,7 @@ export function renderEnsMaintenancePhase({
               if (choice === 'back') return onBack()
               if (choice === 'check') return runCheckAgain()
               if (choice === 'unlink' && currentEnsName) return runUnlinkEnsLoading(currentEnsName)
+              if (choice === 'delete' && currentEnsName) return runDeleteSubdomainPreflight(currentEnsName)
               if (choice === 'link' && !needsCustodySetup) return runDiscovery()
             }}
             onCancel={onBack}
@@ -156,7 +163,7 @@ export function renderEnsMaintenancePhase({
 
   if (phase.kind === 'delete-subdomain-blocked') {
     return (
-      <Surface title={`Can't Delete ${phase.fullName}`} subtitle={phase.reason} footer={SELECT_FOOTER} tone="error">
+      <Surface title={`Can't Delete ${phase.fullName}`} subtitle={asSentence(phase.reason)} footer={SELECT_FOOTER} tone="error">
         <Select<'back'>
           options={[{ value: 'back', label: 'Back', role: 'utility' }]}
           hintLayout="inline"
@@ -172,7 +179,7 @@ export function renderEnsMaintenancePhase({
     return (
       <Surface
         title={`Delete ${plan.fullName}?`}
-        subtitle={`Removes the subdomain from ${plan.parentName}. Your wallet approves one transaction on Ethereum Mainnet.`}
+        subtitle={`Removes it from ${plan.parentName}. Your wallet approves the deletion on Ethereum Mainnet, then a snapshot save drops it from your agent.`}
         footer={SELECT_FOOTER}
         tone="error"
       >
@@ -210,25 +217,10 @@ export function renderEnsMaintenancePhase({
         ownerAddress={ownerAddress}
         walletSession={operatorWalletSession}
         onWalletReady={setOperatorWalletSession}
-        onDeleted={() => {
-          onEnsUnlink()
-          setPhase({ kind: 'delete-subdomain-done', fullName: phase.plan.fullName })
-        }}
+        onDeleted={onEnsUnlink}
         onError={msg => setPhase({ kind: 'delete-subdomain-blocked', fullName: phase.plan.fullName, reason: msg })}
+        onCancel={home}
       />
-    )
-  }
-
-  if (phase.kind === 'delete-subdomain-done') {
-    return (
-      <Surface title="Subdomain Deleted" subtitle={`${phase.fullName} is gone and no longer linked to your agent.`} footer={SELECT_FOOTER}>
-        <Select<'back'>
-          options={[{ value: 'back', label: 'Back', role: 'utility' }]}
-          hintLayout="inline"
-          onSubmit={home}
-          onCancel={home}
-        />
-      </Surface>
     )
   }
 

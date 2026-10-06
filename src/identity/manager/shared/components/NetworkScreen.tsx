@@ -7,13 +7,14 @@ import { networkName, networkSubtitle } from '../model/network.js'
 import { chainIdForNetwork } from '../../../registry/erc8004.js'
 
 type NetworkScreenProps = {
+  title?: string
   subtitle: React.ReactNode
   footer: React.ReactNode
   onSelect: (network: SelectableNetwork) => void
   onCancel: () => void
 }
 
-export const NetworkScreen: React.FC<NetworkScreenProps> = ({ subtitle, footer, onSelect, onCancel }) => {
+export const NetworkScreen: React.FC<NetworkScreenProps> = ({ title = 'Choose a Network', subtitle, footer, onSelect, onCancel }) => {
   const ordered: SelectableNetwork[] = ['mainnet', ...SELECTABLE_NETWORKS.filter(network => network !== 'mainnet')]
   const options: Array<SelectOption<SelectableNetwork>> = ordered.map(network => ({
     value: network,
@@ -22,7 +23,7 @@ export const NetworkScreen: React.FC<NetworkScreenProps> = ({ subtitle, footer, 
   }))
 
   return (
-    <Surface title="Network" subtitle={subtitle} footer={footer}>
+    <Surface title={title} subtitle={subtitle} footer={footer}>
       <Select<SelectableNetwork>
         options={options}
         hintLayout="inline"

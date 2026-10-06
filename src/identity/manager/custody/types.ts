@@ -1,5 +1,4 @@
 import type React from 'react'
-import type { Address } from 'viem'
 import type { EthagentConfig, EthagentIdentity } from '../../../storage/config.js'
 import type { Erc8004RegistryConfig } from '../../registry/erc8004.js'
 import type { EffectCallbacks } from '../shared/effects/types.js'

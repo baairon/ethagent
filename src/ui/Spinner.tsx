@@ -333,6 +333,7 @@ function restoreSpinnerTerms(value: string): string {
     .replace(/\bsoul\.md\b/g, 'SOUL.md')
     .replace(/\buri\b/g, 'URI')
     .replace(/\burl\b/g, 'URL')
+    .replace(/\bvault\b/g, 'Vault')
     .replace(/\bbase\b/g, 'Base')
     .replace(/\bethereum mainnet\b/g, 'Ethereum Mainnet')
     .replace(/\bethereum\b/g, 'Ethereum')

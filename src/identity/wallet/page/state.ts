@@ -64,7 +64,7 @@ export function setState(state: string, payload?: any): void {
   applyTransferTimeline();
   switch (state) {
     case "connecting":
-      setStatus("·", "Connecting To Wallet...", "Open your wallet if needed.", true);
+      setStatus("·", "Connecting to your wallet...", "Open your wallet if needed.", true);
       break;
     case "approve":
       if (config.kind === "account") {
@@ -94,9 +94,9 @@ export function setState(state: string, payload?: any): void {
       }
       break;
     case "submitting":
-      if (config.kind === "account") setStatus("·", "Connecting Wallet...", "Returning to terminal.", true);
-      else if (config.kind === "sign") setStatus("·", "Verifying Signature...", hasNextLifecyclePrompt() ? nextLifecycleHint() : "Returning to terminal.", true);
-      else setStatus("·", "Submitted · Waiting For Confirmation...", "Your wallet accepted the transaction.", true);
+      if (config.kind === "account") setStatus("·", "Connecting your wallet...", "Returning to terminal.", true);
+      else if (config.kind === "sign") setStatus("·", "Verifying the signature...", hasNextLifecyclePrompt() ? nextLifecycleHint() : "Returning to terminal.", true);
+      else setStatus("·", "Submitted. Waiting for confirmation...", "Your wallet accepted the transaction.", true);
       break;
     case "done":
       stopSpinner();

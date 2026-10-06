@@ -524,7 +524,7 @@ test('token values flags an onchain owner that differs from the local owner', ()
     onBack: () => {},
   }), { columns: 100 }))
 
-  assert.match(output, /Onchain Owner\s+0x0000…bEEF/)
+  assert.match(output, /Onchain owner\s+0x0000…bEEF/)
   assert.match(output, /Owner Wallet\s+0x0000\S*dEaD/)
 })
 

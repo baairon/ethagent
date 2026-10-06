@@ -108,7 +108,6 @@ export const TokenTransferFlow: React.FC<TokenTransferFlowProps> = ({
           error: step.error,
           pinataJwt: step.pinataJwt,
         }}
-        footer={footer}
         title="Connect IPFS Storage"
         subtitle="Save a Pinata JWT so ethagent can pin the transfer snapshot to IPFS."
         onSubmit={async input => {
