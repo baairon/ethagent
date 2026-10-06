@@ -12,6 +12,7 @@ export async function runHistoryCommand(verb: string, args: string[], baseDeps: 
     case 'checkpoint': return (await import('./checkpoint.js')).runCheckpointCommand(args, deps)
     case 'rollback': return (await import('./rollback.js')).runRollbackCommand(args, deps)
     case 'forget': return (await import('./forget.js')).runForgetCommand(args, deps)
+    case 'skills': return (await import('./skills.js')).runSkillsCommand(args, deps)
     default: return 2
   }
 }

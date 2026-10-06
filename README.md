@@ -147,6 +147,7 @@ The foundation is built on open standards, so your agent is never tied to one ap
 | To | Run |
 | --- | --- |
 | Back up your agent onchain | `ethagent save` |
+| See every identifier and what needs attention | `ethagent check` |
 | See what changed since the last save | `ethagent status` |
 | See what changed in memory since a date | `ethagent diff at:YYYY-MM-DD working --file MEMORY.md --sections` |
 | Find when a rule first appeared | `ethagent history --file MEMORY.md --sections` |
@@ -158,6 +159,9 @@ The foundation is built on open standards, so your agent is never tied to one ap
 | Remove leaked content | Edit it out, `ethagent save`, then `ethagent forget <ref> --file <path> --yes` for each version that held it |
 | Connect another tool | `ethagent --add "<path to the instructions file it loads every session>"` |
 | Find the vault | `ethagent --vault-dir` |
+| List skills and what the Agent Card shows | `ethagent skills` |
+| Make a skill public or private | `ethagent skills --public <name>` or `ethagent skills --private <name>` |
+| Delete a skill | `ethagent skills --delete <name>`, then again with `--yes` |
 | See the Vault, its build, and who may do what | `ethagent custody`, or `ethagent custody --verify` to simulate each permission |
 | Check the agent's ENS name | `ethagent ens` |
 | Point the agent at another ENS name | `ethagent ens <name>`, then again with `--yes` |
@@ -188,6 +192,10 @@ Run any of these with `npx ethagent`. Commands marked interactive need a termina
 | `pause` / `resume` | Stop or restart background sync. | Local |
 | `--status` | One-line summary: agent, network, local changes, connected tools. | Read-only |
 | `--vault-dir` | Print the vault path. | Read-only |
+| `check [--json]` | Every value that identifies the agent: token ID, network, registry, owner, agent URI, snapshot, metadata and agent card CIDs, ENS name, custody, Vault, operator, last saved, pending publish, transfer state, and any unconfirmed transaction. Then anything that needs attention, each with the command that fixes it. Exits 4 when something does. | Goes online |
+| `skills [--json]` | Every skill in the vault, its visibility, and whether the Agent Card publishes it. | Read-only |
+| `skills --public <name> \| --private <name> [--json]` | Change a skill's visibility and update the Agent Card. `ethagent save` publishes it. | Writes the vault |
+| `skills --delete <name> [--yes] [--json]` | Remove a skill's folder. Previews until `--yes`, checkpoints first, and names the rollback that brings it back. | Writes the vault |
 | `reset [--yes]` | Delete the local identity, vault, history, and saved secrets (the IPFS storage credential is kept), and disconnect your tools. Asks first unless `--yes`. | Deletes local data |
 | `status [--verify] [--json]` | What changed since the latest snapshot, per file and per skill. | Read-only; `--verify` goes online |
 | `history [--json]` | Snapshots and checkpoints, newest first. | Read-only |
@@ -235,7 +243,7 @@ Run any of these with `npx ethagent`. Commands marked interactive need a termina
 | `1` | Failed. |
 | `2` | Usage error. |
 | `3` | No working storage credential, no operator key, or the wallet was cancelled or timed out. |
-| `4` | Pinned, but the owner still needs to publish it. |
+| `4` | Pinned, but the owner still needs to publish it: run `ethagent save` again and approve with the owner wallet. |
 
 ### Onchain identity
 
@@ -249,7 +257,7 @@ Run any of these with `npx ethagent`. Commands marked interactive need a termina
 
 ### Setting up and moving an agent
 
-`create`, `restore`, `profile`, `transfer`, `storage`, and the custody changes run without the manager too. Everything the manager can do now has a command.
+`create`, `restore`, `profile`, `transfer`, `storage`, and the custody changes run without the manager too. Everything the manager can do has a command, except deleting an ENS subname, which stays in the manager on purpose; `ens --unlink` clears the agent's records instead.
 
 - **Previews.** Anything that signs or sends previews first: every signature and transaction, who signs it, and what can be simulated now. Nothing happens without `--yes`.
 - **One tab.** Each command runs all its wallet prompts in one browser tab. `--no-open` prints the link instead of opening it.
@@ -380,6 +388,8 @@ Instructions for the agent.
 
 What a save packs: folder and file names of letters, digits, `.`, `_`, and `-`; files with an extension; up to 4 folders deep; up to 2 MiB per file and 500 files in total. Build caches (`__pycache__`, `.pyc`, `node_modules`) and dotfiles are left out. Files are stored as text, so `ethagent status` lists anything a save would skip or couldn't store exactly.
 
+`ethagent skills` lists the skills and which ones the Agent Card publishes; `--public <name>` and `--private <name>` set `visibility` for you. A public skill without a real description is treated as a draft and left off the card.
+
 ### Files and locations
 
 | What | Where | Notes |
@@ -435,7 +445,7 @@ With `--json`, every history and onchain command prints one line of ASCII-only J
 | `1` | Failed: unknown ref, missing path, or a store error. |
 | `2` | Usage error, or a ref that matches more than one thing. |
 | `3` | The snapshot isn't cached here or there's no key to open it, `--operator` ran without an injected operator key, or the wallet approval was cancelled. |
-| `4` | Partly done (a custody change or `create --advanced` that stopped after something landed; run it again to finish), or `status --verify` or `custody --verify` found a mismatch. |
+| `4` | Partly done (a custody change or `create --advanced` that stopped after something landed; run it again to finish), `status --verify` or `custody --verify` found a mismatch, or `check` found something that needs attention. |
 
 ### Environment variables
 

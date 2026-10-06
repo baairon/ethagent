@@ -11,6 +11,7 @@ export async function runOnchainCommand(verb: string, args: string[], baseDeps: 
     case 'create': return (await import('./create.js')).runCreateCommand(args, deps)
     case 'storage': return (await import('./storage.js')).runStorageCommand(args, deps)
     case 'transfer': return (await import('./transfer.js')).runTransferCommand(args, deps)
+    case 'check': return (await import('./check.js')).runCheckCommand(args, deps)
     default: return 2
   }
 }

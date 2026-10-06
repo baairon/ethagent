@@ -63,23 +63,23 @@ export async function runSave(args: string[] = [], deps: RunSaveDeps = defaultDe
 
   const config = await deps.loadConfig().catch(() => null)
   if (!config?.identity) {
-    return fail(1, 'No agent identity yet. Run `npx ethagent` to create or link one.')
+    return fail(1, 'No agent identity yet. Mint one with `ethagent create`, or bring one back with `ethagent restore <token-id>`.')
   }
   const activeConfig: EthagentConfig = config
   const identity = config.identity
 
   if (!identity.agentId) {
-    return fail(1, 'This identity has no agent token ID yet. Create or restore it with `npx ethagent` first.')
+    return fail(1, 'This identity has no agent token ID yet. Mint one with `ethagent create`, or bring one back with `ethagent restore <token-id>`.')
   }
 
   const registry = resolveRegistryForIdentity(identity, activeConfig)
   if (!registry) {
-    return fail(1, 'No agent registry configured for this identity. Run `npx ethagent` to set it up.')
+    return fail(1, 'No agent registry configured for this identity. `ethagent restore <token-id>` records it.')
   }
 
   const vault = await deps.continuityVaultStatus(identity).catch(() => ({ ready: false }))
   if (!vault.ready) {
-    return fail(1, 'Local continuity files are not restored. Run `npx ethagent` and restore this identity before saving a snapshot.')
+    return fail(1, 'Local continuity files are not restored. Bring them back with `ethagent restore` before saving a snapshot.')
   }
 
   await deps.pullHarnessSoulMemoryIntoVault(identity).catch(() => [])
@@ -103,10 +103,10 @@ export async function runSave(args: string[] = [], deps: RunSaveDeps = defaultDe
     jwt = await deps.resolveValidatedPinataJwt()
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err)
-    return fail(3, `The configured Pinata JWT is invalid or unreachable (${detail}). The wallet was not opened. Update it via \`npx ethagent\` -> IPFS Storage, then retry \`ethagent save\`.`)
+    return fail(3, `The configured Pinata JWT is invalid or unreachable (${detail}). The wallet was not opened. Replace it with \`ethagent storage --set\` (reads the JWT from stdin), then retry \`ethagent save\`.`)
   }
   if (!jwt) {
-    return fail(3, 'No IPFS storage credential configured, so the snapshot cannot be pinned and the wallet was not opened. Run `npx ethagent` once and set up IPFS Storage (or export PINATA_JWT in this shell), then retry `ethagent save`.')
+    return fail(3, 'No IPFS storage credential configured, so the snapshot cannot be pinned and the wallet was not opened. Save one with `ethagent storage --set` (reads the JWT from stdin), or export PINATA_JWT in this shell, then retry `ethagent save`.')
   }
 
   let completed = false
@@ -191,7 +191,7 @@ export async function runSave(args: string[] = [], deps: RunSaveDeps = defaultDe
     stdout.write(`${detail}\n`)
     if (cid) stdout.write(`  pinned CID: ${cid}\n`)
     stderr.write('NOT published onchain yet: this snapshot will not survive a reset/restore until the owner publishes it.\n')
-    stderr.write('Publish with the owner wallet via `npx ethagent` -> Save Snapshot (it shows a "publish" step).\n')
+    stderr.write('Publish it with the owner wallet: run `ethagent save` again and approve with the owner. `ethagent check` shows what is still pending.\n')
   }
   return 4
 }
