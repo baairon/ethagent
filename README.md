@@ -8,6 +8,8 @@ ethagent gives your agent an identity you hold instead: a token in your wallet, 
 
 Its soul, memory, and skills travel with it, encrypted and restored on any machine exactly as you left them. You hold the only key, so no host can read them and no platform can take them away.
 
+Once it's set up, ethagent goes invisible. It becomes the infrastructure underneath the tools you already use, so every session, on any machine, starts from the same foundation: one identity, one soul, one memory, one set of skills. Everything your agent learns from there builds on top of it.
+
 Own your agent. Carry it anywhere.
 
 ## Quick start
@@ -26,7 +28,7 @@ A guided menu does the rest: name it and write who it is. When you're done, your
   <img src="preview/menu.svg" alt="ethagent main menu for a linked agent" width="100%">
 </p>
 
-**2. Use it anywhere.** That's the whole setup. ethagent wires itself into the AI tools you use, on any machine or OS, and your agent follows you and keeps learning. After this you rarely open the menu again: only to edit something by hand, change custody, or restore on a new machine.
+**2. Use it anywhere.** That's the whole setup. ethagent wires itself into the AI tools you use, on any machine or OS, and your agent follows you and keeps learning. After this you rarely open the menu again: only to edit something by hand, change custody, or restore on a new machine. [Underneath](#underneath) shows what runs in the meantime.
 
 If a tool wasn't picked up, `npx ethagent --status` lists the ones ethagent keeps in sync. Open the missing tool and paste this to its agent:
 
@@ -45,13 +47,37 @@ An agent should be careful with a command that edits its own instructions, so th
 
 After setup, ethagent stays out of the way. You show up for the moments that need your wallet; your agent handles everything in between.
 
-| You | Your agent |
+What you do:
+
+- Create the agent, or restore it on a new machine.
+- Approve each save in your wallet.
+- Choose custody, an ENS name, or a transfer.
+- Pause sync, or reset.
+
+What your agent does:
+
+- Keeps its soul and memory current as you work.
+- Writes and edits its own skills.
+- Keeps every tool you use in step, both ways.
+- Reads its own history: what changed, when, and why.
+- Rolls back its own mistakes when you ask, with undo.
+
+## Underneath
+
+There's no app to keep open and no command to remember. ethagent works through the instructions file each tool already loads, the tool's own hooks where it has them, and a small watcher in the background.
+
+| When | What happens |
 | --- | --- |
-| Create the agent, or restore it on a new machine | Keeps its soul and memory current as you work |
-| Approve each save in your wallet | Writes and edits its own skills |
-| Choose custody, an ENS name, or a transfer | Keeps every tool you use in step, both ways |
-| Pause sync, or reset | Reads its own history: what changed, when, and why |
-| | Rolls back its own mistakes when you ask, with undo |
+| A session starts | Your agent opens with its current soul, memory, and skills, plus a short briefing: where they live, and which commands it can run on its own. |
+| Your agent tries to write somewhere that won't travel | In tools that support hooks, ethagent stops the write and points your agent to the right file. That covers a tool's own per-project memory and the read-only skills mirror. |
+| Your agent edits its soul, memory, or a skill | The change reaches the vault and every other tool. |
+| Anything changes while you work | The watcher keeps the vault and every connected tool in step, both ways, and the newest edit wins. It starts with your sessions and new terminals, and `ethagent pause` stops it. |
+| A restore, refetch, or rollback is about to overwrite the vault | The exact bytes are checkpointed first, so it can be undone. |
+| You approve a save | ethagent encrypts everything on your machine, pins it to IPFS, points your token at it, checks that the pointer landed, and keeps the exact bytes in local history. |
+
+That's the foundation your agent builds on. Its vault and history are plain files on your machine that any tool can read. Every command but the manager runs headless, and the history commands answer in versioned JSON that only ever gains fields, with fixed exit codes and a hint that names the fix, so what your agent builds on them keeps working when ethagent updates itself. More in [History](#history) and [Output and exit codes](#output-and-exit-codes).
+
+For everything ethagent writes outside the vault, see [Files and locations](#files-and-locations).
 
 ## Soul, memory, skills
 
@@ -107,7 +133,7 @@ To move the agent to another wallet, stage a transfer snapshot in ethagent. Both
 
 ## Architecture
 
-Built on open standards, so your agent is never tied to one app.
+The foundation is built on open standards, so your agent is never tied to one app.
 
 | Layer | Built on | What it does |
 | --- | --- | --- |
@@ -312,8 +338,11 @@ What a save packs: folder and file names of letters, digits, `.`, `_`, and `-`; 
 | Snapshot ledger | `.published-snapshots.jsonl` in the vault | Every published snapshot: CID, time, transaction. |
 | Connected tools | Each tool's instructions file | Holds the soul and memory blocks, synced both ways. Add one with `--add`, `~/.ethagent/harnesses.json`, or `ETHAGENT_HARNESS_FILES`. |
 | Mirrored skills | A tool's own skills folder, where it has one | Read-only and regenerated from the vault. |
+| Hooks | A tool's settings, where it supports hooks | Brief your agent at session start, stop writes that won't travel, and sync after edits. If the tool has the ethagent plugin installed, the plugin carries them instead. |
+| Autostart | A marked block in your shell profile | Starts the background watcher with each new terminal. Delete the block to turn it off. |
+| Config and logs | `~/.ethagent/` | Your identity and settings, connected tools (`harnesses.json`), saved secrets (encrypted), and the watcher's log (`daemon.log`). The vault lives here too. |
 
-Sync runs in the background and on every edit, in both directions, and the newest edit wins.
+Sync runs in the background and on every edit, in both directions, and the newest edit wins. `ethagent reset` takes out the hooks and the autostart block along with `~/.ethagent/`.
 
 History is plain files, so any sha256 tool can check them without ethagent:
 
