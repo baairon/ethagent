@@ -689,3 +689,42 @@ test('browser wallet session.requestSignatureAndTransaction completes through on
     await session.close()
   }
 })
+
+test('browser wallet session.sendTransaction carries the prepared gas and fees to the page', async () => {
+  const session = await openBrowserWalletSession({})
+  try {
+    const cancelled = session.sendTransaction({
+      chainId: 1,
+      expectedAccount: '0x0000000000000000000000000000000000000002',
+      to: '0x0000000000000000000000000000000000000001',
+      data: '0xabcd',
+      gas: '0x5208',
+      maxFeePerGas: '0x77359400',
+      maxPriorityFeePerGas: '0x3b9aca00',
+      timeoutMs: 3_000,
+    }).then(() => null, err => err as Error)
+
+    const events = await fetch(new URL('/events', session.url))
+    const reader = events.body!.getReader()
+    const decoder = new TextDecoder()
+    let buf = ''
+    while (!buf.includes('event: prompt')) {
+      const { value, done } = await reader.read()
+      if (done) break
+      buf += decoder.decode(value, { stream: true })
+    }
+    void reader.cancel()
+    assert.match(buf, /"gas":"0x5208"/)
+    assert.match(buf, /"maxFeePerGas":"0x77359400"/)
+    assert.match(buf, /"maxPriorityFeePerGas":"0x3b9aca00"/)
+    const sessionToken = buf.match(/"sessionToken":"([^"]+)"/)![1]
+    await fetch(new URL('/cancel', session.url), {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ sessionToken }),
+    })
+    assert.match((await cancelled)?.message ?? '', /cancelled/)
+  } finally {
+    await session.close()
+  }
+})

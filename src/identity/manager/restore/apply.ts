@@ -1,4 +1,4 @@
-import { getAddress } from 'viem'
+import { getAddress, type Address } from 'viem'
 import type { EthagentIdentity } from '../../../storage/config.js'
 import { restoreAgentStateBackupEnvelope } from '../../crypto/backupEnvelope.js'
 import {
@@ -13,46 +13,88 @@ import {
 import { syncAgentCardManifest } from '../../continuity/skills/publicSkillsSync.js'
 import { recordPublishedContinuitySnapshot } from '../../continuity/snapshots.js'
 import { captureSnapshot, checkpointBeforeRestore } from '../../continuity/snapshotCapture.js'
-import { requestBrowserWalletSignature } from '../../wallet/browserWallet.js'
+import { requestBrowserWalletSignature, type SignatureRequest } from '../../wallet/browserWallet.js'
+import type { ContinuitySnapshotEnvelope } from '../../continuity/envelope.js'
+import { decryptContinuityWithLocalSigner, signLegacyChallengeLocally, type RestoreSigner } from './signer.js'
+import { canRestoreCandidate } from './discover.js'
 import { setVaultAddressField } from '../../identityCompat.js'
 import type { Step } from '../reducer.js'
 import type { EffectCallbacks } from '../shared/effects/types.js'
 import { isContinuitySnapshotEnvelope } from './envelopes.js'
-import { restoreSignatureRequestForStep } from './auth.js'
+import { restoreMessageForWallet, restoreSignatureRequestForStep } from './auth.js'
 import { type BackupMetadata, operatorStateFromCandidate, restorePublishedAgentCard } from './helpers.js'
 
 export async function runRestoreAuthorize(
   step: Extract<Step, { kind: 'restore-authorizing' }>,
   callbacks: EffectCallbacks,
+  opts: { signer?: RestoreSigner } = {},
 ): Promise<void> {
-  const signatureRequest = restoreSignatureRequestForStep(step)
-  const wallet = await requestBrowserWalletSignature({
-    chainId: step.candidate.chainId,
-    expectedAccount: signatureRequest.expectedAccount,
-    message: signatureRequest.message,
-    purpose: signatureRequest.purpose,
-    onReady: callbacks.onWalletReady,
-    ...(callbacks.signal ? { signal: callbacks.signal } : {}),
-  })
-  callbacks.onWalletReady(null)
-  callbacks.onRestoreProgress?.({ phase: 'decrypting', label: 'Decrypting the snapshot…' })
   let restored: ReturnType<typeof restoreAgentStateBackupEnvelope> | ReturnType<typeof restoreContinuitySnapshotEnvelope>
   let continuityFiles: ReturnType<typeof restoreContinuitySnapshotEnvelope>['files'] | undefined
   let continuitySkills: ReturnType<typeof restoreContinuitySnapshotEnvelope>['skills']
-  if (isContinuitySnapshotEnvelope(step.envelope)) {
-    const payload = restoreContinuitySnapshotEnvelope({
-      envelope: step.envelope,
-      walletSignature: wallet.signature,
-      currentOwnerAddress: wallet.account,
-    })
-    restored = payload
-    continuityFiles = payload.files
-    continuitySkills = payload.skills
+  let signerAccount: Address
+  if (opts.signer?.kind === 'local') {
+    // The operator key answers the challenge locally: no browser, and the snapshot
+    // opens only if it carries a slot for that key.
+    if (isContinuitySnapshotEnvelope(step.envelope)) {
+      const opened = await decryptContinuityWithLocalSigner(step.envelope, opts.signer.signer)
+      restored = opened.payload
+      continuityFiles = opened.payload.files
+      continuitySkills = opened.payload.skills
+      signerAccount = opened.account
+    } else {
+      const envelope = step.envelope
+      const opened = await signLegacyChallengeLocally(opts.signer.signer, envelope.challenge, signature =>
+        restoreAgentStateBackupEnvelope({ envelope, walletSignature: signature }))
+      restored = opened.value
+      signerAccount = opened.account
+    }
+    callbacks.onRestoreProgress?.({ phase: 'decrypting', label: 'Decrypting the snapshot…' })
   } else {
-    restored = restoreAgentStateBackupEnvelope({
-      envelope: step.envelope,
-      walletSignature: wallet.signature,
+    const requestSignature = opts.signer?.kind === 'browser'
+      ? opts.signer.requestSignature
+      : (req: SignatureRequest) => requestBrowserWalletSignature({
+          ...req,
+          onReady: callbacks.onWalletReady,
+          ...(callbacks.signal ? { signal: callbacks.signal } : {}),
+        })
+    // Without a known requester and with a continuity snapshot, whichever wallet
+    // connects is asked for its own slot's challenge and checked afterwards.
+    const openRequest = !step.requesterAddress && isContinuitySnapshotEnvelope(step.envelope)
+    const envelopeForRequest = step.envelope
+    const signatureRequest = openRequest ? null : restoreSignatureRequestForStep(step)
+    const wallet = await requestSignature({
+      chainId: step.candidate.chainId,
+      ...(signatureRequest
+        ? { expectedAccount: signatureRequest.expectedAccount, message: signatureRequest.message, purpose: signatureRequest.purpose }
+        : {
+            purpose: 'restore-owner-wallet',
+            messageForAccount: (account: Address) => {
+              if (!canRestoreCandidate(step.candidate, account)) {
+                throw new Error(`${account} is not this agent's owner or an approved operator wallet. Connect one of those.`)
+              }
+              return restoreMessageForWallet(envelopeForRequest as ContinuitySnapshotEnvelope, account)
+            },
+          }),
     })
+    callbacks.onWalletReady(null)
+    signerAccount = getAddress(wallet.account)
+    callbacks.onRestoreProgress?.({ phase: 'decrypting', label: 'Decrypting the snapshot…' })
+    if (isContinuitySnapshotEnvelope(step.envelope)) {
+      const payload = restoreContinuitySnapshotEnvelope({
+        envelope: step.envelope,
+        walletSignature: wallet.signature,
+        currentOwnerAddress: wallet.account,
+      })
+      restored = payload
+      continuityFiles = payload.files
+      continuitySkills = payload.skills
+    } else {
+      restored = restoreAgentStateBackupEnvelope({
+        envelope: step.envelope,
+        walletSignature: wallet.signature,
+      })
+    }
   }
   callbacks.onRestoreProgress?.({ phase: 'writing', label: 'Writing soul, memory, and skills…' })
   const transferSnapshot = isContinuitySnapshotEnvelope(step.envelope)
@@ -75,7 +117,7 @@ export async function runRestoreAuthorize(
   }
   const restoreRequester = step.requesterAddress && /^0x[a-fA-F0-9]{40}$/.test(step.requesterAddress)
     ? getAddress(step.requesterAddress)
-    : step.candidate.ownerAddress
+    : signerAccount
   const tokenOwnerAddress = step.candidate.tokenOwnerAddress ?? step.candidate.ownerAddress
   const restoredState: Record<string, unknown> = {
     ...restored.state,

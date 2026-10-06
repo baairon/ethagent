@@ -244,7 +244,14 @@ export async function openBrowserWalletSession(args: {
         kind: 'transaction',
         chainIdHex: chainIdHex(req.chainId),
         expectedAccount: req.expectedAccount,
-        tx: { to: req.to, data: req.data, ...(req.value ? { value: req.value } : {}) },
+        tx: {
+          ...(req.to ? { to: req.to } : {}),
+          data: req.data,
+          ...(req.value ? { value: req.value } : {}),
+          ...(req.gas ? { gas: req.gas } : {}),
+          ...(req.maxFeePerGas ? { maxFeePerGas: req.maxFeePerGas } : {}),
+          ...(req.maxPriorityFeePerGas ? { maxPriorityFeePerGas: req.maxPriorityFeePerGas } : {}),
+        },
         ...(req.purpose ? { purpose: req.purpose } : {}),
         ...(req.flowId ? { flowId: req.flowId } : {}),
         ...(typeof req.flowStep === 'number' ? { flowStep: req.flowStep } : {}),
@@ -266,7 +273,14 @@ export async function openBrowserWalletSession(args: {
             account: `0x${string}`
             message: string
             signature: `0x${string}`
-            tx: { to: `0x${string}`; data: `0x${string}`; value?: `0x${string}` }
+            tx: {
+              to: `0x${string}`
+              data: `0x${string}`
+              value?: `0x${string}`
+              gas?: `0x${string}`
+              maxFeePerGas?: `0x${string}`
+              maxPriorityFeePerGas?: `0x${string}`
+            }
             prepared: TPrepared
           }
         | null = null
@@ -303,6 +317,9 @@ export async function openBrowserWalletSession(args: {
               to: next.to,
               data: next.data,
               ...(next.value ? { value: next.value } : {}),
+              ...(next.gas ? { gas: next.gas } : {}),
+              ...(next.maxFeePerGas ? { maxFeePerGas: next.maxFeePerGas } : {}),
+              ...(next.maxPriorityFeePerGas ? { maxPriorityFeePerGas: next.maxPriorityFeePerGas } : {}),
             },
             prepared: next.prepared,
           }
