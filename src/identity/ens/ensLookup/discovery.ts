@@ -1,7 +1,6 @@
 import type { Address } from 'viem'
 import type { DiscoverOptions, EnsNameDiscoveryResult } from './types.js'
-import { RPC_TIMEOUT_MS } from './constants.js'
-import { createMainnetClient } from './client.js'
+import { cancellable, createMainnetClient } from './client.js'
 import { isEthDomain, normalizeEthDomain, splitSubdomainName } from './names.js'
 
 export async function discoverOwnedEnsNames(
@@ -16,47 +15,37 @@ export async function discoverOwnedEnsNameDetails(
   ownerAddress: Address,
   opts: DiscoverOptions = {},
 ): Promise<EnsNameDiscoveryResult> {
-  const rpcTimeoutMs = opts.rpcTimeoutMs ?? RPC_TIMEOUT_MS
-  const controller = new AbortController()
-  const onParentAbort = () => controller.abort()
-  opts.signal?.addEventListener('abort', onParentAbort, { once: true })
-  const budgetTimer = setTimeout(() => controller.abort(), rpcTimeoutMs)
+  const client = opts.publicClient ?? createMainnetClient()
+  if (opts.signal?.aborted) {
+    return { status: 'error', names: [], sourcesChecked: [], errors: ['ENS name lookup was cancelled'] }
+  }
   try {
-    const client = opts.publicClient ?? createMainnetClient()
-    if (controller.signal.aborted) {
-      return { status: 'error', names: [], sourcesChecked: [], errors: ['ENS name lookup was cancelled'] }
-    }
-    try {
-      const primary = await client.getEnsName({ address: ownerAddress })
-      const names = new Set<string>()
-      if (primary) {
-        const normalized = normalizeEthDomain(primary)
-        if (normalized && normalized.endsWith('.eth')) {
-          if (isRootEthName(normalized)) {
-            names.add(normalized)
-          } else {
-            const parts = splitSubdomainName(normalized)
-            if (parts && isRootEthName(parts.parent)) names.add(parts.parent)
-          }
+    const primary = await cancellable(client.getEnsName({ address: ownerAddress }), opts.signal)
+    const names = new Set<string>()
+    if (typeof primary === 'string' && primary) {
+      const normalized = normalizeEthDomain(primary)
+      if (normalized && normalized.endsWith('.eth')) {
+        if (isRootEthName(normalized)) {
+          names.add(normalized)
+        } else {
+          const parts = splitSubdomainName(normalized)
+          if (parts && isRootEthName(parts.parent)) names.add(parts.parent)
         }
       }
-      return {
-        status: 'ok',
-        names: [...names].sort((a, b) => a.localeCompare(b)),
-        sourcesChecked: ['ENS reverse resolver'],
-        errors: [],
-      }
-    } catch (err) {
-      return {
-        status: 'error',
-        names: [],
-        sourcesChecked: [],
-        errors: [formatDiscoveryError(err)],
-      }
     }
-  } finally {
-    clearTimeout(budgetTimer)
-    opts.signal?.removeEventListener('abort', onParentAbort)
+    return {
+      status: 'ok',
+      names: [...names].sort((a, b) => a.localeCompare(b)),
+      sourcesChecked: ['ENS reverse resolver'],
+      errors: [],
+    }
+  } catch (err) {
+    return {
+      status: 'error',
+      names: [],
+      sourcesChecked: [],
+      errors: [formatDiscoveryError(err)],
+    }
   }
 }
 

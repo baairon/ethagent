@@ -1,15 +1,9 @@
 import React from 'react'
 import type { Address } from 'viem'
-import { mainnet } from 'viem/chains'
 import { useAppInput } from '../../../app/input/AppInputProvider.js'
-import {
-  createMainnetClient,
-} from '../../ens/ensLookup.js'
 import type { EnsSubdomainDeletePlan } from '../../ens/ensAutomation.js'
-import {
-  sendBrowserWalletTransaction,
-  type BrowserWalletReady,
-} from '../../wallet/browserWallet.js'
+import type { BrowserWalletReady } from '../../wallet/browserWallet.js'
+import { runDeleteEnsSubdomain } from './transactions.js'
 import { WalletApprovalScreen } from '../shared/components/WalletApprovalScreen.js'
 import { isWalletCancelled } from '../shared/utils.js'
 
@@ -23,30 +17,33 @@ export const EscCancel: React.FC<{ onCancel: () => void }> = ({ onCancel }) => {
 export const DeleteSubdomainTxRunner: React.FC<{
   plan: EnsSubdomainDeletePlan
   ownerAddress: Address
+  recordKeys: readonly string[]
   walletSession: BrowserWalletReady | null
   onWalletReady: (session: BrowserWalletReady | null) => void
   onDeleted: () => void
   onError: (msg: string) => void
   onCancel: () => void
-}> = ({ plan, ownerAddress, walletSession, onWalletReady, onDeleted, onError, onCancel }) => {
+}> = ({ plan, ownerAddress, recordKeys, walletSession, onWalletReady, onDeleted, onError, onCancel }) => {
   const [confirming, setConfirming] = React.useState(false)
   React.useEffect(() => {
     let cancelled = false
     const request = new AbortController()
-    sendBrowserWalletTransaction({
-      chainId: mainnet.id,
-      expectedAccount: ownerAddress,
-      to: plan.transaction.to,
-      data: plan.transaction.data,
-      purpose: 'delete-ens-subdomain',
-      signal: request.signal,
-      onReady: ready => { if (!cancelled) onWalletReady(ready) },
+    runDeleteEnsSubdomain({
+      plan,
+      recordKeys,
+      ownerAddress,
+      callbacks: {
+        onStep: () => {},
+        onIdentityComplete: async () => {},
+        onWalletReady: ready => {
+          if (cancelled) return
+          onWalletReady(ready)
+          setConfirming(!ready)
+        },
+        signal: request.signal,
+      },
     })
-      .then(async result => {
-        if (cancelled) return
-        onWalletReady(null)
-        setConfirming(true)
-        await createMainnetClient().waitForTransactionReceipt({ hash: result.txHash })
+      .then(() => {
         if (!cancelled) onDeleted()
       })
       .catch((err: unknown) => {
@@ -66,9 +63,9 @@ export const DeleteSubdomainTxRunner: React.FC<{
   return (
     <WalletApprovalScreen
       title={`Delete ${plan.fullName}`}
-      subtitle="Approve one transaction on Ethereum Mainnet. It needs gas."
+      subtitle="Clears the agent records on the name, then removes it. Each step is one transaction on Ethereum Mainnet and needs gas."
       walletSession={confirming ? null : walletSession}
-      label={confirming ? 'Confirming the deletion…' : 'Waiting for your wallet…'}
+      label={confirming ? 'Confirming on Ethereum Mainnet…' : 'Waiting for your wallet…'}
       {...(confirming ? {} : { onCancel })}
     />
   )

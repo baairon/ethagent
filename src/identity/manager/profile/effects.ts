@@ -36,9 +36,9 @@ import {
   readEnsOkFromState,
 } from '../shared/effects/profilePrep.js'
 import {
-  appendResolverSyncWarning,
+  appendOperatorSyncWarning,
   markCurrentContinuityFilesPublished,
-  resolverSyncWarningMessage,
+  operatorSyncWarningMessage,
   syncVaultOperatorsAfterOwnerSave,
 } from '../shared/effects/sync.js'
 import {
@@ -230,19 +230,19 @@ async function runPublicProfileSigningInner(
   }
   await writeAgentCardFile(nextIdentity, result.prepared.agentCardJson)
   await markCurrentContinuityFilesPublished(nextIdentity)
-  const resolverSyncWarning = await syncVaultOperatorsAfterOwnerSave({
+  const operatorSyncWarning = await syncVaultOperatorsAfterOwnerSave({
     beforeIdentity: step.identity,
     afterIdentity: nextIdentity,
     registry: step.registry,
     callbacks,
-  }).then(() => null).catch(err => resolverSyncWarningMessage(err))
-  const completionMessage = appendResolverSyncWarning(
+  }).then(() => null).catch(err => operatorSyncWarningMessage(err))
+  const completionMessage = appendOperatorSyncWarning(
     rebackupCompletionMessage(
       step.profileUpdates,
       step.identity,
       readEnsOkFromState(nextIdentity.state),
     ),
-    resolverSyncWarning,
+    operatorSyncWarning,
   )
   await callbacks.onIdentityComplete(nextIdentity, completionMessage, 'update')
 }

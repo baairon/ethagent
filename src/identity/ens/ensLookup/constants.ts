@@ -1,7 +1,5 @@
 import { parseAbi, type Address } from 'viem'
 
-export const RPC_TIMEOUT_MS = 8_000
-
 export const ENS_REGISTRY_ADDRESS_MAINNET = '0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e' as Address
 export const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000' as Address
 

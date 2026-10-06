@@ -24,6 +24,7 @@ import {
   EscCancel,
 } from './EnsEditRunners.js'
 import { ensValidationReasonText, selectEnsStatus } from './state.js'
+import { agentEnsRecordKeys } from './records.js'
 import type {
   EnsEditProps,
   EnsPhase,
@@ -215,6 +216,7 @@ export function renderEnsMaintenancePhase({
       <DeleteSubdomainTxRunner
         plan={phase.plan}
         ownerAddress={ownerAddress}
+        recordKeys={identity.identityRegistryAddress ? agentEnsRecordKeys(identity.identityRegistryAddress, identity.agentId) : []}
         walletSession={operatorWalletSession}
         onWalletReady={setOperatorWalletSession}
         onDeleted={onEnsUnlink}

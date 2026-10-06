@@ -6,6 +6,7 @@ import {
   releaseTxGuard,
   resetTxGuardForTest,
   txGuardBusyMessage,
+  TxGuardBusyError,
 } from '../../../src/identity/manager/shared/txGuard.js'
 
 test('txGuard acquire and release toggles busy flag', () => {
@@ -17,15 +18,20 @@ test('txGuard acquire and release toggles busy flag', () => {
   assert.equal(isTxGuardBusy('rebackup'), false)
 })
 
-test('txGuard tolerates re-acquire of same kind without throwing', () => {
+test('txGuard blocks a second send of the same kind while one is in flight', () => {
   resetTxGuardForTest()
   acquireTxGuard('rebackup')
   try {
-    assert.doesNotThrow(() => acquireTxGuard('rebackup'))
+    assert.throws(
+      () => acquireTxGuard('rebackup'),
+      (err: unknown) => err instanceof TxGuardBusyError && err.kind === 'rebackup' && /already in flight/.test(err.message),
+    )
     assert.equal(isTxGuardBusy('rebackup'), true)
   } finally {
     releaseTxGuard('rebackup')
   }
+  assert.doesNotThrow(() => acquireTxGuard('rebackup'))
+  releaseTxGuard('rebackup')
 })
 
 test('txGuard tracks each kind independently', () => {

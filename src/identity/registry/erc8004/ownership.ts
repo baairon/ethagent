@@ -1,5 +1,7 @@
 import { getAddress, type Address, type PublicClient } from 'viem'
-import { VAULT_ABI } from '../vault.js'
+import { VAULT_ABI } from '../vault/constants.js'
+import { NetError } from '../../../net/adaptive.js'
+import { RpcUnansweredError } from '../../../net/rpc.js'
 import { ERC8004_ABI } from './abi.js'
 import { createErc8004PublicClient } from './client.js'
 import type { Erc8004RegistryConfig } from './types.js'
@@ -106,13 +108,20 @@ async function readVaultLevelOwner(args: Erc8004RegistryConfig & {
     if (normalizedVaultOwner.toLowerCase() === ZERO_ADDRESS) return { kind: 'empty' }
     return { kind: 'ok', ownerAddress: normalizedVaultOwner }
   } catch (err: unknown) {
-    return looksLikeTransientVaultReadFailure(err) ? { kind: 'error', error: err } : { kind: 'not-vault' }
+    return isUnansweredRead(err) ? { kind: 'error', error: err } : { kind: 'not-vault' }
   }
 }
 
-function looksLikeTransientVaultReadFailure(err: unknown): boolean {
-  const message = err instanceof Error ? err.message : String(err)
-  return /timeout|network|header not found|rate|server|rpc/i.test(message)
+// A read that no endpoint answered (the transport's own error types) is an error, not
+// "not a Vault", whatever its text says. Anything the chain answered, such as a revert
+// or no data from an address without the function, means the owner is not a Vault.
+function isUnansweredRead(err: unknown): boolean {
+  let current: unknown = err
+  for (let depth = 0; depth < 6 && current; depth += 1) {
+    if (current instanceof NetError || current instanceof RpcUnansweredError) return true
+    current = (current as { cause?: unknown }).cause
+  }
+  return false
 }
 
 function shortHex(value: string): string {

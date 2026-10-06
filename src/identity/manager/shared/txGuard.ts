@@ -21,7 +21,10 @@ export function isTxGuardBusy(kind: TxGuardKind): boolean {
   return inFlight.has(kind)
 }
 
+// Refuses a second send of the same kind while one is in flight: a second wallet
+// request for the same deploy, deposit or save would race the first onchain.
 export function acquireTxGuard(kind: TxGuardKind): void {
+  if (inFlight.has(kind)) throw new TxGuardBusyError(kind, txGuardBusyMessage(kind))
   inFlight.add(kind)
 }
 

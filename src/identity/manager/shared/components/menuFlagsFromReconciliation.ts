@@ -43,7 +43,7 @@ export function menuFlagsFromReconciliation(r: AgentReconciliation, perspective:
     ensNameHint = 'Token unlinked'
   }
 
-  const custodyAsterisk = r.custody === 'mid-flow-uri-pending' || r.vault === 'missing'
+  const custodyAsterisk = r.custody === 'mid-flow-uri-pending' || r.vault === 'missing' || r.vault === 'unrecognized'
   let custodyHint: string | undefined
   if (isOperator) {
     custodyHint = undefined
@@ -51,6 +51,8 @@ export function menuFlagsFromReconciliation(r: AgentReconciliation, perspective:
     custodyHint = 'Setup pending, open to finish'
   } else if (r.vault === 'missing') {
     custodyHint = 'Vault missing, open to redeploy'
+  } else if (r.vault === 'unrecognized') {
+    custodyHint = 'Vault code not recognized'
   }
 
   const agentUriLocalNewer = r.agentUri === 'local-newer' && r.custody !== 'mid-flow-uri-pending'

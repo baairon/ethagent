@@ -62,9 +62,9 @@ import {
   walletRestoreAccessContext,
 } from './snapshot.js'
 import {
-  appendResolverSyncWarning,
+  appendOperatorSyncWarning,
   markCurrentContinuityFilesPublished,
-  resolverSyncWarningMessage,
+  operatorSyncWarningMessage,
   syncVaultOperatorsAfterOwnerSave,
 } from '../shared/effects/sync.js'
 import { runOperatorWalletRebackup } from './vault.js'
@@ -395,20 +395,21 @@ async function runRebackupSigningInner(
   }
   await recordPublishedContinuitySnapshot({ identity: nextIdentity, label: 'published encrypted snapshot' }).catch(() => null)
   await markCurrentContinuityFilesPublished(nextIdentity, result.prepared.publishedSources).catch(() => null)
-  const resolverSyncWarning = await syncVaultOperatorsAfterOwnerSave({
+  const operatorSyncWarning = await syncVaultOperatorsAfterOwnerSave({
     beforeIdentity: step.identity,
     afterIdentity: nextIdentity,
     registry: step.registry,
     ...(step.vaultAddress ? { vaultAddress: step.vaultAddress } : {}),
     callbacks,
-  }).then(() => null).catch(err => resolverSyncWarningMessage(err))
-  const completionMessage = appendResolverSyncWarning(
+    afterDeposit: step.profileUpdates?.custodyPhase === 'switch-advanced',
+  }).then(() => null).catch(err => operatorSyncWarningMessage(err))
+  const completionMessage = appendOperatorSyncWarning(
     rebackupCompletionMessage(
       step.profileUpdates,
       step.identity,
       readEnsOkFromState(nextIdentity.state),
     ),
-    resolverSyncWarning,
+    operatorSyncWarning,
   )
   await callbacks.onIdentityComplete(nextIdentity, completionMessage, 'update')
 }

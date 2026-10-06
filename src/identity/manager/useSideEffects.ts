@@ -343,19 +343,10 @@ export function useIdentityManagerSideEffects({
     runEnsSetupRecordsTransaction({ setup: step.setup, callbacks: scope.callbacks, tokenChainId: step.registry.chainId })
       .then(() => {
         if (cancelled) return
-        const ensUpdates = step.setup.mode === 'advanced'
-          ? {
-              ensName: step.setup.fullName,
-              custodyMode: 'advanced' as const,
-              ownerAddress: step.setup.ownerAddress,
-              approvedOperatorWallets: [step.setup.operatorAddress],
-              activeOperatorAddress: step.setup.operatorAddress,
-            }
-          : {
-              ensName: step.setup.fullName,
-              custodyMode: 'simple' as const,
-            }
-        triggerRebackup(step.returnTo ?? { kind: 'menu' }, ensUpdates)
+        // Creating a name changes only the name. Custody stays as the identity has it:
+        // a Simple create must not drop an advanced setup, and an advanced create must
+        // not list the owner as its own operator.
+        triggerRebackup(step.returnTo ?? { kind: 'menu' }, { ensName: step.setup.fullName })
       })
       .catch((err: unknown) => {
         if (cancelled) return

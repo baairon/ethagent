@@ -1,7 +1,7 @@
 import { getAddress, namehash, type Address } from 'viem'
 import type { DiscoverOptions, EnsValidation } from './types.js'
-import { ENS_REGISTRY_ABI, ENS_REGISTRY_ADDRESS_MAINNET, RPC_TIMEOUT_MS, ZERO_ADDRESS } from './constants.js'
-import { createMainnetClient, withDeadline } from './client.js'
+import { ENS_REGISTRY_ABI, ENS_REGISTRY_ADDRESS_MAINNET, ZERO_ADDRESS } from './constants.js'
+import { createMainnetClient, cancellable } from './client.js'
 import { isEthDomain, splitSubdomainName } from './names.js'
 
 export async function validateAgentEnsLink(
@@ -19,29 +19,25 @@ export async function validateAgentEnsLink(
   const node = namehash(fullName)
   let resolver: Address
   try {
-    const owner = await withDeadline(
+    const owner = await cancellable(
       client.readContract({
         address: ENS_REGISTRY_ADDRESS_MAINNET,
         abi: ENS_REGISTRY_ABI,
         functionName: 'owner',
         args: [node],
       }),
-      opts.rpcTimeoutMs ?? RPC_TIMEOUT_MS,
-      'registry.owner',
       opts.signal,
     ) as Address
     if (owner === ZERO_ADDRESS) {
       return { ok: false, reason: 'no-owner', detail: 'name does not exist on ENS' }
     }
-    resolver = await withDeadline(
+    resolver = await cancellable(
       client.readContract({
         address: ENS_REGISTRY_ADDRESS_MAINNET,
         abi: ENS_REGISTRY_ABI,
         functionName: 'resolver',
         args: [node],
       }),
-      opts.rpcTimeoutMs ?? RPC_TIMEOUT_MS,
-      'registry.resolver',
       opts.signal,
     ) as Address
     if (resolver === ZERO_ADDRESS) {
@@ -52,10 +48,8 @@ export async function validateAgentEnsLink(
   }
   let resolved: Address | null
   try {
-    resolved = await withDeadline(
+    resolved = await cancellable(
       client.getEnsAddress({ name: fullName }),
-      opts.rpcTimeoutMs ?? RPC_TIMEOUT_MS,
-      'getEnsAddress',
       opts.signal,
     )
   } catch (err) {

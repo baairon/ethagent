@@ -6,6 +6,7 @@ import {
   type PublicClient,
 } from 'viem'
 import { ENS_AUTOMATION_RESOLVER_ABI } from './ensAutomation.js'
+import { isChainAnswer } from '../../net/paced.js'
 
 type ResolverDelegationReadClient = Pick<PublicClient, 'readContract'>
 
@@ -42,7 +43,10 @@ export async function readDelegation(args: ResolverDelegationReadArgs): Promise<
       args: [getAddress(args.ownerAddress), args.node, getAddress(args.delegateAddress)],
     }) as boolean
     return Boolean(approved)
-  } catch {
-    return false
+  } catch (err: unknown) {
+    // A resolver without delegation answers with a revert: not approved. An unanswered
+    // read is an error.
+    if (isChainAnswer(err)) return false
+    throw err
   }
 }

@@ -2,17 +2,24 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { decodeFunctionData, keccak256, parseAbi, type Hex } from 'viem'
+import { encodeErrorResult } from 'viem'
+import { advance, track } from '../../support/time.js'
 import {
   assertVaultBytecode,
   confirmAgentInVault,
   confirmAgentWithdrawnFromVault,
-  discoverVaultedTokens,
   encodeDepositAgent,
   encodeRotateAgentURI,
   encodeSetMetadataOperator,
   encodeUnwrapAgent,
   isAgentInVault,
   readMetadataOperators,
+  CURRENT_VAULT_BUILD,
+  FIRST_COMMITTED_VAULT_BUILD,
+  vaultBuildForCode,
+  vaultBuildForHash,
+  describeVaultRevert,
+  type VaultBuild,
   resolveConfiguredVaultAddress,
   VAULT_ABI,
   VAULT_ADDRESSES,
@@ -146,7 +153,7 @@ test('isAgentInVault reports inVault=true and surfaces the vault-level owner', a
   assert.equal(result.ownerAddress?.toLowerCase(), OWNER.toLowerCase())
 })
 
-test('readMetadataOperators returns per-address authorization map and treats RPC errors as false', async () => {
+test('readMetadataOperators surfaces a failed read instead of reporting the operator as not approved', async () => {
   const candidates = [OPERATOR, RECIPIENT] as const
   const client = {
     readContract: async (args: { args?: readonly unknown[] }) => {
@@ -155,15 +162,12 @@ test('readMetadataOperators returns per-address authorization map and treats RPC
       throw new Error('boom')
     },
   } as unknown as Parameters<typeof readMetadataOperators>[0]['client']
-  const result = await readMetadataOperators({
-    client,
-    vaultAddress: VAULT,
-    registry: REGISTRY,
-    agentId: 5n,
-    candidates,
-  })
-  assert.equal(result[OPERATOR], true)
-  assert.equal(result[RECIPIENT], false)
+  await assert.rejects(
+    () => readMetadataOperators({ client, vaultAddress: VAULT, registry: REGISTRY, agentId: 5n, candidates }),
+    /boom/,
+  )
+  const approvedOnly = await readMetadataOperators({ client, vaultAddress: VAULT, registry: REGISTRY, agentId: 5n, candidates: [OPERATOR] })
+  assert.equal(approvedOnly[OPERATOR], true)
 })
 
 test('vaultAddressForChain returns undefined when no deployment is recorded', () => {
@@ -292,7 +296,15 @@ test('assertVaultBytecode never passes blockNumber to getBytecode (latest only, 
   assert.deepEqual(observedKeys[0], ['address'])
 })
 
-test('assertVaultBytecode polls past a transient BlockNotFoundError before succeeding', async () => {
+// Records each pause instead of sleeping, so the pacing is checked without waiting.
+function recordedPauses(): { pauses: number[]; pause: (ms: number) => Promise<void> } {
+  const pauses: number[] = []
+  return { pauses, pause: async (ms: number) => { pauses.push(ms) } }
+}
+
+const PACING = { blockTimeMs: 2_000 }
+
+test('assertVaultBytecode looks again on a new block past a transient BlockNotFoundError', async () => {
   let calls = 0
   const client = {
     getBytecode: async () => {
@@ -305,11 +317,14 @@ test('assertVaultBytecode polls past a transient BlockNotFoundError before succe
       return VAULT_RUNTIME_BYTECODE
     },
   } as unknown as AssertVaultBytecodeClient
-  await assertVaultBytecode(client, VAULT)
+  const { pauses, pause } = recordedPauses()
+  const build = await assertVaultBytecode(client, VAULT, undefined, { ...PACING, pause })
   assert.equal(calls, 2)
+  assert.deepEqual(pauses, [2_000])
+  assert.equal(build.id, 'current')
 })
 
-test('assertVaultBytecode polls past an InvalidParamsRpcError-shaped throw (publicnode -32602 "header not found")', async () => {
+test('assertVaultBytecode looks again past a "header not found" answer', async () => {
   let calls = 0
   const client = {
     getBytecode: async () => {
@@ -322,24 +337,12 @@ test('assertVaultBytecode polls past an InvalidParamsRpcError-shaped throw (publ
       return VAULT_RUNTIME_BYTECODE
     },
   } as unknown as AssertVaultBytecodeClient
-  await assertVaultBytecode(client, VAULT)
+  const { pause } = recordedPauses()
+  await assertVaultBytecode(client, VAULT, undefined, { ...PACING, pause })
   assert.equal(calls, 2)
 })
 
-test('assertVaultBytecode polls past arbitrary throws (any provider error during a fresh-deploy read is treated as transient)', async () => {
-  let calls = 0
-  const client = {
-    getBytecode: async () => {
-      calls += 1
-      if (calls === 1) throw new Error('completely unrelated provider message')
-      return VAULT_RUNTIME_BYTECODE
-    },
-  } as unknown as AssertVaultBytecodeClient
-  await assertVaultBytecode(client, VAULT)
-  assert.equal(calls, 2)
-})
-
-test('assertVaultBytecode retries on empty code (follower latest behind newly-deployed contract)', async () => {
+test('assertVaultBytecode looks again on empty code (follower behind the deploy block)', async () => {
   let calls = 0
   const client = {
     getBytecode: async () => {
@@ -348,11 +351,32 @@ test('assertVaultBytecode retries on empty code (follower latest behind newly-de
       return VAULT_RUNTIME_BYTECODE
     },
   } as unknown as AssertVaultBytecodeClient
-  await assertVaultBytecode(client, VAULT)
+  const { pause } = recordedPauses()
+  await assertVaultBytecode(client, VAULT, undefined, { ...PACING, pause })
   assert.equal(calls, 2)
 })
 
-test('assertVaultBytecode surfaces the last error after the retry budget is exhausted', async () => {
+test('assertVaultBytecode waits for the endpoint head to reach the receipt block before reading', async () => {
+  const heads = [99n, 99n, 100n]
+  let reads = 0
+  const client = {
+    getBytecode: async () => {
+      reads += 1
+      return VAULT_RUNTIME_BYTECODE
+    },
+  } as unknown as AssertVaultBytecodeClient
+  const { pauses, pause } = recordedPauses()
+  await assertVaultBytecode(client, VAULT, ('0x' + 'ab'.repeat(32)) as Hex, {
+    ...PACING,
+    pause,
+    receiptBlock: 100n,
+    getBlockNumber: async () => heads.shift() ?? 100n,
+  })
+  assert.equal(reads, 1)
+  assert.deepEqual(pauses, [2_000, 4_000])
+})
+
+test('assertVaultBytecode doubles its pause from the block time and gives up at the backoff ceiling', async () => {
   let calls = 0
   const client = {
     getBytecode: async () => {
@@ -362,11 +386,50 @@ test('assertVaultBytecode surfaces the last error after the retry budget is exha
       throw err
     },
   } as unknown as AssertVaultBytecodeClient
+  const { pauses, pause } = recordedPauses()
   await assert.rejects(
-    () => assertVaultBytecode(client, VAULT),
+    () => assertVaultBytecode(client, VAULT, undefined, { ...PACING, pause }),
     (err: unknown) => err instanceof Error && err.name === 'InvalidParamsRpcError',
   )
-  assert.equal(calls, 5)
+  assert.deepEqual(pauses, [2_000, 4_000, 8_000, 16_000, 32_000])
+  assert.equal(calls, 6)
+})
+
+test('assertVaultBytecode reports no code once the ceiling passes with the address still empty', async () => {
+  const client = { getBytecode: async () => '0x' as Hex } as unknown as AssertVaultBytecodeClient
+  const { pause } = recordedPauses()
+  await assert.rejects(
+    () => assertVaultBytecode(client, VAULT, undefined, { blockTimeMs: 12_000, pause }),
+    (err: unknown) => err instanceof VaultBytecodeMismatchError && err.observedHash === null,
+  )
+})
+
+test('assertVaultBytecode spends real block-time pauses that a cancel ends', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  let calls = 0
+  const client = {
+    getBytecode: async () => {
+      calls += 1
+      return calls < 3 ? '0x' as Hex : VAULT_RUNTIME_BYTECODE
+    },
+  } as unknown as AssertVaultBytecodeClient
+  const done = track(assertVaultBytecode(client, VAULT, undefined, PACING))
+  await advance(t, 1_750)
+  assert.equal(calls, 1)
+  await advance(t, 750)
+  assert.equal(calls, 2)
+  await advance(t, 4_500)
+  assert.equal(done.settled, true)
+  assert.equal(done.error, undefined)
+
+  const controller = new AbortController()
+  const empty = { getBytecode: async () => '0x' as Hex } as unknown as AssertVaultBytecodeClient
+  const cancelled = track(assertVaultBytecode(empty, VAULT, undefined, { ...PACING, signal: controller.signal }))
+  await advance(t, 500)
+  controller.abort()
+  await advance(t, 250)
+  assert.equal(cancelled.settled, true)
+  assert.equal((cancelled.error as Error).name, 'AbortError')
 })
 
 test('assertVaultBytecode never retries a real bytecode mismatch', async () => {
@@ -379,13 +442,55 @@ test('assertVaultBytecode never retries a real bytecode mismatch', async () => {
     },
   } as unknown as AssertVaultBytecodeClient
   await assert.rejects(
-    () => assertVaultBytecode(client, VAULT),
+    () => assertVaultBytecode(client, VAULT, undefined, PACING),
     (err: unknown) => err instanceof VaultBytecodeMismatchError,
   )
   assert.equal(calls, 1)
 })
 
-test('confirmAgentInVault polls past a transient inVault:false (follower behind deposit block)', async () => {
+test('assertVaultBytecode accepts any known build for an existing Vault but only the current one after a deploy', async () => {
+  const otherCode = ('0x' + '60'.repeat(40)) as Hex
+  const otherBuild: VaultBuild = {
+    id: 'pre-release',
+    label: 'test build without heldAgent',
+    runtimeHash: keccak256(otherCode),
+    hasHeldAgent: false,
+  }
+  const client = { getBytecode: async () => otherCode } as unknown as AssertVaultBytecodeClient
+  const build = await assertVaultBytecode(client, VAULT, undefined, { ...PACING, builds: [CURRENT_VAULT_BUILD, otherBuild] })
+  assert.equal(build.id, 'pre-release')
+  assert.equal(build.hasHeldAgent, false)
+  await assert.rejects(
+    () => assertVaultBytecode(client, VAULT, ('0x' + 'ab'.repeat(32)) as Hex, { ...PACING, builds: [CURRENT_VAULT_BUILD, otherBuild] }),
+    (err: unknown) => err instanceof VaultBytecodeMismatchError && /intercepted/.test(err.message),
+  )
+})
+
+test('the builds table knows the current and first committed builds by runtime hash', () => {
+  assert.equal(vaultBuildForCode(VAULT_RUNTIME_BYTECODE)?.id, 'current')
+  assert.equal(vaultBuildForHash(FIRST_COMMITTED_VAULT_BUILD.runtimeHash)?.id, 'first-committed')
+  assert.equal(FIRST_COMMITTED_VAULT_BUILD.runtimeHash, '0xfea7e898c15b1e72a5a54ec35bdad917dfed8ea3d4bfe078fafa3cf00784cde4')
+  assert.equal(vaultBuildForHash(('0x' + '11'.repeat(32)) as Hex), undefined)
+})
+
+test('VAULT_ABI names the Vault custom errors by their selectors', () => {
+  const selectors = Object.fromEntries(
+    ['AlreadyDeposited', 'UnexpectedToken', 'NotOwner', 'NotAuthorized'].map(name => [
+      name,
+      encodeErrorResult({ abi: VAULT_ABI, errorName: name as 'NotOwner' }),
+    ]),
+  )
+  assert.deepEqual(selectors, {
+    AlreadyDeposited: '0xd5a82115',
+    UnexpectedToken: '0x9667ffdf',
+    NotOwner: '0x30cd7471',
+    NotAuthorized: '0xea8e4eb5',
+  })
+  const revert = Object.assign(new Error('execution reverted'), { code: 3, data: '0x30cd7471' })
+  assert.match(describeVaultRevert(new Error('outer', { cause: revert })) ?? '', /NotOwner/)
+})
+
+test('confirmAgentInVault looks again past a transient inVault:false (follower behind deposit block)', async () => {
   let calls = 0
   const client = {
     readContract: async () => {
@@ -394,13 +499,14 @@ test('confirmAgentInVault polls past a transient inVault:false (follower behind 
       return OWNER
     },
   } as unknown as Parameters<typeof confirmAgentInVault>[0]['client']
-  const status = await confirmAgentInVault({ client, vaultAddress: VAULT, registry: REGISTRY, agentId: 5n })
+  const { pause } = recordedPauses()
+  const status = await confirmAgentInVault({ client, vaultAddress: VAULT, registry: REGISTRY, agentId: 5n, pacing: { ...PACING, pause } })
   assert.equal(calls, 2)
   assert.equal(status.inVault, true)
   assert.equal(status.ownerAddress.toLowerCase(), OWNER.toLowerCase())
 })
 
-test('confirmAgentInVault polls past a thrown read error', async () => {
+test('confirmAgentInVault looks again past a thrown read error', async () => {
   let calls = 0
   const client = {
     readContract: async () => {
@@ -409,12 +515,13 @@ test('confirmAgentInVault polls past a thrown read error', async () => {
       return OWNER
     },
   } as unknown as Parameters<typeof confirmAgentInVault>[0]['client']
-  const status = await confirmAgentInVault({ client, vaultAddress: VAULT, registry: REGISTRY, agentId: 5n })
+  const { pause } = recordedPauses()
+  const status = await confirmAgentInVault({ client, vaultAddress: VAULT, registry: REGISTRY, agentId: 5n, pacing: { ...PACING, pause } })
   assert.equal(calls, 2)
   assert.equal(status.ownerAddress.toLowerCase(), OWNER.toLowerCase())
 })
 
-test('confirmAgentInVault exhausts the budget on persistent inVault:false and throws with vault context', async () => {
+test('confirmAgentInVault gives up at the ceiling on persistent inVault:false and throws with vault context', async () => {
   let calls = 0
   const client = {
     readContract: async () => {
@@ -422,31 +529,44 @@ test('confirmAgentInVault exhausts the budget on persistent inVault:false and th
       return '0x0000000000000000000000000000000000000000' as `0x${string}`
     },
   } as unknown as Parameters<typeof confirmAgentInVault>[0]['client']
+  const { pauses, pause } = recordedPauses()
   await assert.rejects(
-    () => confirmAgentInVault({ client, vaultAddress: VAULT, registry: REGISTRY, agentId: 5n }),
+    () => confirmAgentInVault({ client, vaultAddress: VAULT, registry: REGISTRY, agentId: 5n, pacing: { ...PACING, pause } }),
     (err: unknown) => err instanceof Error
       && err.message.toLowerCase().includes(VAULT.toLowerCase())
       && err.message.includes('#5'),
   )
-  assert.equal(calls, 5)
+  assert.equal(calls, pauses.length + 1)
+  assert.ok(pauses.every(ms => ms <= 60_000))
 })
 
-test('confirmAgentInVault surfaces the last error after the retry budget exhausts', async () => {
+test('confirmAgentInVault surfaces the last error once the ceiling passes', async () => {
+  const client = {
+    readContract: async () => {
+      throw new Error('persistent rpc timeout')
+    },
+  } as unknown as Parameters<typeof confirmAgentInVault>[0]['client']
+  const { pause } = recordedPauses()
+  await assert.rejects(
+    () => confirmAgentInVault({ client, vaultAddress: VAULT, registry: REGISTRY, agentId: 5n, pacing: { ...PACING, pause } }),
+    (err: unknown) => err instanceof Error && /persistent rpc timeout/.test(err.message),
+  )
+})
+
+test('confirmAgentInVault stops at once on a revert', async () => {
   let calls = 0
   const client = {
     readContract: async () => {
       calls += 1
-      throw new Error('persistent rpc timeout')
+      throw Object.assign(new Error('execution reverted'), { code: 3 })
     },
   } as unknown as Parameters<typeof confirmAgentInVault>[0]['client']
-  await assert.rejects(
-    () => confirmAgentInVault({ client, vaultAddress: VAULT, registry: REGISTRY, agentId: 5n }),
-    (err: unknown) => err instanceof Error && /persistent rpc timeout/.test(err.message),
-  )
-  assert.equal(calls, 5)
+  const { pause } = recordedPauses()
+  await assert.rejects(() => confirmAgentInVault({ client, vaultAddress: VAULT, registry: REGISTRY, agentId: 5n, pacing: { ...PACING, pause } }))
+  assert.equal(calls, 1)
 })
 
-test('confirmAgentWithdrawnFromVault polls until the token owner is the withdraw recipient', async () => {
+test('confirmAgentWithdrawnFromVault looks again until the token owner is the withdraw recipient', async () => {
   let ownerOfCalls = 0
   const client = {
     readContract: async (call: { functionName: string }) => {
@@ -458,60 +578,17 @@ test('confirmAgentWithdrawnFromVault polls until the token owner is the withdraw
       throw new Error(`unexpected read: ${call.functionName}`)
     },
   } as unknown as Parameters<typeof confirmAgentWithdrawnFromVault>[0]['client']
+  const { pause } = recordedPauses()
   const status = await confirmAgentWithdrawnFromVault({
     client,
     vaultAddress: VAULT,
     registry: REGISTRY,
     agentId: 5n,
     recipient: RECIPIENT,
+    pacing: { ...PACING, pause },
   })
 
   assert.equal(ownerOfCalls, 2)
   assert.equal(status.inVault, false)
   assert.equal(status.ownerAddress.toLowerCase(), RECIPIENT.toLowerCase())
-})
-
-test('discoverVaultedTokens retries a single window after a transient getLogs throw and continues', async () => {
-  let getLogsCalls = 0
-  const client = {
-    getBlockNumber: async () => 100n,
-    getLogs: async () => {
-      getLogsCalls += 1
-      if (getLogsCalls === 1) throw new Error('The request took too long to respond')
-      return []
-    },
-    readContract: async () => '0x0000000000000000000000000000000000000000',
-  } as unknown as Parameters<typeof discoverVaultedTokens>[0]['client']
-  const out = await discoverVaultedTokens({
-    client,
-    vaultAddress: VAULT,
-    registry: REGISTRY,
-    depositorAddress: OWNER,
-    fromBlock: 0n,
-  })
-  assert.deepEqual(out, [])
-  assert.ok(getLogsCalls >= 2, 'expected at least one retry on the first window')
-})
-
-test('discoverVaultedTokens exhausts the per-window budget on persistent getLogs throws and surfaces the error', async () => {
-  let getLogsCalls = 0
-  const client = {
-    getBlockNumber: async () => 100n,
-    getLogs: async () => {
-      getLogsCalls += 1
-      throw new Error('persistent getLogs timeout')
-    },
-    readContract: async () => '0x0000000000000000000000000000000000000000',
-  } as unknown as Parameters<typeof discoverVaultedTokens>[0]['client']
-  await assert.rejects(
-    () => discoverVaultedTokens({
-      client,
-      vaultAddress: VAULT,
-      registry: REGISTRY,
-      depositorAddress: OWNER,
-      fromBlock: 0n,
-    }),
-    (err: unknown) => err instanceof Error && /persistent getLogs timeout/.test(err.message),
-  )
-  assert.equal(getLogsCalls, 3)
 })

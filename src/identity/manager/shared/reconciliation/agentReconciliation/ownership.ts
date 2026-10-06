@@ -12,13 +12,10 @@ export type OwnershipGuardResult =
   | { ok: true; effectiveOwner: Address; heldByVault: boolean }
   | { ok: false; reason: 'not-owned' | 'lookup-failed'; detail: string; onChainOwner?: Address }
 
-type OwnershipCacheEntry = {
-  expiresAt: number
-  result: OwnershipGuardResult
-}
-
-const OWNERSHIP_CACHE_TTL_MS = 30_000
-const ownershipCache = new Map<string, OwnershipCacheEntry>()
+// Ownership changes only through a custody transaction or a transfer, and each of those
+// clears this cache when it ends, so an entry stays good until then. A failed lookup is
+// never kept.
+const ownershipCache = new Map<string, OwnershipGuardResult>()
 
 function ownershipCacheKey(args: {
   registry: Erc8004RegistryConfig
@@ -53,9 +50,9 @@ export async function preflightTokenOwnership(args: {
   const agentId = BigInt(args.identity.agentId)
   const key = ownershipCacheKey({ registry: args.registry, agentId, expectedSigner, requiredRole: args.requiredRole })
   const cached = ownershipCache.get(key)
-  if (cached && cached.expiresAt > Date.now()) return cached.result
+  if (cached) return cached
   const result = await runOwnershipPreflight({ ...args, agentId, expectedSigner })
-  ownershipCache.set(key, { result, expiresAt: Date.now() + OWNERSHIP_CACHE_TTL_MS })
+  if (result.ok || result.reason !== 'lookup-failed') ownershipCache.set(key, result)
   return result
 }
 

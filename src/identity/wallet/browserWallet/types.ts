@@ -145,6 +145,10 @@ export type PrepareTransactionGasFeeArgs = {
   to?: Address
   data: Hex
   value?: bigint
+  // The chain's block time, the pause before estimating again.
+  blockTimeMs?: number
+  signal?: AbortSignal
+  pause?: (ms: number, signal?: AbortSignal) => Promise<void>
 }
 
 export type PreparedGasFee = {

@@ -1,13 +1,11 @@
 import {
-  createPublicClient,
-  fallback,
   getAddress,
-  http,
   type Address,
   type Hex,
   type PublicClient,
 } from 'viem'
-import { mainnet } from 'viem/chains'
+import { createMainnetClient } from '../ensLookup/client.js'
+import { isChainAnswer } from '../../../net/paced.js'
 import {
   recordsFromTextMap,
   type AgentEnsRecordState,
@@ -18,7 +16,6 @@ import {
   ENS_AUTOMATION_RESOLVER_ABI,
   ENS_NAME_WRAPPER_ADDRESS_MAINNET,
   ENS_REGISTRY_ADDRESS_MAINNET,
-  ENS_RPC_URLS,
   ZERO_ADDRESS,
 } from './contracts.js'
 import type { EnsAutomationReadClient } from './types.js'
@@ -29,11 +26,7 @@ export function shortHex(value: string): string {
 }
 
 export function createEnsAutomationClient(): PublicClient {
-  const transports = ENS_RPC_URLS.map(url => http(url, { retryCount: 0, timeout: 8_000 }))
-  return createPublicClient({
-    chain: mainnet,
-    transport: transports.length === 1 ? transports[0]! : fallback(transports, { retryCount: 0 }),
-  })
+  return createMainnetClient()
 }
 
 export async function readOwner(client: EnsAutomationReadClient, node: Hex): Promise<Address> {
@@ -75,8 +68,11 @@ export async function readAddressRecord(client: EnsAutomationReadClient, resolve
       args: [node],
     }) as Address
     return isZero(addr) ? null : getAddress(addr)
-  } catch {
-    return null
+  } catch (err: unknown) {
+    // A resolver without addr() answers with a revert: no record. An unanswered read
+    // is an error, never "no record".
+    if (isChainAnswer(err)) return null
+    throw err
   }
 }
 
@@ -96,7 +92,8 @@ export async function readTextRecords(
         args: [node, key],
       }) as string
       if (value) text[key] = value
-    } catch {
+    } catch (err: unknown) {
+      if (!isChainAnswer(err)) throw err
     }
   }
   return recordsFromTextMap(text)

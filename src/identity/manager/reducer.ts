@@ -88,7 +88,6 @@ export type Step =
   | { kind: 'custody-vault-deposit-tx'; identity: EthagentIdentity; registry: Erc8004RegistryConfig; vaultAddress: `0x${string}`; profileUpdates: ProfileUpdates; returnTo?: Step }
   | { kind: 'custody-vault-unwrap-tx'; identity: EthagentIdentity; registry: Erc8004RegistryConfig; vaultAddress: `0x${string}`; profileUpdates: ProfileUpdates; returnTo?: Step; agentIds?: string[] }
   | { kind: 'custody-vault-withdraw-discovering'; identity: EthagentIdentity; registry: Erc8004RegistryConfig; vaultAddress: `0x${string}`; returnTo?: Step; returnContext?: 'ens' | 'simple-exit' }
-  | { kind: 'custody-vault-withdraw-pick-token'; identity: EthagentIdentity; registry: Erc8004RegistryConfig; vaultAddress: `0x${string}`; tokens: ReadonlyArray<{ agentId: string }>; returnTo?: Step; returnContext?: 'ens' | 'simple-exit' }
   | { kind: 'custody-vault-withdraw-tx'; identity: EthagentIdentity; registry: Erc8004RegistryConfig; vaultAddress: `0x${string}`; agentId?: string; returnTo?: Step; returnContext?: 'ens' | 'simple-exit' }
   | { kind: 'custody-vault-withdraw-done'; identity: EthagentIdentity; registry: Erc8004RegistryConfig; vaultAddress: `0x${string}`; recipient: `0x${string}`; returnTo?: Step; returnContext?: 'ens' | 'simple-exit' }
   | { kind: 'custody-advanced-done'; identity: EthagentIdentity; registry: Erc8004RegistryConfig; vaultAddress?: `0x${string}`; returnTo?: Step }
@@ -223,7 +222,6 @@ function backStep(from: Step): Step {
     case 'custody-vault-deposit-tx':
     case 'custody-vault-unwrap-tx':
     case 'custody-vault-withdraw-discovering':
-    case 'custody-vault-withdraw-pick-token':
     case 'custody-vault-withdraw-tx':
     case 'custody-vault-withdraw-done':
       return { kind: 'custody-model', identity: from.identity, registry: from.registry, returnTo: from.returnTo }

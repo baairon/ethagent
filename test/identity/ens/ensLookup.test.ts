@@ -84,7 +84,6 @@ test('ENS discovery returns the wallet primary name from the reverse resolver', 
 
   const result = await discoverOwnedEnsNameDetails(owner, {
     publicClient: fakeClient,
-    rpcTimeoutMs: 1_000,
   })
 
   assert.equal(result.status, 'ok')
@@ -100,7 +99,6 @@ test('ENS discovery extracts the root parent when the primary name is a subdomai
 
   const result = await discoverOwnedEnsNameDetails(owner, {
     publicClient: fakeClient,
-    rpcTimeoutMs: 1_000,
   })
 
   assert.equal(result.status, 'ok')
@@ -115,7 +113,6 @@ test('ENS discovery returns an empty list when the wallet has no primary name', 
 
   const result = await discoverOwnedEnsNameDetails(owner, {
     publicClient: fakeClient,
-    rpcTimeoutMs: 1_000,
   })
 
   assert.equal(result.status, 'ok')
@@ -132,7 +129,6 @@ test('ENS discovery reports an error when the reverse-resolver lookup fails', as
 
   const result = await discoverOwnedEnsNameDetails(owner, {
     publicClient: failingClient,
-    rpcTimeoutMs: 1_000,
   })
 
   assert.equal(result.status, 'error')

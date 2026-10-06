@@ -18,6 +18,8 @@ export function buildPortableInstruction(opts: PortableInstructionOptions): stri
     "inside that skill's folder there. Do not hand-edit them (they are regenerated from the vault). To add or change a skill, " +
     'put its folder in the vault skills dir (NOT this read-only mirror): run `npx ethagent --vault-dir` to print the vault ' +
     "path, then create or edit the `<name>/SKILL.md` folder inside its `skills/` subdir. Past snapshots are kept locally " +
-    'byte for byte; `npx ethagent status --json` and `npx ethagent diff --json` show what changed.'
+    'byte for byte; `npx ethagent status --json` and `npx ethagent diff --json` show what changed. ' +
+    '`npx ethagent custody --json` and `npx ethagent ens --json` show the onchain identity; ENS changes preview ' +
+    "without `--yes`, and anything with `--yes` is the user's to run."
   )
 }

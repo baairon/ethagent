@@ -18,7 +18,9 @@ export function buildSessionStartContext(identity?: EthagentIdentity | null): st
     'folder, private by default. The vault always exists once an identity is set, so never assume it is missing. ' +
     'Every save is also kept locally byte for byte: `npx ethagent status`, `history`, `show`, and `diff` (add `--json`) ' +
     'are read-only and safe to run anytime; run `rollback` or `forget` only when the user asks, preview first, and see ' +
-    '`npx ethagent <command> --help` for usage.'
+    '`npx ethagent <command> --help` for usage. ' +
+    '`npx ethagent custody` and `npx ethagent ens` (with `--json`) show the Vault and the ENS name and are safe to run; ' +
+    'ENS changes preview without `--yes`, and anything with `--yes` stays the user\'s to run.'
   )
 }
 

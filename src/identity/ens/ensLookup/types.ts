@@ -16,9 +16,6 @@ export type EnsValidation =
 
 export type DiscoverOptions = {
   signal?: AbortSignal
-  budgetMs?: number
-  rpcTimeoutMs?: number
-  scanWindowBlocks?: bigint
   publicClient?: PublicClient
 }
 

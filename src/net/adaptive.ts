@@ -23,6 +23,8 @@ type HostStats = {
   failures: number
   lastFailureAt?: number
   lastSuccessAt?: number
+  // The widest eth_getLogs block range this host has served or named as its limit.
+  logRange?: number
 }
 
 const hosts = new Map<string, HostStats>()
@@ -54,6 +56,7 @@ function load(): void {
         ...(Number.isFinite(value.rttvar) ? { rttvar: Number(value.rttvar) } : {}),
         ...(Number.isFinite(value.lastFailureAt) ? { lastFailureAt: Number(value.lastFailureAt) } : {}),
         ...(Number.isFinite(value.lastSuccessAt) ? { lastSuccessAt: Number(value.lastSuccessAt) } : {}),
+        ...(Number.isFinite(value.logRange) && Number(value.logRange) > 0 ? { logRange: Number(value.logRange) } : {}),
       })
     }
   } catch {
@@ -62,7 +65,7 @@ function load(): void {
 }
 
 function statsText(): string {
-  const measured = [...hosts].filter(([, stats]) => stats.samples > 0 || stats.failures > 0)
+  const measured = [...hosts].filter(([, stats]) => stats.samples > 0 || stats.failures > 0 || stats.logRange !== undefined)
   return `${JSON.stringify(Object.fromEntries(measured), null, 2)}\n`
 }
 
@@ -125,6 +128,8 @@ export function rto(host: string): number {
   return Math.min(MAX_RTO_MS, Math.max(MIN_RTO_MS, stats.srtt + VARIANCE_WEIGHT * stats.rttvar))
 }
 
+export const BACKOFF_CEILING_MS = MAX_RTO_MS
+
 export function withinBackoffCeiling(ms: number): boolean {
   return ms <= MAX_RTO_MS
 }
@@ -149,6 +154,17 @@ export function noteFailure(host: string): void {
   const stats = statsFor(host)
   stats.failures += 1
   stats.lastFailureAt = Date.now()
+  persist()
+}
+
+export function learnedLogRange(host: string): number | undefined {
+  return statsFor(host).logRange
+}
+
+export function noteLogRange(host: string, blocks: number): void {
+  const stats = statsFor(host)
+  if (stats.logRange === blocks) return
+  stats.logRange = blocks
   persist()
 }
 

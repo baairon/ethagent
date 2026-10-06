@@ -1,4 +1,4 @@
-import { getAddress, isAddress, type Address, type PublicClient } from 'viem'
+import { createPublicClient, getAddress, isAddress, type Address, type PublicClient } from 'viem'
 import { mainnet } from 'viem/chains'
 import { DEFAULT_IPFS_API_URL } from '../../storage/ipfs.js'
 import { isAgentInVault } from '../vault.js'
@@ -7,10 +7,13 @@ import {
   SUPPORTED_ERC8004_CHAINS,
   chainSortIndex,
   erc8004ConfigForSupportedChain,
+  chainForId,
   logBlockRangeForChain,
-  minLogBlockRangeForChain,
+  rpcUrlsForClient,
   supportedErc8004ChainForId,
 } from './chains.js'
+import { adaptiveRpcTransport } from '../../../net/rpc.js'
+import { scanLogs } from '../../../net/logs.js'
 import { createErc8004PublicClient } from './client.js'
 import { parseEthagentBackupPointer, parseEthagentOperatorsPointer, parseEthagentPublicDiscoveryPointer } from './metadata.js'
 import type { DiscoverOwnedAgentsAcrossSupportedNetworksArgs, DiscoverOwnedAgentsArgs, Erc8004AgentCandidate, Erc8004RegistryConfig, EthagentOperatorsPointer } from './types.js'
@@ -70,6 +73,7 @@ export async function discoverOwnedAgentBackups(args: DiscoverOwnedAgentsArgs): 
   const fromBlock = args.fromBlock ?? supportedErc8004ChainForId(args.chainId)?.fromBlock ?? 0n
   const tokenIds = await findCandidateTokenIds({
     publicClient,
+    injectedClient: Boolean(args.publicClient),
     registry: args,
     ownerAddress,
     fromBlock,
@@ -148,6 +152,7 @@ export async function discoverOwnedAgentBackupsAcrossSupportedNetworks(
 
 async function findCandidateTokenIds(args: {
   publicClient: PublicClient
+  injectedClient: boolean
   registry: Erc8004RegistryConfig
   ownerAddress: Address
   fromBlock: bigint
@@ -183,6 +188,7 @@ async function findCandidateTokenIds(args: {
   try {
     for await (const logs of getTransferLogChunksBackwards({
       publicClient: args.publicClient,
+      injectedClient: args.injectedClient,
       registry: args.registry,
       ownerAddress: args.ownerAddress,
       fromBlock: args.fromBlock,
@@ -216,36 +222,42 @@ async function findCandidateTokenIds(args: {
   return [...tokenIds]
 }
 
+// Transfer logs into the owner, newest first, through scanLogs: each endpoint's
+// learned block range instead of fixed windows, handing over when an endpoint cannot
+// reach back far enough. An injected client (tests, callers with their own transport)
+// answers for every endpoint.
 async function* getTransferLogChunksBackwards(args: {
   publicClient: PublicClient
+  injectedClient: boolean
   registry: Erc8004RegistryConfig
   ownerAddress: Address
   fromBlock: bigint
 }): AsyncGenerator<TransferLog[]> {
   const latest = await args.publicClient.getBlockNumber()
   if (args.fromBlock > latest) return
-  
-  const ranges = blockRangesBackwards(args.fromBlock, latest, logBlockRangeForChain(args.registry.chainId))
-  const CONCURRENCY = 5
-  
-  for (let i = 0; i < ranges.length; i += CONCURRENCY) {
-    const batch = ranges.slice(i, i + CONCURRENCY)
-    const logsArrays = await Promise.all(batch.map(async range => {
-      try {
-        return await getTransferLogsAdaptive({
-          ...args,
-          fromBlock: range.fromBlock,
-          toBlock: range.toBlock,
-          minBlockRange: minLogBlockRangeForChain(args.registry.chainId),
-        })
-      } catch {
-        return [] as TransferLog[]
-      }
-    }))
-    for (const logs of logsArrays) {
-      if (logs.length > 0) yield logs
+  const clients = new Map<string, PublicClient>()
+  const clientFor = (url: string): PublicClient => {
+    if (args.injectedClient) return args.publicClient
+    let client = clients.get(url)
+    if (!client) {
+      client = createPublicClient({ chain: chainForId(args.registry.chainId), transport: adaptiveRpcTransport([url]) })
+      clients.set(url, client)
     }
+    return client
   }
+  yield* scanLogs<TransferLog>({
+    urls: args.injectedClient ? [args.registry.rpcUrl] : rpcUrlsForClient(args.registry),
+    fromBlock: args.fromBlock,
+    toBlock: latest,
+    initialRange: logBlockRangeForChain(args.registry.chainId),
+    query: async (url, fromBlock, toBlock) => await clientFor(url).getLogs({
+      address: args.registry.identityRegistryAddress,
+      event: TRANSFER_EVENT,
+      args: { to: args.ownerAddress },
+      fromBlock,
+      toBlock,
+    }) as TransferLog[],
+  })
 }
 
 async function findEnumerableTokenIds(args: {
@@ -268,35 +280,6 @@ async function findEnumerableTokenIds(args: {
     return tokenIds
   } catch {
     return null
-  }
-}
-
-async function getTransferLogsAdaptive(args: {
-  publicClient: PublicClient
-  registry: Erc8004RegistryConfig
-  ownerAddress: Address
-  fromBlock: bigint
-  toBlock: bigint
-  minBlockRange: bigint
-}): Promise<TransferLog[]> {
-  const size = args.toBlock - args.fromBlock + 1n
-  try {
-    const logs = await args.publicClient.getLogs({
-      address: args.registry.identityRegistryAddress,
-      event: TRANSFER_EVENT,
-      args: { to: args.ownerAddress },
-      fromBlock: args.fromBlock,
-      toBlock: args.toBlock,
-    })
-    return logs as TransferLog[]
-  } catch (err: unknown) {
-    if (size <= args.minBlockRange) throw err
-    const mid = args.fromBlock + size / 2n - 1n
-    const [newer, older] = await Promise.all([
-      getTransferLogsAdaptive({ ...args, fromBlock: mid + 1n, toBlock: args.toBlock }),
-      getTransferLogsAdaptive({ ...args, fromBlock: args.fromBlock, toBlock: mid }),
-    ])
-    return [...newer, ...older]
   }
 }
 
@@ -462,17 +445,3 @@ function compareCandidatesByNetworkThenNewest(a: Erc8004AgentCandidate, b: Erc80
   return Number(b.agentId - a.agentId)
 }
 
-function blockRangesBackwards(
-  fromBlock: bigint,
-  latest: bigint,
-  blockRange: bigint,
-): Array<{ fromBlock: bigint; toBlock: bigint }> {
-  const ranges: Array<{ fromBlock: bigint; toBlock: bigint }> = []
-  for (let end = latest; end >= fromBlock;) {
-    const start = end - blockRange + 1n > fromBlock ? end - blockRange + 1n : fromBlock
-    ranges.push({ fromBlock: start, toBlock: end })
-    if (start === fromBlock) break
-    end = start - 1n
-  }
-  return ranges
-}

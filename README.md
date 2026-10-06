@@ -108,7 +108,7 @@ What gets kept:
 What you can count on:
 
 - What comes back has the same sha256 as what went in.
-- Reading history never changes your vault, and only `fetch` and `status --verify` go online.
+- Reading history never changes your vault. `fetch` and `status --verify` go online, and so do `show`, `diff`, and `history --stat` when an operator key is set, to fill in a snapshot that isn't cached yet.
 - A rollback previews first, checkpoints before it writes, and never touches the chain.
 - `forget` removes local copies only. The encrypted snapshots on IPFS don't change.
 
@@ -156,6 +156,12 @@ The foundation is built on open standards, so your agent is never tied to one ap
 | Remove leaked content | Edit it out, `ethagent save`, then `ethagent forget <ref> --file <path> --yes` for each version that held it |
 | Connect another tool | `ethagent --add "<path to the instructions file it loads every session>"` |
 | Find the vault | `ethagent --vault-dir` |
+| See the Vault, its build, and who may do what | `ethagent custody`, or `ethagent custody --verify` to simulate each permission |
+| Check the agent's ENS name | `ethagent ens` |
+| Point the agent at another ENS name | `ethagent ens agent.yourname.eth`, then again with `--yes` |
+| Change the name's text records | `ethagent ens --set url=https://example.com --clear description`, then again with `--yes` |
+| Unlink the ENS name | `ethagent ens --unlink`, then again with `--yes` |
+| Sign ENS changes with the operator key | `keychain exec ethagent -- ethagent ens <args> --operator` |
 
 ### Commands
 
@@ -178,7 +184,13 @@ Run any of these with `npx ethagent`. Commands marked interactive need a termina
 | `checkpoint [label] [--json]` | Record the vault as it is right now. | Writes history |
 | `rollback <ref> [--yes] [--json]` | Put past bytes back. Previews until `--yes`. | Writes the vault |
 | `forget <ref> [--yes] [--json]` | Erase versions from local history. Previews until `--yes`. | Deletes history |
-| `--version`, `--help` | Version, or the full command list. Every history command also takes `--help`. | Read-only |
+| `custody [--json]` | Custody mode, the Vault and its build, whether it holds the token, the Vault-level owner, and the approved operators. | Goes online |
+| `custody --verify [--json]` | Also simulates, sending nothing: the owner withdrawing and changing an operator, the operator rotating the agent URI, and the operator and a stranger being refused. Exits 4 on a mismatch. | Goes online |
+| `ens [--json]` | The linked name, its records, the two-way check, the resolver, who controls the name, and whether the operator key could sign for it. | Goes online |
+| `ens <name> [--operator] [--yes] [--json]` | Point the agent at a name: create it under a parent the signer controls, write the agent records, clear them on the old name, then publish the name. Previews until `--yes`. | Opens your wallet |
+| `ens --unlink [--operator] [--yes] [--json]` | Clear the agent records on the linked name, then publish it unlinked. Previews until `--yes`. | Opens your wallet |
+| `ens --set k=v --clear k [--operator] [--yes] [--json]` | Write every record change in one transaction. No save needed. Previews until `--yes`. | Opens your wallet, or none with `--operator` |
+| `--version`, `--help` | Version, or the full command list. Every history and onchain command also takes `--help`. | Read-only |
 
 ### Saving
 
@@ -202,6 +214,17 @@ Run any of these with `npx ethagent`. Commands marked interactive need a termina
 | `2` | Usage error. |
 | `3` | No working storage credential, no operator key, or the wallet was cancelled or timed out. |
 | `4` | Pinned, but the owner still needs to publish it. |
+
+### Onchain identity
+
+`ethagent custody` and `ethagent ens` work without the manager.
+
+- **Previews.** ENS changes preview by default. They list every transaction, simulate the ones that can run now from the signer, and send nothing. Rerun with `--yes` to send.
+- **Signers.** ENS transactions are signed in your browser wallet, in one tab for the whole change. With `--operator`, the operator key signs them with no popup instead. Run it as `keychain exec ethagent -- ethagent ens ... --operator`.
+- **What the operator key may do.** It only writes text records and creates subnames under a parent it controls. It never sets `addr` on an existing name and never changes ownership.
+- **Publishing.** Changing or unlinking the name always ends with one owner-signed save. A stolen operator key therefore can't point your agent at a name it registered. Local state takes the new name only after that save lands.
+- **Control check.** Before anything is sent, the command refuses unless the signer controls the name: as its owner, its NameWrapper owner, or a delegate approved on its resolver.
+- **Custody writes.** Withdrawing, depositing, and changing operators stay in the manager.
 
 ### History commands
 
@@ -365,7 +388,7 @@ A manifest:
 
 ### Output and exit codes
 
-With `--json`, every history command prints one line of ASCII-only JSON with `"schema": 1`. Fields are only ever added. A failure looks like this, and the hint names the fix:
+With `--json`, every history and onchain command prints one line of ASCII-only JSON with `"schema": 1`. Fields are only ever added. A failure looks like this, and the hint names the fix:
 
 ```json
 { "schema": 1, "ok": false, "code": 3, "error": "snapshot bafybei... is not cached locally", "hint": "fetch it first: ..." }
@@ -376,19 +399,21 @@ With `--json`, every history command prints one line of ASCII-only JSON with `"s
 | `0` | Done. `diff` returns 0 whether or not anything differs and reports `identical`. |
 | `1` | Failed: unknown ref, missing path, or a store error. |
 | `2` | Usage error, or a ref that matches more than one thing. |
-| `3` | The snapshot isn't cached here, or there's no key to open it. |
-| `4` | Partly done, or `status --verify` found a mismatch. |
+| `3` | The snapshot isn't cached here or there's no key to open it, `--operator` ran without an injected operator key, or the wallet approval was cancelled. |
+| `4` | Partly done, or `status --verify` or `custody --verify` found a mismatch. |
 
 ### Environment variables
 
 | Variable | Effect |
 | --- | --- |
-| `ETHAGENT_OPERATOR_KEY` | The operator key for `save --operator` and `fetch`. Inject it from your OS keychain; never type it into a command. |
+| `ETHAGENT_OPERATOR_KEY` | The operator key for `save --operator`, `fetch`, and `ens --operator`. Inject it from your OS keychain; never type it into a command. |
+| `ETHAGENT_RPC_URL` | The RPC endpoint asked first for the agent's network. Use one that keeps history when the public endpoints can't reach back far enough for a wallet search. |
+| `ETHAGENT_IPFS_API_URL` | Where snapshots are uploaded, in place of Pinata. |
 | `PINATA_JWT` | IPFS storage credential, if you haven't set one up in the manager. |
 | `PINATA_GATEWAY_URL` | Your own IPFS gateway. Downloads try it before any other source. |
 | `ETHAGENT_IPFS_GATEWAYS` | Gateways to download from, separated by commas, in place of the built-in ones. |
 | `ETHAGENT_IPFS_ROUTERS` | Content routers that find more sources for a file, separated by commas. Leave it empty to turn that off. |
-| `ETHAGENT_HOSTS_FILE` | Where ethagent remembers how quickly each host answers, so the fastest is asked first. Defaults to `~/.ethagent/hosts.json`. Leave it empty to remember nothing. |
+| `ETHAGENT_HOSTS_FILE` | Where ethagent remembers how quickly each host answers, so the fastest is asked first, and how many blocks each serves per log query. Defaults to `~/.ethagent/hosts.json`. Leave it empty to remember nothing. |
 | `ETHAGENT_HARNESS_FILES` | Extra instruction files to keep in sync, separated by commas. |
 | `ETHAGENT_NO_DAEMON` | Set to `1` to turn off background sync. |
 
