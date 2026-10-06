@@ -124,6 +124,9 @@ export async function runCustodyWrite(
   config: EthagentConfig,
   identity: EthagentIdentity,
   seams: CustodyWriteSeams,
+  // A caller that already has a wallet tab open (create --advanced) passes it, and
+  // reports the outcome itself.
+  embed?: { tab: WalletTab; onResult: (result: Record<string, unknown>) => void },
 ): Promise<number> {
   if (!identity.agentId) throw new HistoryError(1, 'This identity has no agent token ID yet.')
   const registry = resolveRegistryForIdentity(identity, config)
@@ -282,7 +285,7 @@ export async function runCustodyWrite(
   const jwt = await requireStorage(seams.resolveJwt)
   await seams.pullHarness(identity).catch(() => [])
 
-  const tab = new WalletTab(seams.openSession, deps.io, flags.json, flags.noOpen, seams.openExternal)
+  const tab = embed?.tab ?? new WalletTab(seams.openSession, deps.io, flags.json, flags.noOpen, seams.openExternal)
   const confirmed: string[] = []
   let saved: EthagentIdentity | undefined
   const callbacks = quietCallbacks()
@@ -354,10 +357,14 @@ export async function runCustodyWrite(
     }
     throw err
   } finally {
-    await tab.close()
+    if (!embed) await tab.close()
   }
   if (!saved) throw new HistoryError(4, `The custody save did not complete.${confirmed.length ? ` Already confirmed: ${confirmed.join('; ')}.` : ''} Run the same command again to finish.`)
   const result = { applied: true, ...summary, vault: write.kind === 'simple' ? null : vaultAddress ?? null, confirmed, txHash: saved.backup?.txHash ?? null }
+  if (embed) {
+    embed.onResult(result)
+    return 0
+  }
   if (flags.json) await emitJson(deps.io, result)
   else await deps.io.out(`Done: ${[...confirmed, 'custody saved'].join('; ')}.\n`)
   return 0
