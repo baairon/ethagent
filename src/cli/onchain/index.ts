@@ -7,6 +7,7 @@ export async function runOnchainCommand(verb: string, args: string[], baseDeps: 
     case 'custody': return (await import('./custody.js')).runCustodyCommand(args, deps)
     case 'ens': return (await import('./ens.js')).runEnsCommand(args, deps)
     case 'restore': return (await import('./restore.js')).runRestoreCommand(args, deps)
+    case 'profile': return (await import('./profile.js')).runProfileCommand(args, deps)
     default: return 2
   }
 }
