@@ -1,6 +1,6 @@
 import test, { afterEach } from 'node:test'
 import assert from 'node:assert/strict'
-import { createPublicClient, parseAbiItem } from 'viem'
+import { createPublicClient, parseAbiItem, type PublicClient } from 'viem'
 import { base } from 'viem/chains'
 import { createAdaptiveFetch, learnedLogRange, resetHostStatsForTest } from '../../src/net/adaptive.js'
 import { adaptiveRpcTransport } from '../../src/net/rpc.js'
@@ -55,11 +55,11 @@ function chain(opts: { http413?: boolean } = {}) {
       : []
     return reply({ result: logs })
   })
-  const clients = new Map<string, ReturnType<typeof createPublicClient>>()
+  const clients = new Map<string, PublicClient>()
   const query = async (url: string, fromBlock: bigint, toBlock: bigint) => {
     let client = clients.get(url)
     if (!client) {
-      client = createPublicClient({ chain: base, transport: adaptiveRpcTransport([url], fetchImpl) })
+      client = createPublicClient({ chain: base, transport: adaptiveRpcTransport([url], fetchImpl) }) as PublicClient
       clients.set(url, client)
     }
     return client.getLogs({ event: TRANSFER, fromBlock, toBlock })
