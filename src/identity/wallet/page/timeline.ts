@@ -1,5 +1,6 @@
 type LifecycleId =
   | "ens-clear"
+  | "ens-delete"
   | "ens-link"
   | "ens-update"
   | "ens-register"
@@ -8,6 +9,7 @@ type LifecycleId =
 
 const LIFECYCLE_DEFINITIONS: Record<LifecycleId, { steps: string[] }> = {
   "ens-clear":    { steps: ["Clear Records on Mainnet", "Save Cleared Snapshot"] },
+  "ens-delete":   { steps: ["Clear Records on Mainnet", "Delete Subdomain", "Save Cleared Snapshot"] },
   "ens-link":     { steps: ["Create Subdomain", "Set Records", "Save Snapshot"] },
   "ens-update":   { steps: ["Update Records on Mainnet", "Save Updated Snapshot"] },
   "ens-register": { steps: ["Commit ENS Name", "Register ENS Name"] },
@@ -17,6 +19,7 @@ const LIFECYCLE_DEFINITIONS: Record<LifecycleId, { steps: string[] }> = {
 
 const FLOW_LIFECYCLE: Record<string, LifecycleId> = {
   "ens-clear":      "ens-clear",
+  "ens-delete":     "ens-delete",
   "ens-link":       "ens-link",
   "ens-update":     "ens-update",
   "ens-register":   "ens-register",

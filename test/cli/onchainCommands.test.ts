@@ -340,3 +340,48 @@ test('ens rejects mixing a name with --unlink or --set', async () => {
   const d = deps(identity())
   assert.equal(await runEnsCommand(['a.femboi.eth', '--unlink'], d, ensSeams({})), 2)
 })
+
+test('ens --delete previews clearing the records, removing the subname from its parent, and an owner-signed save', async () => {
+  const id = identity({ ensName: 'meow.femboi.eth' })
+  const d = deps(id)
+  const code = await runEnsCommand(['--delete', '--json'], d, ensSeams({
+    'femboi.eth': { owner: OWNER },
+    'meow.femboi.eth': { owner: OWNER, resolver: RESOLVER, addr: OWNER, text: { [ENSIP25_BASE]: '1' } },
+  }))
+  assert.equal(code, 0, d.io.stdout())
+  const out = d.io.json() as Record<string, any>
+  assert.equal(out.applied, false)
+  assert.equal(out.action, 'delete')
+  assert.equal(out.parent, 'femboi.eth')
+  assert.deepEqual(out.transactions.map((tx: any) => tx.step), ['clear-records', 'delete-subdomain'])
+  assert.equal(getAddress(out.transactions[1].to), ENS_REGISTRY)
+  assert.equal(out.publish.ensName, '')
+  assert.match(String(out.note), /can create it again/)
+})
+
+test('ens --delete refuses when the signer does not manage the parent, and never takes the operator key', async () => {
+  const id = identity({ ensName: 'meow.femboi.eth' })
+  const other = getAddress('0x00000000000000000000000000000000000beef1')
+  const d = deps(id)
+  assert.equal(await runEnsCommand(['--delete', '--json'], d, ensSeams({
+    'femboi.eth': { owner: other },
+    'meow.femboi.eth': { owner: OWNER, resolver: RESOLVER },
+  })), 1)
+  assert.match(String(d.io.json().hint), /--unlink/)
+  const op = operatorDeps(id)
+  assert.equal(await runEnsCommand(['--delete', '--operator', '--json'], op, ensSeams({})), 2)
+  const top = deps(identity({ ensName: 'femboi.eth' }))
+  assert.equal(await runEnsCommand(['--delete', '--json'], top, ensSeams({ 'femboi.eth': { owner: OWNER } })), 1)
+  assert.match(String(top.io.json().error), /not a subdomain/)
+  const mixed = deps(id)
+  assert.equal(await runEnsCommand(['--delete', '--unlink', '--json'], mixed, ensSeams({})), 2)
+})
+
+test('ens --delete resumes: a subname already removed leaves only the save', async () => {
+  const id = identity({ ensName: 'meow.femboi.eth' })
+  const d = deps(id)
+  assert.equal(await runEnsCommand(['--delete', '--json'], d, ensSeams({ 'femboi.eth': { owner: OWNER } })), 0, d.io.stdout())
+  const out = d.io.json() as Record<string, any>
+  assert.deepEqual(out.transactions, [])
+  assert.equal(out.publish.ensName, '')
+})

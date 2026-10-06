@@ -15,6 +15,7 @@ import {
   type AgentRecordDiff,
 } from '../../ens/agentRecords.js'
 import { normalizeEthDomain, splitSubdomainName } from '../../ens/ensLookup.js'
+import { preflightDeleteSubdomain } from '../../ens/ensAutomation/delete.js'
 import {
   ENS_AUTOMATION_RESOLVER_ABI,
   ENS_PUBLIC_RESOLVER_ADDRESS_MAINNET,
@@ -114,7 +115,7 @@ export async function signerControlOf(client: EnsReadClient, control: EnsNameCon
 }
 
 export type EnsPlannedTransaction = {
-  step: 'create-subdomain' | 'set-records' | 'clear-old-records' | 'clear-records' | 'update-records'
+  step: 'create-subdomain' | 'set-records' | 'clear-old-records' | 'clear-records' | 'update-records' | 'delete-subdomain'
   name: string
   to: Address
   data: Hex
@@ -344,6 +345,61 @@ export async function planEnsUnlink(args: {
     name: normalizeEthDomain(args.name),
     transactions: cleared.tx ? [cleared.tx] : [],
     current: cleared.current,
+  }
+}
+
+export type EnsDeletePlan = {
+  kind: 'delete'
+  name: string
+  parentName: string
+  transactions: EnsPlannedTransaction[]
+  current: AgentEnsRecordState
+}
+
+// Unlink, then remove the subname from its parent. Only the parent's manager can remove
+// it, and the records are cleared first so nothing points at the token if the parent
+// later recreates the name.
+export async function planEnsDelete(args: {
+  client: EnsReadClient
+  name: string
+  signer: Address
+  signerRole: string
+  identityRegistryAddress: Address
+  agentId: string
+}): Promise<EnsDeletePlan> {
+  const preflight = await preflightDeleteSubdomain({ fullName: args.name, expectedOwnerAddress: args.signer, ensClient: args.client })
+  if (!preflight.ok && preflight.reason === 'subdomain-missing') {
+    // Already removed, for example by a run stopped before its save: only the save is left.
+    const name = normalizeEthDomain(args.name)
+    return { kind: 'delete', name, parentName: splitSubdomainName(name)?.parent ?? '', transactions: [], current: {} }
+  }
+  if (!preflight.ok) {
+    const hint = preflight.reason === 'not-a-subdomain'
+      ? 'Only a subname can be deleted. `ethagent ens --unlink` clears the agent records instead.'
+      : preflight.reason === 'parent-owner-mismatch'
+        ? 'Run it with the wallet that manages the parent name, or use `ethagent ens --unlink` to clear the agent records instead.'
+        : undefined
+    throw new EnsPlanRefusal(`Cannot delete ${args.name}: ${preflight.detail}.`, hint)
+  }
+  const unlink = await planEnsUnlink(args)
+  const plan = preflight.plan
+  return {
+    kind: 'delete',
+    name: plan.fullName,
+    parentName: plan.parentName,
+    current: unlink.current,
+    transactions: [
+      ...unlink.transactions,
+      {
+        step: 'delete-subdomain',
+        name: plan.fullName,
+        to: plan.transaction.to,
+        data: plan.transaction.data,
+        purpose: 'delete-ens-subdomain',
+        description: `remove ${plan.fullName} from ${plan.parentName}${plan.parentWrapped ? ' (through the NameWrapper)' : ''}; ${args.signerRole} ${args.signer} manages the parent`,
+        dependsOnPrevious: false,
+      },
+    ],
   }
 }
 
