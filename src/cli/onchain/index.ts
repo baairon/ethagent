@@ -6,6 +6,11 @@ export async function runOnchainCommand(verb: string, args: string[], baseDeps: 
   switch (verb) {
     case 'custody': return (await import('./custody.js')).runCustodyCommand(args, deps)
     case 'ens': return (await import('./ens.js')).runEnsCommand(args, deps)
+    case 'restore': return (await import('./restore.js')).runRestoreCommand(args, deps)
+    case 'profile': return (await import('./profile.js')).runProfileCommand(args, deps)
+    case 'create': return (await import('./create.js')).runCreateCommand(args, deps)
+    case 'storage': return (await import('./storage.js')).runStorageCommand(args, deps)
+    case 'transfer': return (await import('./transfer.js')).runTransferCommand(args, deps)
     default: return 2
   }
 }

@@ -36,6 +36,8 @@ import { setOwnerAddressField } from '../../identityCompat.js'
 import {
   prepareTransactionGasFee,
   requestBrowserWalletSignatureAndTransaction,
+  type BrowserWalletSession,
+  type SignAndTransactionRequest,
 } from '../../wallet/browserWallet.js'
 import { initialAgentState, PREFLIGHT_AGENT_URI } from '../profile/identity.js'
 import { mergeImportedNotes } from './importScan.js'
@@ -119,12 +121,11 @@ function registryResolutionForNetwork(network: SelectableNetwork): RegistryResol
 export async function runCreateSigning(
   step: Extract<Step, { kind: 'create-signing' }>,
   callbacks: EffectCallbacks,
+  opts: { session?: BrowserWalletSession } = {},
 ): Promise<void> {
-  const result = await requestBrowserWalletSignatureAndTransaction<CreatePreparedTransaction>({
+  const request: SignAndTransactionRequest<CreatePreparedTransaction> = {
     chainId: step.registry.chainId,
     messageForAccount: account => createContinuitySnapshotChallenge(account),
-    onReady: callbacks.onWalletReady,
-    ...(callbacks.signal ? { signal: callbacks.signal } : {}),
     purpose: 'create-agent',
     prepareTransaction: async wallet => {
       await preflightRegisterAgent({
@@ -219,7 +220,14 @@ export async function runCreateSigning(
         },
       }
     },
-  })
+  }
+  const result = opts.session
+    ? await opts.session.requestSignatureAndTransaction(request)
+    : await requestBrowserWalletSignatureAndTransaction<CreatePreparedTransaction>({
+        ...request,
+        onReady: callbacks.onWalletReady,
+        ...(callbacks.signal ? { signal: callbacks.signal } : {}),
+      })
   callbacks.onWalletReady(null)
   callbacks.onCreateProgress?.({ phase: 'confirming', label: 'Confirming the transaction…' })
   const client = createErc8004PublicClient(step.registry)

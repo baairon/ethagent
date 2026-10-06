@@ -5,7 +5,9 @@ import { invalidateOwnershipCache } from '../shared/reconciliation/index.js'
 import type { ProfileUpdates } from '../reducer.js'
 import type { CustodyFlowDeps } from './types.js'
 import { scopeCallbacks } from '../shared/effects/types.js'
-import { humanOwnerAddress } from './helpers.js'
+import { humanOwnerAddress, localOperatorAddresses } from './helpers.js'
+import { revokeVaultOperatorsBeforeWithdraw } from '../shared/effects/sync.js'
+import { getAddress } from 'viem'
 import {
   receiptPacing,
   recordDeployedVault,
@@ -152,6 +154,14 @@ export function useCustodyTransactionEffects({
       : (step.identity.agentId ? [step.identity.agentId] : [])
     ;(async () => {
       try {
+        await revokeVaultOperatorsBeforeWithdraw({
+          identity: step.identity,
+          registry: step.registry,
+          vaultAddress: step.vaultAddress,
+          ownerAddress: getAddress(humanOwnerAddress(step.identity)),
+          candidates: localOperatorAddresses(step.identity),
+          callbacks: scope.callbacks,
+        })
         for (const agentIdStr of agentIds) {
           if (cancelled) return
           await runVaultUnwrapTransaction({

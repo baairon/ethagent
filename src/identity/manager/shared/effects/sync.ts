@@ -11,7 +11,7 @@ import {
   encodeSetMetadataOperator,
   readMetadataOperators,
 } from '../../../registry/vault.js'
-import { prepareTransactionGasFee, sendBrowserWalletTransaction } from '../../../wallet/browserWallet.js'
+import { prepareTransactionGasFee, sendBrowserWalletTransaction, type BrowserWalletSession } from '../../../wallet/browserWallet.js'
 import {
   computeApprovalDiff,
   type ApprovalDiff,
@@ -47,6 +47,7 @@ export async function syncVaultOperatorsAfterOwnerSave(args: {
   // which wipes every approval, so operators that local state still lists are approved
   // again even though the local diff is empty.
   afterDeposit?: boolean
+  session?: BrowserWalletSession
 }): Promise<void> {
   const beforeState = (args.beforeIdentity.state ?? {}) as Record<string, unknown>
   const afterState = (args.afterIdentity.state ?? {}) as Record<string, unknown>
@@ -79,6 +80,7 @@ export async function syncVaultOperatorsAfterOwnerSave(args: {
     diff,
     ownerAddress,
     callbacks: args.callbacks,
+    ...(args.session ? { session: args.session } : {}),
   })
 }
 
@@ -89,6 +91,7 @@ export async function syncVaultMetadataOperatorsAfterOwnerSave(args: {
   diff: ApprovalDiff
   ownerAddress: Address
   callbacks: EffectCallbacks
+  session?: BrowserWalletSession
 }): Promise<void> {
   if (!args.vaultAddress) return
   const agentIdRaw = args.afterIdentity.agentId
@@ -126,16 +129,21 @@ export async function syncVaultMetadataOperatorsAfterOwnerSave(args: {
       to: encoded.to,
       data: encoded.data,
     })
-    const tx = await sendBrowserWalletTransaction({
+    const request = {
       chainId: args.registry.chainId,
       expectedAccount: args.ownerAddress,
       to: encoded.to,
       data: encoded.data,
       ...gasFee,
-      onReady: args.callbacks.onWalletReady,
-      ...(args.callbacks.signal ? { signal: args.callbacks.signal } : {}),
-      purpose: 'sync-operator-vault',
-    })
+      purpose: 'sync-operator-vault' as const,
+    }
+    const tx = args.session
+      ? await args.session.sendTransaction(request)
+      : await sendBrowserWalletTransaction({
+          ...request,
+          onReady: args.callbacks.onWalletReady,
+          ...(args.callbacks.signal ? { signal: args.callbacks.signal } : {}),
+        })
     args.callbacks.onWalletReady(null)
     await awaitConfirmedReceipt(probeClient, tx.txHash, 'Vault operator sync')
   }
@@ -199,4 +207,39 @@ export async function markCurrentContinuityFilesPublished(
       ...(identity.agentCard?.cid ? { agentCardCid: identity.agentCard.cid } : {}),
     })
   }
+}
+
+// Revokes every operator the Vault still approves for this token, before the token
+// leaves it. Some Vault builds keep approvals across a withdraw, so leftover operators
+// could otherwise rotate the URI of whoever deposits the token next.
+export async function revokeVaultOperatorsBeforeWithdraw(args: {
+  identity: EthagentIdentity
+  registry: Erc8004RegistryConfig
+  vaultAddress: Address
+  ownerAddress: Address
+  candidates: readonly Address[]
+  callbacks: EffectCallbacks
+  session?: BrowserWalletSession
+}): Promise<Address[]> {
+  const agentIdRaw = args.identity.agentId
+  if (!agentIdRaw || args.candidates.length === 0) return []
+  const approved = await readMetadataOperators({
+    client: createErc8004PublicClient(args.registry),
+    vaultAddress: getAddress(args.vaultAddress),
+    registry: getAddress(args.registry.identityRegistryAddress),
+    agentId: BigInt(agentIdRaw),
+    candidates: args.candidates.map(candidate => getAddress(candidate)),
+  })
+  const removed = Object.entries(approved).filter(([, on]) => on).map(([address]) => getAddress(address))
+  if (removed.length === 0) return []
+  await syncVaultMetadataOperatorsAfterOwnerSave({
+    afterIdentity: args.identity,
+    registry: args.registry,
+    vaultAddress: args.vaultAddress,
+    diff: { added: [], removed },
+    ownerAddress: args.ownerAddress,
+    callbacks: args.callbacks,
+    ...(args.session ? { session: args.session } : {}),
+  })
+  return removed
 }

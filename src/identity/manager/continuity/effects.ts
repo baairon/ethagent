@@ -402,6 +402,7 @@ async function runRebackupSigningInner(
     ...(step.vaultAddress ? { vaultAddress: step.vaultAddress } : {}),
     callbacks,
     afterDeposit: step.profileUpdates?.custodyPhase === 'switch-advanced',
+    ...(opts?.session ? { session: opts.session } : {}),
   }).then(() => null).catch(err => operatorSyncWarningMessage(err))
   const completionMessage = appendOperatorSyncWarning(
     rebackupCompletionMessage(

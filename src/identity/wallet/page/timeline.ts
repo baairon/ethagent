@@ -11,7 +11,7 @@ const LIFECYCLE_DEFINITIONS: Record<LifecycleId, { steps: string[] }> = {
   "ens-link":     { steps: ["Create Subdomain", "Set Records", "Save Snapshot"] },
   "ens-update":   { steps: ["Update Records on Mainnet", "Save Updated Snapshot"] },
   "ens-register": { steps: ["Commit ENS Name", "Register ENS Name"] },
-  "custody-switch": { steps: ["Deploy Vault", "Deposit Token", "Reconcile Operators"] },
+  "custody-switch": { steps: ["Deploy Vault", "Deposit Token", "Save Through Vault"] },
   "public-profile-vault": { steps: ["Sign Profile", "Save Through Vault"] },
 };
 

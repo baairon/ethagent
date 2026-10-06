@@ -15,8 +15,9 @@ import { readCustodyMode, readIdentityStateString } from '../../identity/manager
 import { humanOwnerAddress } from '../../identity/manager/custody/helpers.js'
 import { normalizeApprovedOperatorWallets } from '../../identity/manager/shared/operatorWallets.js'
 import { emitJson, failFrom, HistoryError, parseHistoryArgs, requireIdentity, type HistoryDeps } from '../history/shared.js'
+import { defaultCustodyWriteSeams, parseCustodyWrite, runCustodyWrite, type CustodyWriteSeams } from './custodyWrite.js'
 
-export const CUSTODY_USAGE = 'ethagent custody [--verify] [--json]'
+export const CUSTODY_USAGE = 'ethagent custody [--verify | --advanced | --simple | --add-operator [<address>] | --remove-operator <address> | --activate-operator <address>] [--operator] [--yes] [--no-open] [--json]'
 
 const STRANGER = getAddress('0x000000000000000000000000000000000000dEaD')
 const ZERO = '0x0000000000000000000000000000000000000000'
@@ -63,10 +64,25 @@ async function simulate(
   }
 }
 
-export async function runCustodyCommand(args: string[], deps: HistoryDeps, seams: CustodySeams = defaultSeams): Promise<number> {
+export async function runCustodyCommand(
+  args: string[],
+  deps: HistoryDeps,
+  seams: CustodySeams = defaultSeams,
+  writeSeams: CustodyWriteSeams = defaultCustodyWriteSeams,
+): Promise<number> {
   const json = args.includes('--json')
   try {
-    const { values } = parseHistoryArgs(args, { verify: { type: 'boolean' } }, CUSTODY_USAGE)
+    const { values, positionals } = parseHistoryArgs(args, {
+      verify: { type: 'boolean' },
+      advanced: { type: 'boolean' },
+      simple: { type: 'boolean' },
+      'add-operator': { type: 'boolean' },
+      'remove-operator': { type: 'string' },
+      'activate-operator': { type: 'string' },
+      operator: { type: 'boolean' },
+      yes: { type: 'boolean' },
+      'no-open': { type: 'boolean' },
+    }, CUSTODY_USAGE)
     if (values.help) {
       await deps.io.out([
         `usage: ${CUSTODY_USAGE}`,
@@ -76,10 +92,29 @@ export async function runCustodyCommand(args: string[], deps: HistoryDeps, seams
         'the owner changing an operator, the operator rotating the agent URI, and the operator and a',
         'stranger being refused. Exits 4 when any result differs from what the Vault should do.',
         '',
+        'Changes (preview until --yes, every wallet prompt in one browser tab, owner wallet signs):',
+        '  --advanced                       deploy a Vault (or reuse one), deposit the token, then save',
+        '  --simple                         revoke the Vault operators, withdraw the token, then save',
+        '  --add-operator [<address>]       approve an operator; it signs a proof in the browser, or',
+        '                                   with --operator the injected operator key signs it locally',
+        '  --remove-operator <address>      remove an operator and revoke it on the Vault',
+        '  --activate-operator <address>    make an approved operator the active one',
+        'Each change is planned from chain state, so a run that stops part way resumes when run again.',
+        '',
       ].join('\n'))
       return 0
     }
     const { config, identity } = await requireIdentity(deps)
+    const write = parseCustodyWrite(values, positionals)
+    if (write) {
+      return await runCustodyWrite(write, {
+        yes: Boolean(values.yes),
+        json,
+        noOpen: Boolean(values['no-open']),
+        operator: Boolean(values.operator),
+      }, deps, config, identity, writeSeams)
+    }
+    if (values.yes || values.operator) throw new HistoryError(2, '--yes and --operator need a change: --advanced, --simple, or an operator flag', `usage: ${CUSTODY_USAGE}`)
     if (!identity.agentId) throw new HistoryError(1, 'This identity has no agent token ID yet.', 'Create or restore it with `npx ethagent` first.')
     const registry = resolveRegistryForIdentity(identity, config)
     if (!registry) throw new HistoryError(1, 'No agent registry is configured for this identity.', 'Run `npx ethagent` to set it up.')

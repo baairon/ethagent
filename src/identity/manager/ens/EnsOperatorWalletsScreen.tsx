@@ -10,10 +10,7 @@ import { openExternalUrl } from '../../../utils/openExternal.js'
 import type { EthagentIdentity } from '../../../storage/config.js'
 import { readOwnerAddressField } from '../../identityCompat.js'
 import type { Erc8004RegistryConfig } from '../../registry/erc8004.js'
-import {
-  createWalletRestoreAccessChallenge,
-  createWalletRestoreAccessKey,
-} from '../../continuity/envelope.js'
+import { operatorAccessContext, operatorProofChallenge, operatorRecordFromProof } from '../shared/operatorAccess.js'
 import { requestBrowserWalletSignature, type BrowserWalletReady } from '../../wallet/browserWallet.js'
 import { FlowTimeline } from '../shared/components/FlowTimeline.js'
 import { FieldList } from '../shared/components/FieldRow.js'
@@ -113,8 +110,7 @@ export const OperatorWalletsScreen: React.FC<OperatorWalletsScreenProps> = ({
       setPhase({ kind: 'main', error: 'agent token ID is required before authorizing a wallet' })
       return
     }
-    const token = restoreAccessToken(registry, identity.agentId)
-    const nextEpoch = restoreAccessEpoch + 1
+    const access = operatorAccessContext(identity, registry)
     setPhase({ kind: 'signing' })
     signingRef.current?.abort()
     const signing = new AbortController()
@@ -123,31 +119,11 @@ export const OperatorWalletsScreen: React.FC<OperatorWalletsScreenProps> = ({
       chainId: registry.chainId,
       purpose: 'operator-proof',
       signal: signing.signal,
-      messageForAccount: account => createWalletRestoreAccessChallenge({
-        token,
-        ownerAddress: ownerAddress,
-        walletAddress: account,
-        accessEpoch: nextEpoch,
-        purpose: 'restore-operator',
-      }),
+      messageForAccount: account => operatorProofChallenge(access, account),
       onReady: onWalletReady,
     }).then(wallet => {
       onWalletReady(null)
-      const restoreAccessKey = createWalletRestoreAccessKey({
-        token,
-        ownerAddress: ownerAddress,
-        walletAddress: wallet.account,
-        walletSignature: wallet.signature,
-        accessEpoch: nextEpoch,
-        createdAt: new Date().toISOString(),
-        purpose: 'restore-operator',
-      })
-      addRecord({
-        address: wallet.account,
-        challenge: wallet.message,
-        verifiedAt: restoreAccessKey.createdAt,
-        restoreAccessKey,
-      })
+      addRecord(operatorRecordFromProof(access, wallet))
     }).catch((err: unknown) => {
       if (signing.signal.aborted) return
       onWalletReady(null)
@@ -332,14 +308,6 @@ const footerHint = (hint: string) => <Text color={theme.dim}>{hint}</Text>
 function readStateNumber(state: Record<string, unknown>, key: string): number | undefined {
   const value = state[key]
   return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : undefined
-}
-
-function restoreAccessToken(registry: Erc8004RegistryConfig, agentId: string) {
-  return {
-    chainId: registry.chainId,
-    identityRegistryAddress: registry.identityRegistryAddress,
-    agentId,
-  }
 }
 
 function readStateAddress(state: Record<string, unknown>, key: string): Address | undefined {

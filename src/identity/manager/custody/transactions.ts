@@ -18,7 +18,13 @@ import {
 import { describeVaultRevert, isNotAContractAnswer, type VaultBuild, type VaultCheckPacing } from '../../registry/vault.js'
 import { loadConfig, saveConfigWithMerge, setConfiguredVaultAddress, type EthagentIdentity } from '../../../storage/config.js'
 import { readVaultAddressField, readOwnerAddressField } from '../../identityCompat.js'
-import { prepareTransactionGasFee, sendBrowserWalletTransaction } from '../../wallet/browserWallet.js'
+import {
+  prepareTransactionGasFee,
+  sendBrowserWalletTransaction,
+  type BrowserWalletSession,
+  type BrowserWalletTransaction,
+  type TransactionRequest,
+} from '../../wallet/browserWallet.js'
 import { acquireTxGuard, releaseTxGuard, type TxGuardKind } from '../shared/txGuard.js'
 import { awaitConfirmedReceipt } from '../shared/effects/receipts.js'
 import { invalidateOwnershipCache } from '../shared/reconciliation/agentReconciliation/ownership.js'
@@ -82,6 +88,20 @@ export class VaultRefusedDepositError extends Error {
   }
 }
 
+// Sends one custody transaction: through the caller's wallet session when it has one,
+// otherwise in a tab of its own.
+async function sendCustodyTransaction(
+  args: { session?: BrowserWalletSession; flowStep?: number },
+  req: TransactionRequest,
+): Promise<BrowserWalletTransaction> {
+  const withStep: TransactionRequest = typeof args.flowStep === 'number' ? { ...req, flowStep: args.flowStep } : req
+  if (args.session) {
+    const { onReady: _onReady, signal: _signal, ...rest } = withStep
+    return args.session.sendTransaction(rest)
+  }
+  return sendBrowserWalletTransaction(withStep)
+}
+
 async function withTxGuard<T>(kind: TxGuardKind, fn: () => Promise<T>): Promise<T> {
   acquireTxGuard(kind)
   try {
@@ -97,6 +117,9 @@ export async function runVaultDeployTransaction(args: {
   walletAddress: Address
   agentId: bigint
   callbacks: EffectCallbacks
+  // When set, the wallet prompts go through this one tab instead of a tab each.
+  session?: BrowserWalletSession
+  flowStep?: number
   publicClient?: Pick<PublicClient, 'waitForTransactionReceipt' | 'getBytecode' | 'getBlockNumber'>
   flowId?: string
   // Called as soon as the deploy receipt names the new Vault, before its code is
@@ -111,6 +134,9 @@ async function runVaultDeployTransactionInner(args: {
   walletAddress: Address
   agentId: bigint
   callbacks: EffectCallbacks
+  // When set, the wallet prompts go through this one tab instead of a tab each.
+  session?: BrowserWalletSession
+  flowStep?: number
   publicClient?: Pick<PublicClient, 'waitForTransactionReceipt' | 'getBytecode' | 'getBlockNumber'>
   flowId?: string
   onDeployed?: (vaultAddress: Address) => Promise<void> | void
@@ -128,7 +154,7 @@ async function runVaultDeployTransactionInner(args: {
     account: walletAddress,
     data: deployData,
   })
-  const result = await sendBrowserWalletTransaction({
+  const result = await sendCustodyTransaction(args, {
     chainId: args.registry.chainId,
     expectedAccount: walletAddress,
     data: deployData,
@@ -157,6 +183,9 @@ export async function runVaultDepositTransaction(args: {
   registry: Erc8004RegistryConfig
   vaultAddress: Address
   callbacks: EffectCallbacks
+  // When set, the wallet prompts go through this one tab instead of a tab each.
+  session?: BrowserWalletSession
+  flowStep?: number
   flowId?: string
 }): Promise<{ txHash: string; receiptBlock: bigint; build: VaultBuild }> {
   return withTxGuard('vault-deposit', () => runVaultDepositTransactionInner(args))
@@ -167,6 +196,9 @@ async function runVaultDepositTransactionInner(args: {
   registry: Erc8004RegistryConfig
   vaultAddress: Address
   callbacks: EffectCallbacks
+  // When set, the wallet prompts go through this one tab instead of a tab each.
+  session?: BrowserWalletSession
+  flowStep?: number
   flowId?: string
 }): Promise<{ txHash: string; receiptBlock: bigint; build: VaultBuild }> {
   const { identity, registry, vaultAddress } = args
@@ -199,7 +231,7 @@ async function runVaultDepositTransactionInner(args: {
     to: encoded.to,
     data: encoded.data,
   })
-  const result = await sendBrowserWalletTransaction({
+  const result = await sendCustodyTransaction(args, {
     chainId: registry.chainId,
     expectedAccount: tokenOwner,
     to: encoded.to,
@@ -314,6 +346,9 @@ export async function runVaultUnwrapTransaction(args: {
   registry: Erc8004RegistryConfig
   vaultAddress: Address
   callbacks: EffectCallbacks
+  // When set, the wallet prompts go through this one tab instead of a tab each.
+  session?: BrowserWalletSession
+  flowStep?: number
   flowId?: string
   agentId?: bigint
 }): Promise<{ txHash: string } | null> {
@@ -325,6 +360,9 @@ async function runVaultUnwrapTransactionInner(args: {
   registry: Erc8004RegistryConfig
   vaultAddress: Address
   callbacks: EffectCallbacks
+  // When set, the wallet prompts go through this one tab instead of a tab each.
+  session?: BrowserWalletSession
+  flowStep?: number
   flowId?: string
   agentId?: bigint
 }): Promise<{ txHash: string } | null> {
@@ -358,7 +396,7 @@ async function runVaultUnwrapTransactionInner(args: {
     to: encoded.to,
     data: encoded.data,
   })
-  const result = await sendBrowserWalletTransaction({
+  const result = await sendCustodyTransaction(args, {
     chainId: registry.chainId,
     expectedAccount: ownerAddress,
     to: encoded.to,
@@ -392,6 +430,9 @@ export async function runVaultWithdrawTransaction(args: {
   registry: Erc8004RegistryConfig
   vaultAddress: Address
   callbacks: EffectCallbacks
+  // When set, the wallet prompts go through this one tab instead of a tab each.
+  session?: BrowserWalletSession
+  flowStep?: number
   agentId?: bigint
 }): Promise<{ txHash: string; recipient: Address }> {
   return withTxGuard('vault-withdraw', () => runVaultWithdrawTransactionInner(args))
@@ -402,6 +443,9 @@ async function runVaultWithdrawTransactionInner(args: {
   registry: Erc8004RegistryConfig
   vaultAddress: Address
   callbacks: EffectCallbacks
+  // When set, the wallet prompts go through this one tab instead of a tab each.
+  session?: BrowserWalletSession
+  flowStep?: number
   agentId?: bigint
 }): Promise<{ txHash: string; recipient: Address }> {
   const { identity, registry, vaultAddress } = args
@@ -435,7 +479,7 @@ async function runVaultWithdrawTransactionInner(args: {
     to: encoded.to,
     data: encoded.data,
   })
-  const result = await sendBrowserWalletTransaction({
+  const result = await sendCustodyTransaction(args, {
     chainId: registry.chainId,
     expectedAccount: recipient,
     to: encoded.to,

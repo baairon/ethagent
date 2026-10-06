@@ -92,3 +92,16 @@ export async function decryptWithSigner(envelope: ContinuitySnapshotEnvelope, si
   }
   return { ok: false, reason: 'signature-mismatch' }
 }
+
+// The challenge this address would sign to open the snapshot, or null when the snapshot
+// has no slot for it. Restore previews use it to say whether a key can decrypt.
+export function envelopeChallengeFor(envelope: ContinuitySnapshotEnvelope, address: string): string | null {
+  const me = address.toLowerCase()
+  if (isWalletContinuitySnapshotEnvelope(envelope)) {
+    return envelope.slots.find(slot => slot.address.toLowerCase() === me)?.challenge ?? null
+  }
+  if (isTransferContinuitySnapshotEnvelope(envelope)) {
+    return [envelope.slots.owner, envelope.slots.target].find(slot => slot.address.toLowerCase() === me)?.challenge ?? null
+  }
+  return envelope.ownerAddress.toLowerCase() === me ? envelope.challenge : null
+}
