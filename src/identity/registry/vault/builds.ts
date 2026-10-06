@@ -27,23 +27,18 @@ export const FIRST_COMMITTED_VAULT_BUILD: VaultBuild = {
   hasHeldAgent: true,
 }
 
-// A build deployed before the source was committed (1,955 bytes). It behaves like the
-// current build except that it has no heldAgent() view. Its full runtime hash starts
-// 0xf8f23197; it is filled in from a live read of a deployed Vault running it
-// (`ethagent custody --json` prints `build.observedHash`).
-export const PRE_RELEASE_VAULT_BUILD_HASH: Hex | undefined = undefined
+// A build deployed before the source was committed (1,955 bytes), read from Vault
+// 0x6bdC52c8e262c6D139e618260400614c2Bfe51d7 on Base, which holds token #45744. It
+// behaves like the current build except that it has no heldAgent() view.
+export const PRE_RELEASE_VAULT_BUILD: VaultBuild = {
+  id: 'pre-release',
+  label: 'pre-release build, no heldAgent()',
+  runtimeHash: '0xf8f2319752c7b0a6382ef0d233426d0bd605641e65300a4e1b2ece5479a64c13',
+  hasHeldAgent: false,
+}
 
 export function knownVaultBuilds(): VaultBuild[] {
-  const builds: VaultBuild[] = [CURRENT_VAULT_BUILD, FIRST_COMMITTED_VAULT_BUILD]
-  if (PRE_RELEASE_VAULT_BUILD_HASH) {
-    builds.push({
-      id: 'pre-release',
-      label: 'pre-release build, no heldAgent()',
-      runtimeHash: PRE_RELEASE_VAULT_BUILD_HASH,
-      hasHeldAgent: false,
-    })
-  }
-  return builds
+  return [CURRENT_VAULT_BUILD, FIRST_COMMITTED_VAULT_BUILD, PRE_RELEASE_VAULT_BUILD]
 }
 
 export function vaultBuildForHash(hash: Hex, builds: readonly VaultBuild[] = knownVaultBuilds()): VaultBuild | undefined {

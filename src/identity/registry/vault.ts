@@ -16,7 +16,7 @@ export type { AssertVaultBytecodeClient, VaultCheckPacing } from './vault/byteco
 export {
   CURRENT_VAULT_BUILD,
   FIRST_COMMITTED_VAULT_BUILD,
-  PRE_RELEASE_VAULT_BUILD_HASH,
+  PRE_RELEASE_VAULT_BUILD,
   knownVaultBuilds,
   vaultBuildForCode,
   vaultBuildForHash,
