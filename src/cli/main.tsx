@@ -78,6 +78,7 @@ function printHelp(): void {
     '  ethagent ens                the linked ENS name, its records, and who controls it',
     '  ethagent ens <name>         point the agent at a name (preview, then --yes)',
     '  ethagent ens --unlink       clear the agent records and unlink (preview, then --yes)',
+    '  ethagent ens --delete       unlink, then remove the subname from its parent (preview, then --yes)',
     '  ethagent ens --set <key>=<value> --clear <key>',
     '                              change text records (preview, then --yes)',
     '  ethagent ens <args> --operator',

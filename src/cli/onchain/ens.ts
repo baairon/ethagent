@@ -14,6 +14,7 @@ import { createMainnetEnsPublicClient, sendEnsTransaction } from '../../identity
 import { browserEnsSigner, operatorEnsSigner, type EnsSigner } from '../../identity/manager/ens/signer.js'
 import {
   EnsPlanRefusal,
+  planEnsDelete,
   planEnsRecords,
   planEnsSwap,
   planEnsUnlink,
@@ -43,7 +44,7 @@ import {
   type HistoryDeps,
 } from '../history/shared.js'
 
-export const ENS_USAGE = 'ethagent ens [<name> | --unlink | --set <key>=<value>... --clear <key>...] [--operator] [--yes] [--no-open] [--json]'
+export const ENS_USAGE = 'ethagent ens [<name> | --unlink | --delete | --set <key>=<value>... --clear <key>...] [--operator] [--yes] [--no-open] [--json]'
 
 const HELP = [
   `usage: ${ENS_USAGE}`,
@@ -57,6 +58,10 @@ const HELP = [
   '                                   publish the name in one owner-signed save.',
   '  ethagent ens --unlink            clear the agent records on the linked name, then publish',
   '                                   the unlinked state in one owner-signed save.',
+  '  ethagent ens --delete            unlink as above, then remove the subname from its parent.',
+  '                                   Signed by the wallet that manages the parent, never the',
+  '                                   operator key. The parent can recreate it, unless its fuses',
+  '                                   forbid that.',
   '  ethagent ens --set <key>=<value> --clear <key>',
   '                                   write every record change on the linked name in one',
   '                                   resolver multicall. No save is needed.',
@@ -95,18 +100,20 @@ const defaultSeams: EnsSeams = {
   saveConfig,
 }
 
-type Mode = { kind: 'read' } | { kind: 'swap'; name: string } | { kind: 'unlink' } | { kind: 'records'; set: Record<string, string>; clear: string[] }
+type Mode = { kind: 'read' } | { kind: 'swap'; name: string } | { kind: 'unlink' } | { kind: 'delete' } | { kind: 'records'; set: Record<string, string>; clear: string[] }
 
 function parseMode(values: Record<string, unknown>, positionals: string[]): Mode {
   const sets = stringValues(values.set as string | string[] | undefined)
   const clears = stringValues(values.clear as string | string[] | undefined)
   const unlink = Boolean(values.unlink)
+  const del = Boolean(values.delete)
   const name = positionals[0]
   if (positionals.length > 1) throw new HistoryError(2, `unexpected argument: ${positionals[1]}`, `usage: ${ENS_USAGE}`)
-  const chosen = [name ? 'a name' : '', unlink ? '--unlink' : '', sets.length + clears.length > 0 ? '--set/--clear' : ''].filter(Boolean)
+  const chosen = [name ? 'a name' : '', unlink ? '--unlink' : '', del ? '--delete' : '', sets.length + clears.length > 0 ? '--set/--clear' : ''].filter(Boolean)
   if (chosen.length > 1) throw new HistoryError(2, `choose one of ${chosen.join(', ')}`, `usage: ${ENS_USAGE}`)
   if (name) return { kind: 'swap', name }
   if (unlink) return { kind: 'unlink' }
+  if (del) return { kind: 'delete' }
   if (sets.length + clears.length > 0) {
     const set: Record<string, string> = {}
     for (const entry of sets) {
@@ -210,6 +217,7 @@ export async function runEnsCommand(args: string[], deps: HistoryDeps, seams: En
       operator: { type: 'boolean' },
       yes: { type: 'boolean' },
       unlink: { type: 'boolean' },
+      delete: { type: 'boolean' },
       'no-open': { type: 'boolean' },
       set: { type: 'string', multiple: true },
       clear: { type: 'string', multiple: true },
@@ -232,6 +240,9 @@ export async function runEnsCommand(args: string[], deps: HistoryDeps, seams: En
 
     if (!identity.agentId) throw new HistoryError(1, 'This identity has no agent token ID yet.', 'Mint one with `ethagent create`, or bring one back with `ethagent restore <token-id>`.')
     const owner = getAddress(humanOwnerAddress(identity))
+    if (mode.kind === 'delete' && values.operator) {
+      throw new HistoryError(2, '--delete is signed by the wallet that manages the parent name, never the operator key.', 'Drop --operator; `ethagent ens --unlink --operator` clears the records instead.')
+    }
     const signer = chooseSigner(deps, Boolean(values.operator), owner)
     const client = seams.readClient()
     const currentName = readIdentityStateString(identity.state as Record<string, unknown> | undefined, 'ensName')
@@ -267,6 +278,25 @@ export async function runEnsCommand(args: string[], deps: HistoryDeps, seams: En
       transactions = plan.transactions
       publishName = ''
       summary = { action: 'unlink', name: plan.name, records: plan.current }
+    } else if (mode.kind === 'delete') {
+      if (!currentName) throw new HistoryError(1, 'No ENS name is linked, so there is nothing to delete.')
+      const plan = await planEnsDelete({
+        client,
+        name: currentName,
+        signer: signer.address,
+        signerRole: signer.role,
+        identityRegistryAddress: registry.identityRegistryAddress,
+        agentId: identity.agentId,
+      })
+      transactions = plan.transactions
+      publishName = ''
+      summary = {
+        action: 'delete',
+        name: plan.name,
+        parent: plan.parentName,
+        records: plan.current,
+        note: `${plan.name} stops resolving. Whoever manages ${plan.parentName} can create it again, unless its fuses forbid that.`,
+      }
     } else {
       if (!currentName) throw new HistoryError(1, 'No ENS name is linked.', 'Link one first with `ethagent ens <name>`.')
       const plan = await planEnsRecords({
@@ -313,6 +343,7 @@ export async function runEnsCommand(args: string[], deps: HistoryDeps, seams: En
             const simText = sim === 'after-previous' ? 'runs after the step before it' : sim && sim.ok ? 'would succeed' : sim ? `refused: ${sim.reason}` : ''
             lines.push(`  ${index + 1}. Ethereum Mainnet tx to ${tx.to}: ${tx.description} [${simText}]`)
           })
+          if (typeof summary.note === 'string') lines.push(`  note: ${summary.note}`)
           if (publish) {
             lines.push(`  ${transactions.length + 1}. owner-signed save publishing ${publish.ensName ? `ensName ${publish.ensName}` : 'no ENS name'} (${publish.via === 'vault' ? 'through the Vault' : 'on the registry'})`)
           }
@@ -360,7 +391,7 @@ export async function runEnsCommand(args: string[], deps: HistoryDeps, seams: En
       onWalletReady: () => {},
       onIdentityComplete: async () => {},
     }
-    const flowId = mode.kind === 'swap' ? 'ens-link' : mode.kind === 'unlink' ? 'ens-clear' : 'ens-update'
+    const flowId = mode.kind === 'swap' ? 'ens-link' : mode.kind === 'unlink' ? 'ens-clear' : mode.kind === 'delete' ? 'ens-delete' : 'ens-update'
     const sent: Array<{ step: string; name: string; txHash: string }> = []
     let savedIdentity: EthagentIdentity | undefined
     try {
@@ -372,7 +403,7 @@ export async function runEnsCommand(args: string[], deps: HistoryDeps, seams: En
       }
       const publicClient = seams.ensClient()
       for (const tx of transactions) {
-        const flowStep = tx.step === 'create-subdomain' ? 1 : mode.kind === 'swap' ? 2 : 1
+        const flowStep = tx.step === 'create-subdomain' ? 1 : tx.step === 'delete-subdomain' ? 2 : mode.kind === 'swap' ? 2 : 1
         await sink(`Sending: ${tx.description}\n`)
         const { txHash } = await sendEnsTransaction({
           signer: ensSigner,
@@ -409,7 +440,7 @@ export async function runEnsCommand(args: string[], deps: HistoryDeps, seams: En
             await seams.saveConfig({ ...config, identity: nextIdentity })
             savedIdentity = nextIdentity
           },
-        }, await ensureSession(), { flowId, flowStep: mode.kind === 'swap' ? 3 : 2 })
+        }, await ensureSession(), { flowId, flowStep: mode.kind === 'swap' || mode.kind === 'delete' ? 3 : 2 })
       }
     } catch (err: unknown) {
       if (isWalletCancelled(err)) {

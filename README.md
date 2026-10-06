@@ -24,7 +24,7 @@ You'll need an Ethereum wallet, the one that holds and unlocks your agent. Day-t
 
 A guided menu does the rest: name it and write who it is. When you're done, your wallet signs once to put it onchain.
 
-Prefer no menu? `ethagent create --name <text> --network <network>` does the same headlessly, previewing first and minting with `--yes`. Every menu action has a command like this, except deleting an ENS subname, which stays in the menu on purpose; see [Setting up and moving an agent](#setting-up-and-moving-an-agent).
+Prefer no menu? `ethagent create --name <text> --network <network>` does the same headlessly, previewing first and minting with `--yes`. Every menu action has a command like this; see [Setting up and moving an agent](#setting-up-and-moving-an-agent).
 
 <p align="center">
   <img src="preview/menu.svg" alt="ethagent main menu for a linked agent" width="100%">
@@ -125,7 +125,7 @@ Local history is plain files beside your vault, the same as the vault itself. `e
 You choose how tightly the agent is held, and you can change it later.
 
 - **Simple.** One wallet owns the agent and signs every save. The default for solo use.
-- **Advanced.** Most people never need this. Your main wallet owns the agent and keeps it in a Vault. Approved "operator" wallets can save backups and publish updates without the main wallet signing each time. Only the owner can move or sell the agent, so operators can **never** take it.
+- **Advanced.** Your main wallet owns the agent and keeps it in a Vault. Approved "operator" wallets can save backups and publish updates without the main wallet signing each time. Only the owner can move or sell the agent, so operators can **never** take it.
 
 To move the agent to another wallet, stage a transfer snapshot with `ethagent transfer <address>` or from the menu. Both wallets sign locally to re-encrypt your soul, memory, and skills for the new owner, so both must be on the same machine. Then transfer the token, and the new owner restores the agent exactly as you left it.
 
@@ -167,6 +167,7 @@ The foundation is built on open standards, so your agent is never tied to one ap
 | Point the agent at another ENS name | `ethagent ens <name>`, then again with `--yes` |
 | Change the name's text records | `ethagent ens --set <key>=<value> --clear <key>`, then again with `--yes` |
 | Unlink the ENS name | `ethagent ens --unlink`, then again with `--yes` |
+| Delete the agent's ENS subname | `ethagent ens --delete`, then again with `--yes` |
 | Sign ENS changes with the operator key | `keychain exec ethagent -- ethagent ens <args> --operator` |
 | Set up IPFS storage | `ethagent storage --set`, with the Pinata JWT on stdin |
 | Create an agent | `ethagent create --name <text> --network <network>`, then again with `--yes` |
@@ -215,6 +216,7 @@ Run any of these with `npx ethagent`. Commands marked interactive need a termina
 | `ens [--json]` | The linked name, its records, the two-way check, the resolver, who controls the name, and whether the operator key could sign for it. | Goes online |
 | `ens <name> [--operator] [--yes] [--json]` | Point the agent at a name: create it under a parent the signer controls, write the agent records, clear them on the old name, then publish the name. Previews until `--yes`. | Opens your wallet |
 | `ens --unlink [--operator] [--yes] [--json]` | Clear the agent records on the linked name, then publish it unlinked. Previews until `--yes`. | Opens your wallet |
+| `ens --delete [--yes] [--json]` | Unlink as above, then remove the subname from its parent. Signed by the wallet that manages the parent. Previews until `--yes`. | Opens your wallet |
 | `ens --set <key>=<value> --clear <key> [--operator] [--yes] [--json]` | Write every record change in one transaction. No save needed. Previews until `--yes`. | Opens your wallet, or none with `--operator` |
 | `custody --advanced [--yes] [--json]` | Deploy a Vault (or reuse one), deposit the token, and save. Previews until `--yes`. | Opens your wallet |
 | `custody --simple [--yes] [--json]` | Revoke the Vault's operators, withdraw the token, and save. Previews until `--yes`. | Opens your wallet |
@@ -252,12 +254,13 @@ Run any of these with `npx ethagent`. Commands marked interactive need a termina
 - **Previews.** ENS changes preview by default. They list every transaction, simulate the ones that can run now from the signer, and send nothing. Rerun with `--yes` to send.
 - **Signers.** ENS transactions are signed in your browser wallet, in one tab for the whole change. With `--operator`, the operator key signs them with no popup instead. Run it as `keychain exec ethagent -- ethagent ens <args> --operator`.
 - **What the operator key may do.** It only writes text records and creates subnames under a parent it controls. It never sets `addr` on an existing name and never changes ownership.
-- **Publishing.** Changing or unlinking the name always ends with one owner-signed save. A stolen operator key therefore can't point your agent at a name it registered. Local state takes the new name only after that save lands.
+- **Deleting.** `ens --delete` clears the records, removes the subname from its parent, then publishes the agent unlinked. Only the wallet that manages the parent can sign it, never the operator key. Whoever manages the parent can create the name again, unless its fuses forbid that. A run stopped after the removal finishes when run again.
+- **Publishing.** Changing, unlinking, or deleting the name always ends with one owner-signed save. A stolen operator key therefore can't point your agent at a name it registered. Local state takes the new name only after that save lands.
 - **Control check.** Before anything is sent, the command refuses unless the signer controls the name: as its owner, its NameWrapper owner, or a delegate approved on its resolver.
 
 ### Setting up and moving an agent
 
-`create`, `restore`, `profile`, `transfer`, `storage`, and the custody changes run without the manager too. Everything the manager can do has a command, except deleting an ENS subname, which stays in the manager on purpose; `ens --unlink` clears the agent's records instead.
+`create`, `restore`, `profile`, `transfer`, `storage`, and the custody changes run without the manager too. Everything the manager can do has a command.
 
 - **Previews.** Anything that signs or sends previews first: every signature and transaction, who signs it, and what can be simulated now. Nothing happens without `--yes`.
 - **One tab.** Each command runs all its wallet prompts in one browser tab. `--no-open` prints the link instead of opening it.
