@@ -1,12 +1,12 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
-import os from 'node:os'
 import path from 'node:path'
 import { readFileSync } from 'node:fs'
 import { installAutostart, renderPwshHookBlock, renderShellHookBlock, shellProfilePaths, uninstallAutostart } from '../../src/cli/autostart.js'
 import { makeInstructionFileAdapter } from '../../src/cli/syncAdapters/instructionFileAdapter.js'
 import type { SkillIndexEntry } from '../../src/identity/continuity/skills/types.js'
+import { withHome } from '../support/home.js'
 
 test('the POSIX shell hook launches --ensure-daemon in the background', () => {
   const block = renderShellHookBlock('/usr/bin/node', '/opt/ethagent/bin/ethagent.js')
@@ -164,19 +164,3 @@ async function countFiles(dir: string): Promise<number> {
   }
 }
 
-async function withHome(fn: (home: string) => Promise<void>): Promise<void> {
-  const prevHome = process.env.HOME
-  const prevUserProfile = process.env.USERPROFILE
-  const home = await fs.mkdtemp(path.join(os.tmpdir(), 'ethagent-autostart-'))
-  process.env.HOME = home
-  process.env.USERPROFILE = home
-  try {
-    await fn(home)
-  } finally {
-    if (prevHome === undefined) delete process.env.HOME
-    else process.env.HOME = prevHome
-    if (prevUserProfile === undefined) delete process.env.USERPROFILE
-    else process.env.USERPROFILE = prevUserProfile
-    await fs.rm(home, { recursive: true, force: true })
-  }
-}

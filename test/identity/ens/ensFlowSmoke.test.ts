@@ -151,8 +151,7 @@ test('operator profile updates never write to ENS', () => {
 test('README documents core-file sync, custody modes, ENS naming, and transfer', () => {
   const readme = readFileSync('README.md', 'utf8')
 
-  assert.match(readme, /Using your agent/)
-  assert.match(readme, /plugin install ethagent/)
+  assert.match(readme, /your agent handles everything in between/)
   assert.match(readme, /wires itself into/)
   assert.match(readme, /in the background/i)
   assert.match(readme, /Save Snapshot/)

@@ -1,7 +1,6 @@
 import type { EthagentIdentity } from '../../../storage/config.js'
 import type { ContinuityAgentSnapshot, ContinuityFiles } from '../envelope.js'
 import { createAgentCard, defaultPublicSkillsProfile, serializeAgentCard } from '../publicSkills.js'
-import { renderPrivateIdentityBlock } from './markdown.js'
 
 export function continuityAgentSnapshot(identity: EthagentIdentity): ContinuityAgentSnapshot {
   const state = identity.state ?? {}
@@ -16,19 +15,10 @@ export function continuityAgentSnapshot(identity: EthagentIdentity): ContinuityA
   }
 }
 
-export function defaultContinuityFiles(identity: EthagentIdentity, _now = new Date()): ContinuityFiles {
-  const owner = identity.ownerAddress ?? identity.address
-  const identityBlock = renderPrivateIdentityBlock({
-    owner,
-    token: identity.agentId ? `#${identity.agentId}` : 'pending registration',
-    chainId: identity.chainId ? identity.chainId.toString() : 'unknown',
-    registry: identity.identityRegistryAddress ?? 'unknown',
-  })
+export function defaultContinuityFiles(_identity: EthagentIdentity, _now = new Date()): ContinuityFiles {
   return {
     'SOUL.md': [
       '# SOUL.md',
-      '',
-      identityBlock,
       '',
       '## Persona',
       '',
@@ -57,8 +47,6 @@ export function defaultContinuityFiles(identity: EthagentIdentity, _now = new Da
     ].join('\n'),
     'MEMORY.md': [
       '# MEMORY.md',
-      '',
-      identityBlock,
       '',
       '## Durable User Preferences',
       '',

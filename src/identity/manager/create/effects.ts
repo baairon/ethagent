@@ -17,6 +17,7 @@ import {
   serializeAgentCard,
 } from '../../continuity/publicSkills.js'
 import { recordPublishedContinuitySnapshot } from '../../continuity/snapshots.js'
+import { captureSnapshot } from '../../continuity/snapshotCapture.js'
 import { addToIpfs, DEFAULT_IPFS_API_URL, isPinataUploadUrl } from '../../storage/ipfs.js'
 import {
   chainIdForNetwork,
@@ -256,6 +257,10 @@ export async function runCreateSigning(
     'agent-card.json': result.prepared.agentCardJson,
   })
   await recordPublishedContinuitySnapshot({ identity: nextIdentity, label: 'initial published snapshot' }).catch(() => null)
+  await captureSnapshot(nextIdentity, backup.cid, {
+    privateFiles: result.prepared.continuityFiles,
+    agentCard: result.prepared.agentCardJson,
+  }, { source: 'save', createdAt: backup.createdAt, agentCardCid: result.prepared.agentCard.cid })
   await callbacks.onIdentityComplete(nextIdentity, `ERC-8004 agent registered · #${registered.agentId.toString()}`, 'create')
 }
 

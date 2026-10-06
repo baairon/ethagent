@@ -23,6 +23,7 @@ import { ensureBootstrapped } from './bootstrap.js'
 import { ensureDaemon } from './daemon.js'
 import { runWatch } from './watch.js'
 import { runAddTool, runPause, runResume } from './prefs.js'
+import { HISTORY_COMMANDS } from './history/commands.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -41,13 +42,24 @@ function printHelp(): void {
     'ethagent: privacy-first AI agent with a portable Ethereum identity',
     '',
     'usage:',
-    '  ethagent                    manage identity',
+    '  ethagent                    manage identity (interactive, needs a terminal)',
     '  ethagent save               back up your agent onchain (you approve in your wallet)',
-    '  ethagent reset              delete local identity, continuity, and secrets',
+    '  ethagent reset [--yes]      delete local identity, continuity, and secrets (asks first unless --yes)',
     '  ethagent --add <path>       wire another tool by its config file (e.g. AGENTS.md)',
     '  ethagent pause              pause background sync (resume with: ethagent resume)',
     '  ethagent --status           print a one-line identity summary',
     "  ethagent --vault-dir        print this agent's vault directory path",
+    '',
+    'continuity history (for your agent; add --json for machine output, --help for details):',
+    '  ethagent status             what changed since the latest snapshot',
+    '  ethagent history            past snapshots and checkpoints',
+    '  ethagent show <ref>         exact bytes of any past file',
+    '  ethagent diff [a] [b]       compare snapshots, checkpoints, or working',
+    '  ethagent fetch <ref|--all>  cache older snapshots from IPFS',
+    '  ethagent checkpoint [label] save a local checkpoint',
+    '  ethagent rollback <ref>     restore past bytes (preview, then --yes)',
+    '  ethagent forget <ref>       erase local history (preview, then --yes)',
+    '',
     '  ethagent --version          print version',
     '  ethagent --help             print this help',
   ]
@@ -164,6 +176,10 @@ async function main(): Promise<number> {
   const flags = new Set(argv)
   const version = readVersion()
 
+  if (argv[0] && HISTORY_COMMANDS.has(argv[0])) {
+    const { runHistoryCommand } = await import('./history/index.js')
+    return runHistoryCommand(argv[0], argv.slice(1))
+  }
   if (flags.has('--version') || flags.has('-v')) {
     process.stdout.write(`ethagent ${version}\n`)
     return 0

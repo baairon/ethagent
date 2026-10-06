@@ -30,15 +30,12 @@ export async function continuityWorkingTreeStatus(
     ? await localContinuitySnapshotContentHashes(identity).catch(() => undefined)
     : undefined
   const publishedContentHashes = publishedSnapshot?.contentHashes
-  const publishState: ContinuityPublishState = !ready
-    ? 'not-restored'
-    : !identity.backup?.cid
-      ? 'not-published'
-      : !localContentHashes || !publishedContentHashes
-        ? 'verify-needed'
-        : equalContinuitySnapshotHashes(localContentHashes, publishedContentHashes)
-          ? 'published'
-          : 'local-changes'
+  const publishState = continuityPublishState({
+    ready,
+    hasBackup: Boolean(identity.backup?.cid),
+    ...(localContentHashes ? { local: localContentHashes } : {}),
+    ...(publishedContentHashes ? { published: publishedContentHashes } : {}),
+  })
 
   return {
     ready,
@@ -48,6 +45,18 @@ export async function continuityWorkingTreeStatus(
     ...(localContentHashes ? { localContentHashes } : {}),
     ...(publishedContentHashes ? { publishedContentHashes } : {}),
   }
+}
+
+export function continuityPublishState(args: {
+  ready: boolean
+  hasBackup: boolean
+  local?: ContinuitySnapshotContentHashes
+  published?: ContinuitySnapshotContentHashes
+}): ContinuityPublishState {
+  if (!args.ready) return 'not-restored'
+  if (!args.hasBackup) return 'not-published'
+  if (!args.local || !args.published) return 'verify-needed'
+  return equalContinuitySnapshotHashes(args.local, args.published) ? 'published' : 'local-changes'
 }
 
 export async function localContinuitySnapshotContentHashes(

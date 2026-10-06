@@ -17,6 +17,7 @@ import {
   syncAgentCardManifest,
 } from '../../continuity/skills/publicSkillsSync.js'
 import { recordPublishedContinuitySnapshot } from '../../continuity/snapshots.js'
+import { captureSnapshot } from '../../continuity/snapshotCapture.js'
 import { addToIpfs, DEFAULT_IPFS_API_URL, isPinataUploadUrl } from '../../storage/ipfs.js'
 import {
   createErc8004PublicClient,
@@ -267,6 +268,11 @@ export async function runTokenTransferSigning(
   }
   await writeAgentCardFile(nextIdentity, agentCardJson)
   await recordPublishedContinuitySnapshot({ identity: nextIdentity, label: 'published transfer snapshot' }).catch(() => null)
+  await captureSnapshot(nextIdentity, snapshotCid, {
+    privateFiles: continuityFiles,
+    agentCard: agentCardJson,
+    skills: skillsTree,
+  }, { source: 'save', createdAt: envelope.createdAt, agentCardCid: agentCard.cid })
   callbacks.onTokenTransferProgress?.(null)
   return {
     identity: nextIdentity,

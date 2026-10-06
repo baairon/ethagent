@@ -14,6 +14,7 @@ import {
 } from '../../continuity/storage.js'
 import { syncAgentCardManifest } from '../../continuity/skills/publicSkillsSync.js'
 import { recordPublishedContinuitySnapshot, updatePublishedContinuitySnapshotContentHashes } from '../../continuity/snapshots.js'
+import { captureSnapshot, checkpointBeforeRestore } from '../../continuity/snapshotCapture.js'
 import { catFromIpfs, DEFAULT_IPFS_API_URL } from '../../storage/ipfs.js'
 import {
   discoverOwnedAgentBackupByTokenId,
@@ -127,6 +128,7 @@ export async function runRecoveryRefetch(
       },
     } : {}),
   }
+  await checkpointBeforeRestore(nextIdentity, candidate.backup.cid)
   await writeContinuityFiles(nextIdentity, payload.files)
   if (payload.skills) {
     await restoreSkillsTree(nextIdentity, payload.skills)
@@ -138,7 +140,16 @@ export async function runRecoveryRefetch(
   const { pushVaultSoulMemoryToHarness } = await import('../../../cli/sync.js')
   await pushVaultSoulMemoryToHarness(nextIdentity).catch(() => undefined)
   await recordPublishedContinuitySnapshot({ identity: nextIdentity, label: 'Refetched Latest Snapshot From Onchain' }).catch(() => null)
-  if (agentCardRestored) {
+  await captureSnapshot(nextIdentity, candidate.backup.cid, {
+    privateFiles: payload.files,
+    agentCard: agentCardRestored,
+    ...(payload.skills ? { skills: payload.skills } : {}),
+  }, {
+    source: 'restore',
+    createdAt: envelope.createdAt,
+    ...(candidate.publicDiscovery?.agentCardCid ? { agentCardCid: candidate.publicDiscovery.agentCardCid } : {}),
+  })
+  if (agentCardRestored !== null) {
     const contentHashes = await localContinuitySnapshotContentHashes(nextIdentity)
     await updatePublishedContinuitySnapshotContentHashes(nextIdentity, candidate.backup.cid, contentHashes).catch(() => null)
   }

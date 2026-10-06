@@ -10,6 +10,7 @@ import { parseManagedContext, removeManagedBlock, renderManagedBlock } from '../
 import { continuityVaultRef, readContinuityFiles, writeContinuityFiles } from '../../../src/identity/continuity/storage.js'
 import type { SkillIndexEntry } from '../../../src/identity/continuity/skills/types.js'
 import type { EthagentIdentity } from '../../../src/storage/config.js'
+import { withHome } from '../../support/home.js'
 
 const identity: EthagentIdentity = {
   source: 'erc8004',
@@ -441,19 +442,3 @@ test('removeManagedBlock is a no-op when the file is missing or has no ethagent 
   })
 })
 
-async function withHome(fn: (home: string) => Promise<void>): Promise<void> {
-  const prevHome = process.env.HOME
-  const prevUserProfile = process.env.USERPROFILE
-  const home = await fs.mkdtemp(path.join(os.tmpdir(), 'ethagent-sync-'))
-  process.env.HOME = home
-  process.env.USERPROFILE = home
-  try {
-    await fn(home)
-  } finally {
-    if (prevHome === undefined) delete process.env.HOME
-    else process.env.HOME = prevHome
-    if (prevUserProfile === undefined) delete process.env.USERPROFILE
-    else process.env.USERPROFILE = prevUserProfile
-    await fs.rm(home, { recursive: true, force: true })
-  }
-}

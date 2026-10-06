@@ -15,12 +15,8 @@ export type ImportCandidate = {
 const MIN_SUBSTANTIVE_CHARS = 120
 const MIN_CONTENT_LINES = 5
 
-function stripIdentityBlocks(text: string): string {
-  return text.replace(/<!--\s*ethagent:identity:start\s*-->[\s\S]*?<!--\s*ethagent:identity:end\s*-->/g, '')
-}
-
 function substantiveLines(text: string): string[] {
-  return stripIdentityBlocks(text)
+  return text
     .split('\n')
     .map(line => line.trim())
     .filter(line => line.length > 0)

@@ -42,7 +42,7 @@ export function isSyncWorthyChange(
   fileKeys: Set<string>,
 ): boolean {
   if (typeof filename !== 'string' || filename === '') return true
-  if (path.basename(filename).startsWith('.')) return false
+  if (filename.split(/[\\/]/).some(segment => segment.startsWith('.'))) return false
   const full = keyPath(path.resolve(dir, filename))
   if (fileKeys.has(full)) return true
   return sourceKeys.some(src => full === src || full.startsWith(src + path.sep))

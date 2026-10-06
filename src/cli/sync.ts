@@ -1,5 +1,7 @@
 import { loadConfig, type EthagentIdentity } from '../storage/config.js'
-import { readContinuityFiles, statIfExists, writeContinuityFiles } from '../identity/continuity/storage/files.js'
+import { readContinuityFiles, readOrDefault, statIfExists, writeContinuityFiles } from '../identity/continuity/storage/files.js'
+import { defaultContinuityFiles } from '../identity/continuity/storage/defaults.js'
+import type { ContinuityFiles } from '../identity/continuity/envelope.js'
 import { continuityVaultRef } from '../identity/continuity/storage/paths.js'
 import { continuityWorkingTreeStatus } from '../identity/continuity/storage/status.js'
 import { listPublishedContinuitySnapshots } from '../identity/continuity/snapshots.js'
@@ -87,8 +89,21 @@ export async function reconcileSoulMemory(
   identity: EthagentIdentity,
   adapters: SyncAdapter[],
 ): Promise<SyncContext & { pulled: string[] }> {
-  const files = await readContinuityFiles(identity)
+  const plan = await planSoulMemoryReconcile(identity, adapters)
+  if (plan.write) await writeContinuityFiles(identity, plan.write)
+  return { soul: plan.soul, memory: plan.memory, pulled: plan.pulled }
+}
+
+export async function planSoulMemoryReconcile(
+  identity: EthagentIdentity,
+  adapters: SyncAdapter[],
+): Promise<SyncContext & { pulled: string[]; write: ContinuityFiles | null }> {
   const ref = continuityVaultRef(identity)
+  const defaults = defaultContinuityFiles(identity)
+  const files: ContinuityFiles = {
+    'SOUL.md': await readOrDefault(ref.soulPath, defaults['SOUL.md']),
+    'MEMORY.md': await readOrDefault(ref.memoryPath, defaults['MEMORY.md']),
+  }
   const [soulStat, memoryStat] = await Promise.all([
     statIfExists(ref.soulPath),
     statIfExists(ref.memoryPath),
@@ -113,10 +128,8 @@ export async function reconcileSoulMemory(
   const pulled: string[] = []
   if (soulPick.pulled) pulled.push('SOUL.md')
   if (memoryPick.pulled) pulled.push('MEMORY.md')
-  if (pulled.length > 0) {
-    await writeContinuityFiles(identity, { 'SOUL.md': soulPick.content, 'MEMORY.md': memoryPick.content })
-  }
-  return { soul: soulPick.content, memory: memoryPick.content, pulled }
+  const write = pulled.length > 0 ? { 'SOUL.md': soulPick.content, 'MEMORY.md': memoryPick.content } : null
+  return { soul: soulPick.content, memory: memoryPick.content, pulled, write }
 }
 
 function pickNewest(

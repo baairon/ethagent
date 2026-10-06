@@ -99,6 +99,15 @@ export function clearDaemonPid(): void {
   } catch {}
 }
 
+export function daemonEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const out: NodeJS.ProcessEnv = {}
+  for (const [key, value] of Object.entries(env)) {
+    if (key.toUpperCase() === 'ETHAGENT_OPERATOR_KEY') continue
+    out[key] = value
+  }
+  return out
+}
+
 export function ensureDaemon(): boolean {
   if (daemonDisabled()) return false
   if (daemonStatus().running) return false
@@ -109,6 +118,7 @@ export function ensureDaemon(): boolean {
       detached: process.platform !== 'win32',
       stdio: ['ignore', out, out],
       windowsHide: true,
+      env: daemonEnv(process.env),
     })
     child.unref()
     try { fs.closeSync(out) } catch {}

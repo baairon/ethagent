@@ -2,6 +2,14 @@ import path from 'node:path'
 
 export const SKILL_FILE_NAME = 'SKILL.md'
 export const MAX_FOLDER_DEPTH = 4
+export const MAX_SKILL_FILE_BYTES = 2 * 1024 * 1024
+
+const BUILD_CACHE_DIRS = new Set(['__pycache__', 'node_modules'])
+const BUILD_CACHE_FILE_RE = /\.py[co]$/i
+
+export function isBuildCacheName(name: string): boolean {
+  return BUILD_CACHE_DIRS.has(name.toLowerCase()) || BUILD_CACHE_FILE_RE.test(name)
+}
 
 const SEGMENT_RE = /^[A-Za-z0-9._-]+$/
 const FILE_EXT_RE = /\.[A-Za-z0-9]+$/
@@ -53,6 +61,7 @@ export function isValidSkillFilePath(rel: string): boolean {
   const segments = rel.split('/')
   if (segments.length < 2) return false
   if (segments.length > MAX_FOLDER_DEPTH + 2) return false
+  if (segments.some(isBuildCacheName)) return false
   const [first, ...rest] = segments
   if (!first || !isValidSegment(first)) return false
   for (let i = 0; i < rest.length; i++) {

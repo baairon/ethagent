@@ -1,7 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
-import os from 'node:os'
 import path from 'node:path'
 import {
   continuityVaultRef,
@@ -19,15 +18,12 @@ import {
   writeContinuityFiles,
 } from '../../../src/identity/continuity/storage.js'
 import {
-  recordPrivateContinuityHistorySnapshot,
-  restorePrivateContinuityHistorySnapshot,
-} from '../../../src/identity/continuity/history.js'
-import {
   listPublishedContinuitySnapshots,
   recordPublishedContinuitySnapshot,
   updatePublishedContinuitySnapshotContentHashes,
 } from '../../../src/identity/continuity/snapshots.js'
 import type { EthagentIdentity } from '../../../src/storage/config.js'
+import { withHome } from '../../support/home.js'
 
 const identity: EthagentIdentity = {
   source: 'erc8004',
@@ -47,14 +43,14 @@ test('continuity storage creates private default SOUL and MEMORY files in a cont
 
     assert.ok(ref.dir.startsWith(path.join(home, '.ethagent', 'continuity')))
     assert.match(files['SOUL.md'], /^# SOUL\.md/)
-    assert.match(files['SOUL.md'], /Owner wallet: 0x000000000000000000000000000000000000dEaD/)
-    assert.match(files['SOUL.md'], /ERC-8004 token: #42/)
+    assert.doesNotMatch(files['SOUL.md'], /Agent Identity/)
     assert.match(files['SOUL.md'], /## Persona/)
     assert.match(files['SOUL.md'], /## Principles/)
     assert.match(files['SOUL.md'], /Public capabilities belong in skill folders/)
     assert.doesNotMatch(files['SOUL.md'], /SKILLS\.md/)
     assert.match(files['SOUL.md'], /Never store seed phrases/)
     assert.match(files['MEMORY.md'], /^# MEMORY\.md/)
+    assert.doesNotMatch(files['MEMORY.md'], /Agent Identity/)
     assert.match(files['MEMORY.md'], /## Durable User Preferences/)
     assert.match(files['MEMORY.md'], /## Project Context/)
     assert.match(files['MEMORY.md'], /Name and aliases:/)
@@ -105,6 +101,21 @@ test('identity continuity sync updates generated profile blocks without overwrit
     assert.match(synced['MEMORY.md'], /keep memory note/)
     assert.match(synced['agent-card.json'], /"name": "renamed agent"/)
     assert.match(synced['agent-card.json'], /"description": "new public description"/)
+  })
+})
+
+test('identity continuity sync leaves existing soul and memory text untouched', async () => {
+  await withHome(async () => {
+    await ensureIdentityMarkdownScaffold(identity)
+    const soul = '# SOUL.md\n\n<!-- ethagent identity:start -->\n## Agent Identity\n- ENS handle: test.eth\n<!-- ethagent identity:end -->\n\n## Persona\n- Voice: calm\n'
+    const memory = '# MEMORY.md\n\n## Owner\n- Name: test\n'
+    await writeContinuityFiles(identity, { 'SOUL.md': soul, 'MEMORY.md': memory })
+
+    const synced = await syncIdentityMarkdownScaffold(identity)
+
+    assert.equal(synced['SOUL.md'], soul)
+    assert.equal(synced['MEMORY.md'], memory)
+    assert.deepEqual(await readContinuityFiles(identity), { 'SOUL.md': soul, 'MEMORY.md': memory })
   })
 })
 
@@ -194,43 +205,6 @@ test('agent card file hydrates from a published fallback without overwriting loc
     assert.equal(second, '{"protocolVersion":"0.3.0","name":"Local Card"}\n')
     assert.equal(await readAgentCardFile(identity), '{"protocolVersion":"0.3.0","name":"Local Card"}\n')
     assert.equal(fallbackReads, 1)
-  })
-})
-
-test('private continuity history restore restores the full markdown checkpoint', async () => {
-  await withHome(async () => {
-    const ref = continuityVaultRef(identity)
-    await writeContinuityFiles(identity, {
-      'SOUL.md': '# Old Soul\nprivate soul\n',
-      'MEMORY.md': '# Old Memory\nprivate memory\n',
-    })
-    await writeAgentCardFile(identity, '{"protocolVersion":"0.3.0","name":"Old Card"}')
-
-    const snapshot = await recordPrivateContinuityHistorySnapshot({
-      identity,
-      file: 'MEMORY.md',
-      filePath: ref.memoryPath,
-      existedBefore: true,
-      previousContent: '# Old Memory\nprivate memory\n',
-      previousFiles: await readContinuityFiles(identity),
-      previousAgentCard: await readAgentCardFile(identity),
-      changeSummary: 'append private memory',
-      createdAt: '2026-04-21T00:00:00.000Z',
-    })
-
-    await writeContinuityFiles(identity, {
-      'SOUL.md': '# New Soul\nchanged soul\n',
-      'MEMORY.md': '# New Memory\nchanged memory\n',
-    })
-    await writeAgentCardFile(identity, '{"protocolVersion":"0.3.0","name":"New Card"}')
-
-    await restorePrivateContinuityHistorySnapshot(identity, snapshot.id)
-
-    assert.deepEqual(await readContinuityFiles(identity), {
-      'SOUL.md': '# Old Soul\nprivate soul\n',
-      'MEMORY.md': '# Old Memory\nprivate memory\n',
-    })
-    assert.equal(await readAgentCardFile(identity), '{"protocolVersion":"0.3.0","name":"Old Card"}\n')
   })
 })
 
@@ -392,19 +366,3 @@ test('published snapshot hashes can be refreshed after refetch restores agent ca
   })
 })
 
-async function withHome(fn: (home: string) => Promise<void>): Promise<void> {
-  const prevHome = process.env.HOME
-  const prevUserProfile = process.env.USERPROFILE
-  const home = await fs.mkdtemp(path.join(os.tmpdir(), 'ethagent-continuity-'))
-  process.env.HOME = home
-  process.env.USERPROFILE = home
-  try {
-    await fn(home)
-  } finally {
-    if (prevHome === undefined) delete process.env.HOME
-    else process.env.HOME = prevHome
-    if (prevUserProfile === undefined) delete process.env.USERPROFILE
-    else process.env.USERPROFILE = prevUserProfile
-    await fs.rm(home, { recursive: true, force: true })
-  }
-}

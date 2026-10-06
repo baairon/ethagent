@@ -6,6 +6,7 @@ import { ensureContinuityVault } from '../storage/files.js'
 import { continuityVaultRef } from '../storage/paths.js'
 import { parseSkillFile } from './frontmatter.js'
 import {
+  isBuildCacheName,
   isReservedWindowsSegment,
   isValidFilenameSegment,
   isValidSegment,
@@ -13,6 +14,7 @@ import {
   isValidSkillFilePath,
   isWithin,
   MAX_FOLDER_DEPTH,
+  MAX_SKILL_FILE_BYTES,
   SKILL_FILE_NAME,
 } from './skillPaths.js'
 import type {
@@ -23,7 +25,6 @@ import type {
 } from './types.js'
 
 const MAX_SKILL_ENTRIES = 200
-const MAX_SKILL_FILE_BYTES = 256 * 1024
 const MAX_TREE_FILES = 500
 
 type IdentityKey = Pick<EthagentIdentity, 'chainId' | 'identityRegistryAddress' | 'agentId' | 'address'>
@@ -192,38 +193,122 @@ export async function readSkillFile(
 export async function loadSkillsTree(identity: EthagentIdentity): Promise<ContinuitySkillsTree> {
   const ref = await ensureContinuityVault(identity)
   await migrateLegacySkillFiles(ref.skillsDir)
+  return (await collectSkillsTree(ref.skillsDir, 'write')).tree
+}
+
+export type SkillSkipReason = 'unsupported-name' | 'too-deep' | 'too-large' | 'over-limit' | 'no-skill-file'
+
+export type SkillSkip = { path: string; reason: SkillSkipReason }
+
+export type PackedSkillsView = {
+  tree: ContinuitySkillsTree
+  lossy: string[]
+  skipped: SkillSkip[]
+  normalizesOnSave: string[]
+  legacyLayout: boolean
+}
+
+export async function readSkillsTreeView(skillsDir: string): Promise<PackedSkillsView> {
+  const collected = await collectSkillsTree(skillsDir, 'pure')
+  return { ...collected, legacyLayout: await hasLegacySkillLayout(skillsDir) }
+}
+
+export async function listSkillEntriesView(skillsDir: string): Promise<SkillIndexEntry[]> {
+  return collectSkillEntries(skillsDir, 'pure')
+}
+
+async function collectSkillsTree(
+  skillsDir: string,
+  mode: 'pure' | 'write',
+): Promise<Omit<PackedSkillsView, 'legacyLayout'>> {
   const tree: ContinuitySkillsTree = {}
+  const lossy: string[] = []
+  const skipped: SkillSkip[] = []
+  const normalizesOnSave: string[] = []
   let categoryDirents: import('node:fs').Dirent[]
   try {
-    categoryDirents = await fs.readdir(ref.skillsDir, { withFileTypes: true })
+    categoryDirents = await fs.readdir(skillsDir, { withFileTypes: true })
   } catch {
-    return tree
+    return { tree, lossy, skipped, normalizesOnSave }
   }
   let totalFiles = 0
   for (const skillEnt of categoryDirents) {
-    if (totalFiles >= MAX_TREE_FILES) break
+    if (totalFiles >= MAX_TREE_FILES && mode === 'write') break
     if (!skillEnt.isDirectory() || skillEnt.isSymbolicLink()) continue
-    if (!isValidSegment(skillEnt.name)) continue
-    const skillDir = path.join(ref.skillsDir, skillEnt.name)
+    if (skillEnt.name.startsWith('.') || isBuildCacheName(skillEnt.name)) continue
+    if (!isValidSegment(skillEnt.name)) {
+      skipped.push({ path: `${skillEnt.name}/`, reason: 'unsupported-name' })
+      continue
+    }
+    const skillDir = path.join(skillsDir, skillEnt.name)
     const entryFile = path.join(skillDir, SKILL_FILE_NAME)
-    if (!(await pathExists(entryFile))) continue
+    if (!(await pathExists(entryFile))) {
+      skipped.push({ path: `${skillEnt.name}/`, reason: 'no-skill-file' })
+      continue
+    }
     const files: SkillFileEntry[] = []
-    await walkFolderFiles(skillDir, '', 0, files)
+    await walkFolderFiles(skillDir, '', 0, files, mode === 'pure' ? { prefix: `${skillEnt.name}/`, list: skipped } : undefined)
     for (const file of files) {
-      if (totalFiles >= MAX_TREE_FILES) break
       const rel = `${skillEnt.name}/${file.relativePath}`
-      if (!isValidSkillFilePath(rel)) continue
-      if (file.sizeBytes > MAX_SKILL_FILE_BYTES) continue
-      const rawContent = await fs.readFile(file.absolutePath, 'utf8').catch(() => null)
-      if (rawContent === null) continue
-      const content = file.relativePath === SKILL_FILE_NAME
-        ? await ensureSkillVisibilityWritten(file.absolutePath, rawContent)
-        : rawContent
+      if (totalFiles >= MAX_TREE_FILES) {
+        if (mode === 'write') break
+        skipped.push({ path: rel, reason: 'over-limit' })
+        continue
+      }
+      if (!isValidSkillFilePath(rel)) {
+        skipped.push({ path: rel, reason: 'unsupported-name' })
+        continue
+      }
+      if (file.sizeBytes > MAX_SKILL_FILE_BYTES) {
+        skipped.push({ path: rel, reason: 'too-large' })
+        continue
+      }
+      const bytes = await fs.readFile(file.absolutePath).catch(() => null)
+      if (bytes === null) continue
+      const rawContent = bytes.toString('utf8')
+      if (!Buffer.from(rawContent, 'utf8').equals(bytes)) lossy.push(rel)
+      let content = rawContent
+      if (file.relativePath === SKILL_FILE_NAME) {
+        const normalized = visibilityNormalizedSkill(rawContent)
+        if (normalized !== rawContent) {
+          normalizesOnSave.push(rel)
+          if (mode === 'write') await atomicWriteText(file.absolutePath, normalized, { mode: 0o600 }).catch(() => undefined)
+          content = normalized
+        }
+      }
       tree[rel] = content
       totalFiles++
     }
   }
-  return tree
+  return { tree, lossy, skipped, normalizesOnSave }
+}
+
+export async function hasLegacySkillLayout(skillsRoot: string): Promise<boolean> {
+  let topDirents: import('node:fs').Dirent[]
+  try {
+    topDirents = await fs.readdir(skillsRoot, { withFileTypes: true })
+  } catch {
+    return false
+  }
+  for (const topEnt of topDirents) {
+    if (topEnt.isSymbolicLink()) continue
+    if (topEnt.isFile() && /\.md$/i.test(topEnt.name)) return true
+    if (!topEnt.isDirectory() || !isValidSegment(topEnt.name)) continue
+    const topDir = path.join(skillsRoot, topEnt.name)
+    if (await pathExists(path.join(topDir, SKILL_FILE_NAME))) continue
+    let children: import('node:fs').Dirent[]
+    try {
+      children = await fs.readdir(topDir, { withFileTypes: true })
+    } catch {
+      continue
+    }
+    for (const child of children) {
+      if (child.isSymbolicLink()) continue
+      if (child.isFile() && /^[A-Za-z0-9._-]+\.md$/i.test(child.name) && !/^SKILL\.md$/i.test(child.name)) return true
+      if (child.isDirectory() && isValidSegment(child.name) && await pathExists(path.join(topDir, child.name, SKILL_FILE_NAME))) return true
+    }
+  }
+  return false
 }
 
 export async function materializeSkillsTree(
@@ -481,8 +566,12 @@ async function walkFolderFiles(
   relativePrefix: string,
   depth: number,
   out: SkillFileEntry[],
+  skips?: { prefix: string; list: SkillSkip[] },
 ): Promise<void> {
-  if (depth > MAX_FOLDER_DEPTH) return
+  if (depth > MAX_FOLDER_DEPTH) {
+    skips?.list.push({ path: `${skips.prefix}${relativePrefix}/`, reason: 'too-deep' })
+    return
+  }
   let dirents: import('node:fs').Dirent[]
   try {
     dirents = await fs.readdir(path.join(root, relativePrefix), { withFileTypes: true })
@@ -493,14 +582,21 @@ async function walkFolderFiles(
     if (ent.isSymbolicLink()) continue
     if (ent.name.startsWith('.')) continue
     if (isReservedWindowsSegment(ent.name)) continue
+    if (isBuildCacheName(ent.name)) continue
+    const rel = relativePrefix ? `${relativePrefix}/${ent.name}` : ent.name
     if (ent.isDirectory()) {
-      if (!isValidSegment(ent.name)) continue
-      const nextPrefix = relativePrefix ? `${relativePrefix}/${ent.name}` : ent.name
-      await walkFolderFiles(root, nextPrefix, depth + 1, out)
+      if (!isValidSegment(ent.name)) {
+        skips?.list.push({ path: `${skips.prefix}${rel}/`, reason: 'unsupported-name' })
+        continue
+      }
+      await walkFolderFiles(root, rel, depth + 1, out, skips)
       continue
     }
     if (!ent.isFile()) continue
-    if (!isValidFilenameSegment(ent.name)) continue
+    if (!isValidFilenameSegment(ent.name)) {
+      skips?.list.push({ path: `${skips.prefix}${rel}`, reason: 'unsupported-name' })
+      continue
+    }
     const absolutePath = path.join(root, relativePrefix, ent.name)
     const stat = await fs.stat(absolutePath).catch(() => null)
     if (!stat) continue
@@ -533,7 +629,7 @@ async function pathExists(file: string): Promise<boolean> {
 const DEFAULT_SKILL_VISIBILITY: SkillVisibility = 'private'
 const LEGACY_DISCOVERABLE_RE = /^\s*visibility\s*:\s*['"]?discoverable['"]?\s*$/im
 
-async function ensureSkillVisibilityWritten(skillFile: string, raw: string): Promise<string> {
+export function visibilityNormalizedSkill(raw: string): string {
   let parsed: { frontmatter: import('./types.js').SkillFrontmatter; body: string }
   try {
     parsed = parseSkillFile(raw)
@@ -547,7 +643,11 @@ async function ensureSkillVisibilityWritten(skillFile: string, raw: string): Pro
     target = DEFAULT_SKILL_VISIBILITY
   }
   if (target === null) return raw
-  const next = rewriteVisibility(raw, target)
+  return rewriteVisibility(raw, target)
+}
+
+async function ensureSkillVisibilityWritten(skillFile: string, raw: string): Promise<string> {
+  const next = visibilityNormalizedSkill(raw)
   if (next === raw) return raw
   try {
     await atomicWriteText(skillFile, next, { mode: 0o600 })
@@ -556,7 +656,7 @@ async function ensureSkillVisibilityWritten(skillFile: string, raw: string): Pro
   return next
 }
 
-async function collectSkillEntries(root: string): Promise<SkillIndexEntry[]> {
+async function collectSkillEntries(root: string, mode: 'pure' | 'write' = 'write'): Promise<SkillIndexEntry[]> {
   const out: SkillIndexEntry[] = []
   let topDirents: import('node:fs').Dirent[]
   try {
@@ -574,7 +674,9 @@ async function collectSkillEntries(root: string): Promise<SkillIndexEntry[]> {
       if (!stat.isFile()) continue
       if (stat.size > MAX_SKILL_FILE_BYTES) continue
       const rawInitial = await fs.readFile(skillFile, 'utf8')
-      const raw = await ensureSkillVisibilityWritten(skillFile, rawInitial)
+      const raw = mode === 'write'
+        ? await ensureSkillVisibilityWritten(skillFile, rawInitial)
+        : visibilityNormalizedSkill(rawInitial)
       const parsed = parseSkillFile(raw)
       const relativePath = `${skillEnt.name}/${SKILL_FILE_NAME}`
       out.push(buildIndexEntry({

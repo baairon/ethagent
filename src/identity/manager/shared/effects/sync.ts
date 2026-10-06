@@ -22,6 +22,7 @@ import {
 } from '../../../continuity/storage.js'
 import type { ContinuityFiles, ContinuitySkillsTree } from '../../../continuity/envelope.js'
 import { updatePublishedContinuitySnapshotContentHashes } from '../../../continuity/snapshots.js'
+import { captureSnapshot } from '../../../continuity/snapshotCapture.js'
 import type { EffectCallbacks } from './types.js'
 import { awaitConfirmedReceipt } from './receipts.js'
 
@@ -166,4 +167,11 @@ export async function markCurrentContinuityFilesPublished(
     ? continuitySnapshotContentHashesFromSources(publishedSources)
     : await localContinuitySnapshotContentHashes(identity)
   await updatePublishedContinuitySnapshotContentHashes(identity, cid, contentHashes).catch(() => null)
+  if (publishedSources) {
+    await captureSnapshot(identity, cid, publishedSources, {
+      source: 'save',
+      ...(identity.backup?.createdAt ? { createdAt: identity.backup.createdAt } : {}),
+      ...(identity.agentCard?.cid ? { agentCardCid: identity.agentCard.cid } : {}),
+    })
+  }
 }

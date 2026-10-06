@@ -1,7 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
-import os from 'node:os'
 import path from 'node:path'
 import { injectManagedBlock, parseManagedContext, renderManagedBlock } from '../../src/cli/syncAdapters/managedBlock.js'
 import { claudeCodeAdapter, mergeClaudeHooks, removeClaudeHooks } from '../../src/cli/syncAdapters/claude-code.js'
@@ -18,6 +17,7 @@ import {
   resumeSync,
   writeDaemonPid,
 } from '../../src/cli/daemon.js'
+import { withHome } from '../support/home.js'
 
 const context = { soul: '# SOUL.md\n\nsoul body\n', memory: '# MEMORY.md\n\nmemory body\n' }
 
@@ -248,19 +248,3 @@ async function withEnv(key: string, value: string, fn: () => Promise<void>): Pro
   }
 }
 
-async function withHome(fn: (home: string) => Promise<void>): Promise<void> {
-  const prevHome = process.env.HOME
-  const prevUserProfile = process.env.USERPROFILE
-  const home = await fs.mkdtemp(path.join(os.tmpdir(), 'ethagent-bootstrap-'))
-  process.env.HOME = home
-  process.env.USERPROFILE = home
-  try {
-    await fn(home)
-  } finally {
-    if (prevHome === undefined) delete process.env.HOME
-    else process.env.HOME = prevHome
-    if (prevUserProfile === undefined) delete process.env.USERPROFILE
-    else process.env.USERPROFILE = prevUserProfile
-    await fs.rm(home, { recursive: true, force: true })
-  }
-}

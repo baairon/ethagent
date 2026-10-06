@@ -1,7 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
-import os from 'node:os'
 import path from 'node:path'
 import {
   deleteSkillEntry,
@@ -21,6 +20,7 @@ import {
   ensureContinuityVault,
 } from '../../../src/identity/continuity/storage.js'
 import type { EthagentIdentity } from '../../../src/storage/config.js'
+import { withHome } from '../../support/home.js'
 
 const identity: EthagentIdentity = {
   source: 'erc8004',
@@ -34,7 +34,7 @@ const identity: EthagentIdentity = {
 }
 
 test('deleteSkillEntry removes the skill folder and all supporting files', async () => {
-  await withHome(async () => {
+  await withSkillsHome(async () => {
     await ensureContinuityVault(identity)
     await writeSkill('obit', '---\nname: obit\nvisibility: private\n---\n\nbody\n')
     const ref = continuityVaultRef(identity)
@@ -76,7 +76,7 @@ test('isValidSkillFilePath accepts supporting files at any nesting up to MAX_FOL
 })
 
 test('materializeSkillsTree writes the canonical layout including supporting files', async () => {
-  await withHome(async () => {
+  await withSkillsHome(async () => {
     await ensureContinuityVault(identity)
     await materializeSkillsTree(identity, {
       'obit/SKILL.md': '---\nname: obit\nvisibility: private\n---\n\nbody one\n',
@@ -95,7 +95,7 @@ test('materializeSkillsTree writes the canonical layout including supporting fil
 })
 
 test('loadSkillsTree round-trips both SKILL.md and supporting files', async () => {
-  await withHome(async () => {
+  await withSkillsHome(async () => {
     await ensureContinuityVault(identity)
     const body = '---\nname: obit\nvisibility: private\n---\n\n# Overview\n\nbody\n'
     await materializeSkillsTree(identity, {
@@ -111,7 +111,7 @@ test('loadSkillsTree round-trips both SKILL.md and supporting files', async () =
 })
 
 test('loadSkillsTree rewrites legacy visibility: discoverable to private on snapshot load (restore round-trip)', async () => {
-  await withHome(async () => {
+  await withSkillsHome(async () => {
     await ensureContinuityVault(identity)
     invalidateSkillsCache(identity)
     await materializeSkillsTree(identity, {
@@ -131,7 +131,7 @@ test('loadSkillsTree rewrites legacy visibility: discoverable to private on snap
 })
 
 test('loadSkillsTree writes visibility: private to any SKILL.md missing it on snapshot load', async () => {
-  await withHome(async () => {
+  await withSkillsHome(async () => {
     await ensureContinuityVault(identity)
     invalidateSkillsCache(identity)
     const ref = continuityVaultRef(identity)
@@ -192,7 +192,7 @@ test('normalizeContinuitySkills: canonical flat key always wins over colliding l
 })
 
 test('setSkillVisibility flips frontmatter and preserves body', async () => {
-  await withHome(async () => {
+  await withSkillsHome(async () => {
     await ensureContinuityVault(identity)
     await writeSkill('obit', '---\nname: obit\nvisibility: private\n---\n\n# Overview\n\nbody\n')
     const ref = continuityVaultRef(identity)
@@ -214,7 +214,7 @@ test('setSkillVisibility flips frontmatter and preserves body', async () => {
 })
 
 test('setSkillVisibility adds visibility line when missing', async () => {
-  await withHome(async () => {
+  await withSkillsHome(async () => {
     await ensureContinuityVault(identity)
     const ref = continuityVaultRef(identity)
     const skillDir = path.join(ref.skillsDir, 'obit')
@@ -247,20 +247,6 @@ async function writeSkill(name: string, body: string): Promise<void> {
   invalidateSkillsCache(identity)
 }
 
-async function withHome(fn: (home: string) => Promise<void>): Promise<void> {
-  const prevHome = process.env.HOME
-  const prevUserProfile = process.env.USERPROFILE
-  const home = await fs.mkdtemp(path.join(os.tmpdir(), 'ethagent-skills-mutations-'))
-  process.env.HOME = home
-  process.env.USERPROFILE = home
-  try {
-    await fn(home)
-  } finally {
-    if (prevHome === undefined) delete process.env.HOME
-    else process.env.HOME = prevHome
-    if (prevUserProfile === undefined) delete process.env.USERPROFILE
-    else process.env.USERPROFILE = prevUserProfile
-    invalidateSkillsCache(identity)
-    await fs.rm(home, { recursive: true, force: true }).catch(() => null)
-  }
+function withSkillsHome(fn: (home: string) => Promise<void>): Promise<void> {
+  return withHome(fn, () => invalidateSkillsCache(identity))
 }

@@ -9,6 +9,8 @@ test('session start context points at both marker pairs in CLAUDE.md', () => {
   assert.match(ctx, /ethagent:soul:start/)
   assert.match(ctx, /ethagent:soul:end/)
   assert.match(ctx, /CLAUDE\.md/)
+  assert.match(ctx, /ethagent status/)
+  assert.match(ctx, /rollback/)
 })
 
 test('session start context forbids the native memory directory', () => {

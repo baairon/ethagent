@@ -9,7 +9,7 @@ import {
   type ContinuitySnapshotContentHashes,
 } from './storage.js'
 
-type PublishedContinuitySnapshot = {
+export type PublishedContinuitySnapshot = {
   version: 1
   id: string
   createdAt: string

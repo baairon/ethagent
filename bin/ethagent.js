@@ -18,5 +18,9 @@ try {
     process.stderr.write('ethagent: node 20+ is required on PATH. install Node.js, then retry.\n')
     process.exit(127)
   }
+  if (err?.code === 'ERR_MODULE_NOT_FOUND') {
+    process.stderr.write('ethagent: dependencies are not installed. run npm install in the ethagent folder, then retry.\n')
+    process.exit(1)
+  }
   process.exit(typeof err?.status === 'number' ? err.status : 1)
 }

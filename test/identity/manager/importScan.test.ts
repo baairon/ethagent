@@ -10,6 +10,7 @@ import {
   scanImportCandidates,
   type ImportCandidate,
 } from '../../../src/identity/manager/create/importScan.js'
+import { withHome } from '../../support/home.js'
 
 const RICH_CLAUDE_MD = [
   '# Global Rules',
@@ -59,7 +60,7 @@ test('isValuableImport accepts substantive real notes', () => {
 
 test('mergeImportedNotes appends a dated section to MEMORY.md and leaves SOUL.md untouched', () => {
   const base = {
-    'SOUL.md': '# SOUL.md\n\n<!-- ethagent:identity:start -->\nid\n<!-- ethagent:identity:end -->\n\n## Persona\n',
+    'SOUL.md': '# SOUL.md\n\n## Persona\n',
     'MEMORY.md': '# MEMORY.md\n\n## Durable User Preferences\n',
   }
   const candidates: ImportCandidate[] = [{ source: 'CLAUDE.md', raw: 'imported note body', contentLines: 1 }]
@@ -108,19 +109,3 @@ test('scanImportCandidates ignores ethagent-managed content and stays silent', a
   })
 })
 
-async function withHome(fn: () => Promise<void>): Promise<void> {
-  const prevHome = process.env.HOME
-  const prevUserProfile = process.env.USERPROFILE
-  const home = await fs.mkdtemp(path.join(os.tmpdir(), 'ethagent-import-'))
-  process.env.HOME = home
-  process.env.USERPROFILE = home
-  try {
-    await fn()
-  } finally {
-    if (prevHome === undefined) delete process.env.HOME
-    else process.env.HOME = prevHome
-    if (prevUserProfile === undefined) delete process.env.USERPROFILE
-    else process.env.USERPROFILE = prevUserProfile
-    await fs.rm(home, { recursive: true, force: true })
-  }
-}

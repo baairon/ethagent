@@ -1,5 +1,4 @@
 import { stdout, stderr } from 'node:process'
-import type { Hex } from 'viem'
 import { loadConfig, saveConfig, type EthagentIdentity } from '../storage/config.js'
 import { resolveRegistryForIdentity } from '../identity/registry/registryConfig.js'
 import { continuityVaultStatus } from '../identity/continuity/storage/status.js'
@@ -9,17 +8,9 @@ import { runOperatorWalletRebackup } from '../identity/manager/continuity/vault.
 import { deriveAgentName } from '../identity/manager/shared/effects/profilePrep.js'
 import { snapshotSaveWalletRole } from '../identity/manager/continuity/snapshot.js'
 import { createLocalKeySignAndTransaction } from '../identity/wallet/localKeyWallet.js'
-import { validatePrivateKey } from '../identity/crypto/eth.js'
 import type { EffectCallbacks } from '../identity/manager/shared/effects/types.js'
 import type { Step } from '../identity/manager/reducer.js'
-
-const OPERATOR_KEY_ENV = 'ETHAGENT_OPERATOR_KEY'
-
-function normalizePrivateKey(raw: string): Hex | null {
-  if (!validatePrivateKey(raw)) return null
-  const hex = raw.startsWith('0x') || raw.startsWith('0X') ? raw.slice(2) : raw
-  return `0x${hex.toLowerCase()}` as Hex
-}
+import { INVALID_OPERATOR_KEY_MESSAGE, OPERATOR_KEY_ENV, readOperatorKey } from './operatorKey.js'
 
 export async function runOperatorSave(args: string[] = []): Promise<number> {
   const json = args.includes('--json')
@@ -29,14 +20,12 @@ export async function runOperatorSave(args: string[] = []): Promise<number> {
     return code
   }
 
-  const rawKey = process.env[OPERATOR_KEY_ENV]?.trim()
-  if (!rawKey) {
+  const operatorKey = readOperatorKey()
+  if (!operatorKey.ok && operatorKey.reason === 'missing') {
     return fail(3, `No operator key available. The os-keychain skill injects ${OPERATOR_KEY_ENV}; run this via \`keychain operator-save\` (set the key first with \`keychain set ethagent/operator_key\`).`)
   }
-  const privateKey = normalizePrivateKey(rawKey)
-  if (!privateKey) {
-    return fail(2, `${OPERATOR_KEY_ENV} is not a valid secp256k1 private key (expected 32 bytes of hex, non-zero, below the curve order).`)
-  }
+  if (!operatorKey.ok) return fail(2, INVALID_OPERATOR_KEY_MESSAGE)
+  const privateKey = operatorKey.key
 
   const config = await loadConfig().catch(() => null)
   if (!config?.identity) return fail(1, 'No agent identity yet. Run `npx ethagent` to create or link one.')

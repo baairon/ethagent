@@ -15,7 +15,10 @@ export function buildSessionStartContext(identity?: EthagentIdentity | null): st
     `Skills live at ${skillsWhere}, mirrored read-only into ~/.claude/skills (never edit that mirror; it is regenerated ` +
     'from the vault on the next sync). To add a skill, put its folder directly in that vault skills dir: run ' +
     '`npx ethagent --vault-dir` to print the vault path (it is non-interactive). A skill is a `<name>/SKILL.md` ' +
-    'folder, private by default. The vault always exists once an identity is set, so never assume it is missing.'
+    'folder, private by default. The vault always exists once an identity is set, so never assume it is missing. ' +
+    'Every save is also kept locally byte for byte: `npx ethagent status`, `history`, `show`, and `diff` (add `--json`) ' +
+    'are read-only and safe to run anytime; run `rollback` or `forget` only when the user asks, preview first, and see ' +
+    '`npx ethagent <command> --help` for usage.'
   )
 }
 

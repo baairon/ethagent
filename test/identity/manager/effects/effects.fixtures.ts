@@ -41,7 +41,7 @@ export const RESTORE_KEY_FIXTURE = {
   kemPublicKey: 'BBBB',
   createdAt: new Date(0).toISOString(),
 }
-export const OWNER_RESTORE_KEY_FIXTURE = {
+const OWNER_RESTORE_KEY_FIXTURE = {
   ...RESTORE_KEY_FIXTURE,
   address: OWNER_WALLET,
 }

@@ -1,11 +1,11 @@
 import type { ContinuitySkillsTree } from './envelope.js'
+import { MAX_SKILL_FILE_BYTES } from './skills/skillPaths.js'
 
 const PRIVATE_SKILL_FILE_RE = /^[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)+$/
 const PRIVATE_SKILL_LAST_SEG_FILE_RE = /^[A-Za-z0-9._-]+\.[A-Za-z0-9]+$/
 const LEGACY_NESTED_SKILL_RE = /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+\/.+$/
 const LEGACY_FLAT_NAME_MD_RE = /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+\.md$/i
 const MAX_PRIVATE_SKILL_ENTRIES = 500
-const MAX_PRIVATE_SKILL_BODY_BYTES = 256 * 1024
 const MAX_PRIVATE_SKILL_PATH_LEN = 256
 
 export function normalizeContinuitySkills(input: unknown): ContinuitySkillsTree | undefined {
@@ -23,7 +23,7 @@ export function normalizeContinuitySkills(input: unknown): ContinuitySkillsTree 
     if (key.startsWith('/')) return
     if (/^[A-Za-z]:/.test(key)) return
     if (!isAcceptableSkillKey(key)) return
-    if (Buffer.byteLength(rawValue, 'utf8') > MAX_PRIVATE_SKILL_BODY_BYTES) return
+    if (Buffer.byteLength(rawValue, 'utf8') > MAX_SKILL_FILE_BYTES) return
     if (out[key] !== undefined) return
     out[key] = rawValue
     count++

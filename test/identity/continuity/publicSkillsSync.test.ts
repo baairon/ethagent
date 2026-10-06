@@ -1,7 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
-import os from 'node:os'
 import path from 'node:path'
 import {
   invalidateSkillsCache,
@@ -13,6 +12,7 @@ import {
 } from '../../../src/identity/continuity/skills/publicSkillsSync.js'
 import { ensureContinuityVault } from '../../../src/identity/continuity/storage.js'
 import type { EthagentIdentity } from '../../../src/storage/config.js'
+import { withHome } from '../../support/home.js'
 
 const identity: EthagentIdentity = {
   source: 'erc8004',
@@ -26,7 +26,7 @@ const identity: EthagentIdentity = {
 }
 
 test('private skills are excluded from the Agent Card; public skills appear; flipping visibility updates it', async () => {
-  await withHome(async () => {
+  await withSkillsHome(async () => {
     await ensureContinuityVault(identity)
     invalidateSkillsCache(identity)
     await writeSkill('classified', '---\nname: classified\ndescription: a real private skill\nvisibility: private\n---\n\nbody\n')
@@ -58,20 +58,6 @@ async function writeSkill(name: string, body: string): Promise<void> {
   invalidateSkillsCache(identity)
 }
 
-async function withHome(fn: (home: string) => Promise<void>): Promise<void> {
-  const prevHome = process.env.HOME
-  const prevUserProfile = process.env.USERPROFILE
-  const home = await fs.mkdtemp(path.join(os.tmpdir(), 'ethagent-public-skills-sync-'))
-  process.env.HOME = home
-  process.env.USERPROFILE = home
-  try {
-    await fn(home)
-  } finally {
-    if (prevHome === undefined) delete process.env.HOME
-    else process.env.HOME = prevHome
-    if (prevUserProfile === undefined) delete process.env.USERPROFILE
-    else process.env.USERPROFILE = prevUserProfile
-    invalidateSkillsCache(identity)
-    await fs.rm(home, { recursive: true, force: true }).catch(() => null)
-  }
+function withSkillsHome(fn: (home: string) => Promise<void>): Promise<void> {
+  return withHome(fn, () => invalidateSkillsCache(identity))
 }

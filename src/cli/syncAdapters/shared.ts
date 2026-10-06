@@ -3,14 +3,15 @@ import path from 'node:path'
 import { createHash } from 'node:crypto'
 import type { SkillIndexEntry } from '../../identity/continuity/skills/types.js'
 import {
+  isBuildCacheName,
   isReservedWindowsSegment,
   isValidFilenameSegment,
   isValidSegment,
   MAX_FOLDER_DEPTH,
+  MAX_SKILL_FILE_BYTES,
 } from '../../identity/continuity/skills/skillPaths.js'
 import { sanitizeSkillFileForStrictYaml } from '../../identity/continuity/skills/frontmatter.js'
 
-const MAX_MIRROR_FILE_BYTES = 256 * 1024
 const SKILL_MIRROR_FORMAT = '3'
 
 export type PublicSkill = SkillIndexEntry
@@ -58,6 +59,7 @@ async function copyVettedSkillTree(srcDir: string, destDir: string, depth = 0): 
     if (ent.isSymbolicLink()) continue
     if (ent.name.startsWith('.')) continue
     if (isReservedWindowsSegment(ent.name)) continue
+    if (isBuildCacheName(ent.name)) continue
     const srcPath = path.join(srcDir, ent.name)
     const destPath = path.join(destDir, ent.name)
     if (ent.isDirectory()) {
@@ -66,7 +68,7 @@ async function copyVettedSkillTree(srcDir: string, destDir: string, depth = 0): 
     } else if (ent.isFile()) {
       if (!isValidFilenameSegment(ent.name)) continue
       const stat = await fs.stat(srcPath).catch(() => null)
-      if (!stat || stat.size > MAX_MIRROR_FILE_BYTES) continue
+      if (!stat || stat.size > MAX_SKILL_FILE_BYTES) continue
       if (depth === 0 && ent.name.toLowerCase() === 'skill.md' && await writeSanitizedSkillFile(srcPath, destPath)) continue
       await fs.copyFile(srcPath, destPath)
     }
@@ -97,6 +99,7 @@ async function collectSignature(srcDir: string, rel = '', depth = 0): Promise<st
     if (ent.isSymbolicLink()) continue
     if (ent.name.startsWith('.')) continue
     if (isReservedWindowsSegment(ent.name)) continue
+    if (isBuildCacheName(ent.name)) continue
     const abs = path.join(srcDir, ent.name)
     const relPath = rel ? `${rel}/${ent.name}` : ent.name
     if (ent.isDirectory()) {
@@ -105,7 +108,7 @@ async function collectSignature(srcDir: string, rel = '', depth = 0): Promise<st
     } else if (ent.isFile()) {
       if (!isValidFilenameSegment(ent.name)) continue
       const stat = await fs.stat(abs).catch(() => null)
-      if (!stat || stat.size > MAX_MIRROR_FILE_BYTES) continue
+      if (!stat || stat.size > MAX_SKILL_FILE_BYTES) continue
       const buf = await fs.readFile(abs).catch(() => null)
       if (!buf) continue
       parts.push(`${relPath} ${createHash('sha256').update(buf).digest('hex')}`)

@@ -79,13 +79,13 @@ export async function restorePublishedAgentCard(
   identity: EthagentIdentity,
   apiUrl: string,
   cid: string | undefined,
-): Promise<boolean> {
-  if (!cid) return false
+): Promise<string | null> {
+  if (!cid) return null
   try {
-    const raw = await catFromIpfs(apiUrl, cid)
-    await writeAgentCardFile(identity, new TextDecoder().decode(raw))
-    return true
+    const card = new TextDecoder().decode(await catFromIpfs(apiUrl, cid))
+    await writeAgentCardFile(identity, card)
+    return card
   } catch {
-    return false
+    return null
   }
 }

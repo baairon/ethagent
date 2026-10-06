@@ -38,6 +38,8 @@ test('any change in the vault subtree triggers a sync (soul/memory and nested sk
 
 test('dot-prefixed bookkeeping is ignored; an unknown filename is conservatively synced', () => {
   assert.equal(isSyncWorthyChange(vault, '.ethagent-sync.json', sourceKeys, fileKeys), false)
+  assert.equal(isSyncWorthyChange(vault, path.join('.snapshots', 'objects', 'a'.repeat(64)), sourceKeys, fileKeys), false)
+  assert.equal(isSyncWorthyChange(vault, path.join('skills', 'x', '.cache', 'y'), sourceKeys, fileKeys), false)
   assert.equal(isSyncWorthyChange(claudeDir, '.ethagent-mirror.json', sourceKeys, fileKeys), false)
   assert.equal(isSyncWorthyChange(vault, null, sourceKeys, fileKeys), true)
 })
@@ -49,4 +51,10 @@ test('idle rescans back off toward the cap and snap back on activity', () => {
   assert.equal(nextRescanDelay(300_000, false), 300_000)
   assert.equal(nextRescanDelay(300_000, true), 30_000)
   assert.equal(nextRescanDelay(30_000, true), 30_000)
+})
+
+test('the daemon never inherits the operator key', async () => {
+  const { daemonEnv } = await import('../../src/cli/daemon.js')
+  const env = daemonEnv({ PATH: '/bin', ETHAGENT_OPERATOR_KEY: '0xabc', ethagent_operator_key: '0xdef' })
+  assert.deepEqual(env, { PATH: '/bin' })
 })

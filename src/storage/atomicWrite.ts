@@ -12,13 +12,13 @@ type WriteOptions = {
 
 export async function atomicWriteText(
   file: string,
-  data: string,
+  data: string | Uint8Array,
   options: WriteOptions = {},
 ): Promise<void> {
   const tmp = `${file}.${process.pid}.${Date.now()}.${(tempCounter = (tempCounter + 1) >>> 0)}.${crypto.randomBytes(4).toString('hex')}.tmp`
   const mode = options.mode ?? 0o600
 
-  await fs.writeFile(tmp, data, { encoding: 'utf8', mode })
+  await fs.writeFile(tmp, data, typeof data === 'string' ? { encoding: 'utf8', mode } : { mode })
 
   try {
     await replaceFileWithRetry(tmp, file)

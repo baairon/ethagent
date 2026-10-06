@@ -17,6 +17,7 @@ export function buildPortableInstruction(opts: PortableInstructionOptions): stri
     `(scripts, assets) are mirrored read-only into ${skillsWhere}; when a skill refers to a file by a relative path, resolve it ` +
     "inside that skill's folder there. Do not hand-edit them (they are regenerated from the vault). To add or change a skill, " +
     'put its folder in the vault skills dir (NOT this read-only mirror): run `npx ethagent --vault-dir` to print the vault ' +
-    "path, then create or edit the `<name>/SKILL.md` folder inside its `skills/` subdir."
+    "path, then create or edit the `<name>/SKILL.md` folder inside its `skills/` subdir. Past snapshots are kept locally " +
+    'byte for byte; `npx ethagent status --json` and `npx ethagent diff --json` show what changed.'
   )
 }

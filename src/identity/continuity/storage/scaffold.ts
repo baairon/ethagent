@@ -61,12 +61,8 @@ export async function prepareSyncedIdentityMarkdownScaffold(identity: EthagentId
   const privateDefaults = defaultContinuityFiles(identity)
   const agentCardDefault = await renderAgentCardJsonForIdentity(identity)
   return {
-    'SOUL.md': syncGeneratedMarkdown(privateFiles['SOUL.md'], privateDefaults['SOUL.md'], [
-      { marker: 'identity' },
-    ]),
-    'MEMORY.md': syncGeneratedMarkdown(privateFiles['MEMORY.md'], privateDefaults['MEMORY.md'], [
-      { marker: 'identity' },
-    ]),
+    'SOUL.md': syncGeneratedMarkdown(privateFiles['SOUL.md'], privateDefaults['SOUL.md']),
+    'MEMORY.md': syncGeneratedMarkdown(privateFiles['MEMORY.md'], privateDefaults['MEMORY.md']),
     'agent-card.json': agentCardDefault,
   }
 }

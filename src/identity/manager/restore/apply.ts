@@ -12,6 +12,7 @@ import {
 } from '../../continuity/storage.js'
 import { syncAgentCardManifest } from '../../continuity/skills/publicSkillsSync.js'
 import { recordPublishedContinuitySnapshot } from '../../continuity/snapshots.js'
+import { captureSnapshot, checkpointBeforeRestore } from '../../continuity/snapshotCapture.js'
 import { requestBrowserWalletSignature } from '../../wallet/browserWallet.js'
 import { setVaultAddressField } from '../../identityCompat.js'
 import type { Step } from '../reducer.js'
@@ -108,13 +109,14 @@ export async function runRestoreAuthorize(
     } : {}),
   }
   if (continuityFiles) {
+    await checkpointBeforeRestore(nextIdentity, step.cid)
     await writeContinuityFiles(nextIdentity, continuityFiles)
   }
   if (continuitySkills) {
     await restoreSkillsTree(nextIdentity, continuitySkills)
   }
   callbacks.onRestoreProgress?.({ phase: 'finishing', label: 'finalizing restored identity...' })
-  await restorePublishedAgentCard(nextIdentity, step.apiUrl, step.candidate.publicDiscovery?.agentCardCid)
+  const restoredCard = await restorePublishedAgentCard(nextIdentity, step.apiUrl, step.candidate.publicDiscovery?.agentCardCid)
   await ensureIdentityMarkdownScaffold(nextIdentity)
   await syncAgentCardManifest(nextIdentity).catch(() => null)
   if (continuityFiles) {
@@ -122,5 +124,16 @@ export async function runRestoreAuthorize(
     await pushVaultSoulMemoryToHarness(nextIdentity).catch(() => undefined)
   }
   await recordPublishedContinuitySnapshot({ identity: nextIdentity, label: 'restored from agent backup' }).catch(() => null)
+  if (continuityFiles) {
+    await captureSnapshot(nextIdentity, step.cid, {
+      privateFiles: continuityFiles,
+      agentCard: restoredCard,
+      ...(continuitySkills ? { skills: continuitySkills } : {}),
+    }, {
+      source: 'restore',
+      createdAt: step.envelope.createdAt,
+      ...(step.candidate.publicDiscovery?.agentCardCid ? { agentCardCid: step.candidate.publicDiscovery.agentCardCid } : {}),
+    })
+  }
   await callbacks.onIdentityComplete(nextIdentity, `ERC-8004 agent restored · #${step.candidate.agentId.toString()}`, 'restore')
 }

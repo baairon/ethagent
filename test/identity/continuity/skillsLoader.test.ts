@@ -1,7 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
-import os from 'node:os'
 import path from 'node:path'
 import {
   invalidateSkillsCache,
@@ -15,6 +14,7 @@ import {
   restoreSkillsTree,
 } from '../../../src/identity/continuity/storage.js'
 import type { EthagentIdentity } from '../../../src/storage/config.js'
+import { withHome } from '../../support/home.js'
 
 const identity: EthagentIdentity = {
   source: 'erc8004',
@@ -28,7 +28,7 @@ const identity: EthagentIdentity = {
 }
 
 test('listSkills reads canonical <skill>/SKILL.md and reflects edits without cache invalidation', async () => {
-  await withHome(async () => {
+  await withSkillsHome(async () => {
     await ensureContinuityVault(identity)
     invalidateSkillsCache(identity)
     const ref = continuityVaultRef(identity)
@@ -71,7 +71,7 @@ test('listSkills reads canonical <skill>/SKILL.md and reflects edits without cac
 })
 
 test('listSkills returns cached entries when the tree has not changed', async () => {
-  await withHome(async () => {
+  await withSkillsHome(async () => {
     await ensureContinuityVault(identity)
     invalidateSkillsCache(identity)
     const ref = continuityVaultRef(identity)
@@ -86,7 +86,7 @@ test('listSkills returns cached entries when the tree has not changed', async ()
 })
 
 test('listSkills migrates legacy <category>/<name>.md files into <category>-<name>/SKILL.md', async () => {
-  await withHome(async () => {
+  await withSkillsHome(async () => {
     await ensureContinuityVault(identity)
     invalidateSkillsCache(identity)
     const ref = continuityVaultRef(identity)
@@ -105,7 +105,7 @@ test('listSkills migrates legacy <category>/<name>.md files into <category>-<nam
 })
 
 test('listSkills migrates legacy nested <category>/<skill>/SKILL.md preserving supporting files', async () => {
-  await withHome(async () => {
+  await withSkillsHome(async () => {
     await ensureContinuityVault(identity)
     invalidateSkillsCache(identity)
     const ref = continuityVaultRef(identity)
@@ -127,7 +127,7 @@ test('listSkills migrates legacy nested <category>/<skill>/SKILL.md preserving s
 })
 
 test('listSkills only recognises files named SKILL.md at the skill folder root', async () => {
-  await withHome(async () => {
+  await withSkillsHome(async () => {
     await ensureContinuityVault(identity)
     invalidateSkillsCache(identity)
     const ref = continuityVaultRef(identity)
@@ -144,7 +144,7 @@ test('listSkills only recognises files named SKILL.md at the skill folder root',
 })
 
 test('listSkillFiles enumerates SKILL.md and supporting files inside a skill folder', async () => {
-  await withHome(async () => {
+  await withSkillsHome(async () => {
     await ensureContinuityVault(identity)
     invalidateSkillsCache(identity)
     const ref = continuityVaultRef(identity)
@@ -161,7 +161,7 @@ test('listSkillFiles enumerates SKILL.md and supporting files inside a skill fol
 })
 
 test('listSkillFiles collisions in migration get -2 suffix', async () => {
-  await withHome(async () => {
+  await withSkillsHome(async () => {
     await ensureContinuityVault(identity)
     invalidateSkillsCache(identity)
     const ref = continuityVaultRef(identity)
@@ -182,7 +182,7 @@ test('listSkillFiles collisions in migration get -2 suffix', async () => {
 })
 
 test('listSkills adopts a bare <slug>.md dropped at the skills/ root into <slug>/SKILL.md', async () => {
-  await withHome(async () => {
+  await withSkillsHome(async () => {
     await ensureContinuityVault(identity)
     invalidateSkillsCache(identity)
     const ref = continuityVaultRef(identity)
@@ -203,7 +203,7 @@ test('listSkills adopts a bare <slug>.md dropped at the skills/ root into <slug>
 })
 
 test('listSkills adopts a bare SKILL.md at the skills/ root using frontmatter name when present', async () => {
-  await withHome(async () => {
+  await withSkillsHome(async () => {
     await ensureContinuityVault(identity)
     invalidateSkillsCache(identity)
     const ref = continuityVaultRef(identity)
@@ -222,7 +222,7 @@ test('listSkills adopts a bare SKILL.md at the skills/ root using frontmatter na
 })
 
 test('listSkills adopts a bare nameless SKILL.md at the skills/ root under imported-skill', async () => {
-  await withHome(async () => {
+  await withSkillsHome(async () => {
     await ensureContinuityVault(identity)
     invalidateSkillsCache(identity)
     const ref = continuityVaultRef(identity)
@@ -240,7 +240,7 @@ test('listSkills adopts a bare nameless SKILL.md at the skills/ root under impor
 })
 
 test('listSkills auto-writes visibility: private to a SKILL.md that lacks a visibility field', async () => {
-  await withHome(async () => {
+  await withSkillsHome(async () => {
     await ensureContinuityVault(identity)
     invalidateSkillsCache(identity)
     const ref = continuityVaultRef(identity)
@@ -263,7 +263,7 @@ test('listSkills auto-writes visibility: private to a SKILL.md that lacks a visi
 })
 
 test('listSkills migrates legacy visibility: discoverable to private on scan', async () => {
-  await withHome(async () => {
+  await withSkillsHome(async () => {
     await ensureContinuityVault(identity)
     invalidateSkillsCache(identity)
     const ref = continuityVaultRef(identity)
@@ -287,7 +287,7 @@ test('listSkills migrates legacy visibility: discoverable to private on scan', a
 })
 
 test('listSkills leaves an explicit visibility untouched on scan', async () => {
-  await withHome(async () => {
+  await withSkillsHome(async () => {
     await ensureContinuityVault(identity)
     invalidateSkillsCache(identity)
     const ref = continuityVaultRef(identity)
@@ -306,7 +306,7 @@ test('listSkills leaves an explicit visibility untouched on scan', async () => {
 })
 
 test('materializeSkillsTree with prune deletes local skills absent from the snapshot', async () => {
-  await withHome(async () => {
+  await withSkillsHome(async () => {
     await ensureContinuityVault(identity)
     invalidateSkillsCache(identity)
     const ref = continuityVaultRef(identity)
@@ -324,7 +324,7 @@ test('materializeSkillsTree with prune deletes local skills absent from the snap
 })
 
 test('materializeSkillsTree with prune REFUSES to wipe all skills when the snapshot has none (backstop)', async () => {
-  await withHome(async () => {
+  await withSkillsHome(async () => {
     await ensureContinuityVault(identity)
     invalidateSkillsCache(identity)
     const ref = continuityVaultRef(identity)
@@ -343,7 +343,7 @@ test('materializeSkillsTree with prune REFUSES to wipe all skills when the snaps
 })
 
 test('materializeSkillsTree with prune sheds stale supporting files inside a kept skill', async () => {
-  await withHome(async () => {
+  await withSkillsHome(async () => {
     await ensureContinuityVault(identity)
     invalidateSkillsCache(identity)
     const ref = continuityVaultRef(identity)
@@ -364,7 +364,7 @@ test('materializeSkillsTree with prune sheds stale supporting files inside a kep
 })
 
 test('materializeSkillsTree without prune leaves existing local skills intact (additive)', async () => {
-  await withHome(async () => {
+  await withSkillsHome(async () => {
     await ensureContinuityVault(identity)
     invalidateSkillsCache(identity)
     const ref = continuityVaultRef(identity)
@@ -382,7 +382,7 @@ test('materializeSkillsTree without prune leaves existing local skills intact (a
 })
 
 test('restoreSkillsTree prunes unsaved local skills (prune wired through)', async () => {
-  await withHome(async () => {
+  await withSkillsHome(async () => {
     await ensureContinuityVault(identity)
     invalidateSkillsCache(identity)
     const ref = continuityVaultRef(identity)
@@ -399,20 +399,6 @@ test('restoreSkillsTree prunes unsaved local skills (prune wired through)', asyn
   })
 })
 
-async function withHome(fn: (home: string) => Promise<void>): Promise<void> {
-  const prevHome = process.env.HOME
-  const prevUserProfile = process.env.USERPROFILE
-  const home = await fs.mkdtemp(path.join(os.tmpdir(), 'ethagent-skills-loader-'))
-  process.env.HOME = home
-  process.env.USERPROFILE = home
-  try {
-    await fn(home)
-  } finally {
-    if (prevHome === undefined) delete process.env.HOME
-    else process.env.HOME = prevHome
-    if (prevUserProfile === undefined) delete process.env.USERPROFILE
-    else process.env.USERPROFILE = prevUserProfile
-    invalidateSkillsCache(identity)
-    await fs.rm(home, { recursive: true, force: true }).catch(() => null)
-  }
+function withSkillsHome(fn: (home: string) => Promise<void>): Promise<void> {
+  return withHome(fn, () => invalidateSkillsCache(identity))
 }
