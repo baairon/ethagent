@@ -466,10 +466,13 @@ test('assertVaultBytecode accepts any known build for an existing Vault but only
   )
 })
 
-test('the builds table knows the current and first committed builds by runtime hash', () => {
+test('the builds table knows the current, first committed, and pre-release builds by runtime hash', () => {
   assert.equal(vaultBuildForCode(VAULT_RUNTIME_BYTECODE)?.id, 'current')
   assert.equal(vaultBuildForHash(FIRST_COMMITTED_VAULT_BUILD.runtimeHash)?.id, 'first-committed')
   assert.equal(FIRST_COMMITTED_VAULT_BUILD.runtimeHash, '0xfea7e898c15b1e72a5a54ec35bdad917dfed8ea3d4bfe078fafa3cf00784cde4')
+  const preRelease = vaultBuildForHash('0xF8F2319752C7B0A6382EF0D233426D0BD605641E65300A4E1B2ECE5479A64C13')
+  assert.equal(preRelease?.id, 'pre-release')
+  assert.equal(preRelease?.hasHeldAgent, false)
   assert.equal(vaultBuildForHash(('0x' + '11'.repeat(32)) as Hex), undefined)
 })
 
