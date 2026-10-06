@@ -42,22 +42,6 @@ function yamlQuote(value: string): string {
   return out + '"'
 }
 
-export function serializeSkillFile(frontmatter: SkillFrontmatter, body: string): string {
-  const lines: string[] = ['---']
-  if (frontmatter.name) lines.push(`name: ${yamlQuote(frontmatter.name)}`)
-  if (frontmatter.description) lines.push(`description: ${yamlQuote(frontmatter.description)}`)
-  if (frontmatter.whenToUse) lines.push(`when_to_use: ${yamlQuote(frontmatter.whenToUse)}`)
-  if (frontmatter.version) lines.push(`version: ${yamlQuote(frontmatter.version)}`)
-  if (frontmatter.argumentHint) lines.push(`argument-hint: ${yamlQuote(frontmatter.argumentHint)}`)
-  if (frontmatter.tags && frontmatter.tags.length > 0) {
-    lines.push(`tags: [${frontmatter.tags.map(yamlQuote).join(', ')}]`)
-  }
-  if (frontmatter.visibility) lines.push(`visibility: ${yamlQuote(frontmatter.visibility)}`)
-  lines.push('---', '')
-  const trimmedBody = body.trim()
-  return lines.join('\n') + (trimmedBody ? trimmedBody + '\n' : '')
-}
-
 export function sanitizeSkillFileForStrictYaml(content: string): string {
   const normalized = content.replace(/^﻿/, '').replace(/\r\n?/g, '\n')
   if (!normalized.startsWith('---\n')) return content

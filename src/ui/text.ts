@@ -120,16 +120,6 @@ export function firstThatFits(candidates: readonly string[], budget: number): st
   return null
 }
 
-export function joinWithMore(items: readonly string[], budget: number, separator = ', '): string | null {
-  const all = items.join(separator)
-  if (all.length <= budget) return all
-  for (let shown = items.length - 1; shown >= 1; shown -= 1) {
-    const candidate = `${items.slice(0, shown).join(separator)} +${items.length - shown} more`
-    if (candidate.length <= budget) return candidate
-  }
-  return null
-}
-
 export function middleEllipsis(value: string, head: number, tail: number): string {
   if (value.length <= head + tail + 1) return value
   return `${value.slice(0, head)}…${value.slice(-tail)}`

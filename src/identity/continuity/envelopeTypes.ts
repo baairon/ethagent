@@ -169,12 +169,6 @@ export type CreateWalletContinuitySnapshotEnvelopeArgs = {
   }
 }
 
-export type RestoreContinuitySnapshotEnvelopeArgs = {
-  envelope: ContinuitySnapshotEnvelope
-  walletSignature: string
-  currentOwnerAddress?: string
-}
-
 export class ContinuitySnapshotOwnerMismatchError extends Error {
   constructor(
     readonly snapshotOwner: string,

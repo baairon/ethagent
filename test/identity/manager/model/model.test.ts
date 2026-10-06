@@ -16,16 +16,11 @@ import {
 import { RecoveryConfirmScreen } from '../../../../src/identity/manager/continuity/RecoveryConfirmScreen.js'
 import { ensValidationReasonText } from '../../../../src/identity/manager/ens/state.js'
 import {
-  chainSummaryRow,
-  networkLabel,
   networkSubtitle,
 } from '../../../../src/identity/manager/shared/model/network.js'
 import {
-  identitySummaryRows,
   isCurrentAgentCandidate,
   lastBackupLabel,
-  tokenCandidateHint,
-  tokenCandidateLabel,
   tokenCandidateSelectLabel,
 } from '../../../../src/identity/manager/profile/identity.js'
 import {
@@ -89,40 +84,6 @@ test('identity manager explains missing restore access without generic identity 
   assert.equal(view.title, 'Wallet Not Included In Snapshot')
   assert.equal(view.detail, 'ERC-8004 metadata authorizes this wallet, but the latest encrypted snapshot was saved before this wallet had restore access.')
   assert.equal(view.hint, 'Use the owner wallet once to save a fresh snapshot, then restore with this wallet.')
-})
-
-test('identity manager summary always shows the short state CID for the menu card', () => {
-  const rows = identitySummaryRows({
-    source: 'erc8004',
-    address: '0x000000000000000000000000000000000000dEaD',
-    ownerAddress: '0x000000000000000000000000000000000000dEaD',
-    createdAt: new Date(0).toISOString(),
-    agentId: '42',
-    backup: {
-      cid: 'bafybeigdyrztma2dbfczw7q6ooozbxlqzyw5r7w4f3qw2axvvxqg3w6y7q',
-      createdAt: new Date(0).toISOString(),
-      envelopeVersion: 'ethagent-state-backup-v1',
-      ipfsApiUrl: 'https://uploads.pinata.cloud/v3/files',
-      status: 'pinned',
-    },
-  })
-
-  assert.deepEqual(rows.map(row => row.label), ['owner wallet', 'token', 'network', 'state', 'card', 'icon'])
-  assert.equal(rows[3]?.value, 'bafybeigdy…3w6y7q')
-  assert.equal(rows[0]?.value, '0x0000…dEaD')
-  assert.equal(rows[4]?.value, 'not saved')
-  assert.equal(rows[5]?.value, 'not attached')
-})
-
-test('identity manager summary collapses gracefully when no identity is loaded', () => {
-  const rows = identitySummaryRows(undefined)
-  assert.deepEqual(rows.map(row => row.label), ['owner wallet', 'token', 'network', 'state', 'card', 'icon'])
-  assert.equal(rows[0]?.value, 'not connected')
-  assert.equal(rows[1]?.value, 'not created')
-  assert.equal(rows[2]?.value, 'ethereum mainnet')
-  assert.equal(rows[3]?.value, 'not saved yet')
-  assert.equal(rows[4]?.value, 'not saved')
-  assert.equal(rows[5]?.value, 'not attached')
 })
 
 test('ensValidationReasonText covers advanced ENS ownership codes', () => {
@@ -263,32 +224,10 @@ test('storage credential confirmation says pinned snapshots survive and defaults
   assert.match(output, /❯ Keep JWT/)
 })
 
-test('networkLabel and networkSubtitle return human-readable strings for every curated network', () => {
-  assert.equal(networkLabel('mainnet'), 'ethereum mainnet')
-  assert.equal(networkLabel('base'), 'base')
+test('networkSubtitle returns a human-readable string for every curated network', () => {
   for (const n of ['mainnet', 'base'] as const) {
     assert.ok(networkSubtitle(n).length > 0)
   }
-})
-
-test('chainSummaryRow prefers identity.chainId, falls back to selectedNetwork', () => {
-  const onMainnet = chainSummaryRow(
-    { version: 2, firstSeenAt: new Date(0).toISOString(), selectedNetwork: 'base' },
-    undefined,
-  )
-  assert.equal(onMainnet.value, 'base')
-  assert.equal(onMainnet.tone, 'dim')
-
-  const fromIdentity = chainSummaryRow(
-    { version: 2, firstSeenAt: new Date(0).toISOString(), selectedNetwork: 'base' },
-    {
-      address: '0x000000000000000000000000000000000000dEaD',
-      createdAt: new Date(0).toISOString(),
-      chainId: 1,
-    },
-  )
-  assert.equal(fromIdentity.value, 'ethereum mainnet')
-  assert.equal(fromIdentity.tone, 'ok')
 })
 
 test('networkSubtitle frames each network as a value-prop, not a jargon dump', () => {
@@ -362,43 +301,6 @@ test('copyableIdentityFields exposes advanced ENS operator wallet state', () => 
   assert.equal(fields.find(field => field.label === 'Vault')?.value, '0x00000000000000000000000000000000000077AB')
   assert.equal(fields.find(field => field.label === 'Operator Wallet')?.value, '0x0000000000000000000000000000000000000A11')
   assert.equal(fields.find(field => field.label === 'Approved Operator Wallets'), undefined)
-})
-
-test('token candidate hint stays terse so wallets with many agents stay scannable', () => {
-  const candidate = {
-    ownerAddress: '0x8DDe0C47EdC7C0a0745f56d4BB92a959CD0c5394',
-    chainId: 8453,
-    rpcUrl: 'https://base.publicnode.com',
-    identityRegistryAddress: '0x8004A169FB4a3325136EB29fA0ceB6D2e539a432',
-    agentId: 45744n,
-    agentUri: 'ipfs://bafy-metadata',
-    name: 'research agent',
-    backup: {
-      cid: 'bafkreib2abcdefghijklmnopqrstuvwxyzjsyzdy',
-      createdAt: '2026-04-25T00:00:00.000Z',
-    },
-    registration: null,
-  } as const
-
-  assert.equal(tokenCandidateLabel(candidate), 'research agent')
-  assert.equal(tokenCandidateHint(candidate), '#45744 · Base · saved 2026-04-25')
-  assert.doesNotMatch(tokenCandidateHint(candidate), /owner/)
-  assert.doesNotMatch(tokenCandidateHint(candidate), /state/)
-})
-
-test('token candidate hint falls back to network only when no backup is pinned yet', () => {
-  const candidate = {
-    ownerAddress: '0x8DDe0C47EdC7C0a0745f56d4BB92a959CD0c5394',
-    chainId: 1,
-    rpcUrl: 'https://eth.publicnode.com',
-    identityRegistryAddress: '0x8004A169FB4a3325136EB29fA0ceB6D2e539a432',
-    agentId: 1n,
-    agentUri: 'ipfs://bafy',
-    registration: null,
-  } as const
-
-  assert.equal(tokenCandidateLabel(candidate), 'Agent Token #1')
-  assert.equal(tokenCandidateHint(candidate), 'Ethereum Mainnet')
 })
 
 test('current agent candidate marker requires the selected token identity', () => {

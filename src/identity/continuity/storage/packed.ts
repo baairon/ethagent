@@ -28,7 +28,6 @@ export type PackedWorkingView = {
   warnings: PackedWarning[]
 }
 
-export const PRIVATE_SNAPSHOT_PATHS = ['SOUL.md', 'MEMORY.md'] as const
 export const AGENT_CARD_PATH = 'agent-card.json'
 export const SKILLS_PREFIX = 'skills/'
 
@@ -43,18 +42,6 @@ export function packedFileMap(sources: PackedSources): Record<string, string> {
     : {}
   for (const [key, value] of Object.entries(skills)) files[`${SKILLS_PREFIX}${key}`] = value
   return files
-}
-
-export function sourcesFromFileMap(files: Record<string, string>): PackedSources {
-  const skills: ContinuitySkillsTree = {}
-  for (const [path, value] of Object.entries(files)) {
-    if (path.startsWith(SKILLS_PREFIX)) skills[path.slice(SKILLS_PREFIX.length)] = value
-  }
-  return {
-    privateFiles: { 'SOUL.md': files['SOUL.md'] ?? '', 'MEMORY.md': files['MEMORY.md'] ?? '' },
-    ...(files[AGENT_CARD_PATH] !== undefined ? { agentCard: files[AGENT_CARD_PATH] } : {}),
-    ...(Object.keys(skills).length > 0 ? { skills } : {}),
-  }
 }
 
 export async function readPackedWorkingView(

@@ -2,7 +2,6 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
   arrayField,
-  booleanField,
   numberField,
   objectField,
   stringField,
@@ -46,16 +45,6 @@ test('arrayField returns arrays, otherwise null', () => {
   assert.equal(arrayField({ a: 'string' }, 'a'), null)
   assert.equal(arrayField({}, 'a'), null)
   assert.equal(arrayField(null, 'a'), null)
-})
-
-test('booleanField returns booleans, otherwise undefined', () => {
-  assert.equal(booleanField({ a: true }, 'a'), true)
-  assert.equal(booleanField({ a: false }, 'a'), false)
-  assert.equal(booleanField({ a: 'true' }, 'a'), undefined)
-  assert.equal(booleanField({ a: 1 }, 'a'), undefined)
-  assert.equal(booleanField({ a: null }, 'a'), undefined)
-  assert.equal(booleanField({}, 'a'), undefined)
-  assert.equal(booleanField(null, 'a'), undefined)
 })
 
 test('field parsers compose for nested registry payloads', () => {

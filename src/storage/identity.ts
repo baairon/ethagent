@@ -5,7 +5,6 @@ import {
   type EthagentIdentity,
 } from './config.js'
 import {
-  rmSecret,
   hasSecret,
   whichBackend,
   type KeyBackend,
@@ -74,32 +73,6 @@ export async function setTokenIdentity(
       identityRegistryAddress: identity.identityRegistryAddress,
     }
   }
-  await saveConfig(next)
-  return next
-}
-
-export async function updateIdentityBackup(
-  config: EthagentConfig,
-  backup: NonNullable<EthagentIdentity['backup']>,
-): Promise<EthagentConfig> {
-  if (!config.identity) throw new Error('No identity set')
-  const next: EthagentConfig = {
-    ...config,
-    identity: {
-      ...config.identity,
-      backup,
-    },
-  }
-  await saveConfig(next)
-  return next
-}
-
-export async function clearIdentity(config: EthagentConfig): Promise<EthagentConfig> {
-  await rmSecret(IDENTITY_ACCOUNT)
-  if (!config.identity) return config
-  const { identity: _drop, ...rest } = config
-  void _drop
-  const next = { ...rest } as EthagentConfig
   await saveConfig(next)
   return next
 }

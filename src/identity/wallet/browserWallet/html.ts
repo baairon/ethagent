@@ -16,10 +16,6 @@ export function walletPage(title: string, sessionToken: string, payload: Record<
   return injectWalletConfig(WALLET_HTML, title, sessionToken, payload)
 }
 
-export function walletPageFresh(title: string, sessionToken: string, payload: Record<string, unknown>): string {
-  return injectWalletConfig(loadWalletHtml(), title, sessionToken, payload)
-}
-
 export function __testWalletPage(title: string, sessionToken: string, payload: Record<string, unknown>): string {
   return walletPage(title, sessionToken, payload)
 }

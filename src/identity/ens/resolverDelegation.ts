@@ -1,5 +1,4 @@
 import {
-  encodeFunctionData,
   getAddress,
   type Address,
   type Hex,
@@ -16,22 +15,6 @@ export type ResolverDelegationReadArgs = {
   ownerAddress: Address
   node: Hex
   delegateAddress: Address
-}
-
-export function encodeApprove(node: Hex, delegateAddress: Address): Hex {
-  return encodeFunctionData({
-    abi: ENS_AUTOMATION_RESOLVER_ABI,
-    functionName: 'approve',
-    args: [node, getAddress(delegateAddress), true],
-  })
-}
-
-export function encodeApprovalRevoke(node: Hex, delegateAddress: Address): Hex {
-  return encodeFunctionData({
-    abi: ENS_AUTOMATION_RESOLVER_ABI,
-    functionName: 'approve',
-    args: [node, getAddress(delegateAddress), false],
-  })
 }
 
 export async function readDelegation(args: ResolverDelegationReadArgs): Promise<boolean> {
