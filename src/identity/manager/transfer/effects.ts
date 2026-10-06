@@ -286,7 +286,7 @@ export async function runTokenTransferSigning(
   }
 }
 
-async function resolveTransferTargetAddress(value: string, options: { signal?: AbortSignal } = {}): Promise<Address> {
+export async function resolveTransferTargetAddress(value: string, options: { signal?: AbortSignal } = {}): Promise<Address> {
   const trimmed = value.trim()
   throwIfTransferAborted(options.signal)
   if (isAddress(trimmed, { strict: false })) return getAddress(trimmed)
