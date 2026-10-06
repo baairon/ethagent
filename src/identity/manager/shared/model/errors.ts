@@ -163,7 +163,7 @@ export function isRegistrationPreflightError(err: unknown): boolean {
 
 function capitalizeErrorText(value: string): string {
   const trimmed = value.trim()
-  if (/^wallet request timed out$/i.test(trimmed)) return 'Wallet Request Timed Out'
+  if (/^wallet request timed out$/i.test(trimmed)) return 'Your wallet did not respond in time.'
   if (!trimmed) return trimmed
   return trimmed.charAt(0).toUpperCase() + trimmed.slice(1)
 }

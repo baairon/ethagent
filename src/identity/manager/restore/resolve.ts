@@ -20,7 +20,7 @@ export async function resolveAgentEnsToCandidate(
   registry: Erc8004RegistryConfig,
 ): Promise<AgentEnsResolution> {
   const trimmed = ensName.trim()
-  if (!trimmed) return { ok: false, message: 'Enter an agent ENS name (e.g. agent.example.eth).' }
+  if (!trimmed) return { ok: false, message: 'Enter the agent\'s ENS name.' }
   if (!ETH_NAME_PATTERN.test(trimmed)) return { ok: false, message: 'Enter a valid .eth name.' }
 
   let records: Record<string, string>

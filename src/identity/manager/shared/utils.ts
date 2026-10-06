@@ -34,15 +34,15 @@ export function rebackupWalletApprovalView(
 ): { title: string; subtitle: string; label: string } {
   if (snapshotSaveRequiresOwnerSigner(identity, profileUpdates)) {
     return {
-      title: 'Use Owner Wallet',
-      subtitle: 'Owner wallet signs this custody-controlled identity update.',
-      label: 'waiting for owner wallet signature...',
+      title: 'Save Snapshot',
+      subtitle: 'Approve in your owner wallet. Custody changes need the owner.',
+      label: 'Waiting for your owner wallet…',
     }
   }
   return {
-    title: 'Use Wallet',
-    subtitle: 'Owner or operator wallet signs the encrypted snapshot and token URI update.',
-    label: 'waiting for wallet signature...',
+    title: 'Save Snapshot',
+    subtitle: 'Approve in your wallet. It signs the encrypted snapshot and points your token at it.',
+    label: 'Waiting for your wallet…',
   }
 }
 

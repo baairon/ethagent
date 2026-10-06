@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { Box, Text } from 'ink'
 import { Surface } from '../../../../ui/Surface.js'
 import { Select, type SelectOption } from '../../../../ui/Select.js'
+import { Paragraph } from '../../../../ui/Paragraph.js'
 import { theme } from '../../../../ui/theme.js'
 import type { EthagentConfig, EthagentIdentity } from '../../../../storage/config.js'
 import {
@@ -11,6 +12,7 @@ import {
 import type { SkillIndexEntry } from '../../../continuity/skills/types.js'
 import { IdentitySummary } from '../../shared/components/IdentitySummary.js'
 import type { ContinuityWorkingTreeStatus } from '../../../continuity/storage.js'
+import { localChangeItems, type LocalChangeItem } from '../state.js'
 
 type SkillsTreeAction =
   | { kind: 'skill'; relativePath: string }
@@ -73,27 +75,26 @@ export const SkillsTreeScreen: React.FC<SkillsTreeScreenProps> = ({
     }
   }, [identity, editorOpened, initialTree])
 
-  const subtitle = notice ?? 'Public and private skills.'
-  const isLoading = tree === null
-  const skills = tree?.skills ?? []
-  const supportingCounts = tree?.supportingCounts ?? {}
-  const hasAny = skills.length > 0
-
-  const options = buildOptions(skills, supportingCounts, isLoading, hasAny)
+  const changed = new Map(
+    localChangeItems(workingStatus)
+      .filter(item => item.kind === 'skill')
+      .map(item => [item.name, item] as const),
+  )
+  const options = buildOptions(tree, changed)
 
   return (
-    <Surface title="Skills" subtitle={subtitle} footer={footer}>
-      <IdentitySummary identity={identity} config={config} workingStatus={workingStatus} compact />
-      {error && (
+    <Surface title="Skills" subtitle={notice ?? 'Public ones show on your Agent Card.'} footer={footer}>
+      <IdentitySummary identity={identity} config={config} />
+      {error ? (
         <Box marginTop={1}>
-          <Text color={theme.accentError}>{error}</Text>
+          <Paragraph color={theme.accentError}>{error}</Paragraph>
         </Box>
-      )}
-      {editorOpened && (
+      ) : null}
+      {editorOpened ? (
         <Box marginTop={1}>
-          <Text color={theme.accentPeriwinkle}>Save with ctrl+s in your editor</Text>
+          <Text color={theme.accentPeriwinkle}>Opened in your editor. Save to apply.</Text>
         </Box>
-      )}
+      ) : null}
       <Box marginTop={1}>
         <Select<SkillsTreeAction>
           options={options}
@@ -111,55 +112,40 @@ export const SkillsTreeScreen: React.FC<SkillsTreeScreenProps> = ({
 }
 
 function buildOptions(
-  entries: SkillIndexEntry[],
-  supportingCounts: Record<string, number>,
-  isLoading: boolean,
-  hasAny: boolean,
+  tree: SkillsTreeView | null,
+  changed: Map<string, LocalChangeItem>,
 ): Array<SelectOption<SkillsTreeAction>> {
   const rows: Array<SelectOption<SkillsTreeAction>> = []
   const noopValue: SkillsTreeAction = { kind: 'noop' }
 
-  if (isLoading) {
-    rows.push({
-      value: noopValue,
-      role: 'notice',
-      label: 'Loading...',
-      labelColor: theme.dim,
-      indent: 0,
-    })
-  } else if (!hasAny) {
-    rows.push({ value: noopValue, role: 'notice', label: 'No skills yet.', labelColor: theme.dim })
+  if (tree === null) {
+    rows.push({ value: noopValue, role: 'notice', label: 'Loading skills…', labelColor: theme.dim })
+  } else if (tree.skills.length === 0) {
+    rows.push({ value: noopValue, role: 'notice', label: 'No skills yet. Add a folder with a SKILL.md to the skills folder.', labelColor: theme.dim })
   } else {
-    rows.push({ value: noopValue, role: 'section', label: 'Catalog' })
-    const sorted = [...entries].sort((a, b) => a.name.localeCompare(b.name))
-    for (const skill of sorted) {
-      if (!skill) continue
-      const supportCount = supportingCounts[skill.name] ?? 0
-      const meta = [capitalize(skill.visibility)]
-      if (supportCount > 0) meta.push(`${supportCount + 1} files`)
-      rows.push({
-        value: { kind: 'skill', relativePath: skill.relativePath },
-        label: skill.name,
-        hint: meta.join('  ·  '),
-      })
+    const sorted = [...tree.skills].sort((a, b) => a.name.localeCompare(b.name))
+    for (const visibility of ['public', 'private'] as const) {
+      const group = sorted.filter(skill => skill.visibility === visibility)
+      if (group.length === 0) continue
+      rows.push({ value: noopValue, role: 'section', label: visibility === 'public' ? 'Public' : 'Private' })
+      for (const skill of group) rows.push(skillOption(skill, tree.supportingCounts[skill.name] ?? 0, changed.get(skill.name)))
     }
     rows.push({ value: noopValue, role: 'section', label: '' })
   }
 
-  rows.push({
-    value: { kind: 'open-folder' },
-    label: 'Open Skills Folder',
-  })
-  rows.push({
-    value: { kind: 'back' },
-    label: 'Back',
-    role: 'utility',
-  })
-
+  rows.push({ value: { kind: 'open-folder' }, label: 'Open Skills Folder' })
+  rows.push({ value: { kind: 'back' }, label: 'Back', role: 'utility' })
   return rows
 }
 
-function capitalize(value: string): string {
-  if (!value) return value
-  return value.charAt(0).toUpperCase() + value.slice(1)
+function skillOption(skill: SkillIndexEntry, supportCount: number, change: LocalChangeItem | undefined): SelectOption<SkillsTreeAction> {
+  const meta = [supportCount > 0 ? `${supportCount + 1} files` : '1 file']
+  if (change) meta.push('unsaved')
+  return {
+    value: { kind: 'skill', relativePath: skill.relativePath },
+    label: skill.name,
+    hint: meta.join(' · '),
+    ...(change ? { labelColor: theme.accentError, hintColor: theme.accentError } : {}),
+  }
 }
+

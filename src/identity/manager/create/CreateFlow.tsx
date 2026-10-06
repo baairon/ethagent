@@ -1,12 +1,13 @@
 import React from 'react'
-import { Box, Text } from 'ink'
+import { Box } from 'ink'
 import { Surface } from '../../../ui/Surface.js'
 import { Select } from '../../../ui/Select.js'
 import { TextInput } from '../../../ui/TextInput.js'
 import { TextArea } from '../../../ui/TextArea.js'
+import { Paragraph } from '../../../ui/Paragraph.js'
 import { theme } from '../../../ui/theme.js'
 import { normalizeErc8004RegistryConfig } from '../../registry/erc8004.js'
-import { networkLabel } from '../shared/model/network.js'
+import { networkName } from '../shared/model/network.js'
 import type { Step } from '../reducer.js'
 import { createStepNumber, CREATE_STEP_LABELS } from '../reducer.js'
 import { WalletApprovalScreen } from '../shared/components/WalletApprovalScreen.js'
@@ -59,11 +60,15 @@ export const CreateFlow: React.FC<CreateFlowProps> = ({
 
   if (step.kind === 'replace-confirm') {
     return (
-      <Surface title="Create a New Agent?" footer="↵ select · esc back">
+      <Surface
+        title="Create a New Agent?"
+        subtitle="This machine switches to the new agent. Switch Agent brings the current one back later."
+        footer="↵ select · esc back"
+      >
         <Select<'replace' | 'back'>
           options={[
             { value: 'back', label: 'Keep Current Agent', role: 'utility' },
-            { value: 'replace', label: 'Mint and Use New Agent' },
+            { value: 'replace', label: 'Create a New Agent' },
           ]}
           hintLayout="inline"
           onSubmit={choice => {
@@ -78,13 +83,13 @@ export const CreateFlow: React.FC<CreateFlowProps> = ({
 
   if (step.kind === 'create-name') {
     return (
-      <Surface title="Name Your Agent" subtitle={header()} footer="↵ continue · esc back">
-        {step.error ? <Text color={theme.accentError}>{step.error}</Text> : null}
+      <Surface title="Name Your Agent" subtitle={header('Other agents and apps see this name.')} footer="↵ continue · esc back">
+        {step.error ? <Box marginBottom={1}><Paragraph color={theme.accentError}>{step.error}</Paragraph></Box> : null}
         <TextInput
           key="agent-name"
           initialValue={step.name ?? ''}
-          placeholder="agent name"
-          validate={value => value.trim().length >= 2 ? null : 'name must be at least 2 characters'}
+          placeholder="Agent name"
+          validate={value => value.trim().length >= 2 ? null : 'Use at least 2 characters.'}
           onSubmit={name => onNameSubmit(name.trim())}
           onCancel={onBack}
         />
@@ -94,11 +99,11 @@ export const CreateFlow: React.FC<CreateFlowProps> = ({
 
   if (step.kind === 'create-description') {
     return (
-      <Surface title="Describe Your Agent" subtitle={header()} footer="↵ continue · esc back">
+      <Surface title="Describe Your Agent" subtitle={header('Optional. A sentence or two for your Agent Card.')} footer="↵ continue · esc back">
         <TextArea
           key="agent-description"
           initialValue={step.description ?? ''}
-          placeholder="optional description"
+          placeholder="What your agent does"
           onSubmit={description => onDescriptionSubmit(step.name, description.trim())}
           onCancel={onBack}
         />
@@ -108,11 +113,11 @@ export const CreateFlow: React.FC<CreateFlowProps> = ({
 
   if (step.kind === 'create-custody') {
     return (
-      <Surface title="Pick Custody Mode" subtitle={header()} footer="↵ continue · esc back">
+      <Surface title="Pick Custody Mode" subtitle={header('Simple suits most agents. You can switch later.')} footer="↵ select · esc back">
         <Select<'simple' | 'advanced'>
           options={[
-            { value: 'simple', label: 'Simple (recommended)' },
-            { value: 'advanced', label: 'Advanced' },
+            { value: 'simple', label: 'Simple', hint: 'Your wallet holds the token' },
+            { value: 'advanced', label: 'Advanced', hint: 'A Vault holds the token' },
           ]}
           hintLayout="inline"
           onSubmit={onCustodySubmit}
@@ -128,7 +133,7 @@ export const CreateFlow: React.FC<CreateFlowProps> = ({
         <BusyScreen
           title="Checking Existing Notes"
           subtitle={header()}
-          label="scanning for notes to import..."
+          label="Looking for notes to import…"
           onCancel={onBack}
         />
       )
@@ -147,15 +152,13 @@ export const CreateFlow: React.FC<CreateFlowProps> = ({
     })
     return (
       <Surface title="Import Existing Notes?" subtitle={header()} footer="↵ select · esc back">
-        <Box flexDirection="column">
-          <Text color={theme.textSubtle}>Found local notes not yet captured by any agent: {summary}.</Text>
-          <Text color={theme.textSubtle}>Import folds them into this agent&apos;s MEMORY.md and the first encrypted snapshot.</Text>
-        </Box>
+        <Paragraph color={theme.textSubtle}>{`Found notes no agent has captured yet: ${summary}.`}</Paragraph>
+        <Paragraph color={theme.textSubtle}>Importing adds them to MEMORY.md and the first encrypted snapshot.</Paragraph>
         <Box marginTop={1}>
           <Select<'import' | 'skip'>
             options={[
               { value: 'import', label: 'Import Notes', hint: 'Adds to MEMORY.md' },
-              { value: 'skip', label: 'Start Fresh', hint: 'Blank scaffolding', role: 'utility' },
+              { value: 'skip', label: 'Start Fresh', hint: 'Empty soul and memory', role: 'utility' },
             ]}
             hintLayout="inline"
             onSubmit={choice => toPreflight(choice === 'import' ? candidates : undefined)}
@@ -171,7 +174,7 @@ export const CreateFlow: React.FC<CreateFlowProps> = ({
       <BusyScreen
         title="Getting Ready"
         subtitle={header()}
-        label="checking storage..."
+        label="Checking IPFS storage…"
         onCancel={onBack}
       />
     )
@@ -180,11 +183,11 @@ export const CreateFlow: React.FC<CreateFlowProps> = ({
   if (step.kind === 'create-registry') {
     return (
       <Surface
-        title={`${step.resolution.network ? networkLabel(step.resolution.network).charAt(0).toUpperCase() + networkLabel(step.resolution.network).slice(1) : ''} Agent Registry`}
+        title={`${networkName(step.resolution.chainId)} Agent Registry`}
         subtitle={header(step.error ?? 'Paste the agent registry address for this network.')}
         footer="↵ continue · esc back"
       >
-        <Text color={theme.dim}>RPC defaults to {step.resolution.defaultRpcUrl}</Text>
+        <Box marginBottom={1}><Paragraph color={theme.dim}>{`RPC defaults to ${step.resolution.defaultRpcUrl}`}</Paragraph></Box>
         <TextInput
           key={`create-registry-${step.resolution.network}`}
           placeholder="0x registry address"
@@ -207,14 +210,14 @@ export const CreateFlow: React.FC<CreateFlowProps> = ({
     const isAdvanced = step.custodyMode === 'advanced'
     return (
       <WalletApprovalScreen
-        title={isAdvanced ? 'Connect Owner Wallet' : 'Sign in Wallet'}
+        title="Create Your Agent"
         subtitle={header(
           isAdvanced
-            ? 'Owner wallet controls the Vault. Operators configured after minting.'
-            : 'Signs backup and submits mint transaction.',
+            ? 'Your owner wallet mints the token and will control the Vault. Add operator wallets afterwards.'
+            : 'Your wallet signs the first snapshot and mints the agent token. Minting needs gas.',
         )}
         walletSession={walletSession}
-        label={isAdvanced ? 'waiting for owner wallet to mint...' : 'waiting for wallet to mint...'}
+        label={isAdvanced ? 'Waiting for your owner wallet…' : 'Waiting for your wallet…'}
         onCancel={onBack}
       />
     )
@@ -224,7 +227,7 @@ export const CreateFlow: React.FC<CreateFlowProps> = ({
     <PinataJwtInput
       inputKey="create-storage"
       title="Connect IPFS Storage"
-      subtitle={header(step.error ?? 'Save a Pinata JWT so ethagent can pin encrypted state to IPFS.')}
+      subtitle={header(step.error ?? 'Snapshots are pinned to IPFS through your own Pinata account.')}
       footer="↵ continue · esc back"
       onSubmit={onStorageSubmit}
       onCancel={onBack}

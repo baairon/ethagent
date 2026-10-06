@@ -1,4 +1,5 @@
 import type { ContinuityFiles } from '../envelope.js'
+import type { LocalChanges } from '../localChanges.js'
 
 export const PRIVATE_CONTINUITY_FILES = ['SOUL.md', 'MEMORY.md'] as const
 export type PrivateContinuityFile = (typeof PRIVATE_CONTINUITY_FILES)[number]
@@ -25,4 +26,5 @@ export type ContinuityWorkingTreeStatus = {
   publishState: ContinuityPublishState
   localContentHashes?: ContinuitySnapshotContentHashes
   publishedContentHashes?: ContinuitySnapshotContentHashes
+  changes?: LocalChanges
 }

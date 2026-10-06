@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url'
 import { theme } from '../ui/theme.js'
 import { Spinner } from '../ui/Spinner.js'
 import { KeybindingProvider } from '../app/keybindings/KeybindingProvider.js'
+import { TerminalSizeProvider } from '../ui/layout.js'
 import { IdentityManager } from '../identity/manager/IdentityManager.js'
 import type { IdentityManagerResult } from '../identity/manager/IdentityManager.js'
 import { loadConfig, saveConfig, type EthagentConfig } from '../storage/config.js'
@@ -39,7 +40,7 @@ function readVersion(): string {
 
 function printHelp(): void {
   const lines = [
-    'ethagent: privacy-first AI agent with a portable Ethereum identity',
+    'ethagent: portable Ethereum identity for your agent',
     '',
     'usage:',
     '  ethagent                    manage identity (interactive, needs a terminal)',
@@ -103,7 +104,7 @@ const Root: React.FC<RootProps> = ({ setExit, initialConfig }) => {
   }, [phase.kind])
 
   if (phase.kind === 'loading') {
-    return <Box height={Math.max(1, rows - 1)} justifyContent="center" alignItems="center"><Spinner label="loading identity..." showElapsed={false} /></Box>
+    return <Box height={Math.max(1, rows - 1)} justifyContent="center" alignItems="center"><Spinner label="loading identity…" showElapsed={false} /></Box>
   }
   if (phase.kind === 'error') {
     return <Box height={Math.max(1, rows - 1)} justifyContent="center" alignItems="center"><Text color={theme.accentError}>Error: {phase.message}</Text></Box>
@@ -147,7 +148,9 @@ async function renderHub(initialConfig: EthagentConfig | null | undefined): Prom
   let exitCode = 0
   const instance = render(
     <KeybindingProvider>
-      <Root setExit={n => { exitCode = n }} initialConfig={initialConfig} />
+      <TerminalSizeProvider>
+        <Root setExit={n => { exitCode = n }} initialConfig={initialConfig} />
+      </TerminalSizeProvider>
     </KeybindingProvider>,
     { exitOnCtrlC: false },
   )

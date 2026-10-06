@@ -1,11 +1,12 @@
-export const WALLET_CSS = String.raw`
+import { PIXEL_FONT_CSS } from './pixelFont.js'
+
+export const WALLET_CSS = PIXEL_FONT_CSS + String.raw`
 *,
 *::before,
 *::after { box-sizing: border-box; }
 
 :root {
-  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", SFMono-Regular, Menlo,
-               Consolas, "DejaVu Sans Mono", "Liberation Mono", monospace;
+  --font-mono: "ms pgothic 14px", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   --font-ui: var(--font-mono);
   --font-display: var(--font-mono);
 
@@ -14,9 +15,9 @@ export const WALLET_CSS = String.raw`
   --panel: #0a0a0c;
   --raise: #131316;
 
-  --line: #1d1d21;
-  --line-soft: #161619;
-  --line-strong: #2a2a30;
+  --line: #3a3a41;
+  --line-soft: #2c2c32;
+  --line-strong: #55555e;
 
   --rim: rgba(255, 255, 255, 0.04);
   --rim-strong: rgba(255, 255, 255, 0.06);
@@ -40,6 +41,9 @@ html, body { height: 100%; margin: 0; overflow: hidden; }
 body {
   position: relative;
   font-family: var(--font-ui);
+  font-synthesis: none;
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: unset;
   color: var(--fg);
   background: var(--bg);
   display: flex;
@@ -58,8 +62,7 @@ main {
   border: 1px solid var(--line-soft);
   border-radius: var(--radius);
   overflow: hidden;
-  box-shadow:
-    0 24px 64px -24px rgba(0, 0, 0, 0.8);
+  box-shadow: none;
   animation: card-in 540ms var(--ease-out) both;
   will-change: height;
 }
@@ -102,9 +105,9 @@ main, .flow-title, .flow-subtitle, .status, .status-line, .status-hint, .flow-de
   flex: 1 1 0;
   min-width: 0;
   font-family: var(--font-ui);
-  font-size: 11px;
+  font-size: 14px;
   font-weight: 700;
-  letter-spacing: 0.01em;
+  letter-spacing: 0;
   color: var(--fg-2);
   white-space: nowrap;
   overflow: hidden;
@@ -115,10 +118,10 @@ main, .flow-title, .flow-subtitle, .status, .status-line, .status-hint, .flow-de
   flex: 0 1 auto;
   text-align: center;
   font-family: var(--font-ui);
-  font-size: 10.5px;
+  font-size: 14px;
   color: var(--fg-4);
   font-weight: 400;
-  letter-spacing: 0.01em;
+  letter-spacing: 0;
   margin: 0;
   white-space: nowrap;
   overflow: hidden;
@@ -146,10 +149,10 @@ main, .flow-title, .flow-subtitle, .status, .status-line, .status-hint, .flow-de
 
 .flow-title {
   font-family: var(--font-display);
-  font-size: 13.5px;
-  font-weight: 700;
-  line-height: 1.3;
-  letter-spacing: -0.01em;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.25;
+  letter-spacing: 0;
   margin: 0;
   color: var(--fg);
   text-wrap: balance;
@@ -158,10 +161,10 @@ main, .flow-title, .flow-subtitle, .status, .status-line, .status-hint, .flow-de
 
 .flow-subtitle {
   font-family: var(--font-ui);
-  font-size: 11px;
+  font-size: 14px;
   font-weight: 400;
   line-height: 1.5;
-  letter-spacing: -0.005em;
+  letter-spacing: 0;
   margin: 0;
   color: var(--fg-3);
   text-align: left;
@@ -192,7 +195,7 @@ main, .flow-title, .flow-subtitle, .status, .status-line, .status-hint, .flow-de
 .timeline-now {
   min-width: 0;
   font-family: var(--font-ui);
-  font-size: 11.5px;
+  font-size: 14px;
   font-weight: 700;
   letter-spacing: 0;
   color: var(--fg);
@@ -205,9 +208,9 @@ main, .flow-title, .flow-subtitle, .status, .status-line, .status-hint, .flow-de
 .timeline-count {
   flex: none;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 14px;
   font-weight: 400;
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
   color: var(--fg-4);
   font-variant-numeric: tabular-nums;
 }
@@ -252,8 +255,7 @@ main, .flow-title, .flow-subtitle, .status, .status-line, .status-hint, .flow-de
   border: 1px solid var(--line-soft);
   border-radius: var(--radius-sm);
   overflow: hidden;
-  box-shadow: 0 4px 16px -4px rgba(0, 0, 0, 0.45),
-              0 1px 0 var(--rim) inset;
+  box-shadow: none;
   animation: block-in 380ms var(--ease-out) both;
 }
 
@@ -265,7 +267,7 @@ main, .flow-title, .flow-subtitle, .status, .status-line, .status-hint, .flow-de
   align-items: center;
   gap: 12px;
   font-family: var(--font-ui);
-  font-size: 12px;
+  font-size: 14px;
   color: var(--fg-2);
   margin: 0;
   line-height: 1.35;
@@ -275,11 +277,11 @@ main, .flow-title, .flow-subtitle, .status, .status-line, .status-hint, .flow-de
 
 .flow-detail .key {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 14px;
   font-weight: 500;
   color: var(--fg-3);
   text-transform: lowercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0;
   padding: 3px 8px;
   background: var(--raise);
   border: 1px solid var(--line-strong);
@@ -308,7 +310,7 @@ main, .flow-title, .flow-subtitle, .status, .status-line, .status-hint, .flow-de
   background: none;
   border: 0;
   text-transform: lowercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
   color: var(--fg-3);
 }
 
@@ -319,7 +321,7 @@ main, .flow-title, .flow-subtitle, .status, .status-line, .status-hint, .flow-de
   white-space: normal;
   overflow: hidden;
   word-break: break-word;
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.45;
   color: var(--fg);
 }
@@ -332,8 +334,7 @@ main, .flow-title, .flow-subtitle, .status, .status-line, .status-hint, .flow-de
   background: var(--panel);
   border: 1px solid var(--line-soft);
   border-radius: var(--radius-sm);
-  box-shadow: 0 4px 16px -4px rgba(0, 0, 0, 0.45),
-              0 1px 0 var(--rim) inset;
+  box-shadow: none;
 }
 
 .status-line, .status-hint {
@@ -352,9 +353,9 @@ main, .flow-title, .flow-subtitle, .status, .status-line, .status-hint, .flow-de
   align-items: flex-start;
   gap: 9px;
   font-family: var(--font-ui);
-  font-size: 11px;
+  font-size: 14px;
   font-weight: 700;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
   line-height: 1.4;
   color: var(--fg);
   margin: 0;
@@ -362,7 +363,7 @@ main, .flow-title, .flow-subtitle, .status, .status-line, .status-hint, .flow-de
 
 .status-line .marker {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 14px;
   width: 14px;
   height: 16.8px;
   display: inline-flex;
@@ -412,14 +413,14 @@ main, .flow-title, .flow-subtitle, .status, .status-line, .status-hint, .flow-de
   position: relative;
   top: 1px;
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1;
   color: var(--fg-3);
 }
 
 .status-hint {
   font-family: var(--font-ui);
-  font-size: 10.5px;
+  font-size: 14px;
   font-weight: 400;
   color: var(--fg-4);
   margin: 4px 0 0 23px;
@@ -434,8 +435,7 @@ main, .flow-title, .flow-subtitle, .status, .status-line, .status-hint, .flow-de
   border: 1px solid var(--line-soft);
   border-radius: var(--radius-sm);
   overflow: hidden;
-  box-shadow: 0 8px 24px -6px rgba(0, 0, 0, 0.5),
-              0 1px 0 var(--rim) inset;
+  box-shadow: none;
   animation: block-in 380ms var(--ease-out) both;
 }
 
@@ -444,9 +444,9 @@ main, .flow-title, .flow-subtitle, .status, .status-line, .status-hint, .flow-de
 .error-title {
   font-family: var(--font-ui);
   color: var(--fg);
-  font-size: 12.5px;
+  font-size: 14px;
   font-weight: 700;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
   line-height: 1.35;
   margin: 0 0 5px;
 }
@@ -454,7 +454,7 @@ main, .flow-title, .flow-subtitle, .status, .status-line, .status-hint, .flow-de
 .error-msg {
   font-family: var(--font-ui);
   color: var(--fg-4);
-  font-size: 10.5px;
+  font-size: 14px;
   font-weight: 400;
   margin: 0 0 10px;
   line-height: 1.55;
@@ -463,7 +463,7 @@ main, .flow-title, .flow-subtitle, .status, .status-line, .status-hint, .flow-de
 .error-action {
   font-family: var(--font-ui);
   color: var(--fg-4);
-  font-size: 11px;
+  font-size: 14px;
   margin: 0 0 6px;
   line-height: 1.5;
 }
@@ -471,7 +471,7 @@ main, .flow-title, .flow-subtitle, .status, .status-line, .status-hint, .flow-de
 .error-cause {
   font-family: var(--font-ui);
   color: var(--fg-4);
-  font-size: 11px;
+  font-size: 14px;
   margin: 0 0 4px 8px;
   line-height: 1.5;
   border-left: 1px solid var(--line-strong);
@@ -481,7 +481,7 @@ main, .flow-title, .flow-subtitle, .status, .status-line, .status-hint, .flow-de
 .error-hint {
   font-family: var(--font-ui);
   color: var(--fg-3);
-  font-size: 11px;
+  font-size: 14px;
   margin: 8px 0 0;
   line-height: 1.5;
 }
@@ -499,7 +499,7 @@ main, .flow-title, .flow-subtitle, .status, .status-line, .status-hint, .flow-de
 
 .error-hint code {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 14px;
   display: inline-flex;
   align-items: center;
   padding: 1px 6px;
@@ -507,7 +507,7 @@ main, .flow-title, .flow-subtitle, .status, .status-line, .status-hint, .flow-de
   background: var(--raise);
   border: 1px solid var(--line-strong);
   border-radius: 0;
-  letter-spacing: 0.02em;
+  letter-spacing: 0;
 }
 
 .footer {
@@ -525,7 +525,7 @@ main, .flow-title, .flow-subtitle, .status, .status-line, .status-hint, .flow-de
 
 .shortcut {
   font-family: var(--font-ui);
-  font-size: 11px;
+  font-size: 14px;
   font-weight: 500;
   letter-spacing: 0;
   background: none;
@@ -569,14 +569,14 @@ main, .flow-title, .flow-subtitle, .status, .status-line, .status-hint, .flow-de
   gap: 4px;
   padding: 2px 6px;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 14px;
   font-weight: 500;
   color: var(--fg-3);
   background: var(--surface);
   border: 1px solid var(--line-strong);
   border-radius: 0;
-  letter-spacing: 0.02em;
-  box-shadow: 0 1px 0 var(--rim) inset;
+  letter-spacing: 0;
+  box-shadow: none;
   transition: background-color 120ms var(--ease-out),
               border-color 120ms var(--ease-out),
               color 120ms var(--ease-out),
@@ -584,8 +584,7 @@ main, .flow-title, .flow-subtitle, .status, .status-line, .status-hint, .flow-de
 }
 
 .shortcut .key {
-  box-shadow: 0 1px 0 var(--rim) inset,
-              0 1px 1.5px rgba(0, 0, 0, 0.45);
+  box-shadow: none;
 }
 
 @media (max-width: 560px), (max-height: 680px) {
@@ -593,17 +592,17 @@ main, .flow-title, .flow-subtitle, .status, .status-line, .status-hint, .flow-de
   main { max-height: calc(100dvh - 20px); border-radius: 0; }
   .chrome { padding: 9px 12px 9px 16px; }
   .body { padding: 12px 13px 14px; gap: 9px; }
-  .flow-title { font-size: 13px; }
-  .flow-subtitle { font-size: 10.5px; }
+  .flow-title { font-size: 14px; }
+  .flow-subtitle { font-size: 14px; }
   .details, .status { padding: 10px 11px; border-radius: 0; }
-  .flow-detail { grid-template-columns: max-content 1fr; gap: 8px; font-size: 11.5px; }
-  .timeline-now { font-size: 11px; }
-  .status-line { gap: 8px; font-size: 11px; }
-  .status-hint { margin-left: 22px; font-size: 10.5px; }
+  .flow-detail { grid-template-columns: max-content 1fr; gap: 8px; font-size: 14px; }
+  .timeline-now { font-size: 14px; }
+  .status-line { gap: 8px; font-size: 14px; }
+  .status-hint { margin-left: 22px; font-size: 14px; }
   #error-block-slot { padding: 13px 14px; }
   .footer { padding: 11px 14px 12px; gap: 12px; }
   .actions { gap: 12px; }
-  .shortcut { font-size: 11px; padding: 5px 4px; }
+  .shortcut { font-size: 14px; padding: 5px 4px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

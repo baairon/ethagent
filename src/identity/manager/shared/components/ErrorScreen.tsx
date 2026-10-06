@@ -1,7 +1,8 @@
 import React from 'react'
-import { Text } from 'ink'
+import { Box } from 'ink'
 import { Surface } from '../../../../ui/Surface.js'
 import { Select } from '../../../../ui/Select.js'
+import { Paragraph } from '../../../../ui/Paragraph.js'
 import { theme } from '../../../../ui/theme.js'
 import type { IdentityManagerErrorView } from '../model/errors.js'
 import type { Step } from '../../reducer.js'
@@ -24,7 +25,7 @@ export const ErrorScreen: React.FC<ErrorScreenProps> = ({
   onClose,
 }) => (
   <Surface title={error.title} tone="error" subtitle={error.detail} footer={footer}>
-    {error.hint ? <Text color={theme.dim}>{error.hint}</Text> : null}
+    {error.hint ? <Box marginBottom={1}><Paragraph color={theme.textSubtle}>{error.hint}</Paragraph></Box> : null}
     <Select<'back' | 'close'>
       options={[
         { value: 'back', label: 'Back' },

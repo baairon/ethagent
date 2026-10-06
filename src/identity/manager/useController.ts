@@ -344,7 +344,7 @@ export function useIdentityManagerController({
       handleStepError(new Error('no agent registry configured for this identity'), { kind: 'menu' })
       return
     }
-    setStep({ kind: 'busy', label: 'Checking token custody...' })
+    setStep({ kind: 'busy', title: 'Custody Mode', label: 'Checking where your token is held…' })
     try {
       await assertTokenNotInVault({ identity, registry, operatorVaults: config?.erc8004?.operatorVaults })
     } catch (err: unknown) {

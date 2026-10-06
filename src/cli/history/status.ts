@@ -1,9 +1,9 @@
 import { getAddress } from 'viem'
 import { continuityPublishState, continuitySnapshotContentHashesFromSources } from '../../identity/continuity/storage/status.js'
 import type { ContinuitySnapshotContentHashes } from '../../identity/continuity/storage/types.js'
-import { listSnapshotManifests, readEntryBytes, readSnapshotManifest, snapshotStoreDir } from '../../identity/continuity/snapshotStore.js'
+import { listSnapshotManifests, readSnapshotManifest, snapshotStoreDir } from '../../identity/continuity/snapshotStore.js'
+import { exactLocalChanges } from '../../identity/continuity/localChanges.js'
 import { continuityVaultRef } from '../../identity/continuity/storage/paths.js'
-import { diffTrees } from '../../identity/continuity/diff/treeDiff.js'
 import { hasPendingPublish } from '../../identity/manager/continuity/state.js'
 import { resolveRegistryForIdentity } from '../../identity/registry/registryConfig.js'
 import { discoverOwnedAgentBackupByTokenId } from '../../identity/registry/erc8004/discovery.js'
@@ -46,23 +46,11 @@ export async function runStatusCommand(args: string[], deps: HistoryDeps, discov
       local: localHashes,
       ...(latest?.contentHashes ? { published: latest.contentHashes } : {}),
     })
-    const manifest = latest ? await readSnapshotManifest(identity, latest.cid) : null
-    let exact = false
+    const exactChanges = await exactLocalChanges(identity, latest?.cid, view)
+    const exact = exactChanges !== null
     let changes: Change[] = []
-    if (latest && manifest?.kind === 'snapshot') {
-      exact = true
-      const base = await readEntryBytes(identity, manifest.files)
-      const working: Record<string, Uint8Array> = {}
-      for (const [key, value] of Object.entries(view.files)) working[key] = Buffer.from(value, 'utf8')
-      const diff = diffTrees(base.files, working, { lines: false, semantic: false })
-      changes = diff.files.map(file => ({
-        path: file.path,
-        change: file.change,
-        added: file.added,
-        removed: file.removed,
-        ...(file.eolOnly ? { eolOnly: true as const } : {}),
-        ...(file.trailingNewlineOnly ? { trailingNewlineOnly: true as const } : {}),
-      }))
+    if (exactChanges) {
+      changes = exactChanges.files
     } else if (latest?.contentHashes) {
       changes = COARSE_PATHS
         .filter(([key]) => (localHashes[key] ?? '') !== (latest.contentHashes?.[key] ?? ''))
@@ -110,7 +98,7 @@ export async function runStatusCommand(args: string[], deps: HistoryDeps, discov
       publishState,
       pendingPublish: hasPendingPublish(identity),
       baseline: latest
-        ? { cid: latest.cid, createdAt: latest.createdAt, txHash: latest.txHash ?? null, cached: manifest?.kind === 'snapshot', exact }
+        ? { cid: latest.cid, createdAt: latest.createdAt, txHash: latest.txHash ?? null, cached: exact, exact }
         : null,
       changes,
       pendingPull: view.pendingPull,
@@ -128,7 +116,7 @@ export async function runStatusCommand(args: string[], deps: HistoryDeps, discov
       const out: string[] = []
       out.push(`agent #${identity.agentId ?? '?'} · vault ${result.vault}`)
       out.push(`publish state: ${publishState}${result.pendingPublish ? ' (pinned snapshot waiting for the owner to publish)' : ''}`)
-      if (latest) out.push(`latest snapshot: ${shortTime(latest.createdAt)} ${shortCid(latest.cid)}${latest.txHash ? ` tx ${latest.txHash.slice(0, 10)}...` : ''}${manifest?.kind === 'snapshot' ? '' : ' (not cached locally, comparison is coarse)'}`)
+      if (latest) out.push(`latest snapshot: ${shortTime(latest.createdAt)} ${shortCid(latest.cid)}${latest.txHash ? ` tx ${latest.txHash.slice(0, 10)}...` : ''}${exact ? '' : ' (not cached locally, comparison is coarse)'}`)
       if (changes.length === 0) out.push('changes since latest: none')
       else {
         out.push(`changes since latest${exact ? '' : ' (coarse)'}:`)

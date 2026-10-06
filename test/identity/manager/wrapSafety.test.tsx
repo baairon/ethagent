@@ -2,22 +2,22 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import React from 'react'
 import { render } from 'ink-testing-library'
-import { Box } from 'ink'
 import type { Address } from 'viem'
 import { CustodyEditFlow } from '../../../src/identity/manager/custody/CustodyEditFlow.js'
 import { TokenTransferSigningScreen } from '../../../src/identity/manager/transfer/TokenTransferScreens.js'
 import { OperatorWalletsScreen } from '../../../src/identity/manager/ens/EnsOperatorWalletsScreen.js'
-import { SimpleEnsIssueScreen } from '../../../src/identity/manager/ens/EnsEditReviewScreens.js'
-import { EnsStatusBanner } from '../../../src/identity/manager/ens/EnsEditShared.js'
+import { renderEnsMaintenancePhase } from '../../../src/identity/manager/ens/EnsEditMaintenanceScreens.js'
+import { SubdomainEntry } from '../../../src/identity/manager/ens/EnsEditShared.js'
 import { PinataJwtInput } from '../../../src/identity/manager/shared/components/PinataJwtInput.js'
 import { IdentitySummary } from '../../../src/identity/manager/shared/components/IdentitySummary.js'
 import { TextArea } from '../../../src/ui/TextArea.js'
+import { TerminalSizeProvider } from '../../../src/ui/layout.js'
 import type { EthagentIdentity } from '../../../src/storage/config.js'
 import type { Erc8004RegistryConfig } from '../../../src/identity/registry/erc8004.js'
 
 const RED_SGR = '38;2;232;184;184'
-const DIM_SGR = '38;2;122;128;144'
 const TEXT_SGR = '38;2;218;220;230'
+const NARROW_COLUMNS = 54
 const CONTENT_WIDTH = 42
 
 const ESC = String.fromCharCode(27)
@@ -25,6 +25,10 @@ const ANSI_RE = new RegExp(ESC + '\\[[0-9;]*m', 'g')
 const stripAnsi = (value: string): string => value.replace(ANSI_RE, '')
 
 const noop = (): void => {}
+
+function renderNarrow(node: React.ReactElement) {
+  return render(<TerminalSizeProvider columns={NARROW_COLUMNS}>{node}</TerminalSizeProvider>)
+}
 
 function frameLines(raw: string): { raw: string[]; plain: string[] } {
   const rawLines = raw.split('\n')
@@ -34,6 +38,17 @@ function frameLines(raw: string): { raw: string[]; plain: string[] } {
 function assertBudget(plain: string[]): void {
   for (const line of plain) {
     assert.ok(line.trim().length <= CONTENT_WIDTH, `line exceeds the ${CONTENT_WIDTH}-col panel budget: ${JSON.stringify(line.trim())}`)
+  }
+}
+
+function assertNoLeadingSpaceWraps(plain: string[]): void {
+  for (let i = 1; i < plain.length; i += 1) {
+    const line = plain[i]!
+    const prev = plain[i - 1]!
+    if (!line.trim() || !prev.trim()) continue
+    const indent = line.length - line.trimStart().length
+    const prevIndent = prev.length - prev.trimStart().length
+    assert.notEqual(indent, prevIndent + 1, `wrapped line starts with a stray space: ${JSON.stringify(line)}`)
   }
 }
 
@@ -99,7 +114,7 @@ test('custody screen keeps a wrapped ENS issue red and collapses multi-operator 
     activeOperatorAddress: OP1,
   })
   type CustodyEditStep = React.ComponentProps<typeof CustodyEditFlow>['step']
-  const { lastFrame, unmount } = render(
+  const { lastFrame, unmount } = renderNarrow(
     <CustodyEditFlow
       step={{ kind: 'custody-model', identity, registry } as CustodyEditStep}
       vaultAddress={VAULT}
@@ -115,7 +130,8 @@ test('custody screen keeps a wrapped ENS issue red and collapses multi-operator 
   try {
     const { raw, plain } = frameLines(lastFrame() ?? '')
     assertBudget(plain)
-    assertFragmentsColored(raw, plain, ['agent.owner1.eth', 'resolving', 'expected wallet'], RED_SGR, 'ENS issue')
+    assertNoLeadingSpaceWraps(plain)
+    assertFragmentsColored(raw, plain, ['agent.owner1.eth', 'point to', 'owner wallet)'], RED_SGR, 'ENS issue')
     const operatorLines = plain.filter(line => line.includes('authorized'))
     assert.equal(operatorLines.length, 1, 'the Operators row must stay one line')
     assert.ok(operatorLines[0]!.includes('2 authorized'), 'multi-operator value must collapse to a count')
@@ -126,10 +142,10 @@ test('custody screen keeps a wrapped ENS issue red and collapses multi-operator 
 
 test('transfer signing screen wraps a long receiver handle without losing it or its color', () => {
   const identity = makeIdentity({ custodyMode: 'simple' })
-  const { lastFrame, unmount } = render(
+  const { lastFrame, unmount } = renderNarrow(
     <TokenTransferSigningScreen
       identity={identity}
-      tokenNetworkLabel="base"
+      tokenNetworkLabel="Base"
       targetHandle={LONG_HANDLE}
       targetAddress={TARGET}
       progress={null}
@@ -142,20 +158,20 @@ test('transfer signing screen wraps a long receiver handle without losing it or 
     assertBudget(plain)
     const squashed = plain.join('').replace(/\s+/g, '')
     assert.ok(squashed.includes(LONG_HANDLE), 'the full receiver handle must survive wrapping untruncated')
-    assertFragmentsColored(raw, plain, ['my-agents', 'agents.really', 'really-long', 'owner1.eth'], TEXT_SGR, 'receiver handle')
+    assertFragmentsColored(raw, plain, ['my-agents', 'really-long'], TEXT_SGR, 'receiver handle')
   } finally {
     unmount()
   }
 })
 
-test('operator wallets list keeps wrapped approval meta dim', () => {
+test('operator wallets list shows each operator with its approval date', () => {
   const identity = makeIdentity({
     custodyMode: 'advanced',
     operatorVaultAddress: VAULT,
     approvedOperatorWallets: [{ address: OP1, verifiedAt: '2026-05-17T01:35:13.390Z' }],
     activeOperatorAddress: OP1,
   })
-  const { lastFrame, unmount } = render(
+  const { lastFrame, unmount } = renderNarrow(
     <OperatorWalletsScreen
       identity={identity}
       registry={registry}
@@ -166,75 +182,95 @@ test('operator wallets list keeps wrapped approval meta dim', () => {
     />,
   )
   try {
-    const { raw, plain } = frameLines(lastFrame() ?? '')
+    const { plain } = frameLines(lastFrame() ?? '')
     assertBudget(plain)
-    assertFragmentsColored(raw, plain, ['approved', '2026-05-17'], DIM_SGR, 'operator meta')
-    assert.ok(plain.some(line => line.includes('0x4444')), 'operator address must render')
+    assertNoLeadingSpaceWraps(plain)
+    const row = plain.find(line => line.includes('0x4444'))
+    assert.ok(row, 'operator address must render')
+    assert.ok(plain.join(' ').includes('approved 2026-05-17'), 'approval date must render')
+    assert.ok(!plain.some(line => line.includes('Navigation')), 'no single-item navigation section')
   } finally {
     unmount()
   }
 })
 
-test('ens issue screen keeps the longest wrapped reason red', () => {
-  type Validation = React.ComponentProps<typeof SimpleEnsIssueScreen>['validation']
-  const { lastFrame, unmount } = render(
-    <SimpleEnsIssueScreen
-      fullName="agent.owner1.eth"
-      validation={{ ok: false, reason: 'address-mismatch' } as Validation}
-      onCreate={noop}
-      onCheckAgain={noop}
-      onChange={noop}
-      onBack={noop}
-    />,
-  )
+test('ens home keeps a wrapped problem red and offers Check Again', () => {
+  const identity = makeIdentity({ ensName: 'agent.owner1.eth', ensValidation: { ok: false, reason: 'address-mismatch' } })
+  const screen = renderEnsMaintenancePhase({
+    phase: { kind: 'mode-select' },
+    identity,
+    currentEnsName: 'agent.owner1.eth',
+    savedCustodyMode: 'simple',
+    savedOwnerAddress: OWNER,
+    validationError: null,
+    ownerAddress: OWNER as Address,
+    operatorWalletSession: null,
+    setOperatorWalletSession: noop,
+    setPhase: noop,
+    runDiscovery: noop,
+    runCheckAgain: noop,
+    runUnlinkEnsLoading: noop,
+    onBack: noop,
+    onEnsUnlink: noop,
+    onEnsRecordsUpdate: noop,
+  })
+  const { lastFrame, unmount } = renderNarrow(<>{screen}</>)
   try {
     const { raw, plain } = frameLines(lastFrame() ?? '')
     assertBudget(plain)
-    assertFragmentsColored(raw, plain, ['resolving', 'expected wallet'], RED_SGR, 'validation reason')
+    assertNoLeadingSpaceWraps(plain)
+    assertFragmentsColored(raw, plain, ['point to', 'owner wallet.'], RED_SGR, 'ENS problem')
+    assert.ok(plain.some(line => line.includes('Check Again')), 'an ENS problem offers Check Again')
   } finally {
     unmount()
   }
 })
 
-test('ens status banner keeps its wrapped not-linked copy dim', () => {
-  const identity = makeIdentity({})
-  const { lastFrame, unmount } = render(
-    <Box width={CONTENT_WIDTH}>
-      <EnsStatusBanner identity={identity} noRootEnsName />
-    </Box>,
+test('subdomain entry previews the full name and the wallet it points to', () => {
+  const { lastFrame, unmount } = renderNarrow(
+    <SubdomainEntry parent="owner1.eth" pointsTo={OWNER as Address} initialValue="agent" onConfirm={noop} onBack={noop} />,
   )
   try {
-    const { raw, plain } = frameLines(lastFrame() ?? '')
+    const { plain } = frameLines(lastFrame() ?? '')
     assertBudget(plain)
-    assertFragmentsColored(raw, plain, ['Not Linked', 'ENS name.'], DIM_SGR, 'status banner')
+    assert.ok(plain.some(line => line.includes('agent.owner1.eth')), 'the full name preview must render')
+    assert.ok(plain.some(line => line.includes('0x1111…1111')), 'the target wallet must render')
   } finally {
     unmount()
   }
 })
 
-test('compact summary strip stays one styled line on mainnet with a long name', () => {
+test('identity header shows the whole name, then token and network', () => {
   const identity: EthagentIdentity = {
-    ...makeIdentity({ name: 'longer-agent-name1', custodyMode: 'simple' }),
+    ...makeIdentity({ name: 'A rather long agent name that keeps going', ensName: 'agent.owner1.eth', ensValidation: { ok: true } }),
     chainId: 1,
     agentId: '45744',
   }
-  const { lastFrame, unmount } = render(
-    <Box width={CONTENT_WIDTH}>
-      <IdentitySummary identity={identity} compact />
-    </Box>,
-  )
+  const { lastFrame, unmount } = renderNarrow(<IdentitySummary identity={identity} />)
   try {
     const { raw, plain } = frameLines(lastFrame() ?? '')
     assertBudget(plain)
-    const stripLines = plain.filter(line => line.trim().length > 0)
-    assert.equal(stripLines.length, 1, `the compact strip must render as exactly one line, got ${JSON.stringify(stripLines)}`)
-    assert.ok(stripLines[0]!.includes('…'), 'the long name must truncate with an ellipsis')
-    assert.ok(stripLines[0]!.includes('#45744'), 'the token segment must survive')
-    assert.ok(stripLines[0]!.includes('ethereum mainnet'), 'the network segment must survive')
+    assertNoLeadingSpaceWraps(plain)
+    const text = plain.map(line => line.trim()).filter(Boolean).join(' ')
+    assert.ok(!text.includes('…'), 'the header must not elide anything')
+    const order = ['A rather long agent name that keeps going', '#45744', 'Ethereum Mainnet'].map(part => text.indexOf(part))
+    assert.ok(order.every((at, i) => at >= 0 && (i === 0 || at > order[i - 1]!)), 'name, token, and network must appear in order')
+    assert.ok(!text.includes('agent.owner1.eth'), 'the ENS name belongs on the ENS screen, not the header')
     for (let i = 0; i < plain.length; i += 1) {
       if (plain[i]!.trim().length === 0) continue
-      assert.ok(raw[i]!.includes('38;2;'), `compact strip line lost all styling: ${JSON.stringify(plain[i])}`)
+      assert.ok(raw[i]!.includes('38;2;'), `header line lost all styling: ${JSON.stringify(plain[i])}`)
     }
+  } finally {
+    unmount()
+  }
+})
+
+test('identity header never repeats a name that is also the ENS name', () => {
+  const identity = makeIdentity({ name: 'agent.owner1.eth', ensName: 'agent.owner1.eth', ensValidation: { ok: true } })
+  const { lastFrame, unmount } = renderNarrow(<IdentitySummary identity={identity} />)
+  try {
+    const text = frameLines(lastFrame() ?? '').plain.join(' ')
+    assert.equal(text.split('agent.owner1.eth').length - 1, 1)
   } finally {
     unmount()
   }
@@ -242,7 +278,7 @@ test('compact summary strip stays one styled line on mainnet with a long name', 
 
 test('textarea renders a long edited line as budgeted rows that keep their color', () => {
   const value = 'a very long description line that keeps on going well past forty columns'
-  const { lastFrame, unmount } = render(
+  const { lastFrame, unmount } = renderNarrow(
     <TextArea initialValue={value} onSubmit={noop} />,
   )
   try {
@@ -264,16 +300,16 @@ test('textarea renders a long edited line as budgeted rows that keep their color
   }
 })
 
-test('pinata storage prompt keeps its address on one intact line', () => {
-  const { lastFrame, unmount } = render(
+test('pinata storage prompt keeps its address intact on one line', () => {
+  const { lastFrame, unmount } = renderNarrow(
     <PinataJwtInput inputKey="wrap-safety" footer={null} onSubmit={noop} onCancel={noop} />,
   )
   try {
     const { plain } = frameLines(lastFrame() ?? '')
     assertBudget(plain)
     assert.ok(
-      plain.some(line => line.trim() === 'app.pinata.cloud/developers/api-keys'),
-      'the API keys address must sit intact on its own line',
+      plain.some(line => line.includes('app.pinata.cloud/developers/api-keys')),
+      'the API keys address must sit intact on one line',
     )
   } finally {
     unmount()

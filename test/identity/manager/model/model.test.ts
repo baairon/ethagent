@@ -4,7 +4,8 @@ import React from 'react'
 import { renderToString } from 'ink'
 import { RegisterAgentPreflightError } from '../../../../src/identity/registry/erc8004.js'
 import { AgentStateOwnerMismatchError } from '../../../../src/identity/crypto/backupEnvelope.js'
-import { IdentitySummary } from '../../../../src/identity/manager/shared/components/IdentitySummary.js'
+import { DetailsScreen } from '../../../../src/identity/manager/shared/components/DetailsScreen.js'
+import { StorageCredentialScreen } from '../../../../src/identity/manager/settings/StorageCredentialScreen.js'
 import { identityManagerErrorView } from '../../../../src/identity/manager/shared/model/errors.js'
 import {
   displayCustodyMode,
@@ -68,7 +69,7 @@ test('identity manager capitalizes generic identity errors', () => {
   const view = identityManagerErrorView(new Error('wallet request timed out'))
 
   assert.equal(view.title, 'Identity Error')
-  assert.equal(view.detail, 'Wallet Request Timed Out')
+  assert.equal(view.detail, 'Your wallet did not respond in time.')
 })
 
 test('identity manager explains locked backups without generic decrypt copy', () => {
@@ -78,7 +79,7 @@ test('identity manager explains locked backups without generic decrypt copy', ()
   ))
 
   assert.equal(view.title, 'Backup Locked to Another Wallet')
-  assert.equal(view.detail, 'Wallet 0x0000...bEEF cannot read state encrypted for 0x0000...dEaD.')
+  assert.equal(view.detail, 'Wallet 0x0000…bEEF cannot read state encrypted for 0x0000…dEaD.')
   assert.equal(view.hint, 'Use the wallet that created this backup.')
 })
 
@@ -107,8 +108,8 @@ test('identity manager summary always shows the short state CID for the menu car
   })
 
   assert.deepEqual(rows.map(row => row.label), ['owner wallet', 'token', 'network', 'state', 'card', 'icon'])
-  assert.equal(rows[3]?.value, 'bafybeigdy...3w6y7q')
-  assert.equal(rows[0]?.value, '0x0000...dEaD')
+  assert.equal(rows[3]?.value, 'bafybeigdy…3w6y7q')
+  assert.equal(rows[0]?.value, '0x0000…dEaD')
   assert.equal(rows[4]?.value, 'not saved')
   assert.equal(rows[5]?.value, 'not attached')
 })
@@ -125,8 +126,8 @@ test('identity manager summary collapses gracefully when no identity is loaded',
 })
 
 test('ensValidationReasonText covers advanced ENS ownership codes', () => {
-  assert.equal(ensValidationReasonText('token-owner-mismatch'), 'Token not held by owner wallet')
-  assert.equal(ensValidationReasonText('token-owner-lookup-failed'), 'Could not verify ERC-8004 token owner')
+  assert.equal(ensValidationReasonText('token-owner-mismatch'), 'Owner wallet does not hold the agent token')
+  assert.equal(ensValidationReasonText('token-owner-lookup-failed'), 'Could not confirm the agent token owner')
   assert.equal(ensValidationReasonText('no-owner'), 'Name does not exist on ENS')
   assert.equal(ensValidationReasonText(undefined), 'Not yet verified')
 })
@@ -200,11 +201,11 @@ test('recovery confirm warns before overwriting dirty local continuity files', (
     }),
   ))
 
-  assert.match(output, /Unsaved local changes detected/)
-  assert.match(output, /SOUL\.md,[\s\S]*Skills/)
-  assert.match(output, /Continuing replaces those files/)
-  assert.match(output, /Overwrite Local Changes/)
-  assert.match(output, /Local snapshot is also ahead of\s+onchain/)
+  assert.match(output, /These unsaved changes will be lost/)
+  assert.match(output, /SOUL\.md\s+Edited[\s\S]*Skills\s+Edited/)
+  assert.match(output, /Discard Changes and Refetch/)
+  assert.match(output.replace(/\s+/g, ' '), /is not onchain yet/)
+  assert.match(output, /❯ Back/)
 })
 
 test('transfer snapshot view is perspective-aware', () => {
@@ -245,12 +246,21 @@ test('transfer snapshot view is perspective-aware', () => {
   }), null)
 })
 
-test('storage credential confirmation distinguishes pinning control from identity cleanup', () => {
-  const line1 = 'Removes the saved pinning token from this machine.'
-  const line2 = 'Existing IPFS backups and agent data are not affected.'
-  assert.match(line1, /pinning token/)
-  assert.match(line2, /IPFS backups/)
-  assert.match(line2, /not affected/)
+test('storage credential confirmation says pinned snapshots survive and defaults to keeping the JWT', () => {
+  const output = stripAnsi(renderToString(React.createElement(StorageCredentialScreen, {
+    step: { kind: 'storage-credential-forget-confirm' },
+    hasCredential: true,
+    footer: null,
+    onEdit: () => {},
+    onForget: () => {},
+    onConfirmForget: () => {},
+    onSubmit: () => {},
+    onCancel: () => {},
+  }), { columns: 100 }))
+  const flat = output.replace(/\s+/g, ' ')
+  assert.match(flat, /Removes the saved Pinata JWT from this machine/)
+  assert.match(flat, /stay on IPFS/)
+  assert.match(output, /❯ Keep JWT/)
 })
 
 test('networkLabel and networkSubtitle return human-readable strings for every curated network', () => {
@@ -283,12 +293,10 @@ test('chainSummaryRow prefers identity.chainId, falls back to selectedNetwork', 
 
 test('networkSubtitle frames each network as a value-prop, not a jargon dump', () => {
   for (const n of ['mainnet', 'base'] as const) {
-    const subtitle = networkSubtitle(n)
-    assert.match(subtitle, /^Best for /)
-    assertNoNetworkJargon(subtitle)
+    assertNoNetworkJargon(networkSubtitle(n))
   }
-  assert.match(networkSubtitle('mainnet'), /security/i)
-  assert.match(networkSubtitle('base'), /lower-cost/i)
+  assert.match(networkSubtitle('mainnet'), /secure/i)
+  assert.match(networkSubtitle('base'), /low fees/i)
 })
 
 test('lastBackupLabel renders never until a backup exists', () => {
@@ -373,7 +381,7 @@ test('token candidate hint stays terse so wallets with many agents stay scannabl
   } as const
 
   assert.equal(tokenCandidateLabel(candidate), 'research agent')
-  assert.equal(tokenCandidateHint(candidate), 'token #45744 · base · backup 2026-04-25')
+  assert.equal(tokenCandidateHint(candidate), '#45744 · Base · saved 2026-04-25')
   assert.doesNotMatch(tokenCandidateHint(candidate), /owner/)
   assert.doesNotMatch(tokenCandidateHint(candidate), /state/)
 })
@@ -390,7 +398,7 @@ test('token candidate hint falls back to network only when no backup is pinned y
   } as const
 
   assert.equal(tokenCandidateLabel(candidate), 'Agent Token #1')
-  assert.equal(tokenCandidateHint(candidate), 'ethereum mainnet')
+  assert.equal(tokenCandidateHint(candidate), 'Ethereum Mainnet')
 })
 
 test('current agent candidate marker requires the selected token identity', () => {
@@ -418,7 +426,7 @@ test('current agent candidate marker requires the selected token identity', () =
   assert.equal(isCurrentAgentCandidate(identity, { ...candidate, agentId: 1n }), false)
   assert.equal(isCurrentAgentCandidate(identity, { ...candidate, chainId: 1 }), false)
   assert.equal(isCurrentAgentCandidate(undefined, candidate), false)
-  assert.equal(tokenCandidateSelectLabel(candidate, true), 'Agent Token #45744  *')
+  assert.equal(tokenCandidateSelectLabel(candidate, true), 'Agent Token #45744 (current)')
   assert.equal(tokenCandidateSelectLabel(candidate, false), 'Agent Token #45744')
 })
 
@@ -499,10 +507,10 @@ test('identityOwnerAddress prefers verified onchain owner and falls back to loca
   assert.equal(identityOwnerAddress({ ...identity, state: {} }), localOwner)
 })
 
-test('identity summary shows simple-mode owner and uses verified onchain owner as authoritative', () => {
+test('token values flags an onchain owner that differs from the local owner', () => {
   const localOwner = '0x000000000000000000000000000000000000dEaD'
   const onchainOwner = '0x000000000000000000000000000000000000bEEF'
-  const output = stripAnsi(renderToString(React.createElement(IdentitySummary, {
+  const output = stripAnsi(renderToString(React.createElement(DetailsScreen, {
     identity: {
       address: localOwner,
       ownerAddress: localOwner,
@@ -511,10 +519,13 @@ test('identity summary shows simple-mode owner and uses verified onchain owner a
       state: { custodyMode: 'simple' },
     },
     onchainOwner,
-  })))
+    footer: null,
+    onCopy: () => {},
+    onBack: () => {},
+  }), { columns: 100 }))
 
-  assert.match(output, /Owner\s+0x0000\.\.\.bEEF/)
-  assert.doesNotMatch(output, /Owner\s+0x0000\.\.\.dEaD/)
+  assert.match(output, /Onchain Owner\s+0x0000…bEEF/)
+  assert.match(output, /Owner Wallet\s+0x0000\S*dEaD/)
 })
 
 test('identityPerspective: undefined identity is unknown', () => {

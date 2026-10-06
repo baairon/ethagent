@@ -1,7 +1,8 @@
 import React from 'react'
-import { Box, Text } from 'ink'
+import { Box } from 'ink'
 import { Surface } from '../../../ui/Surface.js'
 import { Select } from '../../../ui/Select.js'
+import { Paragraph } from '../../../ui/Paragraph.js'
 import { theme } from '../../../ui/theme.js'
 import { PinataJwtInput } from '../shared/components/PinataJwtInput.js'
 import type { Step } from '../reducer.js'
@@ -34,7 +35,7 @@ export const StorageCredentialScreen: React.FC<StorageCredentialScreenProps> = (
       <PinataJwtInput
         inputKey="storage-credential-input"
         title="IPFS Storage"
-        subtitle={step.error ?? 'Save the Pinata JWT used to pin encrypted snapshots.'}
+        subtitle={step.error ?? 'Snapshots are pinned to IPFS through your own Pinata account.'}
         footer={footer}
         onSubmit={onSubmit}
         onCancel={onCancel}
@@ -46,24 +47,20 @@ export const StorageCredentialScreen: React.FC<StorageCredentialScreenProps> = (
     return (
       <Surface
         title="Forget IPFS Storage?"
-        subtitle="Local token only. Pinned files are not deleted."
+        subtitle="Removes the saved Pinata JWT from this machine. Snapshots already pinned stay on IPFS."
         footer={footer}
+        tone="error"
       >
-        <Box flexDirection="column">
-          <Text color={theme.dim}>Removes the saved pinning token from this machine.</Text>
-          <Text color={theme.dim}>Existing IPFS backups and agent data are not affected.</Text>
-        </Box>
-        <Box marginTop={1}>
-          <Select<StorageCredentialAction>
-            options={[
-              { value: 'forget', label: 'Forget Credential' },
-              { value: 'back', label: 'Keep Credential', role: 'utility' },
-            ]}
-            hintLayout="inline"
-            onSubmit={choice => choice === 'forget' ? onConfirmForget() : onCancel()}
-            onCancel={onCancel}
-          />
-        </Box>
+        <Select<StorageCredentialAction>
+          options={[
+            { value: 'forget', label: 'Forget JWT' },
+            { value: 'back', label: 'Keep JWT', role: 'utility' },
+          ]}
+          initialIndex={1}
+          hintLayout="inline"
+          onSubmit={choice => choice === 'forget' ? onConfirmForget() : onCancel()}
+          onCancel={onCancel}
+        />
       </Surface>
     )
   }
@@ -71,25 +68,26 @@ export const StorageCredentialScreen: React.FC<StorageCredentialScreenProps> = (
   return (
     <Surface
       title="IPFS Storage"
-      subtitle="Pin encrypted snapshots from this machine."
+      subtitle={hasCredential
+        ? 'A Pinata JWT is saved, so this machine can pin encrypted snapshots.'
+        : 'No Pinata JWT yet. Saving a snapshot asks for one.'}
       footer={footer}
     >
-      <Box marginTop={1}>
-        <Select<StorageCredentialAction>
-          options={[
-            { value: 'edit', label: hasCredential ? 'Replace Credential' : 'Save Credential' },
-            { value: 'forget', label: 'Forget Credential', disabled: !hasCredential },
-            { value: 'back', label: 'Back', role: 'utility' },
-          ]}
-          hintLayout="inline"
-          onSubmit={choice => {
-            if (choice === 'edit') return onEdit()
-            if (choice === 'forget') return onForget()
-            return onCancel()
-          }}
-          onCancel={onCancel}
-        />
-      </Box>
+      {!hasCredential ? <Box marginBottom={1}><Paragraph color={theme.dim}>Get one at app.pinata.cloud/developers/api-keys.</Paragraph></Box> : null}
+      <Select<StorageCredentialAction>
+        options={[
+          { value: 'edit', label: hasCredential ? 'Replace JWT' : 'Add JWT' },
+          ...(hasCredential ? [{ value: 'forget' as const, label: 'Forget JWT' }] : []),
+          { value: 'back', label: 'Back', role: 'utility' },
+        ]}
+        hintLayout="inline"
+        onSubmit={choice => {
+          if (choice === 'edit') return onEdit()
+          if (choice === 'forget') return onForget()
+          return onCancel()
+        }}
+        onCancel={onCancel}
+      />
     </Surface>
   )
 }

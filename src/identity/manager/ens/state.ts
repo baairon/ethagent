@@ -39,10 +39,10 @@ export function ensValidationReasonText(reason: string | undefined): string {
   switch (reason) {
     case 'no-owner':           return 'Name does not exist on ENS'
     case 'no-resolver':        return 'Name has no resolver set'
-    case 'address-mismatch':   return 'ENS name is not resolving to the expected wallet'
-    case 'lookup-failed':      return 'Could not reach Ethereum mainnet'
-    case 'token-owner-mismatch': return 'Token not held by owner wallet'
-    case 'token-owner-lookup-failed': return 'Could not verify ERC-8004 token owner'
+    case 'address-mismatch':   return 'Name does not point to the owner wallet'
+    case 'lookup-failed':      return 'Could not reach Ethereum Mainnet'
+    case 'token-owner-mismatch': return 'Owner wallet does not hold the agent token'
+    case 'token-owner-lookup-failed': return 'Could not confirm the agent token owner'
     case undefined:            return 'Not yet verified'
     default:                   return reason
   }

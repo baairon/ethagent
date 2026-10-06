@@ -1,6 +1,7 @@
 import React from 'react'
-import { Box, Text } from 'ink'
-import { theme, PANEL_WIDTH } from '../../../../ui/theme.js'
+import { Box } from 'ink'
+import { theme } from '../../../../ui/theme.js'
+import { Paragraph } from '../../../../ui/Paragraph.js'
 import { FlowTimeline } from './FlowTimeline.js'
 
 type StepHeaderProps = {
@@ -10,12 +11,12 @@ type StepHeaderProps = {
 }
 
 export const StepHeader: React.FC<StepHeaderProps> = ({ steps, current, description }) => (
-  <Box flexDirection="column" width={PANEL_WIDTH - 4}>
+  <Box flexDirection="column">
     <FlowTimeline steps={steps} current={current} />
     {description ? (
       <Box marginTop={1}>
         {typeof description === 'string'
-          ? <Text color={theme.menuStatus}>{description}</Text>
+          ? <Paragraph color={theme.menuStatus}>{description}</Paragraph>
           : description}
       </Box>
     ) : null}

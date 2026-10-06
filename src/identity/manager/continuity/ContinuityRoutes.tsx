@@ -107,9 +107,9 @@ export const ContinuityRoutes: React.FC<ContinuityRoutesProps> = ({ controller, 
     return (
       <WalletApprovalScreen
         title="Refetch Latest Snapshot"
-        subtitle="Decrypts and restores SOUL.md, MEMORY.md, and skills."
+        subtitle="Sign in your wallet to open the latest onchain snapshot. Signing is free."
         walletSession={walletSession}
-        label={restoreProgress?.label ?? (walletSession ? 'waiting for your signature...' : 'fetching snapshot...')}
+        label={restoreProgress?.label ?? (walletSession ? 'Waiting for your signature…' : 'Fetching the snapshot…')}
         onCancel={() => setStep(step.back)}
       />
     )
@@ -149,7 +149,6 @@ export const ContinuityRoutes: React.FC<ContinuityRoutesProps> = ({ controller, 
       <PublicProfileScreen
         identity={identity}
         config={config}
-        workingStatus={workingStatus}
         ready={continuityReady}
         notice={step.notice}
         footer={footer}

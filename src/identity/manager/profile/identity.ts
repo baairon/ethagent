@@ -2,7 +2,7 @@ import type { EthagentConfig, EthagentIdentity } from '../../../storage/config.j
 import { supportedErc8004ChainForId, type Erc8004AgentCandidate } from '../../registry/erc8004.js'
 import { readCustodyMode, type CustodyMode } from '../custody/state.js'
 import { formatDate, shortAddress, shortCid } from '../shared/model/format.js'
-import { chainSummaryRow, networkLabel } from '../shared/model/network.js'
+import { chainSummaryRow } from '../shared/model/network.js'
 
 export const PREFLIGHT_AGENT_URI = 'ipfs://bafybeigdyrztma2dbfczw7q6ooozbxlqzyw5r7w4f3qw2axvvxqg3w6y7q'
 
@@ -27,16 +27,15 @@ export function tokenCandidateSelectLabel(
   candidate: Erc8004AgentCandidate,
   current = false,
 ): string {
-  return `${tokenCandidateLabel(candidate)}${current ? '  *' : ''}`
+  return `${tokenCandidateLabel(candidate)}${current ? ' (current)' : ''}`
 }
 
 export function tokenCandidateHint(candidate: Erc8004AgentCandidate): string {
-  const chain = supportedErc8004ChainForId(candidate.chainId)
-  const network = chain?.network ? networkLabel(chain.network) : chain?.name ?? `chain ${candidate.chainId}`
+  const network = supportedErc8004ChainForId(candidate.chainId)?.name ?? `Chain ${candidate.chainId}`
   const parts = [
-    candidate.name?.trim() ? `token #${candidate.agentId.toString()}` : null,
+    candidate.name?.trim() ? `#${candidate.agentId.toString()}` : null,
     network,
-    candidate.backup?.createdAt ? `backup ${formatDate(candidate.backup.createdAt)}` : null,
+    candidate.backup?.createdAt ? `saved ${formatDate(candidate.backup.createdAt)}` : null,
   ].filter((part): part is string => Boolean(part))
   return parts.join(' · ')
 }

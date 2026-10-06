@@ -1,5 +1,5 @@
 export const glyphs = {
-  ellipsis: "…",
+  ellipsis: "...",
 };
 
 export function escapeHtml(value: unknown): string {

@@ -34,7 +34,7 @@ export async function runRestoreAuthorize(
     onReady: callbacks.onWalletReady,
   })
   callbacks.onWalletReady(null)
-  callbacks.onRestoreProgress?.({ phase: 'decrypting', label: 'signature received · decrypting encrypted snapshot...' })
+  callbacks.onRestoreProgress?.({ phase: 'decrypting', label: 'Decrypting the snapshot…' })
   let restored: ReturnType<typeof restoreAgentStateBackupEnvelope> | ReturnType<typeof restoreContinuitySnapshotEnvelope>
   let continuityFiles: ReturnType<typeof restoreContinuitySnapshotEnvelope>['files'] | undefined
   let continuitySkills: ReturnType<typeof restoreContinuitySnapshotEnvelope>['skills']
@@ -53,7 +53,7 @@ export async function runRestoreAuthorize(
       walletSignature: wallet.signature,
     })
   }
-  callbacks.onRestoreProgress?.({ phase: 'writing', label: 'restoring local agent files...' })
+  callbacks.onRestoreProgress?.({ phase: 'writing', label: 'Writing soul, memory, and skills…' })
   const transferSnapshot = isContinuitySnapshotEnvelope(step.envelope)
     ? transferSnapshotMetadataFromEnvelope(step.envelope)
     : null
@@ -115,7 +115,7 @@ export async function runRestoreAuthorize(
   if (continuitySkills) {
     await restoreSkillsTree(nextIdentity, continuitySkills)
   }
-  callbacks.onRestoreProgress?.({ phase: 'finishing', label: 'finalizing restored identity...' })
+  callbacks.onRestoreProgress?.({ phase: 'finishing', label: 'Finishing up…' })
   const restoredCard = await restorePublishedAgentCard(nextIdentity, step.apiUrl, step.candidate.publicDiscovery?.agentCardCid)
   await ensureIdentityMarkdownScaffold(nextIdentity)
   await syncAgentCardManifest(nextIdentity).catch(() => null)

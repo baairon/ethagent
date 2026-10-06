@@ -5,6 +5,9 @@ import { Select } from '../../../ui/Select.js'
 import { TextInput } from '../../../ui/TextInput.js'
 import { TextArea } from '../../../ui/TextArea.js'
 import { theme } from '../../../ui/theme.js'
+import { Paragraph } from '../../../ui/Paragraph.js'
+import { useContentWidth } from '../../../ui/layout.js'
+import { FieldList } from '../shared/components/FieldRow.js'
 import type { AgentEnsRecordState, AgentEnsRecords } from '../../ens/agentRecords.js'
 import type { EnsSetupPlan } from '../../ens/ensAutomation.js'
 import type { Step } from '../reducer.js'
@@ -41,7 +44,7 @@ type EditProfileFlowProps = {
   onBackToEditMenu: () => void
 }
 
-const footerHint = (hint: string) => <Text color={theme.menuStatus}>{hint}</Text>
+const footerHint = (hint: string) => <Text color={theme.dim}>{hint}</Text>
 
 export const EditProfileFlow: React.FC<EditProfileFlowProps> = ({
   step,
@@ -69,18 +72,15 @@ export const EditProfileFlow: React.FC<EditProfileFlowProps> = ({
   if (step.kind === 'edit-profile-name') {
     const currentName = step.name ?? readIdentityStateString(step.identity.state, 'name')
     return (
-      <Surface title="Edit Name" footer={footerHint('↵ save · esc back')}>
-        <Text color={theme.menuStatus}>Saved: {readIdentityStateString(step.identity.state, 'name') || '(unnamed)'}</Text>
-        <Box marginTop={1}>
-          <TextInput
-            key="edit-profile-name"
-            initialValue={currentName}
-            placeholder="agent name"
-            validate={value => value.trim().length >= 2 ? null : 'name must be at least 2 characters'}
-            onSubmit={value => onNameSubmit(value.trim())}
-            onCancel={onBackToEditMenu}
-          />
-        </Box>
+      <Surface title="Edit Name" subtitle={`Published now: ${readIdentityStateString(step.identity.state, 'name') || 'not set'}`} footer={footerHint('↵ save · esc back')}>
+        <TextInput
+          key="edit-profile-name"
+          initialValue={currentName}
+          placeholder="Agent name"
+          validate={value => value.trim().length >= 2 ? null : 'Use at least 2 characters.'}
+          onSubmit={value => onNameSubmit(value.trim())}
+          onCancel={onBackToEditMenu}
+        />
       </Surface>
     )
   }
@@ -113,17 +113,14 @@ export const EditProfileFlow: React.FC<EditProfileFlowProps> = ({
   const currentDescription = readIdentityStateString(step.identity.state, 'description')
   const draftDescription = step.description ?? currentDescription
   return (
-    <Surface title="Edit Description" footer={footerHint('↵ save · esc back')}>
-      <Text color={theme.menuStatus}>Saved: {currentDescription || '(no description)'}</Text>
-      <Box marginTop={1}>
-        <TextArea
-          key="edit-profile-description"
-          initialValue={draftDescription}
-          placeholder="describe this agent"
-          onSubmit={value => onDescriptionSubmit(value.trim())}
-          onCancel={onBackToEditMenu}
-        />
-      </Box>
+    <Surface title="Edit Description" subtitle="A sentence or two for your Agent Card." footer={footerHint('↵ save · esc back')}>
+      <TextArea
+        key="edit-profile-description"
+        initialValue={draftDescription}
+        placeholder="What your agent does"
+        onSubmit={value => onDescriptionSubmit(value.trim())}
+        onCancel={onBackToEditMenu}
+      />
     </Surface>
   )
 }
@@ -134,6 +131,7 @@ const EditProfileMenuStep: React.FC<{
   onSaveProfile: () => void
   onBack: () => void
 }> = ({ step, onSelectField, onSaveProfile, onBack }) => {
+  const contentWidth = useContentWidth()
   const savedName = readIdentityStateString(step.identity.state, 'name')
   const savedDescription = readIdentityStateString(step.identity.state, 'description')
   const savedIcon = readIdentityStateString(step.identity.state, 'imageUrl')
@@ -142,25 +140,23 @@ const EditProfileMenuStep: React.FC<{
   const draftDescription = step.description ?? savedDescription
   const draftIcon = describeDraftIcon(step.imagePath, savedIcon)
 
-  const nameHint = draftName || '(unnamed)'
-  const descriptionHint = draftDescription || '(no description)'
-  const iconHint = step.imagePath !== undefined
-    ? `${draftIcon} (draft)`
-    : savedIcon
-      ? draftIcon
-      : '(no icon)'
+  const edited = (changed: boolean, value: string) => changed ? `${value} · edited` : value
+  const nameHint = edited(step.name !== undefined, draftName || 'Not set')
+  const hintBudget = contentWidth - 'Publish Profile'.length - 4 - (step.description !== undefined ? ' · edited'.length : 0)
+  const descriptionHint = edited(step.description !== undefined, previewText(draftDescription || 'Not set', hintBudget))
+  const iconHint = edited(step.imagePath !== undefined, savedIcon || step.imagePath !== undefined ? draftIcon : 'None')
 
   const dirty = step.name !== undefined || step.description !== undefined || step.imagePath !== undefined
-  const saveHint = dirty ? 'Review what gets published' : 'No changes to save'
+  const saveHint = dirty ? 'Review first' : 'No changes yet'
 
   return (
-    <Surface title="Edit Profile" subtitle="Saving also snapshots your soul, memory, and skills onchain." footer={footerHint('↵ select · esc back')}>
+    <Surface title="Edit Profile" subtitle="Publishing also saves a snapshot of your soul, memory, and skills." footer={footerHint('↵ select · esc back')}>
       <Select<'name' | 'description' | 'image' | 'save' | 'back'>
         options={[
           { value: 'name', label: 'Name', hint: nameHint },
           { value: 'description', label: 'Description', hint: descriptionHint },
           { value: 'image', label: 'Icon', hint: iconHint },
-          { value: 'save', label: 'Save Profile', hint: saveHint, disabled: !dirty },
+          { value: 'save', label: 'Publish Profile', hint: saveHint, disabled: !dirty },
           { value: 'back', label: 'Back', role: 'utility' },
         ]}
         hintLayout="inline"
@@ -190,34 +186,32 @@ const AgentIconStep: React.FC<{
 
   if (entryMode) {
     return (
-      <Surface title="Edit Icon" footer={footerHint('↵ save · esc back')}>
-        <Text color={theme.menuStatus}>Current: {currentIcon ? shortIconReference(currentIcon) : '(no icon)'}</Text>
-        <Box marginTop={1}>
-          <TextInput
-            key="edit-profile-icon-entry"
-            placeholder="https://.../icon.png or C:\\path\\icon.png"
-            validate={validateAgentIconReference}
-            onSubmit={value => onIconSubmit(value.trim())}
-            onCancel={() => setEntryMode(false)}
-          />
-        </Box>
+      <Surface title="Edit Icon" subtitle="Paste an https or ipfs URL, or the path to an image on this machine." footer={footerHint('↵ save · esc back')}>
+        <TextInput
+          key="edit-profile-icon-entry"
+          placeholder="https or ipfs URL, or a file path"
+          validate={validateAgentIconReference}
+          onSubmit={value => onIconSubmit(value.trim())}
+          onCancel={() => setEntryMode(false)}
+        />
       </Surface>
     )
   }
 
   return (
-    <Surface title="Edit Icon" footer={footerHint('↵ select · esc back')}>
-      <Box flexDirection="column">
-        <Text color={theme.menuStatus}>Agent Icon: {selectedIcon}</Text>
-        {step.error ? <Text color={theme.accentError}>{step.error}</Text> : null}
-      </Box>
-      <Box marginTop={1}>
+    <Surface title="Edit Icon" subtitle={`Icon: ${selectedIcon === '(no icon)' ? 'none yet' : selectedIcon}`} footer={footerHint('↵ select · esc back')}>
+      {step.error ? <Box marginBottom={1}><Paragraph color={theme.accentError}>{step.error}</Paragraph></Box> : null}
+      <Box>
         <Select<'choose' | 'enter' | 'skip' | 'delete' | 'back'>
           options={[
-            { value: 'choose', label: 'Choose Local File', hint: 'Open the file picker' },
-            { value: 'enter', label: 'Enter URL Or Path', hint: 'https, ipfs, or local path' },
-            { value: 'skip', label: currentIcon ? 'Keep Current Icon' : 'No Icon' },
-            { value: 'delete', label: 'Remove Agent Icon', disabled: !currentIcon },
+            { value: 'choose', label: 'Choose a File', hint: 'Opens the file picker' },
+            { value: 'enter', label: 'Enter a URL or Path', hint: 'https, ipfs, or a local image' },
+            ...(currentIcon
+              ? [
+                  { value: 'skip' as const, label: 'Keep Current Icon' },
+                  { value: 'delete' as const, label: 'Remove Icon' },
+                ]
+              : []),
             { value: 'back', label: 'Back', role: 'utility' },
           ]}
           hintLayout="inline"
@@ -239,14 +233,17 @@ const EditProfileReviewStep: React.FC<{
   step: Extract<Step, { kind: 'edit-profile-review' }>
   onSave: () => void
   onBack: () => void
-}> = ({ onSave, onBack }) => {
+}> = ({ step, onSave, onBack }) => {
+  const savedName = readIdentityStateString(step.identity.state, 'name')
+  const savedDescription = readIdentityStateString(step.identity.state, 'description')
+  const savedIcon = readIdentityStateString(step.identity.state, 'imageUrl')
   return (
-    <Surface title="Review & Publish" subtitle="Publishing onchain:" footer={footerHint('↵ publish · esc back')}>
-      <Box flexDirection="column">
-        {['Name', 'Description', 'Agent icon', 'Soul, memory, and skills snapshot'].map(item => (
-          <Text key={item} color={theme.text}>{`· ${item}`}</Text>
-        ))}
-      </Box>
+    <Surface title="Publish Profile?" subtitle="Your wallet approves publishing it onchain. A snapshot of your soul, memory, and skills is saved with it." footer={footerHint('↵ select · esc back')}>
+      <FieldList fields={[
+        { label: 'Name', value: step.name || 'Not set', ...(step.name === savedName ? { valueColor: theme.dim } : {}) },
+        { label: 'Description', value: step.description || 'Not set', ...(step.description === savedDescription ? { valueColor: theme.dim } : {}) },
+        { label: 'Icon', value: step.imagePath === 'delete' ? 'Removed' : step.imagePath ? shortIconReference(step.imagePath) : savedIcon ? shortIconReference(savedIcon) : 'None', ...(step.imagePath === undefined ? { valueColor: theme.dim } : {}) },
+      ]} />
       <Box marginTop={1}>
         <Select<'save' | 'back'>
           options={[
@@ -273,7 +270,7 @@ function shortIconReference(value: string): string {
   if (trimmed.length <= 56) return trimmed
   const url = shortUrlReference(trimmed)
   if (url) return url
-  return `${trimmed.slice(0, 24)}...${trimmed.slice(-20)}`
+  return `${trimmed.slice(0, 24)}…${trimmed.slice(-20)}`
 }
 
 function shortUrlReference(value: string): string | null {
@@ -283,9 +280,17 @@ function shortUrlReference(value: string): string | null {
     const parts = url.pathname.split('/').filter(Boolean)
     const file = parts.at(-1)
     if (!file) return `${url.protocol}//${url.hostname}`
-    return `${url.protocol}//${url.hostname}/.../${file}`
+    return `${url.protocol}//${url.hostname}/…/${file}`
   } catch {
     if (!/^ipfs:\/\//i.test(value)) return null
-    return `${value.slice(0, 22)}...${value.slice(-18)}`
+    return `${value.slice(0, 22)}…${value.slice(-18)}`
   }
+}
+
+function previewText(value: string, width: number): string {
+  const singleLine = value.replace(/\s+/g, ' ').trim()
+  if (singleLine.length <= width) return singleLine
+  const cut = singleLine.slice(0, Math.max(8, width - 1))
+  const space = cut.lastIndexOf(' ')
+  return `${(space > 8 ? cut.slice(0, space) : cut).replace(/[\s,.;:]+$/, '')}…`
 }

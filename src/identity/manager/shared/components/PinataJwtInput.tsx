@@ -1,5 +1,5 @@
 import React from 'react'
-import { Text } from 'ink'
+import { Box, Text } from 'ink'
 import { Surface } from '../../../../ui/Surface.js'
 import { TextInput } from '../../../../ui/TextInput.js'
 import { theme } from '../../../../ui/theme.js'
@@ -26,27 +26,27 @@ export const PinataJwtInput: React.FC<PinataJwtInputProps> = ({
 }) => (
   <Surface
     title={title ?? 'Connect IPFS Storage'}
-    subtitle={subtitle ?? 'Save a Pinata JWT so ethagent can pin encrypted state to IPFS.'}
+    subtitle={subtitle ?? 'Snapshots are pinned to IPFS through your own Pinata account.'}
     footer={footer}
   >
-    <Text color={theme.dim}>Paste your Pinata JWT. Get one at</Text>
-    <Text color={theme.accentPeriwinkle} underline>{PINATA_API_KEYS_URL}</Text>
-    <Text color={theme.dim}>Saved encrypted on this device.</Text>
-    <Text color={theme.dim}>Used only for IPFS pinning.</Text>
-    <TextInput
-      key={inputKey}
-      isSecret
-      placeholder="Pinata JWT"
-      validate={v => {
-        try {
-          extractPinataJwt(v)
-          return null
-        } catch (err: unknown) {
-          return (err as Error).message
-        }
-      }}
-      onSubmit={onSubmit}
-      onCancel={onCancel}
-    />
+    <Text color={theme.dim}>Paste a Pinata JWT from <Text color={theme.accentPeriwinkle} underline>{PINATA_API_KEYS_URL}</Text></Text>
+    <Text color={theme.dim}>It is saved encrypted on this device and only used for pinning.</Text>
+    <Box marginTop={1}>
+      <TextInput
+        key={inputKey}
+        isSecret
+        placeholder="Pinata JWT"
+        validate={v => {
+          try {
+            extractPinataJwt(v)
+            return null
+          } catch (err: unknown) {
+            return (err as Error).message
+          }
+        }}
+        onSubmit={onSubmit}
+        onCancel={onCancel}
+      />
+    </Box>
   </Surface>
 )

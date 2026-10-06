@@ -7,6 +7,7 @@ const WALLET_PAGE_DIR = 'page'
 const WALLET_PAGE_PARTS = [
   'types.ts',
   'constants.ts',
+  'pixelFont.ts',
   'css.ts',
   'markup.ts',
   'config.ts',

@@ -106,7 +106,7 @@ test('advanced ENS save state rejects incoherent validation', () => {
       activeOperatorAddress: '0x0000000000000000000000000000000000000A11',
     },
     {},
-  ), /token not held by owner wallet/i)
+  ), /owner wallet does not hold the agent token/i)
 })
 
 const ensip25Key = 'agent-registration[0x000100000101140000000000000000000000000000000000000001][2]'

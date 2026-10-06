@@ -52,10 +52,10 @@ export const DeleteSubdomainTxRunner: React.FC<{
   }, [])
   return (
     <WalletApprovalScreen
-      title="Delete ENS Subdomain"
-      subtitle={`Clearing the subnode for ${plan.fullName} at ${plan.parentName} on Ethereum mainnet.`}
+      title={`Delete ${plan.fullName}`}
+      subtitle="Approve one transaction on Ethereum Mainnet. It needs gas."
       walletSession={walletSession}
-      label="waiting for wallet to delete the subdomain..."
+      label="Waiting for your wallet…"
       onCancel={() => onError('Subdomain deletion cancelled.')}
     />
   )

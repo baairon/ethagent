@@ -1,6 +1,8 @@
-import React, { useState, useRef, useEffect } from 'react'
-import { Box, Text, useStdout } from 'ink'
-import { theme, PANEL_WIDTH } from './theme.js'
+import React, { useEffect, useState, useRef } from 'react'
+import { Box, Text } from 'ink'
+import { theme } from './theme.js'
+import { contentWidthFor, useTerminalColumns } from './layout.js'
+import { wrapWords } from './text.js'
 import { useAppInput } from '../app/input/AppInputProvider.js'
 
 const DEFAULT_CHROME_WIDTH = 10
@@ -19,6 +21,7 @@ type TextInputProps = {
   onCancel?: () => void
   onNavigateLeft?: () => void
   onNavigateRight?: (value: string) => void
+  onChange?: (value: string) => void
 }
 
 export function TextInput({
@@ -35,19 +38,16 @@ export function TextInput({
   onCancel,
   onNavigateLeft,
   onNavigateRight,
+  onChange,
 }: TextInputProps) {
-  const { stdout } = useStdout()
   const [value, setValue] = useState(initialValue)
+  const onChangeRef = useRef(onChange)
+  onChangeRef.current = onChange
+  useEffect(() => { onChangeRef.current?.(value) }, [value])
   const [cursor, setCursor] = useState(initialValue.length)
   const [error, setError] = useState<string | null>(null)
 
-  const [columns, setColumns] = useState<number>(() => Math.floor(stdout?.columns ?? 80))
-  useEffect(() => {
-    if (!stdout) return
-    const handleResize = () => setColumns(Math.floor(stdout.columns ?? 80))
-    stdout.on('resize', handleResize)
-    return () => { stdout.off('resize', handleResize) }
-  }, [stdout])
+  const columns = useTerminalColumns()
 
   const wrapWidth = textInputWrapWidth(columns, chromeWidth, maxWidth)
 
@@ -59,7 +59,7 @@ export function TextInput({
 
     const submitValue = (submit: (value: string) => void) => {
       if (!allowEmpty && val.trim().length === 0) {
-        setError('value cannot be empty')
+        setError('Enter a value.')
         return false
       }
       const validationError = validate?.(val) ?? null
@@ -155,11 +155,11 @@ export function TextInput({
           )}
         </Box>
       </Box>
-      {error ? <Text color={theme.accentError}>{error}</Text> : null}
+      {error ? <Text color={theme.accentError}>{wrapWords(error, contentWidthFor(columns)).join('\n')}</Text> : null}
     </Box>
   )
 }
 
-export function textInputWrapWidth(columns: number, chromeWidth = DEFAULT_CHROME_WIDTH, maxWidth = PANEL_WIDTH - 6): number {
+export function textInputWrapWidth(columns: number, chromeWidth = DEFAULT_CHROME_WIDTH, maxWidth = contentWidthFor(columns) - 2): number {
   return Math.min(maxWidth, Math.max(1, Math.floor(columns) - Math.max(0, Math.floor(chromeWidth))))
 }

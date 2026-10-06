@@ -1,9 +1,11 @@
 import React from 'react'
-import { Box, Text } from 'ink'
+import { Box } from 'ink'
 import { Surface } from '../../../ui/Surface.js'
 import { Select } from '../../../ui/Select.js'
+import { Paragraph } from '../../../ui/Paragraph.js'
 import { theme } from '../../../ui/theme.js'
-import { localChangeStatusView, type LocalChangeStatusView } from './state.js'
+import { localChangeStatusView } from './state.js'
+import { ChangeList } from './ChangeList.js'
 
 import type { ContinuityWorkingTreeStatus } from '../../continuity/storage.js'
 
@@ -18,45 +20,66 @@ interface RecoveryConfirmScreenProps {
   onBack: () => void
 }
 
-export const RecoveryConfirmScreen: React.FC<RecoveryConfirmScreenProps> = ({ mode, workingStatus, pendingPublish, footer, onConfirm, onBack }) => {
-  const isPublish = mode === 'publish'
-  const isRestore = mode === 'restore'
-  const title = isPublish
-    ? 'Save Snapshot?'
-    : isRestore
-      ? 'Overwrite Local Changes?'
-      : 'Refetch Latest From Onchain?'
-  const subtitle = isPublish
-    ? 'Saves SOUL.md, MEMORY.md, skills, and profile changes.'
-    : isRestore
-      ? 'This restore targets the active agent and overwrites local continuity files.'
-      : 'This overwrites local files with the onchain version.'
+const COPY: Record<RecoveryConfirmMode, { title: string; subtitle: string; confirm: string; discard: string }> = {
+  publish: {
+    title: 'Save Snapshot',
+    subtitle: 'Publishes an encrypted snapshot onchain.',
+    confirm: 'Save Snapshot',
+    discard: 'Save Snapshot',
+  },
+  refetch: {
+    title: 'Refetch Latest Snapshot',
+    subtitle: 'Replaces local files with the latest save.',
+    confirm: 'Refetch',
+    discard: 'Discard Changes and Refetch',
+  },
+  restore: {
+    title: 'Replace Local Files?',
+    subtitle: 'Restoring overwrites this agent\'s files.',
+    confirm: 'Restore',
+    discard: 'Discard Changes and Restore',
+  },
+}
 
-  const localChangeStatus = localChangeStatusView(workingStatus)
-  const body = isPublish
-    ? <SaveSnapshotStatusLine status={localChangeStatus} />
-    : localChangeStatus.hasLocalChanges
-      ? <OverwriteStatusLine status={localChangeStatus} pendingPublish={pendingPublish} />
-      : pendingPublish
-        ? <Text color={theme.accentError} bold>Local snapshot is ahead of onchain; unsaved edits are discarded.</Text>
+export const RecoveryConfirmScreen: React.FC<RecoveryConfirmScreenProps> = ({ mode, workingStatus, pendingPublish, footer, onConfirm, onBack }) => {
+  const copy = COPY[mode]
+  const status = localChangeStatusView(workingStatus)
+  const destructive = mode !== 'publish' && (status.hasLocalChanges || Boolean(pendingPublish))
+
+  const changes = (heading: string): React.ReactNode => status.items.length > 0
+    ? <ChangeList heading={heading} items={status.items} />
+    : <Paragraph color={theme.accentError}>Local files differ from your last snapshot.</Paragraph>
+
+  let body: React.ReactNode = null
+  if (mode === 'publish') {
+    body = status.hasLocalChanges
+      ? changes('Changes since your last snapshot')
+      : status.detail
+        ? <Paragraph color={theme.dim}>{status.detail === 'None detected' ? 'No changes since your last snapshot.' : status.detail}</Paragraph>
         : null
-  const confirmLabel = isPublish
-    ? 'Save Snapshot Now'
-    : localChangeStatus.hasLocalChanges
-      ? 'Overwrite Local Changes'
-      : isRestore
-        ? 'Restore'
-        : 'Refetch'
+  } else {
+    body = (
+      <Box flexDirection="column">
+        {status.hasLocalChanges ? changes('These unsaved changes will be lost') : null}
+        {pendingPublish ? (
+          <Box marginTop={status.hasLocalChanges ? 1 : 0}>
+            <Paragraph color={theme.accentError}>A newer local snapshot is not onchain yet. It is replaced too.</Paragraph>
+          </Box>
+        ) : null}
+      </Box>
+    )
+  }
 
   return (
-    <Surface title={title} subtitle={subtitle} footer={footer} tone="primary">
-      {body ? <Box flexDirection="column">{body}</Box> : null}
-      <Box marginTop={1}>
+    <Surface title={copy.title} subtitle={copy.subtitle} footer={footer} tone="primary">
+      {body}
+      <Box marginTop={body ? 1 : 0}>
         <Select<'confirm' | 'back'>
           options={[
-            { value: 'confirm', label: confirmLabel },
+            { value: 'confirm', label: status.hasLocalChanges ? copy.discard : copy.confirm },
             { value: 'back', label: 'Back', role: 'utility' },
           ]}
+          initialIndex={destructive ? 1 : 0}
           hintLayout="inline"
           onSubmit={choice => {
             if (choice === 'confirm') return onConfirm()
@@ -67,34 +90,4 @@ export const RecoveryConfirmScreen: React.FC<RecoveryConfirmScreenProps> = ({ mo
       </Box>
     </Surface>
   )
-}
-
-const OverwriteStatusLine: React.FC<{ status: LocalChangeStatusView; pendingPublish?: boolean }> = ({ status, pendingPublish }) => (
-  <Box flexDirection="column">
-    <Text color={theme.textSubtle}>Unsaved local changes detected:</Text>
-    <Text color={theme.accentError} bold>{status.files.length > 0 ? status.files.join(', ') : 'local files differ from saved snapshot'}</Text>
-    <Text color={theme.accentError}>
-      Continuing replaces those files with the restored snapshot.
-    </Text>
-    {pendingPublish ? (
-      <Text color={theme.accentError}>Local snapshot is also ahead of onchain.</Text>
-    ) : null}
-  </Box>
-)
-
-const SaveSnapshotStatusLine: React.FC<{ status: LocalChangeStatusView }> = ({ status }) => {
-  if (status.hasLocalChanges) {
-    return (
-      <Box flexDirection="column">
-        <Text color={theme.textSubtle}>Local changes detected:</Text>
-        <Text color={theme.accentError} bold>{status.files.length > 0 ? status.files.join(', ') : 'local files differ from saved snapshot'}</Text>
-      </Box>
-    )
-  }
-
-  if (!status.detail) return null
-
-  const color = status.tone === 'ok' || status.tone === 'warn' ? theme.accentPeriwinkle : theme.dim
-  const label = status.detail === 'None detected' ? 'No local changes detected.' : status.detail
-  return <Text color={color}>{label}</Text>
 }

@@ -1,16 +1,17 @@
 import { getAddress, type Address } from 'viem'
-import type { AgentEnsRecords, AgentRecordDiff } from '../../ens/agentRecords.js'
+import { AGENT_TOKEN_RECORD_KEY, type AgentEnsRecords, type AgentRecordDiff } from '../../ens/agentRecords.js'
 import type { EnsSetupBlockedPlan } from '../../ens/ensAutomation.js'
 import type { CustodyMode } from '../custody/state.js'
+import { networkName } from '../shared/model/network.js'
 
 export function abbreviateHexBlobs(input: string): string {
   return input.replace(/0x([0-9a-fA-F]{20,})/g, (_match, hex) => {
-    return `0x${hex.slice(0, 8)}...${hex.slice(-8)}`
+    return `0x${hex.slice(0, 8)}…${hex.slice(-8)}`
   })
 }
 
 export function abbreviateRecordValue(input: string): string {
-  return abbreviateHexBlobs(input).replace(/\bbaf[a-z2-7]{30,}/g, cid => `${cid.slice(0, 10)}...${cid.slice(-6)}`)
+  return abbreviateHexBlobs(input).replace(/\bbaf[a-z2-7]{30,}/g, cid => `${cid.slice(0, 10)}…${cid.slice(-6)}`)
 }
 
 export type EnsLinkOptions = {
@@ -42,52 +43,77 @@ export function discoveryErrorMessage(errors: string[]): string {
   return errors.find(Boolean) ?? 'ENS lookup failed'
 }
 
-export function modeSwitchHeading(
-  currentEnsName: string,
-  currentMode: CustodyMode | undefined,
-  nextEnsName: string,
-  nextMode: 'simple' | 'advanced',
-): string {
-  if (!currentEnsName && !currentMode) return 'Automation'
-  const currentTopology = currentMode === 'advanced' ? 'advanced' : currentMode === 'simple' ? 'simple' : undefined
-  const modeChanged = currentTopology !== undefined && currentTopology !== nextMode
-  if (modeChanged) return 'Prepare ENS Setup Switch'
-  if (currentEnsName !== nextEnsName) return 'Prepare ENS Name Switch'
-  return 'Automation'
+function chainIdFromInteropAddress(hex: string): number | null {
+  const body = hex.replace(/^0x/i, '')
+  if (body.length < 10) return null
+  const referenceLength = parseInt(body.slice(8, 10), 16)
+  if (!Number.isFinite(referenceLength) || referenceLength === 0) return null
+  const reference = body.slice(10, 10 + referenceLength * 2)
+  const chainId = parseInt(reference, 16)
+  return Number.isFinite(chainId) && chainId > 0 ? chainId : null
 }
 
-export function networkLabelForChainId(chainId: number): string {
-  switch (chainId) {
-    case 1: return 'Ethereum Mainnet'
-    case 8453: return 'Base'
-    default: return `Chain ${chainId}`
+export function recordTokenTarget(key: string, value: string): string | null {
+  const ensip25 = /^agent-registration\[(0x[0-9a-fA-F]+)\]\[([^\]]+)\]$/.exec(key)
+  if (ensip25) {
+    const chainId = chainIdFromInteropAddress(ensip25[1]!)
+    return `token #${ensip25[2]}${chainId ? ` on ${networkName(chainId)}` : ''}`
   }
+  if (key === AGENT_TOKEN_RECORD_KEY) {
+    const reference = /^eip155:(\d+):0x[0-9a-fA-F]{40}:(\S+)$/.exec(value)
+    if (reference) return `token #${reference[2]} on ${networkName(Number(reference[1]))}`
+  }
+  return null
+}
+
+export function describeRecordChanges(recordsDiff: AgentRecordDiff[]): string[] {
+  const lines: string[] = []
+  for (const diff of recordsDiff) {
+    if (!diff.changed) continue
+    const target = recordTokenTarget(diff.key, diff.next || diff.current)
+    const line = target
+      ? diff.next ? `Link to ${target}` : `Remove the link to ${target}`
+      : diff.next ? `Set ${abbreviateRecordValue(diff.key)}` : `Clear ${abbreviateRecordValue(diff.key)}`
+    if (!lines.includes(line)) lines.push(line)
+  }
+  return lines
+}
+
+export function describeCurrentRecords(recordsDiff: AgentRecordDiff[]): string[] {
+  const lines: string[] = []
+  for (const diff of recordsDiff) {
+    if (!diff.current.trim()) continue
+    const target = recordTokenTarget(diff.key, diff.current)
+    const line = target ? `Remove the link to ${target}` : `Clear ${abbreviateRecordValue(diff.key)}`
+    if (!lines.includes(line)) lines.push(line)
+  }
+  return lines
 }
 
 export function manualReasonTitle(reason: EnsSetupBlockedPlan['reason']): string {
   switch (reason) {
     case 'wrapped-parent':
     case 'subdomain-wrapped':
-      return 'ENS NameWrapper ownership could not be verified'
+      return 'The NameWrapper owner of this name could not be confirmed.'
     case 'token-owner-mismatch':
-      return 'Owner wallet does not own this ERC-8004 token'
+      return 'The owner wallet does not hold this agent token.'
     case 'token-owner-lookup-failed':
-      return 'Could not verify ERC-8004 token owner'
+      return 'The agent token owner could not be confirmed.'
     case 'parent-missing-resolver':
-      return 'Parent ENS name needs a resolver'
+      return 'The parent name needs a resolver first.'
     case 'subdomain-owned-by-other':
-      return 'Subdomain is managed by another wallet'
+      return 'Another wallet controls this subdomain.'
     case 'operator-matches-owner':
-      return 'Operator wallet must be separate'
+      return 'The operator wallet must differ from the owner wallet.'
     case 'root-not-owned':
-      return 'Parent ENS name is not manageable'
+      return 'This wallet does not manage the parent name.'
     case 'root-owner-mismatch':
-      return 'Connected wallet does not manage the parent ENS name'
+      return 'The connected wallet does not manage the parent name.'
     case 'invalid-root':
     case 'invalid-label':
     case 'missing-token-id':
     case 'lookup-failed':
-      return 'ENS setup needs attention'
+      return 'The name could not be checked.'
   }
 }
 

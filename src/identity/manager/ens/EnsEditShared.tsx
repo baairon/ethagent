@@ -2,160 +2,100 @@ import React from 'react'
 import { Box, Text } from 'ink'
 import type { Address } from 'viem'
 import { Surface } from '../../../ui/Surface.js'
+import { Paragraph } from '../../../ui/Paragraph.js'
 import { TextInput } from '../../../ui/TextInput.js'
+import { Spinner } from '../../../ui/Spinner.js'
 import { theme } from '../../../ui/theme.js'
-import {
-  isEthDomain,
-  sanitizeSubdomainPrefix,
-} from '../../ens/ensLookup.js'
-import {
-  displayCustodyMode,
-  readIdentityStateString,
-  type CustodyMode,
-} from '../custody/state.js'
-import { ensValidationReasonText } from './state.js'
+import { sanitizeSubdomainPrefix } from '../../ens/ensLookup.js'
 import { shortAddress } from '../shared/model/format.js'
-import { FieldRow } from '../shared/components/FieldRow.js'
-import { readValidationFromState } from './editCopy.js'
-import type { EnsEditProps } from './types.js'
+import { FieldList } from '../shared/components/FieldRow.js'
+import { EscCancel } from './EnsEditRunners.js'
 
 export const footerHint = (hint: string) => <Text color={theme.dim}>{hint}</Text>
-
-import { abbreviateRecordValue } from './editCopy.js'
-
-export const renderRecordValue = (value: string) =>
-  value
-    ? <Text color={theme.accentPeriwinkle}>{abbreviateRecordValue(value)}</Text>
-    : <Text color={theme.dim}>Unset</Text>
 
 export function rootErrorMessage(
   reason: 'invalid-root' | 'missing-token-id' | 'root-not-owned' | 'wrapped-parent' | 'root-owner-mismatch' | 'token-owner-mismatch' | 'token-owner-lookup-failed' | 'lookup-failed',
   detail: string,
   rootName: string,
 ): string {
+  const extra = detail ? ` ${detail}` : ''
   switch (reason) {
     case 'invalid-root':
-      return 'Enter the parent .eth name, e.g. name.eth'
+      return 'Enter a top-level .eth name.'
     case 'missing-token-id':
-      return 'This identity is missing an ERC-8004 token id'
+      return 'This agent has no token id yet.'
     case 'root-not-owned':
-      return `${rootName} does not have an ENS manager on Ethereum mainnet. Switch wallets or pick a different parent name.`
+      return `This wallet does not manage ${rootName} on Ethereum Mainnet. Switch wallets or choose another name.`
     case 'wrapped-parent':
-      return `${rootName} ENS NameWrapper ownership could not be verified: ${detail}`
+      return `The NameWrapper owner of ${rootName} could not be confirmed.${extra}`
     case 'root-owner-mismatch':
-      return `Connected wallet does not manage ${rootName}. ${detail}`
+      return `This wallet does not manage ${rootName}.${extra}`
     case 'token-owner-mismatch':
-      return `Connected wallet manages ${rootName} but does not own this ERC-8004 token. ${detail}. Move the token to this wallet, then submit again.`
+      return `This wallet manages ${rootName} but does not hold the agent token. Move the token here, then try again.`
     case 'token-owner-lookup-failed':
-      return `Could not verify ERC-8004 token owner: ${detail}`
+      return `The agent token owner could not be confirmed.${extra}`
     case 'lookup-failed':
-      return `ENS lookup failed: ${detail}`
+      return `The ENS lookup failed.${extra}`
   }
-}
-
-export const EnsSetupRow: React.FC<{ label: string; value: string; muted?: boolean }> = ({ label, value, muted }) => (
-  <Box flexDirection="row">
-    <Box width={16} flexShrink={0}>
-      <Text color={theme.dim}>{label}</Text>
-    </Box>
-    <Box flexShrink={1}>
-      <Text color={muted ? theme.dim : theme.text}>{value}</Text>
-    </Box>
-  </Box>
-)
-
-export const EnsStatusBanner: React.FC<{ identity: EnsEditProps['identity']; noRootEnsName?: boolean }> = ({ identity, noRootEnsName }) => {
-  const ensName = readIdentityStateString(identity.state, 'ensName')
-  if (!ensName) {
-    const status = noRootEnsName
-      ? 'Not Linked. This wallet does not own a root .eth ENS name.'
-      : 'Not Linked. Choose a setup below.'
-    return <FieldRow label="Status:" labelWidth={8} value={<Text color={theme.dim}>{status}</Text>} />
-  }
-  const validation = readValidationFromState(identity.state)
-  if (validation?.ok) {
-    return <FieldRow label="Status:" labelWidth={8} value={<Text color={theme.accentPeriwinkle}>linked, {ensName}</Text>} />
-  }
-  return (
-    <FieldRow
-      label="Status:"
-      labelWidth={8}
-      value={<Text color={theme.accentError}>issue, {ensName} ({ensValidationReasonText(validation?.reason)})</Text>}
-    />
-  )
-}
-
-type AssignEnsCurrentSetupProps = {
-  currentEnsName: string
-  currentMode: CustodyMode | undefined
-  ownerAddress: string
-  operatorAddress: string
-  tokenNetworkLabel: string
-}
-
-export const AssignEnsCurrentSetup: React.FC<AssignEnsCurrentSetupProps> = ({
-  currentEnsName,
-  currentMode,
-  ownerAddress,
-  operatorAddress,
-  tokenNetworkLabel,
-}) => {
-  const modeLabel = displayCustodyMode(currentMode)
-  return (
-    <Box marginTop={1} flexDirection="column">
-      <Text color={theme.dim}>Current Setup</Text>
-      <EnsSetupRow label="ENS name" value={currentEnsName || 'None'} muted={!currentEnsName} />
-      <EnsSetupRow label="Custody" value={modeLabel} />
-      <EnsSetupRow label="ENS network" value="Ethereum Mainnet" />
-      <EnsSetupRow label="Token network" value={tokenNetworkLabel} />
-      {currentMode === 'advanced'
-        ? (
-          <>
-            {ownerAddress ? <EnsSetupRow label="Owner wallet" value={shortAddress(ownerAddress)} /> : null}
-            {operatorAddress ? <EnsSetupRow label="Operator wallet" value={shortAddress(operatorAddress)} /> : null}
-          </>
-          )
-        : null}
-    </Box>
-  )
 }
 
 type SubdomainEntryProps = {
   parent: string
-  ownerAddress: Address
+  pointsTo: Address
   initialValue?: string
-  placeholder?: string
   error?: string
-  onConfirm: (fullName: string) => void
+  onConfirm: (label: string) => void
   onBack: () => void
 }
 
-export const SubdomainEntry: React.FC<SubdomainEntryProps> = ({ parent, ownerAddress, initialValue, placeholder, error, onConfirm, onBack }) => (
-  <Surface
-    title={`Subdomain of ${parent}`}
-    footer={footerHint('↵ continues · esc back')}
-  >
-    {error ? <Text color={theme.accentError}>{error}</Text> : null}
-    <TextInput
-      key={`edit-ens-subdomain-${parent}`}
-      initialValue={initialValue ?? ''}
-      placeholder={placeholder || 'subdomain name'}
-      validate={value => {
-        const v = sanitizeSubdomainPrefix(value)
-        if (!v) return 'Subdomain name cannot be empty'
-        if (value.includes('.')) return 'Enter only the subdomain name, not the full ENS name'
-        if (!isEthDomain(`${v}.${parent}`)) return 'Invalid characters in subdomain name'
-        return null
-      }}
-      onSubmit={value => {
-        const prefix = sanitizeSubdomainPrefix(value)
-        if (!prefix) return
-        onConfirm(`${prefix}.${parent}`)
-      }}
-      onCancel={onBack}
-    />
-    <Box marginTop={1}>
-      <Text color={theme.dim}>Wallet: {shortAddress(ownerAddress)}</Text>
-    </Box>
+export const SubdomainEntry: React.FC<SubdomainEntryProps> = ({ parent, pointsTo, initialValue, error, onConfirm, onBack }) => {
+  const [draft, setDraft] = React.useState(initialValue ?? '')
+  const label = sanitizeSubdomainPrefix(draft.trim())
+  return (
+    <Surface
+      title="Name Your Subdomain"
+      subtitle={`Choose the part that comes before .${parent}.`}
+      footer={footerHint('↵ continue · esc back')}
+    >
+      {error ? <Box marginBottom={1}><Paragraph color={theme.accentError}>{error}</Paragraph></Box> : null}
+      <TextInput
+        key={`ens-subdomain-${parent}`}
+        initialValue={initialValue ?? ''}
+        placeholder="subdomain"
+        onChange={setDraft}
+        validate={value => {
+          const trimmed = value.trim()
+          const next = sanitizeSubdomainPrefix(trimmed)
+          if (!next) return 'Enter a subdomain.'
+          if (trimmed.includes('.')) return `Enter only the part before .${parent}.`
+          if (next !== trimmed.toLowerCase()) return 'Use lowercase letters, numbers, and hyphens.'
+          return null
+        }}
+        onSubmit={value => {
+          const next = sanitizeSubdomainPrefix(value.trim())
+          if (next) onConfirm(next)
+        }}
+        onCancel={onBack}
+      />
+      <Box marginTop={1}>
+        <FieldList fields={[
+          { label: 'Full name', value: `${label || 'subdomain'}.${parent}`, valueColor: label ? theme.accentPeriwinkle : theme.dim },
+          { label: 'Points to', value: shortAddress(pointsTo) },
+        ]} />
+      </Box>
+    </Surface>
+  )
+}
+
+export const CheckingScreen: React.FC<{ title: string; subtitle: string; children: React.ReactNode }> = ({ title, subtitle, children }) => (
+  <Surface title={title} subtitle={subtitle} footer={footerHint('esc cancel')}>
+    {children}
   </Surface>
+)
+
+export const CheckingName: React.FC<{ fullName: string; subtitle?: string; onCancel: () => void }> = ({ fullName, subtitle, onCancel }) => (
+  <CheckingScreen title={`Checking ${fullName}`} subtitle={subtitle ?? 'Reading its ENS records on Ethereum Mainnet.'}>
+    <Spinner label="Checking the name…" />
+    <EscCancel onCancel={onCancel} />
+  </CheckingScreen>
 )

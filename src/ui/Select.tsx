@@ -1,17 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Box, Text, useStdout } from 'ink'
-import { theme, PANEL_WIDTH, gradientColor } from './theme.js'
+import { theme, gradientColor } from './theme.js'
+import { useContentWidth } from './layout.js'
+import { wrapWords } from './text.js'
 import { useAppInput } from '../app/input/AppInputProvider.js'
 
-const CONTENT_WIDTH = PANEL_WIDTH - 4
 const SELECT_CHROME_ROWS = 17
 const MIN_VISIBLE = 4
-
-export function fitHint(hint: string, budget: number): string {
-  if (budget < 8) return ''
-  if (hint.length <= budget) return hint
-  return `${hint.slice(0, budget - 1)}…`
-}
+const CURSOR_WIDTH = 2
+const HINT_GAP = 2
 
 function rainbowColor(index: number, total: number): string {
   return gradientColor(total <= 1 ? 0 : index / (total - 1))
@@ -43,6 +40,24 @@ type SelectProps<T> = {
   onHighlight?: (value: T) => void
 }
 
+function isSectionOption<T>(option: SelectOption<T>): boolean {
+  return option.role === 'section' || option.role === 'group'
+}
+
+function optionLabelText<T>(option: SelectOption<T>): string {
+  return option.prefix && !isSectionOption(option) ? `${option.prefix} ${option.label}` : option.label
+}
+
+function inlineHintColumn<T>(options: Array<SelectOption<T>>, contentWidth: number): number {
+  let column = 0
+  for (const option of options) {
+    if (!option.hint || isSectionOption(option)) continue
+    const start = (option.indent ?? 0) + CURSOR_WIDTH + optionLabelText(option).length + HINT_GAP
+    if (start + option.hint.length <= contentWidth) column = Math.max(column, start)
+  }
+  return column
+}
+
 export function Select<T>({
   label,
   options,
@@ -65,6 +80,7 @@ export function Select<T>({
     setIndex(start === -1 ? 0 : start)
   }, [optionsSignature, start])
 
+  const contentWidth = useContentWidth()
   const { stdout } = useStdout()
   const [termRows, setTermRows] = useState<number | undefined>(stdout?.rows)
   useEffect(() => {
@@ -83,7 +99,7 @@ export function Select<T>({
   const visibleOptions = options.slice(windowStart, windowEnd)
   const hasAbove = windowStart > 0
   const hasBelow = windowEnd < options.length
-  const usesInlineSections = hintLayout === 'inline' && options.some(option => option.role === 'section' || option.role === 'group')
+  const hintColumn = hintLayout === 'inline' ? inlineHintColumn(options, contentWidth) : 0
 
   const moveBy = (delta: number) => {
     if (options.length === 0) return
@@ -118,64 +134,73 @@ export function Select<T>({
       ) : null}
       {visibleOptions.map((option, visibleIndex) => {
         const absoluteIndex = windowStart + visibleIndex
+        const indent = option.indent ?? 0
+        const textWidth = Math.max(8, contentWidth - indent - CURSOR_WIDTH)
+
+        if (isSectionOption(option)) {
+          return (
+            <Box key={absoluteIndex} flexDirection="column" marginLeft={indent}>
+              <Text color={option.labelColor ?? theme.textSubtle} bold={option.bold ?? true}>{option.label || ' '}</Text>
+              {option.hint ? <Text color={option.hintColor ?? theme.dim}>{wrapWords(option.hint, contentWidth - indent).join('\n')}</Text> : null}
+            </Box>
+          )
+        }
+
         const isActive = absoluteIndex === index
         const selectable = isSelectableOption(option)
         const disabled = !!option.disabled
-        const cursor = !selectable ? ' ' : isActive ? '❯' : ' '
-        const isSection = option.role === 'section' || option.role === 'group'
-        const prefix = option.prefix && !isSection ? `${option.prefix} ` : ''
-        const rowIndent = option.indent ?? (usesInlineSections ? isSection ? 1 : 3 : 0)
-        const prefixColor = disabled
-          ? option.labelColor ?? theme.border
-          : isActive && selectable
-            ? theme.accentPeriwinkle
-            : option.labelColor ?? theme.dim
-        const labelColor = isSection
-          ? option.labelColor ?? theme.textSubtle
-          : isActive && selectable
-            ? theme.accentPeriwinkle
-            : option.labelColor ?? (disabled ? theme.dim : theme.text)
-        const hintColor = isActive && selectable
+        const highlighted = isActive && selectable
+        const cursor = highlighted ? '❯' : ' '
+        const labelText = optionLabelText(option)
+        const labelColor = highlighted
+          ? theme.accentPeriwinkle
+          : option.labelColor ?? (disabled ? theme.dim : theme.text)
+        const hintColor = highlighted
           ? theme.textSubtle
           : disabled
             ? theme.border
             : option.hintColor ?? theme.dim
         const subtextColor = disabled ? theme.border : option.subtextColor ?? theme.dim
-        const bold = option.bold ?? (isSection || (isActive && selectable))
-        const label = fitHint(option.label, Math.max(8, CONTENT_WIDTH - rowIndent - prefix.length - 2))
-        const inlineHint = Boolean(option.hint && hintLayout === 'inline' && !isSection)
-        const belowHint = Boolean(option.hint && (!inlineHint || isSection))
-        const inlineHintText = inlineHint
-          ? fitHint(option.hint ?? '', CONTENT_WIDTH - rowIndent - prefix.length - label.length - 4)
-          : ''
-        const belowHintText = belowHint
-          ? fitHint(option.hint ?? '', CONTENT_WIDTH - rowIndent - 2)
-          : ''
-        const showActiveGradient = isActive && selectable && !isSection && label.length > 0
+        const bold = option.bold ?? highlighted
+        const hint = option.hint ?? ''
+        const labelEnd = indent + CURSOR_WIDTH + labelText.length
+        const inlineHint = Boolean(
+          hint
+          && hintLayout === 'inline'
+          && hintColumn > 0
+          && labelEnd + HINT_GAP <= hintColumn
+          && hintColumn + hint.length <= contentWidth,
+        )
+        const belowHint = Boolean(hint) && !inlineHint
+        const gap = inlineHint ? ' '.repeat(hintColumn - labelEnd) : ''
         return (
-          <Box key={absoluteIndex} flexDirection="column">
-            <Box flexDirection="row" marginLeft={rowIndent}>
-              <Text color={prefixColor}>{cursor} </Text>
-              {prefix ? <Text color={prefixColor}>{prefix}</Text> : null}
-              {showActiveGradient ? (
-                <Text>
-                  {label.split('').map((ch, ci) => (
-                    <Text key={ci} color={rainbowColor(ci, label.length)}>{ch}</Text>
-                  ))}
-                </Text>
-              ) : (
-                <Text color={labelColor} bold={bold}>{label}</Text>
-              )}
-              {inlineHint && inlineHintText ? <Text color={hintColor}>  {inlineHintText}</Text> : null}
+          <Box key={absoluteIndex} flexDirection="column" marginLeft={indent}>
+            <Box flexDirection="row">
+              <Text color={highlighted ? theme.accentPeriwinkle : theme.dim}>{cursor} </Text>
+              <Box flexShrink={1}>
+                {highlighted && labelText.length > 0 ? (
+                  <Text>
+                    {labelText.split('').map((ch, ci) => (
+                      <Text key={ci} color={rainbowColor(ci, labelText.length)}>{ch}</Text>
+                    ))}
+                    {inlineHint ? <Text color={hintColor}>{gap}{hint}</Text> : null}
+                  </Text>
+                ) : (
+                  <Text>
+                    <Text color={labelColor} bold={bold}>{labelText}</Text>
+                    {inlineHint ? <Text color={hintColor}>{gap}{hint}</Text> : null}
+                  </Text>
+                )}
+              </Box>
             </Box>
             {option.subtext ? (
-              <Box marginLeft={2 + rowIndent}>
-                <Text color={subtextColor}>{option.subtext}</Text>
+              <Box marginLeft={CURSOR_WIDTH}>
+                <Text color={subtextColor}>{wrapWords(option.subtext, textWidth).join('\n')}</Text>
               </Box>
             ) : null}
-            {belowHint && belowHintText ? (
-              <Box marginLeft={2 + rowIndent}>
-                <Text color={hintColor}>{belowHintText}</Text>
+            {belowHint ? (
+              <Box marginLeft={CURSOR_WIDTH}>
+                <Text color={hintColor}>{wrapWords(hint, textWidth).join('\n')}</Text>
               </Box>
             ) : null}
           </Box>

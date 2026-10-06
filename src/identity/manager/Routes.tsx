@@ -3,6 +3,7 @@ import { Box, Text } from 'ink'
 import { getAddress, isAddress } from 'viem'
 import { Surface } from '../../ui/Surface.js'
 import { Select } from '../../ui/Select.js'
+import { Paragraph } from '../../ui/Paragraph.js'
 import { theme } from '../../ui/theme.js'
 import type { EthagentIdentity, SelectableNetwork } from '../../storage/config.js'
 import { copyToClipboard } from '../../utils/clipboard.js'
@@ -80,26 +81,21 @@ export const IdentityManagerRoutes: React.FC<{ controller: IdentityManagerContro
   }
 
   if (step.kind === 'first-run-ens-prompt') {
-    const tokenLabel = step.identity.agentId ? `#${step.identity.agentId}` : ''
+    const tokenLabel = step.identity.agentId ? `Token #${step.identity.agentId}` : 'Your agent'
     return (
       <Surface
-        title={step.origin === 'restore' ? 'Agent Restored' : 'Token Minted'}
-        subtitle={`${tokenLabel} is live. Optional: link an ENS name.`}
+        title={step.origin === 'restore' ? 'Agent Restored' : 'Agent Created'}
+        subtitle={`${tokenLabel} is live.`}
         footer={footer}
       >
-        <Box flexDirection="column">
-          <Text color={theme.textSubtle}>An ENS name like agent.you.eth gives your agent a public handle.</Text>
-          <Text color={theme.textSubtle}>Optional. The token id and network already make it restorable.</Text>
-        </Box>
+        <Paragraph color={theme.textSubtle}>Want an ENS name for it? It is optional. The token id already makes your agent restorable.</Paragraph>
         <Box marginTop={1}>
           <Select<'ens' | 'later'>
             options={[
-              { value: 'ens', role: 'section', label: 'Set Up Now' },
-              { value: 'ens', label: 'Set Up ENS Name', hint: 'Root → Name → Apply' },
-              { value: 'later', role: 'section', label: 'Later' },
-              { value: 'later', label: 'Add ENS Later', hint: 'Name it anytime from the menu', role: 'utility' },
+              { value: 'ens', label: 'Choose an ENS Name' },
+              { value: 'later', label: 'Not Now', hint: 'Add one anytime from ENS Name', role: 'utility' },
             ]}
-            hintLayout="below"
+            hintLayout="inline"
             onSubmit={choice => {
               if (choice === 'later') {
                 finishFirstRunIdentity()
@@ -339,14 +335,13 @@ export const IdentityManagerRoutes: React.FC<{ controller: IdentityManagerContro
       <DetailsScreen
         identity={identity}
         config={config}
-        workingStatus={workingStatus}
         copyNotice={copyNotice}
         unlinked={reconciliation?.token === 'unlinked'}
         {...(reconciliation?.onChainOwner ? { onchainOwner: reconciliation.onChainOwner } : {})}
         footer={footer}
         onCopy={async (label, value) => {
           const result = await copyToClipboard(value)
-          setCopyNotice(result.ok ? `${label} copied to clipboard.` : `copy failed: ${result.error}`)
+          setCopyNotice(result.ok ? `${label} copied to clipboard.` : `Copy failed: ${result.error}`)
           setStep({ kind: 'details' })
         }}
         onBack={back}

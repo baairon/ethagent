@@ -1,147 +1,83 @@
 import React from 'react'
-import { Box, Text } from 'ink'
-import { getAddress, type Address } from 'viem'
+import { Box } from 'ink'
 import { Surface } from '../../../ui/Surface.js'
-import { Select, type SelectOption } from '../../../ui/Select.js'
+import { Select } from '../../../ui/Select.js'
+import { Paragraph } from '../../../ui/Paragraph.js'
 import { theme } from '../../../ui/theme.js'
-import type {
-  AgentEnsRecords,
-  AgentRecordDiff,
-} from '../../ens/agentRecords.js'
+import { plural } from '../../../ui/text.js'
+import type { AgentRecordDiff } from '../../ens/agentRecords.js'
 import type { EnsValidation } from '../../ens/ensLookup.js'
 import type {
   EnsSetupBlockedPlan,
   EnsSetupPlan,
 } from '../../ens/ensAutomation.js'
-import { createErc8004PublicClient, type Erc8004RegistryConfig } from '../../registry/erc8004.js'
-import {
-  displayCustodyMode,
-  type CustodyMode,
-} from '../custody/state.js'
 import { ensValidationReasonText } from './state.js'
 import { shortAddress } from '../shared/model/format.js'
-import { FieldRow } from '../shared/components/FieldRow.js'
+import { FieldList } from '../shared/components/FieldRow.js'
 import {
-  abbreviateRecordValue,
+  describeCurrentRecords,
+  describeRecordChanges,
   manualReasonTitle,
-  modeSwitchHeading,
 } from './editCopy.js'
-import {
-  EnsSetupRow,
-  footerHint,
-  renderRecordValue,
-} from './EnsEditShared.js'
-import type { EnsIssueValidation } from './types.js'
+import { footerHint } from './EnsEditShared.js'
 
-type SimpleEnsIssueScreenProps = {
-  fullName: string
-  validation: EnsIssueValidation
-  onCreate: () => void
-  onCheckAgain: () => void
-  onChange: () => void
-  onBack: () => void
-}
+const FOOTER = footerHint('↵ select · esc back')
 
-export const SimpleEnsIssueScreen: React.FC<SimpleEnsIssueScreenProps> = ({
-  fullName,
-  validation,
-  onCreate,
-  onCheckAgain,
-  onChange,
-  onBack,
-}) => {
-  type Action = 'create' | 'check-again' | 'change' | 'back'
-  const reason = ensValidationReasonText(validation.reason)
-  const showDetail = validation.detail && validation.detail !== reason
-  return (
-    <Surface
-      title="ENS Name Not Found"
-      footer={footerHint('↵ select · esc back')}
-    >
-      <Box flexDirection="column">
-        <Text color={theme.dim}>The subdomain is not on Ethereum Mainnet yet. You can create it from here.</Text>
-        <FieldRow label="Name" labelWidth={12} value={<Text color={theme.text} bold>{fullName}</Text>} />
-        <FieldRow label="Reason" labelWidth={12} value={<Text color={theme.accentError}>{reason}</Text>} />
-        {showDetail ? <Text color={theme.dim}>{validation.detail}</Text> : null}
-      </Box>
-      <Box marginTop={1}>
-        <Select<Action>
-          options={[
-            { value: 'create', label: 'Create This ENS Name' },
-            { value: 'change', label: 'Pick A Different Name' },
-            { value: 'back', label: 'Back', role: 'utility' },
-          ]}
-          hintLayout="inline"
-          onSubmit={choice => {
-            if (choice === 'create') return onCreate()
-            if (choice === 'check-again') return onCheckAgain()
-            if (choice === 'change') return onChange()
-            return onBack()
-          }}
-          onCancel={onBack}
-        />
-      </Box>
-    </Surface>
-  )
+function gasLine(txCount: number): string {
+  return txCount === 1
+    ? 'One wallet transaction on Ethereum Mainnet. It needs gas.'
+    : `${plural(txCount, 'wallet transaction')} on Ethereum Mainnet. Each needs gas.`
 }
 
 type EnsSetupReviewScreenProps = {
   setup: EnsSetupPlan
   currentEnsName: string
-  currentMode: CustodyMode | undefined
-  registry: Erc8004RegistryConfig
   onBegin: () => void
+  onChange: () => void
   onBack: () => void
 }
 
 export const EnsSetupReviewScreen: React.FC<EnsSetupReviewScreenProps> = ({
   setup,
   currentEnsName,
-  currentMode,
-  registry,
   onBegin,
+  onChange,
   onBack,
 }) => {
-  type Action = 'begin' | 'back'
-  const isSimple = setup.mode === 'simple'
-  const createLabel = setup.registryAction === 'create-subdomain'
-    ? 'Create Subdomain'
-    : setup.registryAction === 'create-wrapped-subdomain'
-      ? 'Create Wrapped Subdomain'
-    : setup.registryAction === 'set-resolver'
-      ? 'Set Resolver'
-      : setup.registryAction === 'set-wrapped-resolver'
-        ? 'Set Wrapped Resolver'
-        : 'Subdomain Ready'
-  const reusingExistingSubdomain = setup.registryAction === 'none'
+  type Action = 'begin' | 'change' | 'back'
+  const creates = setup.registryAction === 'create-subdomain' || setup.registryAction === 'create-wrapped-subdomain'
+  const records = describeRecordChanges(setup.recordDiffs)
+  const signer = setup.mode === 'simple' ? 'Connected wallet' : 'Owner wallet'
   return (
     <Surface
-      title={isSimple ? 'Create Simple ENS Name' : 'Create ENS Name'}
-      footer={footerHint('↵ select · esc back')}
+      title={creates ? `Create ${setup.fullName}` : `Set Up ${setup.fullName}`}
+      subtitle={setup.txCount > 0 ? gasLine(setup.txCount) : 'No transaction needed. This only links the name to your agent.'}
+      footer={FOOTER}
     >
-      {reusingExistingSubdomain ? (
-        <Box marginBottom={1}>
-          <Text color={theme.accentPeriwinkle}>Subdomain detected from a prior attempt, reusing.</Text>
-        </Box>
+      <FieldList fields={[
+        { label: 'Name', value: setup.fullName, valueColor: theme.accentPeriwinkle },
+        { label: 'Points to', value: `${shortAddress(setup.addressRecord.next)}${setup.addressRecord.changed ? '' : ' (already set)'}` },
+        { label: 'Records', value: records.length > 0 ? records.join('\n') : 'Already set' },
+        { label: 'Signs with', value: `${signer} ${shortAddress(setup.ownerAddress)}` },
+        currentEnsName && currentEnsName !== setup.fullName ? { label: 'Replaces', value: currentEnsName } : null,
+      ]} />
+      {setup.registryAction === 'none' ? (
+        <Box marginTop={1}><Paragraph color={theme.dim}>This subdomain exists from an earlier attempt and will be reused.</Paragraph></Box>
       ) : null}
-      <Box flexDirection="column">
-        <Text color={theme.dim}>{modeSwitchHeading(currentEnsName, currentMode, setup.fullName, setup.mode)}</Text>
-        <EnsSetupRow label="ENS name" value={setup.fullName} />
-        <EnsSetupRow label="Parent root" value={setup.rootName} />
-        <EnsSetupRow label="Subdomain label" value={setup.label} />
-        <EnsSetupRow label="ENS network" value="Ethereum Mainnet" />
-        <EnsSetupRow label="Signer wallet" value={`${shortAddress(setup.ownerAddress)} (${isSimple ? 'connected' : 'owner'})`} />
-        <EnsSetupRow label="Registry action" value={createLabel} />
-      </Box>
+      {setup.warnings.map(warning => (
+        <Box key={warning} marginTop={1}><Paragraph color={theme.accentError}>{warning}</Paragraph></Box>
+      ))}
       <Box marginTop={1}>
         <Select<Action>
           options={[
-            { value: 'begin', label: 'Continue Setup' },
+            { value: 'begin', label: creates ? 'Create Name' : setup.txCount > 0 ? 'Set Up Name' : 'Link Name' },
+            { value: 'change', label: 'Choose Another Name' },
             { value: 'back', label: 'Back', role: 'utility' },
           ]}
           hintLayout="inline"
           onSubmit={choice => {
             if (choice === 'begin') return onBegin()
+            if (choice === 'change') return onChange()
             return onBack()
           }}
           onCancel={onBack}
@@ -154,54 +90,37 @@ export const EnsSetupReviewScreen: React.FC<EnsSetupReviewScreenProps> = ({
 type EnsSetupBlockedScreenProps = {
   fallback: EnsSetupBlockedPlan
   onCheckAgain: () => void
+  onChange: () => void
   onBack: () => void
 }
 
 export const EnsSetupBlockedScreen: React.FC<EnsSetupBlockedScreenProps> = ({
   fallback,
   onCheckAgain,
+  onChange,
   onBack,
 }) => {
-  type Action = 'check' | 'back'
-  const isSimple = fallback.mode === 'simple'
+  type Action = 'check' | 'change' | 'back'
+  const title = manualReasonTitle(fallback.reason)
   return (
-    <Surface
-      title="ENS Setup Blocked"
-      footer={footerHint('↵ select · esc back')}
-    >
-      <Box flexDirection="column">
-        <Text color={theme.accentError}>{manualReasonTitle(fallback.reason)}</Text>
-        <Text color={theme.dim}>{fallback.detail}</Text>
-        <Box marginTop={1} flexDirection="column">
-          <EnsSetupRow label="Agent ENS" value={fallback.fullName} />
-          {isSimple
-            ? <EnsSetupRow label="Wallet" value={fallback.ownerAddress ? shortAddress(fallback.ownerAddress) : shortAddress(fallback.operatorAddress)} />
-            : (fallback.ownerAddress ? <EnsSetupRow label="Owner wallet" value={shortAddress(fallback.ownerAddress)} /> : null)}
-          {fallback.nextRecords && Object.keys(fallback.nextRecords).length > 0
-            ? <EnsSetupRow label="Attestation" value="ENSIP-25 agent-registration record" />
-            : null}
-          <EnsSetupRow label="Address" value={`Set the subdomain address record to the ${isSimple ? 'connected wallet' : 'owner wallet'}.`} />
-          {!isSimple
-            ? (
-              <>
-                <Box marginTop={1} flexDirection="column">
-                  <Text color={theme.text}>To proceed: the owner wallet signs ENS records and must hold this token at setup time. Once setup is done you can deposit the token into the Vault while the ENS subdomain stays with the owner wallet.</Text>
-                </Box>
-                <Text color={theme.dim}>Operator wallets have no authority on this name; they only rotate the onchain ERC-8004 URI via the Vault.</Text>
-              </>
-              )
-            : null}
+    <Surface title={`Can't Set Up ${fallback.fullName}`} subtitle={title} footer={FOOTER} tone="error">
+      {fallback.detail && fallback.detail !== title ? <Paragraph color={theme.dim}>{fallback.detail}</Paragraph> : null}
+      {fallback.mode === 'advanced' ? (
+        <Box marginTop={fallback.detail ? 1 : 0}>
+          <Paragraph color={theme.textSubtle}>The owner wallet signs the ENS records and must hold the token during setup. Afterwards the token can go back into the Vault. Operator wallets never control the name.</Paragraph>
         </Box>
-      </Box>
+      ) : null}
       <Box marginTop={1}>
         <Select<Action>
           options={[
             { value: 'check', label: 'Check Again' },
+            { value: 'change', label: 'Choose Another Name' },
             { value: 'back', label: 'Back', role: 'utility' },
           ]}
           hintLayout="inline"
           onSubmit={choice => {
             if (choice === 'check') return onCheckAgain()
+            if (choice === 'change') return onChange()
             return onBack()
           }}
           onCancel={onBack}
@@ -213,8 +132,6 @@ export const EnsSetupBlockedScreen: React.FC<EnsSetupBlockedScreenProps> = ({
 
 type UnlinkEnsReviewScreenProps = {
   fullName: string
-  currentMode: CustodyMode | undefined
-  registryNetworkLabel: string
   recordsDiff: AgentRecordDiff[]
   onUnlink: () => void
   onBack: () => void
@@ -222,47 +139,28 @@ type UnlinkEnsReviewScreenProps = {
 
 export const UnlinkEnsReviewScreen: React.FC<UnlinkEnsReviewScreenProps> = ({
   fullName,
-  currentMode,
-  registryNetworkLabel,
   recordsDiff,
   onUnlink,
   onBack,
 }) => {
   type Action = 'unlink' | 'back'
-  const changedDiffs = recordsDiff.filter(diff => diff.current.trim())
-  const recordsAlreadyEmpty = changedDiffs.length === 0
+  const records = describeCurrentRecords(recordsDiff)
   return (
     <Surface
-      title="Unlink ENS"
-      footer={footerHint('↵ select · esc back')}
+      title={`Unlink ${fullName}`}
+      subtitle={records.length > 0
+        ? 'You keep the name. One wallet transaction on Ethereum Mainnet clears its agent records.'
+        : 'You keep the name. Its records are already clear, so only your agent profile changes.'}
+      footer={FOOTER}
     >
-      <Box flexDirection="column">
-        <EnsSetupRow label="ENS name" value={fullName} />
-        <EnsSetupRow label="Custody" value={displayCustodyMode(currentMode)} />
-        {recordsAlreadyEmpty ? (
-          <Box marginTop={1}>
-            <Text color={theme.dim}>
-              Removes the token URI link only.
-            </Text>
-          </Box>
-        ) : (
-          <Box marginTop={1} flexDirection="column">
-            <Text color={theme.textSubtle}>Will be cleared:</Text>
-            {changedDiffs.map(diff => (
-              <Box key={diff.key} flexDirection="column">
-                <Text color={theme.dim}>{`  ${abbreviateRecordValue(diff.key)}`}</Text>
-                <FieldRow label="" labelWidth={4} value={renderRecordValue(diff.current)} />
-              </Box>
-            ))}
-          </Box>
-        )}
-      </Box>
-      <Box marginTop={1}>
+      {records.length > 0 ? <FieldList fields={[{ label: 'Records', value: records.join('\n') }]} /> : null}
+      <Box marginTop={records.length > 0 ? 1 : 0}>
         <Select<Action>
           options={[
-            { value: 'unlink', label: 'Unlink ENS' },
+            { value: 'unlink', label: 'Unlink Name' },
             { value: 'back', label: 'Back', role: 'utility' },
           ]}
+          initialIndex={1}
           hintLayout="inline"
           onSubmit={choice => {
             if (choice === 'unlink') return onUnlink()
@@ -277,75 +175,43 @@ export const UnlinkEnsReviewScreen: React.FC<UnlinkEnsReviewScreenProps> = ({
 
 type ReviewScreenProps = {
   fullName: string
-  ownerAddress: Address
   validation: EnsValidation
   recordsDiff: AgentRecordDiff[]
-  nextRecords: AgentEnsRecords
   currentEnsName: string
-  currentMode: CustodyMode | undefined
-  registryNetworkLabel: string
-  mode: 'simple' | 'advanced'
   onContinue: () => void
   onCheckAgain: () => void
   onChange: () => void
-  onCreate?: () => void
   onBack: () => void
 }
 
 export const ReviewScreen: React.FC<ReviewScreenProps> = ({
   fullName,
-  ownerAddress,
   validation,
   recordsDiff,
-  nextRecords,
   currentEnsName,
-  currentMode,
-  registryNetworkLabel,
-  mode,
   onContinue,
   onCheckAgain,
   onChange,
-  onCreate,
   onBack,
 }) => {
-  void ownerAddress
-  void nextRecords
-  type ReviewAction = 'continue' | 'create' | 'check-again' | 'change' | 'back'
-  const changedDiffs = recordsDiff.filter(d => d.changed)
-  const hasRecordChanges = changedDiffs.length > 0
-  const reviewSubtitle = 'Review ENS records before linking.'
+  type ReviewAction = 'continue' | 'check-again' | 'change' | 'back'
 
   if (!validation.ok) {
     const reason = ensValidationReasonText(validation.reason)
     const showDetail = validation.detail && validation.detail !== reason
     return (
-      <Surface
-        title="ENS Issue"
-        subtitle={`${fullName} could not be verified on Ethereum mainnet.`}
-        footer={footerHint('↵ select · esc back')}
-      >
-        <Box flexDirection="column">
-          <FieldRow label="Name" labelWidth={12} value={<Text color={theme.text} bold>{fullName}</Text>} />
-          <FieldRow label="Reason" labelWidth={12} value={<Text color={theme.accentError}>{reason}</Text>} />
-          {showDetail
-            ? <Text color={theme.dim}>{validation.detail}</Text>
-            : null}
-        </Box>
+      <Surface title="Name Needs Attention" subtitle={`${reason}.`} footer={FOOTER} tone="error">
+        <FieldList fields={[{ label: 'Name', value: fullName }]} />
+        {showDetail ? <Paragraph color={theme.dim}>{validation.detail!}</Paragraph> : null}
         <Box marginTop={1}>
           <Select<ReviewAction>
             options={[
-              ...(onCreate
-                ? [
-                    { value: 'create' as ReviewAction, label: 'Create This ENS Name' },
-                  ]
-                : []),
               { value: 'check-again', label: 'Check Again' },
-              { value: 'change', label: 'Pick A Different Name' },
+              { value: 'change', label: 'Choose Another Name' },
               { value: 'back', label: 'Back', role: 'utility' },
             ]}
             hintLayout="inline"
             onSubmit={choice => {
-              if (choice === 'create' && onCreate) return onCreate()
               if (choice === 'check-again') return onCheckAgain()
               if (choice === 'change') return onChange()
               return onBack()
@@ -357,43 +223,25 @@ export const ReviewScreen: React.FC<ReviewScreenProps> = ({
     )
   }
 
-  const options: Array<SelectOption<ReviewAction>> = [
-    { value: 'continue', label: 'Continue Setup' },
-    { value: 'change', label: 'Pick A Different Name' },
-    { value: 'back', label: 'Back', role: 'utility' },
-  ]
-
+  const records = describeRecordChanges(recordsDiff)
   return (
     <Surface
-      title={`Update ENS records for ${fullName}?`}
-      subtitle={reviewSubtitle}
-      footer={footerHint('↵ select · esc back')}
+      title={`Link ${fullName}`}
+      subtitle={records.length > 0 ? gasLine(1) : 'The records already match. Only your agent profile changes.'}
+      footer={FOOTER}
     >
-      <Box flexDirection="column">
-        {currentEnsName || currentMode
-          ? (
-            <Box marginBottom={1} flexDirection="column">
-              <FieldRow label="Current:" labelWidth={9} value={currentEnsName || 'None'} valueColor={currentEnsName ? theme.text : theme.dim} />
-              <FieldRow label="Next:" labelWidth={9} value={fullName} />
-            </Box>
-            )
-          : null}
-        {recordsDiff.map(diff => (
-          <Box key={diff.key} flexDirection="column">
-            <Text color={theme.dim}>{`- ${abbreviateRecordValue(diff.key)}`}</Text>
-            {diff.changed
-              ? <FieldRow label="" labelWidth={2} value={renderRecordValue(diff.current)} />
-              : null}
-            <FieldRow label={diff.changed ? '→' : ''} labelWidth={2} value={renderRecordValue(diff.next)} />
-          </Box>
-        ))}
-        {!hasRecordChanges
-          ? <Box marginTop={1}><Text color={theme.dim}>All ENS records already match. Link this ENS name to the token URI.</Text></Box>
-          : null}
-      </Box>
+      <FieldList fields={[
+        { label: 'Name', value: fullName, valueColor: theme.accentPeriwinkle },
+        records.length > 0 ? { label: 'Records', value: records.join('\n') } : null,
+        currentEnsName && currentEnsName !== fullName ? { label: 'Replaces', value: currentEnsName } : null,
+      ]} />
       <Box marginTop={1}>
         <Select<ReviewAction>
-          options={options}
+          options={[
+            { value: 'continue', label: 'Link Name' },
+            { value: 'change', label: 'Choose Another Name' },
+            { value: 'back', label: 'Back', role: 'utility' },
+          ]}
           hintLayout="inline"
           onSubmit={choice => {
             if (choice === 'continue') return onContinue()

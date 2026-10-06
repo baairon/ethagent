@@ -11,7 +11,6 @@ import {
 import {
   discoverOwnedEnsNameDetails,
   readEthagentTextRecords,
-  sanitizeSubdomainPrefix,
   splitSubdomainName,
   validateAgentEnsLink,
 } from '../../ens/ensLookup.js'
@@ -28,7 +27,6 @@ import {
 import {
   discoveryErrorMessage,
   emptyAgentEnsRecords,
-  networkLabelForChainId,
   type EnsLinkOptions,
 } from './editCopy.js'
 import { rootErrorMessage } from './EnsEditShared.js'
@@ -46,25 +44,20 @@ export type { EnsLinkOptions }
 export const EnsEditFlow: React.FC<EnsEditProps> = ({
   identity,
   registry,
-  reconciliation,
   onEnsLink,
   onEnsUnlink,
   onEnsRecordsUpdate,
   onEnsSetup,
-  onManageOperatorWalletAccess,
   initialView,
   onBack,
 }) => {
   const ownerAddress = getAddress((identity.ownerAddress ?? identity.address) as Address)
   const currentEnsName = readIdentityStateString(identity.state, 'ensName')
   const currentEnsParts = currentEnsName ? splitSubdomainName(currentEnsName) : null
-  const savedRootName = currentEnsParts?.parent ?? ''
   const savedSubdomainLabel = currentEnsParts?.label ?? ''
-  const agentNameSuggestion = sanitizeSubdomainPrefix(readIdentityStateString(identity.state, 'name'))
   const savedCustodyMode = readCustodyMode(identity.state)
   const savedOwnerAddress = readIdentityStateString(identity.state, 'ownerAddress')
   const savedOperator = readIdentityStateString(identity.state, 'activeOperatorAddress')
-  const registryNetworkLabel = networkLabelForChainId(registry.chainId)
   const hasAdvancedSetup = savedCustodyMode === 'advanced' && Boolean(savedOwnerAddress) && Boolean(currentEnsName)
 
   const [discovery, setDiscovery] = React.useState<DiscoveryState>({ status: 'idle' })
@@ -76,6 +69,12 @@ export const EnsEditFlow: React.FC<EnsEditProps> = ({
   const [discoveryStartedAt, setDiscoveryStartedAt] = React.useState<number>(() => Date.now())
   const [operatorWalletSession, setOperatorWalletSession] = React.useState<BrowserWalletReady | null>(null)
   const discoveryControllerRef = React.useRef<AbortController | null>(null)
+
+  const phaseRef = React.useRef(phase)
+  phaseRef.current = phase
+  const settle = React.useCallback((stillWaiting: (current: EnsPhase) => boolean, next: EnsPhase): void => {
+    if (stillWaiting(phaseRef.current)) setPhase(next)
+  }, [])
 
   const runDiscovery = React.useCallback((targetMode: 'simple' | 'advanced' = 'simple') => {
     discoveryControllerRef.current?.abort()
@@ -100,7 +99,7 @@ export const EnsEditFlow: React.FC<EnsEditProps> = ({
         setDiscovery({
           status: 'ok',
           names: result.names,
-          ...(result.status === 'partial' ? { warning: 'Some ENS lookup sources failed; showing root names found so far.' } : {}),
+          ...(result.status === 'partial' ? { warning: 'Some lookups failed. Showing the names found so far.' } : {}),
         })
         setPhase({ kind: 'pick-parent', mode: targetMode })
       })
@@ -128,6 +127,37 @@ export const EnsEditFlow: React.FC<EnsEditProps> = ({
     setPhase(parts ? { kind: 'pick-subdomain', parent: parts.parent, label: parts.label } : { kind: 'pick-parent' })
   }, [])
 
+  const runSimpleCreatePreflight = React.useCallback((fullName: string): void => {
+    const parts = splitSubdomainName(fullName)
+    if (!parts) {
+      setPhase({ kind: 'pick-parent' })
+      return
+    }
+    setPhase({ kind: 'simple-create-preflight', rootName: parts.parent, label: parts.label, fullName })
+    const waiting = (current: EnsPhase) => current.kind === 'simple-create-preflight' && current.fullName === fullName
+    preflightEnsSetup({
+      rootName: parts.parent,
+      label: parts.label,
+      operatorAddress: ownerAddress,
+      mode: 'simple',
+      expectedOwnerAddress: ownerAddress,
+      allowSameOwnerOperator: true,
+      registry,
+      agentId: identity.agentId,
+    }).then(result => {
+      settle(waiting, result.ok
+        ? { kind: 'simple-create-review', setup: result.setup }
+        : { kind: 'simple-create-blocked', fallback: result.fallback })
+    }).catch((err: unknown) => {
+      settle(waiting, {
+        kind: 'pick-subdomain',
+        parent: parts.parent,
+        label: parts.label,
+        error: err instanceof Error ? err.message : String(err),
+      })
+    })
+  }, [identity.agentId, ownerAddress, registry, settle])
+
   const runValidation = React.useCallback(async (
     fullName: string,
     mode: 'simple' | 'advanced',
@@ -136,8 +166,13 @@ export const EnsEditFlow: React.FC<EnsEditProps> = ({
   ): Promise<void> => {
     setValidationError(null)
     setPhase({ kind: 'validating', fullName, mode, ownerAddress: phaseOwnerAddress, operatorWallet })
+    const waiting = (current: EnsPhase) => current.kind === 'validating' && current.fullName === fullName
     try {
       const validation = await validateAgentEnsLink(fullName, ownerAddress)
+      if (mode === 'simple' && !validation.ok && validation.reason === 'no-owner') {
+        if (waiting(phaseRef.current)) runSimpleCreatePreflight(fullName)
+        return
+      }
       const readKeys = identity.agentId
         ? [
             ...SUPPORTED_ERC8004_CHAINS.map(chain => buildEnsip25Key({
@@ -158,37 +193,45 @@ export const EnsEditFlow: React.FC<EnsEditProps> = ({
         agentId: identity.agentId,
       })
       const recordsDiff = diffRecords(current, next)
-      if (mode === 'simple' && !validation.ok && validation.reason === 'no-owner') {
-        setPhase({ kind: 'simple-name-missing', fullName, validation })
-        return
-      }
-      setPhase({ kind: 'review', fullName, validation, recordsDiff, currentRecords: current, nextRecords: next, mode, ownerAddress: phaseOwnerAddress, operatorWallet })
+      settle(waiting, { kind: 'review', fullName, validation, recordsDiff, currentRecords: current, nextRecords: next, mode, ownerAddress: phaseOwnerAddress, operatorWallet })
     } catch (err: unknown) {
+      if (!waiting(phaseRef.current)) return
       setValidationError(err instanceof Error ? err.message : String(err))
-      setPhase({ kind: 'pick-parent' })
+      setPhase(fullName === currentEnsName ? { kind: 'mode-select' } : { kind: 'pick-parent' })
     }
-  }, [ownerAddress, registry, identity.agentId])
+  }, [ownerAddress, registry, identity.agentId, currentEnsName, runSimpleCreatePreflight, settle])
+
+  const runCheckAgain = React.useCallback((): void => {
+    if (!currentEnsName) return
+    const advanced = savedCustodyMode === 'advanced' && /^0x[0-9a-fA-F]{40}$/.test(savedOwnerAddress)
+    void runValidation(
+      currentEnsName,
+      advanced ? 'advanced' : 'simple',
+      advanced ? getAddress(savedOwnerAddress as Address) : undefined,
+      advanced && /^0x[0-9a-fA-F]{40}$/.test(savedOperator) ? getAddress(savedOperator as Address) : undefined,
+    )
+  }, [currentEnsName, runValidation, savedCustodyMode, savedOperator, savedOwnerAddress])
 
   const runAdvancedRootCheck = React.useCallback((rootName: string): void => {
     setPhase({ kind: 'advanced-root-check', rootName })
+    const waiting = (current: EnsPhase) => current.kind === 'advanced-root-check' && current.rootName === rootName
     preflightEnsRoot({
       rootName,
       expectedOwnerAddress: ownerAddress,
       registry,
       agentId: identity.agentId,
     }).then(result => {
-      if (result.ok) {
-        setPhase({ kind: 'advanced-subdomain', rootName, label: savedSubdomainLabel })
-        return
-      }
-      setPhase({ kind: 'pick-parent', mode: 'advanced', error: rootErrorMessage(result.reason, result.detail, rootName) })
+      settle(waiting, result.ok
+        ? { kind: 'advanced-subdomain', rootName, label: savedSubdomainLabel }
+        : { kind: 'pick-parent', mode: 'advanced', error: rootErrorMessage(result.reason, result.detail, rootName) })
     }).catch((err: unknown) => {
-      setPhase({ kind: 'pick-parent', mode: 'advanced', error: err instanceof Error ? err.message : String(err) })
+      settle(waiting, { kind: 'pick-parent', mode: 'advanced', error: err instanceof Error ? err.message : String(err) })
     })
-  }, [agentNameSuggestion, identity.agentId, ownerAddress, registry, savedSubdomainLabel])
+  }, [identity.agentId, ownerAddress, registry, savedSubdomainLabel, settle])
 
   const runAdvancedSubdomainCheck = React.useCallback((rootName: string, label: string): void => {
     setPhase({ kind: 'advanced-subdomain-check', rootName, label })
+    const waiting = (current: EnsPhase) => current.kind === 'advanced-subdomain-check' && current.rootName === rootName && current.label === label
     preflightEnsSetup({
       rootName,
       label,
@@ -197,72 +240,38 @@ export const EnsEditFlow: React.FC<EnsEditProps> = ({
       registry,
       agentId: identity.agentId,
     }).then(result => {
-      if (result.ok) {
-        setPhase({ kind: 'advanced-review', setup: result.setup })
-        return
-      }
-      setPhase({ kind: 'advanced-manual', fallback: result.fallback })
+      settle(waiting, result.ok
+        ? { kind: 'advanced-review', setup: result.setup }
+        : { kind: 'advanced-manual', fallback: result.fallback })
     }).catch((err: unknown) => {
-      setPhase({
+      settle(waiting, {
         kind: 'advanced-subdomain',
         rootName,
         label,
         error: err instanceof Error ? err.message : String(err),
       })
     })
-  }, [identity.agentId, ownerAddress, registry])
-
-  const runSimpleCreatePreflight = React.useCallback((fullName: string): void => {
-    const parts = splitSubdomainName(fullName)
-    if (!parts) {
-      setPhase({ kind: 'pick-parent' })
-      return
-    }
-    setPhase({ kind: 'simple-create-preflight', rootName: parts.parent, label: parts.label, fullName })
-    preflightEnsSetup({
-      rootName: parts.parent,
-      label: parts.label,
-      operatorAddress: ownerAddress,
-      mode: 'simple',
-      expectedOwnerAddress: ownerAddress,
-      allowSameOwnerOperator: true,
-      registry,
-      agentId: identity.agentId,
-    }).then(result => {
-      if (result.ok) {
-        setPhase({ kind: 'simple-create-review', setup: result.setup })
-        return
-      }
-      setPhase({ kind: 'simple-create-blocked', fallback: result.fallback })
-    }).catch((err: unknown) => {
-      setPhase({
-        kind: 'pick-subdomain',
-        parent: parts.parent,
-        label: parts.label,
-        error: err instanceof Error ? err.message : String(err),
-      })
-    })
-  }, [identity.agentId, ownerAddress, registry])
+  }, [identity.agentId, ownerAddress, registry, settle])
 
   const runDeleteSubdomainPreflight = React.useCallback((fullName: string): void => {
     setValidationError(null)
     setPhase({ kind: 'delete-subdomain-preflight', fullName })
+    const waiting = (current: EnsPhase) => current.kind === 'delete-subdomain-preflight' && current.fullName === fullName
     preflightDeleteSubdomain({ fullName, expectedOwnerAddress: ownerAddress })
       .then(result => {
-        if (result.ok) {
-          setPhase({ kind: 'delete-subdomain-confirm', plan: result.plan })
-          return
-        }
-        setPhase({ kind: 'delete-subdomain-blocked', fullName, reason: result.detail })
+        settle(waiting, result.ok
+          ? { kind: 'delete-subdomain-confirm', plan: result.plan }
+          : { kind: 'delete-subdomain-blocked', fullName, reason: result.detail })
       })
       .catch((err: unknown) => {
-        setPhase({ kind: 'delete-subdomain-blocked', fullName, reason: err instanceof Error ? err.message : String(err) })
+        settle(waiting, { kind: 'delete-subdomain-blocked', fullName, reason: err instanceof Error ? err.message : String(err) })
       })
-  }, [ownerAddress])
+  }, [ownerAddress, settle])
 
   const runUnlinkEnsLoading = React.useCallback((fullName: string): void => {
     setValidationError(null)
     setPhase({ kind: 'unlink-loading', fullName })
+    const waiting = (current: EnsPhase) => current.kind === 'unlink-loading' && current.fullName === fullName
     const readKeys = identity.agentId
       ? [
           ...SUPPORTED_ERC8004_CHAINS.map(chain => buildEnsip25Key({
@@ -276,7 +285,7 @@ export const EnsEditFlow: React.FC<EnsEditProps> = ({
     readEthagentTextRecords(fullName, readKeys)
       .then(currentText => {
         const currentRecords = recordsFromTextMap(currentText)
-        setPhase({
+        settle(waiting, {
           kind: 'unlink-review',
           fullName,
           currentRecords,
@@ -284,28 +293,26 @@ export const EnsEditFlow: React.FC<EnsEditProps> = ({
         })
       })
       .catch((err: unknown) => {
+        if (!waiting(phaseRef.current)) return
         setValidationError(err instanceof Error ? err.message : String(err))
         setPhase({ kind: 'mode-select' })
       })
-  }, [identity.agentId, registry.chainId, registry.identityRegistryAddress])
+  }, [identity.agentId, registry.identityRegistryAddress, settle])
 
   const maintenanceScreen = renderEnsMaintenancePhase({
     phase,
     identity,
     currentEnsName,
-    currentEnsCanDelete: Boolean(currentEnsParts),
     savedCustodyMode,
     savedOwnerAddress,
-    savedOperator,
-    registryNetworkLabel,
     validationError,
     ownerAddress,
     operatorWalletSession,
     setOperatorWalletSession,
     setPhase,
     runDiscovery,
+    runCheckAgain,
     runUnlinkEnsLoading,
-    runDeleteSubdomainPreflight,
     onBack,
     onEnsUnlink,
     onEnsRecordsUpdate,
@@ -314,17 +321,10 @@ export const EnsEditFlow: React.FC<EnsEditProps> = ({
 
   const advancedScreen = renderAdvancedEnsPhase({
     phase,
-    identity,
     ownerAddress,
-    agentId: identity.agentId,
-    reconciliation,
     savedSubdomainLabel,
-    agentNameSuggestion,
     currentEnsName,
-    savedCustodyMode,
-    registry,
     setPhase,
-    runDiscovery,
     runAdvancedSubdomainCheck,
     onEnsSetup,
     onEnsLink,
@@ -338,12 +338,6 @@ export const EnsEditFlow: React.FC<EnsEditProps> = ({
     discoveryStartedAt,
     validationError,
     currentEnsName,
-    savedCustodyMode,
-    registryNetworkLabel,
-    registry,
-    agentNameSuggestion,
-    operatorWalletSession,
-    setOperatorWalletSession,
     setPhase,
     cancelDiscoveryToModeSelect,
     runDiscovery,
@@ -354,7 +348,6 @@ export const EnsEditFlow: React.FC<EnsEditProps> = ({
     onEnsSetup,
     onEnsLink,
     onEnsRecordsUpdate,
-    identity,
   })
   if (simpleScreen) return simpleScreen
 

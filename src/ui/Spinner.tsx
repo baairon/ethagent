@@ -1,8 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Text } from 'ink'
-import { theme, PANEL_WIDTH } from './theme.js'
-
-const CONTENT_WIDTH = PANEL_WIDTH - 4
+import { theme } from './theme.js'
+import { useContentWidth } from './layout.js'
 
 export const SPINNER_VERBS: string[] = [
   'accomplishing',
@@ -225,6 +224,7 @@ export const Spinner: React.FC<SpinnerProps> = ({
   startedAt,
   showElapsed = true,
 }) => {
+  const contentWidth = useContentWidth()
   const stickyVerbRef = useRef<string | null>(null)
   const internalStartedAtRef = useRef<number>(Date.now())
   const [frame, setFrame] = useState(0)
@@ -261,7 +261,7 @@ export const Spinner: React.FC<SpinnerProps> = ({
   const hint = renderedHint ? spinnerHintText(renderedHint) : ''
 
   const hintReserve = hint ? hint.length + 3 : 0
-  const labelBudget = Math.max(0, CONTENT_WIDTH - 2 - hintReserve)
+  const labelBudget = Math.max(0, contentWidth - 2 - hintReserve)
   let text = spinnerText(label ?? `${autoLabel}…`)
   if (text.length > labelBudget) {
     text = text.slice(0, Math.max(0, labelBudget - 1)) + '…'

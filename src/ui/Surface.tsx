@@ -1,6 +1,8 @@
 import React from 'react'
 import { Box, Text } from 'ink'
-import { theme, PANEL_WIDTH } from './theme.js'
+import { theme } from './theme.js'
+import { usePanelWidth } from './layout.js'
+import { Paragraph } from './Paragraph.js'
 
 type SurfaceTone = 'primary' | 'muted' | 'error'
 
@@ -25,15 +27,15 @@ export const Surface: React.FC<SurfaceProps> = ({
   tone = 'primary',
   children,
 }) => {
-  const titleColor = toneColor[tone]
+  const panelWidth = usePanelWidth()
   return (
     <Box flexDirection="column" alignItems="center" paddingY={1} width="100%">
-      <Box flexDirection="column" paddingX={2} width={PANEL_WIDTH}>
+      <Box flexDirection="column" paddingX={2} width={panelWidth}>
         <Box flexDirection="column">
-          <Text color={titleColor} bold>{title}</Text>
+          <Paragraph color={toneColor[tone]} bold>{title}</Paragraph>
           {subtitle ? (
             typeof subtitle === 'string'
-              ? <Text color={theme.menuStatus}>{subtitle}</Text>
+              ? <Paragraph color={theme.menuStatus}>{subtitle}</Paragraph>
               : subtitle
           ) : null}
         </Box>

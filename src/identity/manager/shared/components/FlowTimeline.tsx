@@ -1,28 +1,30 @@
 import React from 'react'
-import { Box, Text } from 'ink'
-import { theme, PANEL_WIDTH } from '../../../../ui/theme.js'
+import { Text } from 'ink'
+import { theme } from '../../../../ui/theme.js'
 
 type FlowTimelineProps = {
   steps: string[]
   current: number
 }
 
-export const FlowTimeline: React.FC<FlowTimelineProps> = ({ steps, current }) => (
-  <Box width={PANEL_WIDTH - 4} justifyContent="center">
+export const FlowTimeline: React.FC<FlowTimelineProps> = ({ steps, current }) => {
+  const position = Math.max(1, Math.min(steps.length, current))
+  return (
     <Text>
       {steps.map((step, index) => {
         const n = index + 1
-        const active = n === current
-        const reached = n <= current
+        const active = n === position
+        const reached = n <= position
         return (
           <React.Fragment key={`${index}:${step}`}>
             {index > 0 ? <Text> </Text> : null}
-            <Text color={active ? theme.accentPeriwinkle : reached ? theme.dim : theme.textSubtle} bold={active}>
+            <Text color={active ? theme.accentPeriwinkle : reached ? theme.dim : theme.border} bold={active}>
               {reached ? '●' : '○'}
             </Text>
           </React.Fragment>
         )
       })}
+      <Text color={theme.dim}>{`  ${position} of ${steps.length}`}</Text>
     </Text>
-  </Box>
-)
+  )
+}

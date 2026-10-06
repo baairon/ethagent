@@ -133,8 +133,8 @@ export const IdentityManagerOperationalRoutes: React.FC<IdentityManagerOperation
   if (step.kind === 'rebackup-start') {
     return (
       <BusyScreen
-        title="Identity"
-        label="preparing snapshot..."
+        title="Save Snapshot"
+        label="Preparing the snapshot…"
         onCancel={back}
       />
     )
@@ -178,9 +178,9 @@ export const IdentityManagerOperationalRoutes: React.FC<IdentityManagerOperation
     return (
       <WalletApprovalScreen
         title="Connect Wallet"
-        subtitle="Find agents this wallet owns or is linked to."
+        subtitle="Connect the wallet that holds your agent, or one of its operator wallets."
         walletSession={walletSession}
-        label="waiting for wallet connection..."
+        label="Waiting for your wallet…"
         onCancel={() => setStep({ kind: 'menu' })}
       />
     )
@@ -189,7 +189,7 @@ export const IdentityManagerOperationalRoutes: React.FC<IdentityManagerOperation
   if (step.kind === 'busy') {
     return (
       <BusyScreen
-        title="Identity"
+        title={step.title ?? 'Working'}
         label={step.label}
         onCancel={back}
       />

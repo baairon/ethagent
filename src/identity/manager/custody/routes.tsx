@@ -4,17 +4,13 @@ import { Surface } from '../../../ui/Surface.js'
 import { Select } from '../../../ui/Select.js'
 import { theme } from '../../../ui/theme.js'
 import { WalletApprovalScreen } from '../shared/components/WalletApprovalScreen.js'
+import { BusyScreen } from '../shared/components/BusyScreen.js'
+import { FieldList } from '../shared/components/FieldRow.js'
 import { shortAddress } from '../shared/model/format.js'
+import { networkName } from '../shared/model/network.js'
 import type { Step } from '../reducer.js'
 import type { CustodyFlowDeps } from './types.js'
-import { chainLabel, humanOwnerAddress } from './helpers.js'
-
-const Row: React.FC<{ label: string; value: string }> = ({ label, value }) => (
-  <Text>
-    <Text color={theme.dim}>{label.padEnd(18)}</Text>
-    <Text color={theme.text}>{value}</Text>
-  </Text>
-)
+import { humanOwnerAddress } from './helpers.js'
 
 export function renderCustodyStep({
   step,
@@ -24,10 +20,10 @@ export function renderCustodyStep({
   if (step.kind === 'custody-vault-deploy-tx') {
     return (
       <WalletApprovalScreen
-        title="Deploy Vault"
-        subtitle={`Deploying Vault on ${chainLabel(step.registry.chainId)}.`}
+        title="Create Your Vault"
+        subtitle={`Deploys your Vault contract on ${networkName(step.registry.chainId)}. It needs gas.`}
         walletSession={walletSession}
-        label="waiting for wallet to deploy Vault..."
+        label="Waiting for your wallet…"
         onCancel={() => setStep({ kind: 'custody-model', identity: step.identity, registry: step.registry, returnTo: step.returnTo })}
       />
     )
@@ -35,25 +31,22 @@ export function renderCustodyStep({
   if (step.kind === 'custody-vault-deposit-tx') {
     return (
       <WalletApprovalScreen
-        title="Deposit Token Into Vault"
-        subtitle={`Depositing token #${step.identity.agentId ?? ''} into its Vault.`}
+        title="Move Token into Vault"
+        subtitle={`Moves token #${step.identity.agentId ?? ''} into your Vault on ${networkName(step.registry.chainId)}. It needs gas.`}
         walletSession={walletSession}
-        label="waiting for wallet to deposit token..."
+        label="Waiting for your wallet…"
         onCancel={() => setStep({ kind: 'custody-model', identity: step.identity, registry: step.registry, returnTo: step.returnTo })}
       />
     )
   }
   if (step.kind === 'custody-vault-withdraw-discovering') {
-    const targetAgentId = step.identity.agentId ?? ''
     return (
-      <Surface
+      <BusyScreen
         title="Checking Vault"
-        subtitle={targetAgentId
-          ? `Checking Vault on ${chainLabel(step.registry.chainId)}.`
-          : `Checking this identity's recorded Vault on ${chainLabel(step.registry.chainId)}.`}
-        footer={<Text color={theme.dim}>esc cancel</Text>}
-      >
-      </Surface>
+        subtitle={`Looking for tokens in your Vault on ${networkName(step.registry.chainId)}.`}
+        label="Reading the Vault…"
+        onCancel={() => setStep({ kind: 'custody-model', identity: step.identity, registry: step.registry, returnTo: step.returnTo })}
+      />
     )
   }
   if (step.kind === 'custody-vault-withdraw-tx') {
@@ -61,9 +54,9 @@ export function renderCustodyStep({
     return (
       <WalletApprovalScreen
         title="Withdraw Token"
-        subtitle={`Withdraws token #${targetAgentId} from its Vault.`}
+        subtitle={`Moves token #${targetAgentId} from the Vault back to your owner wallet. It needs gas.`}
         walletSession={walletSession}
-        label="waiting for wallet to withdraw token..."
+        label="Waiting for your wallet…"
         onCancel={() => setStep({ kind: 'custody-model', identity: step.identity, registry: step.registry, returnTo: step.returnTo })}
       />
     )
@@ -72,16 +65,16 @@ export function renderCustodyStep({
     const activeId = step.identity.agentId
     const options = step.tokens.map(t => ({
       value: t.agentId,
-      label: `Token #${t.agentId}${activeId && t.agentId === activeId ? ' (active)' : ''}`,
-      hint: 'Withdraw to owner wallet',
+      label: `Token #${t.agentId}`,
+      ...(activeId && t.agentId === activeId ? { hint: 'This agent' } : {}),
     }))
     return (
       <Surface
-        title="Pick a Vaulted Token"
-        subtitle={`${step.tokens.length} vaulted tokens on ${chainLabel(step.registry.chainId)}.`}
+        title="Choose a Token to Withdraw"
+        subtitle={`${step.tokens.length} tokens are in this Vault on ${networkName(step.registry.chainId)}. The one you pick returns to your owner wallet.`}
         footer={<Text color={theme.dim}>↵ select · esc back</Text>}
       >
-        <Box marginTop={1}>
+        <Box>
           <Select<string>
             options={[
               ...options,
@@ -129,15 +122,15 @@ export function renderCustodyStep({
     }
     return (
       <Surface
-        title="Token Returned to Owner Wallet"
-        subtitle={`Token returned to ${shortAddress(step.recipient)}.`}
+        title="Token Back in Your Wallet"
+        subtitle={`The token is now held by ${shortAddress(step.recipient)}.`}
         footer={<Text color={theme.dim}>↵ select · esc back</Text>}
       >
-        <Box marginTop={1}>
+        <Box>
           <Select<'return-to-vault' | 'keep-out'>
             options={[
-              { value: 'return-to-vault', label: 'Return Token to Vault', hint: 'Redeposit' },
-              { value: 'keep-out', label: 'Keep Out For Now', role: 'utility' },
+              { value: 'return-to-vault', label: 'Return It to the Vault', hint: 'Needs one more transaction' },
+              { value: 'keep-out', label: 'Keep It Out for Now', role: 'utility' },
             ]}
             hintLayout="inline"
             onSubmit={choice => {
@@ -153,10 +146,10 @@ export function renderCustodyStep({
   if (step.kind === 'custody-vault-unwrap-tx') {
     return (
       <WalletApprovalScreen
-        title="Unwrap Token From Vault"
-        subtitle={`Unwrapping token #${step.identity.agentId ?? ''} from Vault.`}
+        title="Switch to Simple"
+        subtitle={`Moves token #${step.identity.agentId ?? ''} out of the Vault and back to your owner wallet. It needs gas.`}
         walletSession={walletSession}
-        label="waiting for wallet to unwrap token..."
+        label="Waiting for your wallet…"
         onCancel={() => setStep({ kind: 'custody-model', identity: step.identity, registry: step.registry, returnTo: step.returnTo })}
       />
     )
@@ -168,14 +161,14 @@ export function renderCustodyStep({
     return (
       <Surface
         title="Advanced Custody Active"
-        subtitle="Token held in its Vault. Operators rotate the URI onchain."
+        subtitle="A Vault holds your token. Operator wallets can now save snapshots."
         footer={<Text color={theme.dim}>↵ continue</Text>}
       >
-        <Box flexDirection="column">
-          {step.vaultAddress ? <Row label="Vault" value={shortAddress(step.vaultAddress)} /> : null}
-          <Row label="Owner Wallet" value={shortAddress(ownerWallet)} />
-          <Row label="Operator Wallets" value={operatorCount === 1 ? '1 approved' : `${operatorCount} approved`} />
-        </Box>
+        <FieldList fields={[
+          step.vaultAddress ? { label: 'Vault', value: shortAddress(step.vaultAddress) } : null,
+          { label: 'Owner wallet', value: shortAddress(ownerWallet) },
+          { label: 'Operators', value: operatorCount === 0 ? 'None yet' : `${operatorCount} approved`, ...(operatorCount === 0 ? { valueColor: theme.dim } : {}) },
+        ]} />
         <Box marginTop={1}>
           <Select<'continue'>
             options={[{ value: 'continue', label: 'Done' }]}
@@ -191,12 +184,10 @@ export function renderCustodyStep({
     return (
       <Surface
         title="Simple Custody Active"
-        subtitle="Token back in owner wallet."
+        subtitle="The token is back in your owner wallet."
         footer={<Text color={theme.dim}>↵ continue</Text>}
       >
-        <Box flexDirection="column">
-          <Row label="Owner Wallet" value={shortAddress(ownerWallet)} />
-        </Box>
+        <FieldList fields={[{ label: 'Owner wallet', value: shortAddress(ownerWallet) }]} />
         <Box marginTop={1}>
           <Select<'continue'>
             options={[{ value: 'continue', label: 'Done' }]}

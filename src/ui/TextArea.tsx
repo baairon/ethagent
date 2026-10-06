@@ -1,6 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react'
-import { Box, Text, useStdout } from 'ink'
-import { theme, PANEL_WIDTH } from './theme.js'
+import React, { useState, useRef } from 'react'
+import { Box, Text } from 'ink'
+import { theme } from './theme.js'
+import { contentWidthFor, useTerminalColumns } from './layout.js'
 import { useAppInput } from '../app/input/AppInputProvider.js'
 
 type TextAreaProps = {
@@ -20,15 +21,7 @@ export function TextArea({
 }: TextAreaProps) {
   const [value, setValue] = useState(initialValue)
   const [cursor, setCursor] = useState(initialValue.length)
-  const { stdout } = useStdout()
-  const [columns, setColumns] = useState<number>(() => Math.floor(stdout?.columns ?? 80))
-
-  useEffect(() => {
-    if (!stdout) return
-    const handleResize = () => setColumns(Math.floor(stdout.columns ?? 80))
-    stdout.on('resize', handleResize)
-    return () => { stdout.off('resize', handleResize) }
-  }, [stdout])
+  const columns = useTerminalColumns()
 
   const stateRef = useRef({ value, cursor })
   stateRef.current = { value, cursor }
@@ -92,7 +85,7 @@ export function TextArea({
     }
   })
 
-  const displayWidth = Math.min(PANEL_WIDTH - 6, Math.max(20, columns - 6))
+  const displayWidth = Math.min(contentWidthFor(columns) - 2, Math.max(20, columns - 6))
   const [cursorLine, cursorCol] = cursorToLineCol(value, cursor)
   const lines = value.split('\n')
   const showPlaceholder = value.length === 0

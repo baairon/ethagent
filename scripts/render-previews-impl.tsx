@@ -3,20 +3,17 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import React from "react";
 import { render } from "ink-testing-library";
-import { Box, Text } from "ink";
-import { theme } from "../src/ui/theme.js";
+import { Box } from "ink";
 import { Logo } from "../src/identity/manager/shared/components/Logo.js";
 import { MenuScreen } from "../src/identity/manager/shared/components/MenuScreen.js";
-import { SkillsTreeScreen } from "../src/identity/manager/continuity/skills/SkillsTreeScreen.js";
 import { ansiToSvg, type AnsiToSvgOptions } from "./ansi-to-svg.js";
-import { previewIdentity, previewConfig, cleanReconciliation, previewSkillsTree } from "./preview-data.js";
+import { previewIdentity, previewConfig, cleanReconciliation } from "./preview-data.js";
 
 const COLS = 80;
 const OUT_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "preview");
 mkdirSync(OUT_DIR, { recursive: true });
 
 const noop = () => {};
-const footer = <Text color={theme.dim}>↵ select · esc back</Text>;
 
 function save(name: string, node: React.ReactNode, opts: Partial<AnsiToSvgOptions> = {}): void {
   const { lastFrame, unmount } = render(node);
@@ -80,23 +77,6 @@ save(
       workingStatus={null}
       canRebackup={true}
       {...menuCallbacks}
-    />,
-  ),
-  { solidBlocks: true },
-);
-
-save(
-  "skills",
-  withChrome(
-    <SkillsTreeScreen
-      identity={previewIdentity}
-      config={previewConfig}
-      workingStatus={null}
-      initialTree={previewSkillsTree}
-      footer={footer}
-      onOpenSkill={noop}
-      onOpenFolder={noop}
-      onBack={noop}
     />,
   ),
   { solidBlocks: true },

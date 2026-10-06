@@ -5,7 +5,7 @@
     {
       "name": "ethagent",
       "source": "./",
-      "description": "Portable Ethereum identity for your AI agent. Its soul, memory, and skills live onchain via ERC-8004 + IPFS and snap back into any session."
+      "description": "Portable Ethereum identity for your agent. Its soul, memory, and skills live onchain via ERC-8004 + IPFS and snap back into any session."
     }
   ]
 }

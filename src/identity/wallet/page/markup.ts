@@ -27,10 +27,10 @@ export const CARD_HTML = `
       <div class="status" id="status-block">
         <p class="status-line">
           <span class="marker" id="status-marker"></span>
-          <span id="status-text">Connecting to your wallet…</span>
+          <span id="status-text">Connecting to your wallet...</span>
         </p>
         <p class="status-hint" id="status-hint">Open your wallet extension if it doesn't pop up automatically.</p>
-        <p class="status-hint" id="reconnect-hint" hidden>Reconnecting to terminal…</p>
+        <p class="status-hint" id="reconnect-hint" hidden>Reconnecting to the terminal...</p>
       </div>
       <div id="error-block-slot"></div>
     </div>
@@ -47,11 +47,6 @@ export const CARD_HTML = `
 `;
 
 export function injectStylesAndMarkup(): void {
-  const font = document.createElement("link");
-  font.rel = "stylesheet";
-  font.href = "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap";
-  document.head.appendChild(font);
-
   const style = document.createElement("style");
   style.id = "wallet-styles";
   style.textContent = WALLET_CSS;

@@ -47,24 +47,24 @@
     <rect x="512" y="90" width="10.1" height="11" fill="#a6adc4"/>
     <rect x="521.6" y="90" width="10.1" height="22" fill="#a9a5c1"/>
     <rect x="550.4" y="90" width="10.1" height="22" fill="#b49cac"/>
-    <text x="204.8" y="172" textLength="432" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#9aa0b0">Portable Ethereum identity for your AI agent.</text>
-    <text x="339.2" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f0eee8">❯</text>
-    <text x="358.4" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f5d0da">C</text>
-    <text x="368" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f5d3d0">r</text>
-    <text x="377.6" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f5d6c7">e</text>
-    <text x="387.2" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f5dbc0">a</text>
-    <text x="396.8" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f4e0bc">t</text>
-    <text x="406.4" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f4e6b8">e</text>
-    <text x="425.6" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#d1e8ca">N</text>
-    <text x="435.2" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#c7e6d5">e</text>
-    <text x="444.8" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#c6e1e2">w</text>
-    <text x="464" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#ccd4f0">A</text>
-    <text x="473.6" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#d4ccf0">g</text>
-    <text x="483.2" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#decaec">e</text>
-    <text x="492.8" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#e9cde3">n</text>
-    <text x="502.4" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f5d0da">t</text>
-    <text x="358.4" y="238" textLength="124.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Load Existing</text>
-    <text x="281.6" y="282" textLength="278.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#7a8090">↑↓ move · ↵ choose · esc quit</text>
+    <text x="214.4" y="172" textLength="403.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#9aa0b0">Portable Ethereum identity for your agent.</text>
+    <text x="320" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f0eee8">❯</text>
+    <text x="339.2" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f5d0da">C</text>
+    <text x="348.8" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f5d3d0">r</text>
+    <text x="358.4" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f5d6c7">e</text>
+    <text x="368" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f5dbc0">a</text>
+    <text x="377.6" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f4e0bc">t</text>
+    <text x="387.2" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f4e6b8">e</text>
+    <text x="406.4" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#d1e8ca">N</text>
+    <text x="416" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#c7e6d5">e</text>
+    <text x="425.6" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#c6e1e2">w</text>
+    <text x="444.8" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#ccd4f0">A</text>
+    <text x="454.4" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#d4ccf0">g</text>
+    <text x="464" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#decaec">e</text>
+    <text x="473.6" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#e9cde3">n</text>
+    <text x="483.2" y="216" textLength="9.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#f5d0da">t</text>
+    <text x="339.2" y="238" textLength="182.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Load Existing Agent</text>
+    <text x="281.6" y="282" textLength="278.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#7a8090">↑↓ move · ↵ select · esc quit</text>
   </g>
   <defs>
     <linearGradient id="wmShine" gradientUnits="userSpaceOnUse" x1="0" y1="68" x2="0" y2="112">

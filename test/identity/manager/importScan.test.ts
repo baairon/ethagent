@@ -20,7 +20,7 @@ const RICH_CLAUDE_MD = [
   '- Communication: conversational and casual, lowercase by default.',
   '',
   '## Key Projects',
-  '- ethagent: privacy-first AI agent with a portable Ethereum identity.',
+  '- ethagent: privacy-first agent with a portable Ethereum identity.',
   '- rodurite.com: decentralized escrow protocol on Ethereum smart contracts.',
   '',
   '## Boundaries',
@@ -87,7 +87,7 @@ test('scanImportCandidates detects a populated CLAUDE.md', async () => {
     const candidates = await scanImportCandidates()
     assert.equal(candidates.length, 1)
     assert.equal(candidates[0]?.source, 'CLAUDE.md')
-    assert.match(candidates[0]?.raw ?? '', /ethagent: privacy-first AI agent/)
+    assert.match(candidates[0]?.raw ?? '', /ethagent: privacy-first agent/)
   })
 })
 

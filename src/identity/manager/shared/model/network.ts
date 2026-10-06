@@ -1,5 +1,5 @@
 import type { EthagentConfig, EthagentIdentity, SelectableNetwork } from '../../../../storage/config.js'
-import { supportedErc8004ChainForId } from '../../../registry/erc8004.js'
+import { chainIdForNetwork, supportedErc8004ChainForId } from '../../../registry/erc8004.js'
 import { resolveSelectedNetwork } from '../../../registry/registryConfig.js'
 
 const NETWORK_LABELS: Record<SelectableNetwork, string> = {
@@ -12,12 +12,22 @@ export function networkLabel(network: SelectableNetwork): string {
 }
 
 const NETWORK_SUBTITLES: Record<SelectableNetwork, string> = {
-  mainnet: 'Best for security',
-  base:    'Best for lower-cost use',
+  mainnet: 'Most secure',
+  base:    'Low fees',
 }
 
 export function networkSubtitle(network: SelectableNetwork): string {
   return NETWORK_SUBTITLES[network]
+}
+
+export function networkName(chainId: number): string {
+  return supportedErc8004ChainForId(chainId)?.name ?? `Chain ${chainId}`
+}
+
+export function identityNetworkName(identity?: EthagentIdentity, config?: EthagentConfig): string | null {
+  const chainId = identity?.chainId ?? config?.erc8004?.chainId
+  if (chainId) return networkName(chainId)
+  return config?.selectedNetwork ? networkName(chainIdForNetwork(config.selectedNetwork)) : null
 }
 
 export function chainSummaryRow(config?: EthagentConfig, identity?: EthagentIdentity): {

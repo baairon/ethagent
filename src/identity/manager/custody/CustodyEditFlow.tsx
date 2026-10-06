@@ -13,7 +13,8 @@ import {
 } from './state.js'
 import { ensValidationReasonText, selectEnsStatus } from '../ens/state.js'
 import { shortAddress } from '../shared/model/format.js'
-import { FieldRow } from '../shared/components/FieldRow.js'
+import { FieldList } from '../shared/components/FieldRow.js'
+import { Paragraph } from '../../../ui/Paragraph.js'
 import { lastBackupLabel } from '../profile/identity.js'
 import {
   type AgentReconciliation,
@@ -65,7 +66,7 @@ export const CustodyEditFlow: React.FC<CustodyEditFlowProps> = ({
     ? (state.approvedOperatorWallets as unknown[]).length
     : 0
   const agentName = readIdentityStateString(state, 'name')
-  const tokenLabel = identity.agentId ? `Token #${identity.agentId}` : 'Token #unknown'
+  const tokenLabel = identity.agentId ? `#${identity.agentId}` : 'Unknown'
   const tokenOwner = identity.ownerAddress ?? identity.address
 
   if (step.kind === 'custody-model') {
@@ -75,10 +76,10 @@ export const CustodyEditFlow: React.FC<CustodyEditFlowProps> = ({
     const isAdvanced = onChainCustody === 'advanced' || midFlow || custodyMode === 'advanced'
     const vaultHolds = onChainCustody === 'advanced' || midFlow
     const subtitle = midFlow
-      ? 'Advanced setup pending.'
+      ? 'Advanced custody setup is unfinished. Resume it or cancel it.'
       : isAdvanced
-        ? 'Advanced custody active.'
-        : 'Simple custody active.'
+        ? 'A Vault holds your token. Operators can save.'
+        : 'Your wallet holds the token.'
     const modeLabel = midFlow ? 'Advanced (setup pending)' : displayCustodyMode(isAdvanced ? 'advanced' : 'simple')
     const options: Array<{ value: Action; role?: 'section' | 'utility'; label: string; hint?: string }> = []
     if (midFlow) {
@@ -89,26 +90,27 @@ export const CustodyEditFlow: React.FC<CustodyEditFlowProps> = ({
       options.push({
         value: 'cancel-advanced',
         label: 'Cancel Advanced Setup',
+        hint: 'Stay on Simple',
       })
     }
     if (!isAdvanced) {
       options.push({
         value: 'switch-advanced',
         label: 'Switch to Advanced',
-        hint: 'Operators publish',
+        hint: 'Into a Vault',
       })
     } else {
       if (!midFlow) {
         options.push({
           value: 'switch-simple',
           label: 'Switch to Simple',
-          hint: 'Remove Vault',
+          hint: 'Back to your wallet',
         })
       }
       options.push({
         value: 'manage-operator-wallets',
         label: 'Manage Operators',
-        hint: 'Add or revoke',
+        hint: 'Add or remove',
       })
     }
     options.push({ value: 'back', label: 'Back', role: 'utility' })
@@ -117,43 +119,41 @@ export const CustodyEditFlow: React.FC<CustodyEditFlowProps> = ({
       <Surface title="Custody Mode" subtitle={subtitle} footer={footerHint('↵ select · esc back')}>
         {notice ? (
           <Box marginBottom={1}>
-            <Text color={theme.accentPeriwinkle}>{notice}</Text>
+            <Paragraph color={theme.accentPeriwinkle}>{notice}</Paragraph>
           </Box>
         ) : null}
-        <Box flexDirection="column">
-          {(() => {
-            const ensStatus = selectEnsStatus(identity)
-            return (
-              <FieldRow
-                label="ENS"
-                labelWidth={14}
-                value={ensStatus.kind === 'linked'
-                  ? <Text color={theme.accentPeriwinkle}>{ensStatus.name}</Text>
+        {(() => {
+          const ensStatus = selectEnsStatus(identity)
+          const lastBackup = lastBackupLabel(identity)
+          return (
+            <FieldList fields={[
+              {
+                label: 'ENS',
+                value: ensStatus.kind === 'none'
+                  ? 'Not linked'
                   : ensStatus.kind === 'issue'
-                    ? <Text color={theme.accentError}>{ensStatus.name} ({ensValidationReasonText(ensStatus.reason)})</Text>
-                    : <Text color={theme.dim}>Not Linked</Text>}
-              />
-            )
-          })()}
-          <Row label="Custody" value={modeLabel} />
-          <Row label="Owner" value={shortAddress(ownerAddress || tokenOwner)} />
-          {isAdvanced && vaultAddress ? <Row label="Vault" value={shortAddress(vaultAddress)} /> : null}
-          {isAdvanced ? (
-            <Row
-              label="Operators"
-              value={approvedOperatorCount > 1
-                ? `${approvedOperatorCount} authorized`
-                : activeOperator
-                  ? shortAddress(activeOperator)
-                  : 'None Authorized'}
-              muted={!activeOperator && approvedOperatorCount === 0}
-            />
-          ) : null}
-          {(() => {
-            const lastBackup = lastBackupLabel(identity)
-            return <Row label="Last Saved" value={lastBackup} muted={lastBackup === 'never'} />
-          })()}
-        </Box>
+                    ? `${ensStatus.name} (${ensValidationReasonText(ensStatus.reason)})`
+                    : ensStatus.name,
+                valueColor: ensStatus.kind === 'linked' ? theme.accentPeriwinkle : ensStatus.kind === 'issue' ? theme.accentError : theme.dim,
+              },
+              { label: 'Custody', value: modeLabel },
+              { label: 'Owner', value: shortAddress(ownerAddress || tokenOwner) },
+              isAdvanced && vaultAddress ? { label: 'Vault', value: shortAddress(vaultAddress) } : null,
+              isAdvanced
+                ? {
+                    label: 'Operators',
+                    value: approvedOperatorCount > 1
+                      ? `${approvedOperatorCount} authorized`
+                      : activeOperator
+                        ? shortAddress(activeOperator)
+                        : 'None yet',
+                    ...(!activeOperator && approvedOperatorCount === 0 ? { valueColor: theme.dim } : {}),
+                  }
+                : null,
+              { label: 'Last Saved', value: lastBackup === 'never' ? 'Never' : lastBackup, ...(lastBackup === 'never' ? { valueColor: theme.dim } : {}) },
+            ]} />
+          )
+        })()}
         <Box marginTop={1}>
           <Select<Action>
             options={options}
@@ -186,20 +186,20 @@ export const CustodyEditFlow: React.FC<CustodyEditFlowProps> = ({
     type Action = 'confirm' | 'transfer' | 'back'
     return (
       <Surface
-        title="Switch to Advanced"
-        subtitle="Token goes into a Vault. Operators update onchain without your sig each time."
-        footer={footerHint('↵ confirm · esc back')}
+        title="Switch to Advanced?"
+        subtitle="Your token moves into a Vault you control, so operator wallets can save for you."
+        footer={footerHint('↵ select · esc back')}
       >
-        <Box flexDirection="column">
-          <Row label="Token" value={tokenLabel} />
-          {agentName ? <Row label="Name" value={agentName} /> : null}
-          <Row label="Owner Wallet" value={shortAddress(ownerAddress || tokenOwner)} />
-        </Box>
+        <FieldList fields={[
+          { label: 'Token', value: tokenLabel },
+          agentName ? { label: 'Name', value: agentName } : null,
+          { label: 'Owner wallet', value: shortAddress(ownerAddress || tokenOwner) },
+        ]} />
         <Box marginTop={1}>
           <Select<Action>
             options={[
-              { value: 'confirm', label: 'Yes, Switch to Advanced' },
-              { value: 'transfer', label: 'Prepare Token Transfer' },
+              { value: 'confirm', label: 'Switch to Advanced' },
+              { value: 'transfer', label: 'Prepare Transfer Instead' },
               { value: 'back', label: 'Back', role: 'utility' },
             ]}
             hintLayout="inline"
@@ -224,21 +224,24 @@ export const CustodyEditFlow: React.FC<CustodyEditFlowProps> = ({
   type Action = 'confirm' | 'back'
   return (
     <Surface
-      title="Switch to Simple"
-      subtitle="Withdraws token from Vault to owner wallet."
-      footer={footerHint('↵ confirm · esc back')}
+      title="Switch to Simple?"
+      subtitle="The token leaves the Vault and returns to your owner wallet."
+      footer={footerHint('↵ select · esc back')}
     >
-      <Box flexDirection="column">
-        <Row label="Token" value={tokenLabel} />
-        {agentName ? <Row label="Name" value={agentName} /> : null}
-        <Text color={theme.accentError}>Operators lose access immediately.</Text>
+      <FieldList fields={[
+        { label: 'Token', value: tokenLabel },
+        agentName ? { label: 'Name', value: agentName } : null,
+      ]} />
+      <Box marginTop={1}>
+        <Paragraph color={theme.accentError}>Operator wallets lose access right away.</Paragraph>
       </Box>
       <Box marginTop={1}>
         <Select<Action>
           options={[
-            { value: 'confirm', label: 'Yes, Switch to Simple' },
+            { value: 'confirm', label: 'Switch to Simple' },
             { value: 'back', label: 'Back', role: 'utility' },
           ]}
+          initialIndex={1}
           hintLayout="inline"
           onSubmit={choice => {
             if (choice === 'back') return onBack()
@@ -259,6 +262,3 @@ export const CustodyEditFlow: React.FC<CustodyEditFlowProps> = ({
   )
 }
 
-const Row: React.FC<{ label: string; value: string; muted?: boolean }> = ({ label, value, muted }) => (
-  <FieldRow label={label} labelWidth={14} value={value} valueColor={muted ? theme.dim : theme.text} />
-)

@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react'
 import { Box } from 'ink'
 import { Surface } from '../../../../ui/Surface.js'
 import { Select, type SelectOption } from '../../../../ui/Select.js'
-import { theme } from '../../../../ui/theme.js'
 import type { EthagentIdentity } from '../../../../storage/config.js'
 import { listSkills, listSkillFiles } from '../../../continuity/skills/loadSkills.js'
 import type { SkillIndexEntry, SkillVisibility } from '../../../continuity/skills/types.js'
@@ -63,20 +62,16 @@ export const SkillActionsScreen: React.FC<SkillActionsScreenProps> = ({
   const subtitle = notice ?? formatLeafMeta(visibility, supportingCount)
 
   const options: Array<SelectOption<SkillAction>> = []
-  const noop: SkillAction = { kind: 'noop' }
 
   options.push({
     value: { kind: 'open' },
     label: 'Open SKILL.md',
+    hint: 'In your editor',
   })
-
-  options.push({ value: noop, role: 'section', label: 'Visibility' })
-  options.push(visibilityOption('private', visibility))
-  options.push(visibilityOption('public', visibility))
-
+  options.push(visibilityOption(visibility === 'public' ? 'private' : 'public'))
   options.push({
     value: { kind: 'delete' },
-    label: 'Delete',
+    label: 'Delete Skill',
   })
   options.push({
     value: { kind: 'back' },
@@ -86,7 +81,7 @@ export const SkillActionsScreen: React.FC<SkillActionsScreenProps> = ({
 
   return (
     <Surface title={displayName} subtitle={subtitle || undefined} footer={footer}>
-      <Box marginTop={1}>
+      <Box>
         <Select<SkillAction>
           options={options}
           hintLayout="inline"
@@ -108,27 +103,15 @@ function formatLeafMeta(visibility: SkillVisibility | undefined, supportingCount
   const fileLabel = supportingCount === null
     ? null
     : supportingCount === 0 ? '1 file' : `${supportingCount + 1} files`
-  return fileLabel ? `${capitalize(visibility)} · ${fileLabel}` : capitalize(visibility)
+  const where = visibility === 'public' ? 'Public, listed on your Agent Card' : 'Private, never listed'
+  return fileLabel ? `${where} · ${fileLabel}` : where
 }
 
-function visibilityOption(level: SkillVisibility, current?: SkillVisibility): SelectOption<SkillAction> {
-  const isCurrent = current === level
-  const hint = visibilityHint(level)
-  const base: SelectOption<SkillAction> = {
+function visibilityOption(level: SkillVisibility): SelectOption<SkillAction> {
+  return {
     value: { kind: 'set-visibility', visibility: level },
-    label: `Set ${capitalize(level)}`,
-    hint,
+    label: level === 'public' ? 'Make Public' : 'Make Private',
+    hint: level === 'public' ? 'Show on your Agent Card' : 'Hide from your Agent Card',
   }
-  if (isCurrent) base.labelColor = theme.accentPeriwinkle
-  return base
 }
 
-function visibilityHint(level: SkillVisibility): string {
-  if (level === 'private') return 'Not in the Agent Card'
-  return 'Listed in the Agent Card'
-}
-
-function capitalize(value: string): string {
-  if (!value) return value
-  return value.charAt(0).toUpperCase() + value.slice(1)
-}

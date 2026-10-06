@@ -1,6 +1,6 @@
 import React from 'react'
+import { networkName } from '../shared/model/network.js'
 import type { BrowserWalletReady } from '../../wallet/browserWallet.js'
-import { supportedErc8004ChainForId } from '../../registry/erc8004.js'
 import {
   runTokenTransferStorageSubmit,
   runTokenTransferTargetSubmit,
@@ -55,7 +55,7 @@ export const TokenTransferFlow: React.FC<TokenTransferFlowProps> = ({
   onBack,
 }) => {
   const resolveAbortRef = React.useRef<AbortController | null>(null)
-  const tokenNetworkLabel = networkLabelForChainId(step.registry.chainId)
+  const tokenNetworkLabel = networkName(step.registry.chainId)
   const readyBackHint = tokenTransferBackHint(step.returnTo)
 
   if (step.kind === 'token-transfer-target') {
@@ -86,9 +86,9 @@ export const TokenTransferFlow: React.FC<TokenTransferFlowProps> = ({
   if (step.kind === 'token-transfer-resolving') {
     return (
       <BusyScreen
-        title="Resolve Receiver Wallet"
-        subtitle={`Resolving ${step.targetHandle}.`}
-        label="checking ens or address..."
+        title="Prepare Token Transfer"
+        subtitle={`Looking up ${step.targetHandle}.`}
+        label="Resolving the receiver wallet…"
         onCancel={() => {
           resolveAbortRef.current?.abort()
           resolveAbortRef.current = null
@@ -152,9 +152,6 @@ export const TokenTransferFlow: React.FC<TokenTransferFlowProps> = ({
   )
 }
 
-function networkLabelForChainId(chainId: number): string {
-  return supportedErc8004ChainForId(chainId)?.name ?? `Chain ${chainId}`
-}
 
 function tokenTransferBackHint(returnTo: Step | undefined): string {
   if (returnTo?.kind === 'edit-profile-ens') return 'Return to ENS setup'

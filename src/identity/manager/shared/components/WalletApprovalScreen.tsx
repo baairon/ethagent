@@ -15,7 +15,7 @@ type WalletApprovalScreenProps = {
   onCancel?: () => void
 }
 
-export const OPEN_BROWSER_HINT = 'Press ↵ to open in browser...'
+export const OPEN_BROWSER_HINT = 'Press ↵ to open the approval page in your browser.'
 
 export const WalletApprovalScreen: React.FC<WalletApprovalScreenProps> = ({ title, subtitle, walletSession, label, onCancel }) => {
   useAppInput((input, key) => {
@@ -24,20 +24,16 @@ export const WalletApprovalScreen: React.FC<WalletApprovalScreenProps> = ({ titl
       openExternalUrl(walletSession.url)
     }
   }, { isActive: Boolean(onCancel) || Boolean(walletSession) })
-  const footer = onCancel ? <Text color={theme.dim}>esc cancels</Text> : undefined
+  const footer = onCancel ? <Text color={theme.dim}>esc cancel</Text> : undefined
   return (
     <Surface title={title} subtitle={subtitle} footer={footer}>
+      <Spinner label={label} />
       {walletSession ? (
-        <Box flexDirection="column">
+        <Box flexDirection="column" marginTop={1}>
+          <Text color={theme.textSubtle}>{OPEN_BROWSER_HINT}</Text>
           <Text color={theme.accentBlue} underline>{walletSession.url}</Text>
-          <Text color={theme.dim}>{OPEN_BROWSER_HINT}</Text>
-          <Box marginTop={1}>
-            <Spinner label={label} />
-          </Box>
         </Box>
-      ) : (
-        <Spinner label={label} />
-      )}
+      ) : null}
     </Surface>
   )
 }

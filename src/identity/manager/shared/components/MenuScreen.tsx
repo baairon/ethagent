@@ -1,17 +1,18 @@
 import React from 'react'
 import { Box, Text } from 'ink'
-import { theme, PANEL_WIDTH } from '../../../../ui/theme.js'
+import { theme } from '../../../../ui/theme.js'
+import { useContentWidth } from '../../../../ui/layout.js'
 import type { EthagentConfig, EthagentIdentity } from '../../../../storage/config.js'
 import { identityPerspective } from '../../custody/state.js'
 import { transferSnapshotView } from '../../transfer/state.js'
 import type { AgentReconciliation } from '../reconciliation/index.js'
 import { menuFlagsFromReconciliation } from './menuFlagsFromReconciliation.js'
-import { localChangeStatusView } from '../../continuity/state.js'
+import { changeSummaryCandidates, localChangeStatusView } from '../../continuity/state.js'
+import { shortAddress } from '../model/format.js'
+import { identityNetworkName } from '../model/network.js'
 import { LazyMenu, type LazyMenuRow } from './LazyMenu.js'
 
 import type { ContinuityWorkingTreeStatus } from '../../../continuity/storage.js'
-
-const MENU_SHORTCUT_COLUMN = PANEL_WIDTH - 4
 
 type MenuScreenProps = {
   config?: EthagentConfig
@@ -49,18 +50,6 @@ type Action =
   | 'load'
   | 'cancel'
 
-function shortAddress(addr: string | undefined): string {
-  if (!addr) return ''
-  return addr.slice(0, 6) + '…' + addr.slice(-4)
-}
-
-function networkLabel(config?: EthagentConfig, identity?: EthagentIdentity): string | null {
-  const chainId = identity?.chainId ?? config?.erc8004?.chainId
-  if (chainId === 1) return 'mainnet'
-  if (chainId === 8453) return 'base'
-  return config?.selectedNetwork ?? null
-}
-
 export const MenuScreen: React.FC<MenuScreenProps> = ({
   config,
   identity,
@@ -81,6 +70,7 @@ export const MenuScreen: React.FC<MenuScreenProps> = ({
   onStorage,
   onCancel,
 }) => {
+  const contentWidth = useContentWidth()
   const canRefetch = Boolean(canRebackup && identity?.backup?.cid)
 
   const perspective = identityPerspective(identity)
@@ -95,13 +85,19 @@ export const MenuScreen: React.FC<MenuScreenProps> = ({
 
   const backupEnabled = canRebackup && !(flags?.saveSnapshotDisabled ?? false)
   const localChangeStatus = localChangeStatusView(workingStatus)
+  const changeNote = localChangeStatus.hasLocalChanges && backupEnabled
+    ? {
+        inlineNote: localChangeStatus.items.length > 0 ? changeSummaryCandidates(localChangeStatus.items) : ['Unsaved changes'],
+        inlineNoteColor: theme.accentError,
+      }
+    : {}
 
   const rows: Array<LazyMenuRow<Action>> = identity
     ? [
         { value: 'public-profile', label: 'Public Profile', shortcut: 'p' },
         { value: 'continuity',     label: 'Soul & Memory',  shortcut: 'm' },
         { value: 'skills-tree',    label: 'Skills',         shortcut: 's' },
-        { value: 'backup',         label: 'Save Snapshot',  shortcut: 'a', disabled: !canRebackup || (flags?.saveSnapshotDisabled ?? false), hint: flags?.saveSnapshotHint, ...(localChangeStatus.hasLocalChanges && backupEnabled ? { inlineNote: localChangeStatus.files.length > 0 ? localChangeStatus.files.join(', ') : 'unsaved changes', inlineNoteColor: theme.accentError } : {}) },
+        { value: 'backup',         label: 'Save Snapshot',  shortcut: 'a', disabled: !canRebackup || (flags?.saveSnapshotDisabled ?? false), hint: flags?.saveSnapshotHint, ...changeNote },
         { value: 'refetch',        label: 'Refetch Latest', shortcut: 'r', disabled: !canRefetch || (flags?.refetchLatestDisabled ?? false), hint: flags?.refetchHint },
         { value: 'ens-name',       label: 'ENS Name',       shortcut: 'e', disabled: flags?.ensNameDisabled ?? false, hint: flags?.ensNameHint },
         { value: 'identity-values', label: 'Token Values',  shortcut: 'v', ...(flags?.tokenValuesUnlinkedNote ? { note: flags.tokenValuesUnlinkedNote } : {}) },
@@ -114,23 +110,22 @@ export const MenuScreen: React.FC<MenuScreenProps> = ({
       ]
     : [
         { value: 'create', label: 'Create New Agent' },
-        { value: 'load',   label: 'Load Existing' },
+        { value: 'load',   label: 'Load Existing Agent' },
       ]
 
   const reconciliationBanner = identity && reconciliation
     ? renderReconciliationBanner(reconciliation, identity)
     : null
 
-  const network = networkLabel(config, identity)
+  const network = identityNetworkName(identity, config)
   const statusBits: string[] = []
   if (identity?.agentId) statusBits.push(`#${identity.agentId}`)
   const displayAddress = perspective === 'operator' ? identity?.connectedWallet : identity?.ownerAddress
   if (displayAddress) statusBits.push(shortAddress(displayAddress))
-  if (network) statusBits.push(network)
-  if (perspective === 'operator') statusBits.push('operator')
+  if (identity && network) statusBits.push(network)
+  if (perspective === 'operator') statusBits.push('Operator')
 
   const statusLine = statusBits.join(' · ')
-  const menuWidth = MENU_SHORTCUT_COLUMN
 
   return (
     <Box flexDirection="column" alignItems="center" paddingY={1}>
@@ -142,12 +137,12 @@ export const MenuScreen: React.FC<MenuScreenProps> = ({
         ) : null}
         {!identity ? (
           <Box marginBottom={1}>
-            <Text color={theme.textSubtle}>Portable Ethereum identity for your AI agent.</Text>
+            <Text color={theme.textSubtle}>Portable Ethereum identity for your agent.</Text>
           </Box>
         ) : null}
         <LazyMenu<Action>
           rows={rows}
-          width={menuWidth}
+          width={contentWidth}
           onSubmit={choice => {
             if (choice === 'cancel') return onCancel()
             if (choice === 'public-profile') return onPublicProfile()
@@ -167,7 +162,7 @@ export const MenuScreen: React.FC<MenuScreenProps> = ({
         />
         {!identity ? (
           <Box marginTop={1}>
-            <Text color={theme.dim}>↑↓ move · ↵ choose · esc quit</Text>
+            <Text color={theme.dim}>↑↓ move · ↵ select · esc quit</Text>
           </Box>
         ) : null}
       </Box>
@@ -183,35 +178,30 @@ export const MenuScreen: React.FC<MenuScreenProps> = ({
 function renderReconciliationBanner(r: AgentReconciliation, identity: EthagentIdentity): React.ReactNode {
   if (r.token === 'no-agent') return null
   if (r.token === 'unlinked') {
-    const tokenLabel = r.tokenAgentId ? `Token #${r.tokenAgentId}` : 'Token'
+    const tokenLabel = r.tokenAgentId ? `Token #${r.tokenAgentId}` : 'The token'
     const transferSnapshot = transferSnapshotView(identity)
-    if (transferSnapshot) {
-      return (
-        <>
-          <Text color={theme.accentError} bold>Agent Unlinked</Text>
-          <Text color={theme.textSubtle}>{tokenLabel} was transferred.</Text>
-          <Text color={theme.textSubtle}>SOUL.md, MEMORY.md, and skills remain.</Text>
-        </>
-      )
-    }
     return (
       <>
         <Text color={theme.accentError} bold>Agent Unlinked</Text>
-        <Text color={theme.textSubtle}>Token left without Prepare Transfer.</Text>
+        <Text color={theme.textSubtle}>
+          {transferSnapshot
+            ? `${tokenLabel} was transferred. Soul, memory, and skills stay on this machine.`
+            : `${tokenLabel} left this wallet without Prepare Transfer.`}
+        </Text>
       </>
     )
   }
   if (r.token === 'unknown') return null
   const lines: string[] = []
-  if (r.custody === 'mid-flow-uri-pending') lines.push('Advanced setup pending')
-  if (r.custody !== 'mid-flow-uri-pending' && r.agentUri === 'local-newer') lines.push('Local newer than onchain')
-  if (r.custody !== 'mid-flow-uri-pending' && r.agentUri === 'chain-newer') lines.push('Onchain newer than local')
-  if (r.vault === 'missing') lines.push('Vault contract missing')
+  if (r.custody === 'mid-flow-uri-pending') lines.push('Advanced custody setup is unfinished.')
+  if (r.custody !== 'mid-flow-uri-pending' && r.agentUri === 'local-newer') lines.push('Your newest snapshot is not onchain yet.')
+  if (r.custody !== 'mid-flow-uri-pending' && r.agentUri === 'chain-newer') lines.push('Newer snapshot onchain. Use Refetch Latest.')
+  if (r.vault === 'missing') lines.push('The Vault contract was not found.')
   if (lines.length === 0) return null
   return (
     <>
-      <Text color={theme.accentPeriwinkle} bold>{lines.length} item{lines.length === 1 ? '' : 's'} need attention</Text>
-      {lines.map((line, i) => <Text key={i} color={theme.textSubtle}>· {line}</Text>)}
+      <Text color={theme.accentPeriwinkle} bold>Needs Attention</Text>
+      {lines.map((line, i) => <Text key={i} color={theme.textSubtle}>{line}</Text>)}
     </>
   )
 }

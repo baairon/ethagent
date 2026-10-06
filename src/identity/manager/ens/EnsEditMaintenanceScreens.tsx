@@ -1,29 +1,27 @@
 import React from 'react'
-import { Box, Text } from 'ink'
+import { Box } from 'ink'
 import type { Address } from 'viem'
 import { Surface } from '../../../ui/Surface.js'
 import { Select } from '../../../ui/Select.js'
 import { Spinner } from '../../../ui/Spinner.js'
+import { Paragraph } from '../../../ui/Paragraph.js'
 import { theme } from '../../../ui/theme.js'
 import type { BrowserWalletReady } from '../../wallet/browserWallet.js'
-import {
-  type CustodyMode,
-} from '../custody/state.js'
+import { type CustodyMode } from '../custody/state.js'
 import { shortAddress } from '../shared/model/format.js'
+import { FieldList } from '../shared/components/FieldRow.js'
 import {
   emptyAgentEnsRecords,
   recordsHaveCurrentValues,
   unlinkEnsLinkOptions,
 } from './editCopy.js'
-import {
-  EnsSetupRow,
-  footerHint,
-} from './EnsEditShared.js'
+import { CheckingScreen, footerHint } from './EnsEditShared.js'
 import { UnlinkEnsReviewScreen } from './EnsEditReviewScreens.js'
 import {
   DeleteSubdomainTxRunner,
   EscCancel,
 } from './EnsEditRunners.js'
+import { ensValidationReasonText, selectEnsStatus } from './state.js'
 import type {
   EnsEditProps,
   EnsPhase,
@@ -33,91 +31,85 @@ type MaintenanceScreenProps = {
   phase: EnsPhase
   identity: EnsEditProps['identity']
   currentEnsName: string
-  currentEnsCanDelete: boolean
   savedCustodyMode: CustodyMode | undefined
   savedOwnerAddress: string
-  savedOperator: string
-  registryNetworkLabel: string
   validationError: string | null
   ownerAddress: Address
   operatorWalletSession: BrowserWalletReady | null
   setOperatorWalletSession: (session: BrowserWalletReady | null) => void
   setPhase: (phase: EnsPhase) => void
   runDiscovery: () => void
+  runCheckAgain: () => void
   runUnlinkEnsLoading: (fullName: string) => void
-  runDeleteSubdomainPreflight: (fullName: string) => void
   onBack: () => void
   onEnsUnlink: EnsEditProps['onEnsUnlink']
   onEnsRecordsUpdate: EnsEditProps['onEnsRecordsUpdate']
 }
 
+const SELECT_FOOTER = footerHint('↵ select · esc back')
+
 export function renderEnsMaintenancePhase({
   phase,
   identity,
   currentEnsName,
-  currentEnsCanDelete,
   savedCustodyMode,
   savedOwnerAddress,
-  savedOperator,
-  registryNetworkLabel,
   validationError,
   ownerAddress,
   operatorWalletSession,
   setOperatorWalletSession,
   setPhase,
   runDiscovery,
+  runCheckAgain,
   runUnlinkEnsLoading,
-  runDeleteSubdomainPreflight,
   onBack,
   onEnsUnlink,
   onEnsRecordsUpdate,
 }: MaintenanceScreenProps): React.ReactNode | null {
+  const home = () => setPhase({ kind: 'mode-select' })
+
   if (phase.kind === 'mode-select') {
-    type EnsAction = 'link' | 'unlink' | 'back'
-    const isAdvanced = savedCustodyMode === 'advanced'
-    const multiNeedsCustodySetup = isAdvanced && !savedOwnerAddress
-    const subtitle = currentEnsName
-      ? `This agent resolves at ${currentEnsName}.`
-      : 'Assign a name so others can find this agent.'
-    const linkHint = multiNeedsCustodySetup
-      ? 'Set Advanced custody first via Custody Mode'
-      : isAdvanced
-        ? 'Root → Name → Apply'
-        : 'Root → Name → Apply'
-    const options: Array<{ value: EnsAction; role?: 'section' | 'utility'; label: string; hint?: string; disabled?: boolean }> = []
-    if (currentEnsName) {
-      options.push({ value: 'unlink', label: 'Unlink Name' })
-    } else {
-      options.push({
-        value: 'link',
-        label: 'Set Up Name',
-        hint: linkHint,
-        disabled: multiNeedsCustodySetup,
-      })
-    }
+    type EnsAction = 'link' | 'check' | 'unlink' | 'back'
+    const ens = selectEnsStatus(identity)
+    const needsCustodySetup = savedCustodyMode === 'advanced' && !savedOwnerAddress
+    const subtitle = !currentEnsName
+      ? 'Name your agent under a .eth you own.'
+      : ens.kind === 'issue'
+        ? 'This name needs attention.'
+        : 'Others can find your agent by this name.'
+    const options: Array<{ value: EnsAction; label: string; hint?: string; disabled?: boolean; role?: 'utility' }> = currentEnsName
+      ? [
+          ...(ens.kind === 'issue' ? [{ value: 'check' as const, label: 'Check Again' }] : []),
+          { value: 'unlink', label: 'Unlink Name', hint: 'You keep the name' },
+        ]
+      : [{
+          value: 'link',
+          label: 'Choose a Name',
+          ...(needsCustodySetup ? { hint: 'Finish Advanced custody setup first', disabled: true } : {}),
+        }]
     options.push({ value: 'back', label: 'Back', role: 'utility' })
     return (
-      <Surface
-        title="ENS Name"
-        subtitle={subtitle}
-        footer={footerHint('↵ select · esc back')}
-      >
-        {validationError ? <Box marginBottom={1}><Text color={theme.accentError}>{validationError}</Text></Box> : null}
-        <Box>
+      <Surface title="ENS Name" subtitle={subtitle} footer={SELECT_FOOTER}>
+        {currentEnsName ? (
+          <FieldList fields={[
+            { label: 'Name', value: currentEnsName, valueColor: ens.kind === 'issue' ? theme.accentError : theme.accentPeriwinkle },
+            ens.kind === 'issue'
+              ? { label: 'Problem', value: `${ensValidationReasonText(ens.reason)}.`, valueColor: theme.accentError }
+              : { label: 'Status', value: identity.agentId ? `Linked to token #${identity.agentId}` : 'Linked' },
+          ]} />
+        ) : null}
+        {validationError ? (
+          <Box marginTop={currentEnsName ? 1 : 0}><Paragraph color={theme.accentError}>{validationError}</Paragraph></Box>
+        ) : null}
+        <Box marginTop={currentEnsName || validationError ? 1 : 0}>
           <Select<EnsAction>
             options={options}
             hintLayout="inline"
             onSubmit={choice => {
               if (choice === 'back') return onBack()
-              if (choice === 'unlink' && currentEnsName) {
-                runUnlinkEnsLoading(currentEnsName)
-                return
-              }
-              if (choice === 'link') {
-                if (multiNeedsCustodySetup) return
-                runDiscovery()
-                return
-              }
+              if (choice === 'check') return runCheckAgain()
+              if (choice === 'unlink' && currentEnsName) return runUnlinkEnsLoading(currentEnsName)
+              if (choice === 'link' && !needsCustodySetup) return runDiscovery()
             }}
             onCancel={onBack}
           />
@@ -128,14 +120,10 @@ export function renderEnsMaintenancePhase({
 
   if (phase.kind === 'unlink-loading') {
     return (
-      <Surface
-        title="Prepare ENS Unlink"
-        subtitle={`Reading ethagent records from ${phase.fullName}`}
-        footer={footerHint('esc back')}
-      >
-        <Spinner label="reading ENS records..." />
-        <EscCancel onCancel={() => setPhase({ kind: 'mode-select' })} />
-      </Surface>
+      <CheckingScreen title={`Unlink ${phase.fullName}`} subtitle="Reading its agent records on Ethereum Mainnet.">
+        <Spinner label="Reading records…" />
+        <EscCancel onCancel={home} />
+      </CheckingScreen>
     )
   }
 
@@ -144,8 +132,6 @@ export function renderEnsMaintenancePhase({
     return (
       <UnlinkEnsReviewScreen
         fullName={phase.fullName}
-        currentMode={savedCustodyMode}
-        registryNetworkLabel={registryNetworkLabel}
         recordsDiff={phase.recordsDiff}
         onUnlink={() => {
           if (recordsHaveCurrentValues(phase.recordsDiff)) {
@@ -154,44 +140,29 @@ export function renderEnsMaintenancePhase({
           }
           onEnsUnlink()
         }}
-        onBack={() => setPhase({ kind: 'mode-select' })}
+        onBack={home}
       />
     )
   }
 
   if (phase.kind === 'delete-subdomain-preflight') {
     return (
-      <Surface
-        title="Prepare Subdomain Deletion"
-        subtitle={`Verifying the parent of ${phase.fullName} on Ethereum mainnet.`}
-        footer={footerHint('esc back')}
-      >
-        <Spinner label="reading ENS owner..." />
-        <EscCancel onCancel={() => setPhase({ kind: 'mode-select' })} />
-      </Surface>
+      <CheckingScreen title={`Delete ${phase.fullName}`} subtitle="Confirming who manages its parent name.">
+        <Spinner label="Reading the parent name…" />
+        <EscCancel onCancel={home} />
+      </CheckingScreen>
     )
   }
 
   if (phase.kind === 'delete-subdomain-blocked') {
     return (
-      <Surface
-        title="Cannot Delete Subdomain"
-        subtitle={`Onchain check for ${phase.fullName} did not pass.`}
-        footer={footerHint('↵ select · esc back')}
-      >
-        <Box flexDirection="column" marginBottom={1}>
-          <Text color={theme.accentError}>{phase.reason}</Text>
-        </Box>
-        <Box>
-          <Select<'back'>
-            options={[
-              { value: 'back', label: 'Back to ENS', role: 'utility' },
-            ]}
-            hintLayout="inline"
-            onSubmit={() => setPhase({ kind: 'mode-select' })}
-            onCancel={() => setPhase({ kind: 'mode-select' })}
-          />
-        </Box>
+      <Surface title={`Can't Delete ${phase.fullName}`} subtitle={phase.reason} footer={SELECT_FOOTER} tone="error">
+        <Select<'back'>
+          options={[{ value: 'back', label: 'Back', role: 'utility' }]}
+          hintLayout="inline"
+          onSubmit={home}
+          onCancel={home}
+        />
       </Surface>
     )
   }
@@ -200,35 +171,32 @@ export function renderEnsMaintenancePhase({
     const plan = phase.plan
     return (
       <Surface
-        title="Delete ENS Subdomain"
-        subtitle={`Remove ${plan.fullName} from ${plan.parentName}.`}
-        footer={footerHint('↵ select · esc back')}
+        title={`Delete ${plan.fullName}?`}
+        subtitle={`Removes the subdomain from ${plan.parentName}. Your wallet approves one transaction on Ethereum Mainnet.`}
+        footer={SELECT_FOOTER}
+        tone="error"
       >
-        <Box flexDirection="column" marginBottom={1}>
-          <EnsSetupRow label="Subdomain" value={plan.fullName} />
-          <EnsSetupRow label="Parent" value={plan.parentName} />
-          <EnsSetupRow label="Owner wallet" value={shortAddress(plan.parentOwnerAddress)} />
-          <EnsSetupRow
-            label="Path"
-            value={plan.parentWrapped ? 'NameWrapper' : 'Registry'}
-          />
-        </Box>
-        <Box>
+        <FieldList fields={[
+          { label: 'Subdomain', value: plan.fullName },
+          { label: 'Parent', value: plan.parentName },
+          { label: 'Signs with', value: `Owner wallet ${shortAddress(plan.parentOwnerAddress)}` },
+        ]} />
+        <Box marginTop={1}>
           <Select<'delete' | 'back'>
             options={[
-              { value: 'delete', role: 'section', label: 'Action' },
-              { value: 'delete', label: 'Delete Subdomain', hint: 'Owner wallet signs' },
+              { value: 'delete', label: 'Delete Subdomain' },
               { value: 'back', label: 'Back', role: 'utility' },
             ]}
+            initialIndex={1}
             hintLayout="inline"
             onSubmit={choice => {
               if (choice === 'delete') {
                 setPhase({ kind: 'delete-subdomain-tx', plan })
                 return
               }
-              setPhase({ kind: 'mode-select' })
+              home()
             }}
-            onCancel={() => setPhase({ kind: 'mode-select' })}
+            onCancel={home}
           />
         </Box>
       </Surface>
@@ -253,21 +221,13 @@ export function renderEnsMaintenancePhase({
 
   if (phase.kind === 'delete-subdomain-done') {
     return (
-      <Surface
-        title="Subdomain Deleted"
-        subtitle={`${phase.fullName} is cleared onchain and unlinked from this token.`}
-        footer={footerHint('↵ select · esc back')}
-      >
-        <Box>
-          <Select<'back'>
-            options={[
-              { value: 'back', label: 'Back to ENS', role: 'utility' },
-            ]}
-            hintLayout="inline"
-            onSubmit={() => setPhase({ kind: 'mode-select' })}
-            onCancel={() => setPhase({ kind: 'mode-select' })}
-          />
-        </Box>
+      <Surface title="Subdomain Deleted" subtitle={`${phase.fullName} is gone and no longer linked to your agent.`} footer={SELECT_FOOTER}>
+        <Select<'back'>
+          options={[{ value: 'back', label: 'Back', role: 'utility' }]}
+          hintLayout="inline"
+          onSubmit={home}
+          onCancel={home}
+        />
       </Surface>
     )
   }

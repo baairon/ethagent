@@ -9,7 +9,6 @@ import {
   listSkillFiles,
   type SkillFileEntry,
 } from '../../../continuity/skills/loadSkills.js'
-import { continuityVaultRef } from '../../../continuity/storage.js'
 import type { SkillIndexEntry } from '../../../continuity/skills/types.js'
 
 type ConfirmChoice = 'delete' | 'cancel'
@@ -24,7 +23,7 @@ interface DeleteSkillConfirmScreenProps {
   onCancel: () => void
 }
 
-const MAX_LISTED_FILES = 10
+const MAX_LISTED_FILES = 8
 
 export const DeleteSkillConfirmScreen: React.FC<DeleteSkillConfirmScreenProps> = ({
   identity,
@@ -51,62 +50,48 @@ export const DeleteSkillConfirmScreen: React.FC<DeleteSkillConfirmScreenProps> =
     return () => { cancelled = true }
   }, [identity, target.relativePath, skillName])
 
-  const ref = identity ? continuityVaultRef(identity) : undefined
   const skillMissing = entries !== null && !entries.some(entry => entry.relativePath === target.relativePath)
-  const supportingCount = (files ?? []).filter(f => f.relativePath !== 'SKILL.md').length
   const subtitle = skillMissing
-    ? `Skill ${skillName} was already removed elsewhere. Cancel and refresh.`
-    : supportingCount > 0
-      ? `Removes ${skillName}/ and ${supportingCount} supporting file${supportingCount === 1 ? '' : 's'}. This cannot be undone.`
-      : `Removes ${skillName}/. This cannot be undone.`
+    ? 'This skill was already removed. Go back to refresh the list.'
+    : 'Removes it from your vault and every connected tool. Saved snapshots keep their copy.'
 
   return (
     <Surface title={`Delete ${skillName}?`} subtitle={subtitle} footer={footer} tone="error">
-      <Box marginTop={1} flexDirection="column">
-        <Text color={theme.dim}>This will remove:</Text>
-        {ref && (
-          <Box marginLeft={2} flexDirection="column">
-            <Text color={theme.text}>{ref.skillsDir}/{skillName}/</Text>
-            {files === null ? (
-              <Text color={theme.dim}>(loading folder contents...)</Text>
-            ) : (
-              <FolderContents files={files} />
-            )}
-          </Box>
-        )}
-      </Box>
-      <Box marginTop={1}>
-        <Select<ConfirmChoice>
-          options={[
-            { value: 'delete', label: 'Yes, delete', hint: skillMissing ? 'Already missing on disk' : 'Permanent on next snapshot', bold: true, disabled: skillMissing },
-            { value: 'cancel', label: 'No, back', role: 'utility' },
-          ]}
-          hintLayout="inline"
-          initialIndex={1}
-          onSubmit={choice => {
-            if (choice === 'delete') return onConfirm()
-            return onCancel()
-          }}
-          onCancel={onCancel}
-        />
-      </Box>
+      {skillMissing ? null : (
+        <Box flexDirection="column" marginBottom={1}>
+          <Text color={theme.text}>{`skills/${skillName}/`}</Text>
+          {files === null
+            ? <Text color={theme.dim}>  Reading the folder…</Text>
+            : <FolderContents files={files} />}
+        </Box>
+      )}
+      <Select<ConfirmChoice>
+        options={[
+          { value: 'delete', label: 'Delete Skill', bold: true, disabled: skillMissing },
+          { value: 'cancel', label: 'Keep Skill', role: 'utility' },
+        ]}
+        hintLayout="inline"
+        initialIndex={1}
+        onSubmit={choice => {
+          if (choice === 'delete') return onConfirm()
+          return onCancel()
+        }}
+        onCancel={onCancel}
+      />
     </Surface>
   )
 }
 
 const FolderContents: React.FC<{ files: SkillFileEntry[] }> = ({ files }) => {
-  if (files.length === 0) {
-    return <Text color={theme.dim}>(empty folder)</Text>
-  }
+  if (files.length === 0) return <Text color={theme.dim}>  Empty folder</Text>
   const shown = files.slice(0, MAX_LISTED_FILES)
   const extra = files.length - shown.length
   return (
-    <Box flexDirection="column" marginTop={1}>
-      <Text color={theme.dim}>Files to be removed:</Text>
+    <Box flexDirection="column">
       {shown.map(f => (
-        <Text key={f.relativePath} color={theme.text}>  · {f.relativePath}</Text>
+        <Text key={f.relativePath} color={theme.textSubtle}>{`  ${f.relativePath}`}</Text>
       ))}
-      {extra > 0 && <Text color={theme.dim}>  · ...and {extra} more</Text>}
+      {extra > 0 ? <Text color={theme.dim}>{`  +${extra} more`}</Text> : null}
     </Box>
   )
 }

@@ -73,13 +73,13 @@ export async function runRecoveryRefetch(
     onReady: callbacks.onWalletReady,
   })
   callbacks.onWalletReady(null)
-  callbacks.onRestoreProgress?.({ phase: 'decrypting', label: 'signature received, decrypting onchain snapshot...' })
+  callbacks.onRestoreProgress?.({ phase: 'decrypting', label: 'Decrypting the snapshot…' })
   const payload = restoreContinuitySnapshotEnvelope({
     envelope,
     walletSignature: wallet.signature,
     currentOwnerAddress: getAddress(wallet.account),
   })
-  callbacks.onRestoreProgress?.({ phase: 'writing', label: 'restoring SOUL.md, MEMORY.md, and skills...' })
+  callbacks.onRestoreProgress?.({ phase: 'writing', label: 'Writing soul, memory, and skills…' })
   const transferSnapshot = transferSnapshotMetadataFromEnvelope(envelope)
   const refreshedBackup: BackupMetadata = {
     cid: candidate.backup.cid,
@@ -133,7 +133,7 @@ export async function runRecoveryRefetch(
   if (payload.skills) {
     await restoreSkillsTree(nextIdentity, payload.skills)
   }
-  callbacks.onRestoreProgress?.({ phase: 'finishing', label: 'finalizing refreshed identity...' })
+  callbacks.onRestoreProgress?.({ phase: 'finishing', label: 'Finishing up…' })
   const agentCardRestored = await restorePublishedAgentCard(nextIdentity, apiUrl, candidate.publicDiscovery?.agentCardCid)
   await ensureIdentityMarkdownScaffold(nextIdentity)
   await syncAgentCardManifest(nextIdentity).catch(() => null)

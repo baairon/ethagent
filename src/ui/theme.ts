@@ -22,8 +22,6 @@ export const theme = {
   textSubtle: '#9aa0b0',
 } as const
 
-export const PANEL_WIDTH = 46
-
 function rgb(hex: string): [number, number, number] {
   const n = parseInt(hex.slice(1), 16)
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255]

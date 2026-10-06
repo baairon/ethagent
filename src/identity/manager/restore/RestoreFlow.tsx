@@ -1,17 +1,18 @@
 import React from 'react'
 import { Box, Text } from 'ink'
+import { isAddress } from 'viem'
 import { Surface } from '../../../ui/Surface.js'
 import { Select } from '../../../ui/Select.js'
 import { TextInput } from '../../../ui/TextInput.js'
 import { Spinner } from '../../../ui/Spinner.js'
+import { Paragraph } from '../../../ui/Paragraph.js'
 import { theme } from '../../../ui/theme.js'
 import { normalizeErc8004RegistryConfig } from '../../registry/erc8004.js'
 import {
   isCurrentAgentCandidate,
-  tokenCandidateHint,
   tokenCandidateSelectLabel,
 } from '../profile/identity.js'
-import { networkLabel } from '../shared/model/network.js'
+import { networkName } from '../shared/model/network.js'
 import { shortAddress } from '../shared/model/format.js'
 import { registryConfigFromConfig } from '../../registry/registryConfig.js'
 import type { Step } from '../reducer.js'
@@ -40,6 +41,10 @@ type RestoreFlowProps = {
 
 const footerHint = (hint: string) => <Text color={theme.dim}>{hint}</Text>
 
+function displayHandle(handle: string): string {
+  return isAddress(handle, { strict: false }) ? shortAddress(handle) : handle
+}
+
 export const RestoreFlow: React.FC<RestoreFlowProps> = ({
   step,
   config,
@@ -55,16 +60,17 @@ export const RestoreFlow: React.FC<RestoreFlowProps> = ({
 }) => {
   const purpose = 'purpose' in step ? step.purpose ?? 'restore' : 'restore'
   const isSwitch = purpose === 'switch'
+  const flowTitle = isSwitch ? 'Switch Agent' : 'Restore Agent'
 
   if (step.kind === 'restore-registry') {
     const resolution = registryConfigFromConfig(config)
     return (
       <Surface
-        title={`${resolution.network ? networkLabel(resolution.network).charAt(0).toUpperCase() + networkLabel(resolution.network).slice(1) : ''} Agent Registry`}
+        title={`${networkName(resolution.chainId)} Agent Registry`}
         subtitle={step.error ? `Lookup failed: ${step.error}` : 'Paste the agent registry address for this network.'}
-        footer={footerHint('↵ discover · esc back')}
+        footer={footerHint('↵ continue · esc back')}
       >
-        <Text color={theme.dim}>RPC defaults to {resolution.defaultRpcUrl}</Text>
+        <Box marginBottom={1}><Text color={theme.dim}>RPC defaults to {resolution.defaultRpcUrl}</Text></Box>
         <TextInput
           initialValue={config?.erc8004?.identityRegistryAddress ?? ''}
           placeholder="0x registry address"
@@ -90,9 +96,9 @@ export const RestoreFlow: React.FC<RestoreFlowProps> = ({
   if (step.kind === 'restore-discovering') {
     return (
       <BusyScreen
-        title={isSwitch ? 'Finding Agents' : 'Finding Agents'}
-        subtitle={step.ownerHandle}
-        label="checking owned tokens..."
+        title={flowTitle}
+        subtitle={`Finding agents for ${displayHandle(step.ownerHandle)} on ${networkName(step.registry.chainId)}.`}
+        label="Checking which agents this wallet can open…"
         onCancel={onBack}
       />
     )
@@ -101,14 +107,14 @@ export const RestoreFlow: React.FC<RestoreFlowProps> = ({
   if (step.kind === 'restore-recovery-input') {
     return (
       <Surface
-        title={isSwitch ? 'Switch Agent' : 'Restore Agent'}
-        subtitle="This wallet doesn't directly own an agent token."
+        title={flowTitle}
+        subtitle="This wallet holds no agent token. Find the agent by its ENS name or token id instead."
         footer={footerHint('↵ select · esc back')}
       >
         <Select<'ens' | 'token-id' | 'back'>
           options={[
-            { value: 'ens', label: 'Enter ENS Name', hint: 'Via ENS subdomain' },
-            { value: 'token-id', label: 'Enter Token ID', hint: 'By token ID' },
+            { value: 'ens', label: 'Enter ENS Name' },
+            { value: 'token-id', label: 'Enter Token ID', hint: `On ${networkName(step.registry.chainId)}` },
             { value: 'back', label: 'Back', role: 'utility' },
           ]}
           hintLayout="inline"
@@ -119,72 +125,27 @@ export const RestoreFlow: React.FC<RestoreFlowProps> = ({
     )
   }
 
-  if (step.kind === 'restore-ens-input') {
+  if (step.kind === 'restore-ens-input' || step.kind === 'restore-token-id-input') {
+    const byEns = step.kind === 'restore-ens-input'
     if (step.busy) {
       return (
-        <Surface
-          title={isSwitch ? 'Switch Agent' : 'Restore Agent'}
-          subtitle="Looking up the agent onchain."
-          footer={footerHint('esc cancels')}
-        >
-          <Box marginTop={1}>
-            <Spinner label="looking up ENS..." />
-          </Box>
+        <Surface title={flowTitle} subtitle="Looking up the agent onchain." footer={footerHint('esc cancel')}>
+          <Spinner label={byEns ? 'Resolving the ENS name…' : 'Looking up the token…'} />
         </Surface>
       )
     }
     return (
       <Surface
-        title={isSwitch ? 'Switch Agent' : 'Restore Agent'}
-        subtitle="Enter the agent ENS name."
+        title={flowTitle}
+        subtitle={byEns ? 'Enter the agent\'s ENS name.' : `Enter the agent's token id on ${networkName(step.registry.chainId)}.`}
         footer={footerHint('↵ continue · esc back')}
       >
+        {step.error ? <Box marginBottom={1}><Paragraph color={theme.accentError}>{step.error}</Paragraph></Box> : null}
         <TextInput
-          placeholder="agent.example.eth"
-          onSubmit={value => onEnsSubmit(value.trim())}
+          placeholder={byEns ? 'name.eth' : 'token id'}
+          onSubmit={value => byEns ? onEnsSubmit(value.trim()) : onTokenIdSubmit(value.trim())}
           onCancel={onBack}
         />
-        {step.error ? (
-          <Box marginTop={1} flexDirection="column">
-            <Text color={theme.accentError}>Could not resolve ENS name</Text>
-            <Text color={theme.textSubtle}>{step.error}</Text>
-          </Box>
-        ) : null}
-      </Surface>
-    )
-  }
-
-  if (step.kind === 'restore-token-id-input') {
-    if (step.busy) {
-      return (
-        <Surface
-          title={isSwitch ? 'Switch Agent' : 'Restore Agent'}
-          subtitle="Looking up the agent onchain."
-          footer={footerHint('esc cancels')}
-        >
-          <Box marginTop={1}>
-            <Spinner label="looking up token..." />
-          </Box>
-        </Surface>
-      )
-    }
-    return (
-      <Surface
-        title={isSwitch ? 'Switch Agent' : 'Restore Agent'}
-        subtitle={`Token ID on ${networkLabelForRegistry(step.registry)}.`}
-        footer={footerHint('↵ continue · esc back')}
-      >
-        <TextInput
-          placeholder="45744"
-          onSubmit={value => onTokenIdSubmit(value.trim())}
-          onCancel={onBack}
-        />
-        {step.error ? (
-          <Box marginTop={1} flexDirection="column">
-            <Text color={theme.accentError}>Could not resolve token</Text>
-            <Text color={theme.textSubtle}>{step.error}</Text>
-          </Box>
-        ) : null}
       </Surface>
     )
   }
@@ -192,16 +153,12 @@ export const RestoreFlow: React.FC<RestoreFlowProps> = ({
   if (step.kind === 'restore-not-found') {
     const view = restoreNotFoundView(step)
     return (
-      <Surface
-        title={view.title}
-        subtitle={view.subtitle}
-        footer={footerHint('↵ continue · esc back')}
-      >
-        <Text color={theme.dim}>{view.detail}</Text>
+      <Surface title={view.title} subtitle={view.subtitle} footer={footerHint('↵ select · esc back')}>
+        {view.detail ? <Box marginBottom={1}><Paragraph color={theme.dim}>{view.detail}</Paragraph></Box> : null}
         <Select<'retry' | 'network'>
           options={[
-            { value: 'retry', label: 'Retry Search' },
-            { value: 'network', label: 'Choose Network' },
+            { value: 'retry', label: 'Search Again' },
+            { value: 'network', label: 'Choose Another Network' },
           ]}
           hintLayout="inline"
           onSubmit={choice => {
@@ -218,22 +175,24 @@ export const RestoreFlow: React.FC<RestoreFlowProps> = ({
     return (
       <Surface
         title={isSwitch ? 'Switch Agent' : 'Choose Your Agent'}
-        subtitle={step.ownerHandle}
+        subtitle={`Agents ${displayHandle(step.ownerHandle)} can open on ${networkName(step.registry.chainId)}.`}
         footer={footerHint('↵ select · esc back')}
       >
         <Select<string>
           options={[
-            { value: 'section:available-agents', role: 'section', label: 'Available Agents' },
             ...step.candidates.map(candidate => {
               const current = isSwitch && isCurrentAgentCandidate(config?.identity, candidate)
+              const restorable = Boolean(candidate.backup?.cid)
               return {
                 value: candidate.agentId.toString(),
                 label: tokenCandidateSelectLabel(candidate, current),
-                hint: tokenCandidateHint(candidate),
+                hint: restorable ? `#${candidate.agentId.toString()}` : `#${candidate.agentId.toString()} · no snapshot`,
+                disabled: !restorable,
               }
             }),
-            { value: '__ens__', label: 'Enter ENS Name', hint: 'Via ENS subdomain' },
-            { value: '__token-id__', label: 'Enter Token ID', hint: 'By token ID' },
+            { value: '__spacer__', role: 'section' as const, label: '' },
+            { value: '__ens__', label: 'Enter ENS Name' },
+            { value: '__token-id__', label: 'Enter Token ID' },
             { value: '__back__', label: 'Back', role: 'utility' },
           ]}
           hintLayout="inline"
@@ -252,21 +211,21 @@ export const RestoreFlow: React.FC<RestoreFlowProps> = ({
   if (step.kind === 'restore-fetching') {
     return (
       <BusyScreen
-        title={isSwitch ? 'Switching Agent' : 'Restoring Your Agent'}
-        subtitle="IPFS"
-        label="opening from IPFS..."
+        title={flowTitle}
+        subtitle="Downloading the encrypted snapshot from IPFS."
+        label="Downloading…"
         onCancel={onBack}
       />
     )
   }
 
   if (step.kind === 'restore-authorizing') {
-    const view = restoreAuthorizationView(step, isSwitch)
+    const view = restoreAuthorizationView(step)
     if (restoreProgress) {
       return (
         <BusyScreen
-          title={view.progressTitle}
-          subtitle="Wallet Signature Received"
+          title={flowTitle}
+          subtitle="Signature received."
           label={restoreProgress.label}
         />
       )
@@ -276,7 +235,7 @@ export const RestoreFlow: React.FC<RestoreFlowProps> = ({
         title={view.title}
         subtitle={view.subtitle}
         walletSession={walletSession}
-        label={view.label}
+        label="Waiting for your signature…"
         onCancel={onBack}
       />
     )
@@ -285,45 +244,35 @@ export const RestoreFlow: React.FC<RestoreFlowProps> = ({
   return null
 }
 
-function networkLabelForRegistry(registry: { chainId: number }): string {
-  const network = registry.chainId === 1 ? 'mainnet'
-    : registry.chainId === 8453 ? 'base'
-      : undefined
-  return network ? networkLabel(network) : `chain ${registry.chainId}`
-}
-
 function restoreNotFoundView(
   step: Extract<RestoreStep, { kind: 'restore-not-found' }>,
 ): { title: string; subtitle: string; detail: string } {
-  const network = networkLabelForRegistry(step.registry)
-  const address = step.requesterAddress ?? step.ownerHandle
+  const network = networkName(step.registry.chainId)
+  const address = displayHandle(step.requesterAddress ?? step.ownerHandle)
   if (step.reason === 'cancelled') {
     return {
-      title: 'Search Cancelled',
-      subtitle: `Stopped scanning ${network} for ${shortAddress(address)}.`,
-      detail: 'No restore target was selected. Retry to keep searching, or choose a different network.',
+      title: 'Search Stopped',
+      subtitle: `Stopped searching ${network} for ${address}.`,
+      detail: '',
     }
   }
   if (step.reason === 'no-owner-or-operator') {
     return {
-      title: 'No Agent Access Found',
-      subtitle: `${shortAddress(address)} has no ERC-8004 agent access on ${network}.`,
-      detail: step.requesterAddress
-        ? 'Checked token ownership and indexed ERC-8004 restore metadata. This wallet owns no agent token and is not listed as an operator wallet.'
-        : 'Checked token ownership for this name. Operator-wallet metadata lookup requires a wallet address.',
+      title: 'No Agents Found',
+      subtitle: `${address} holds no agent token on ${network} and is not an operator for one.`,
+      detail: step.requesterAddress ? '' : 'Operator wallets are only checked when you connect a wallet.',
     }
   }
   return {
     title: 'Agent Search Incomplete',
-    subtitle: `ERC-8004 ownership or restore metadata could not be checked completely on ${network}.`,
-    detail: 'No restore target was selected. Retry the search or choose another network.',
+    subtitle: `The search on ${network} could not finish.`,
+    detail: '',
   }
 }
 
 function restoreAuthorizationView(
   step: Extract<RestoreStep, { kind: 'restore-authorizing' }>,
-  isSwitch: boolean,
-): { title: string; subtitle: string; label: string; progressTitle: string } {
+): { title: string; subtitle: string } {
   const owner = step.candidate.ownerAddress
   let requester: string | undefined = step.requesterAddress
   let role: 'owner-wallet' | 'operator-wallet' = 'owner-wallet'
@@ -337,17 +286,13 @@ function restoreAuthorizationView(
 
   if (role === 'operator-wallet' && requester) {
     return {
-      title: 'Operator Wallet Required',
-      subtitle: `Sign with the operator wallet ${shortAddress(requester)} to decrypt this snapshot.`,
-      label: 'waiting for operator wallet signature...',
-      progressTitle: isSwitch ? 'Switching Agent' : 'Restoring Your Agent',
+      title: 'Sign with Your Operator Wallet',
+      subtitle: `Sign with ${shortAddress(requester)} to open this snapshot. Signing is free.`,
     }
   }
 
   return {
-    title: 'Owner Wallet Required',
-    subtitle: `This encrypted snapshot requires the owner wallet ${shortAddress(owner)}.`,
-    label: 'waiting for owner wallet signature...',
-    progressTitle: isSwitch ? 'Switching Agent' : 'Restoring Your Agent',
+    title: 'Sign with Your Owner Wallet',
+    subtitle: `Only the owner wallet ${shortAddress(owner)} can open this snapshot. Signing is free.`,
   }
 }

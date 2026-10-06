@@ -23,7 +23,6 @@ export type SimpleEnsPhase =
   | { kind: 'pick-parent'; mode?: 'simple' | 'advanced'; error?: string }
   | { kind: 'manual-parent'; mode?: 'simple' | 'advanced'; error?: string }
   | { kind: 'pick-subdomain'; parent: string; label?: string; error?: string }
-  | { kind: 'simple-name-missing'; fullName: string; validation: EnsIssueValidation }
   | { kind: 'simple-create-preflight'; rootName: string; label: string; fullName: string }
   | { kind: 'simple-create-review'; setup: EnsSetupPlan }
   | { kind: 'simple-create-blocked'; fallback: EnsSetupBlockedPlan }

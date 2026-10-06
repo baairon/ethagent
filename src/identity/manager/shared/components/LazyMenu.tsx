@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Box, Text } from 'ink'
-import { theme, gradientColor, PANEL_WIDTH } from '../../../../ui/theme.js'
-import { fitHint } from '../../../../ui/Select.js'
+import { theme, gradientColor } from '../../../../ui/theme.js'
+import { useContentWidth } from '../../../../ui/layout.js'
+import { firstThatFits, wrapWords } from '../../../../ui/text.js'
 import { useAppInput } from '../../../../app/input/AppInputProvider.js'
 
 export type LazyMenuItem<T> = {
@@ -13,7 +14,7 @@ export type LazyMenuItem<T> = {
   hint?: string
   note?: string
   noteColor?: string
-  inlineNote?: string
+  inlineNote?: string | readonly string[]
   inlineNoteColor?: string
 }
 
@@ -39,7 +40,9 @@ type Props<T> = {
   onCancel?: () => void
 }
 
-export function LazyMenu<T>({ rows, width = PANEL_WIDTH, onSubmit, onCancel }: Props<T>) {
+export function LazyMenu<T>({ rows, width, onSubmit, onCancel }: Props<T>) {
+  const contentWidth = useContentWidth()
+  const menuWidth = width ?? contentWidth
   const firstSelectable = Math.max(0, rows.findIndex(r => isItem(r) && !r.disabled))
   const [index, setIndex] = useState(firstSelectable)
 
@@ -89,11 +92,9 @@ export function LazyMenu<T>({ rows, width = PANEL_WIDTH, onSubmit, onCancel }: P
       {rows.map((row, i) => {
         if (!isItem(row)) {
           return (
-            <React.Fragment key={i}>
-              <Box flexDirection="row" width={width}>
-                <Text color={theme.menuStatus} bold>{row.label}</Text>
-              </Box>
-            </React.Fragment>
+            <Box key={i} flexDirection="row" width={menuWidth}>
+              <Text color={theme.menuStatus} bold>{row.label}</Text>
+            </Box>
           )
         }
         const active = i === index
@@ -102,13 +103,17 @@ export function LazyMenu<T>({ rows, width = PANEL_WIDTH, onSubmit, onCancel }: P
         const shortcutColor = disabled ? theme.border : theme.menuShortcut
         const chars = row.label.split('')
         const shortcut = row.shortcut
-        const noteBudget = width - 2 - row.label.length - 2 - (shortcut ? shortcut.length + 2 : 0)
-        const inline = row.inlineNote ? fitHint(row.inlineNote, noteBudget) : ''
+        const noteBudget = menuWidth - 2 - row.label.length - 2 - (shortcut ? shortcut.length + 2 : 0)
+        const candidates = row.inlineNote === undefined
+          ? []
+          : typeof row.inlineNote === 'string' ? [row.inlineNote] : row.inlineNote
+        const inline = candidates.length > 0 ? firstThatFits(candidates, noteBudget) ?? '' : ''
+        const overflow = candidates.length > 0 && !inline ? candidates[0]! : ''
         const inlineWidth = inline ? inline.length + 2 : 0
-        const pad = shortcut ? Math.max(2, width - (2 + row.label.length + inlineWidth + shortcut.length)) : 0
+        const pad = shortcut ? Math.max(2, menuWidth - (2 + row.label.length + inlineWidth + shortcut.length)) : 0
         return (
           <React.Fragment key={i}>
-            <Box flexDirection="row" {...(shortcut ? { width } : {})}>
+            <Box flexDirection="row" {...(shortcut ? { width: menuWidth } : {})}>
               <Text color={cursorColor}>{active ? '❯ ' : '  '}</Text>
               <Text>
                 {active && !disabled
@@ -131,14 +136,19 @@ export function LazyMenu<T>({ rows, width = PANEL_WIDTH, onSubmit, onCancel }: P
                 </>
               ) : null}
             </Box>
+            {overflow ? (
+              <Box paddingLeft={2}>
+                <Text color={row.inlineNoteColor ?? theme.dim}>{wrapWords(overflow, menuWidth - 2).join('\n')}</Text>
+              </Box>
+            ) : null}
             {row.hint && disabled ? (
               <Box paddingLeft={2}>
-                <Text color={theme.dim}>{row.hint}</Text>
+                <Text color={theme.dim}>{wrapWords(row.hint, menuWidth - 2).join('\n')}</Text>
               </Box>
             ) : null}
             {row.note ? (
               <Box paddingLeft={2}>
-                <Text color={row.noteColor ?? theme.dim}>{row.note}</Text>
+                <Text color={row.noteColor ?? theme.dim}>{wrapWords(row.note, menuWidth - 2).join('\n')}</Text>
               </Box>
             ) : null}
           </React.Fragment>

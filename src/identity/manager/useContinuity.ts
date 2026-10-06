@@ -10,6 +10,7 @@ import {
 } from '../continuity/storage.js'
 import { openFileInEditor, openInFileManager } from '../continuity/editor.js'
 import { listPublishedContinuitySnapshots } from '../continuity/snapshots.js'
+import { exactLocalChanges } from '../continuity/localChanges.js'
 import {
   deleteSkillEntry,
   invalidateSkillsCache,
@@ -86,7 +87,10 @@ export function useIdentityManagerContinuity({
     if (!identity) return null
     try {
       const [latest] = await listPublishedContinuitySnapshots(identity, 1)
-      return await continuityWorkingTreeStatus(identity, latest)
+      const status = await continuityWorkingTreeStatus(identity, latest)
+      if (status.publishState !== 'local-changes') return status
+      const changes = await exactLocalChanges(identity, latest?.cid).catch(() => null)
+      return changes ? { ...status, changes } : status
     } catch {
       return null
     }

@@ -16,7 +16,8 @@ import {
 } from '../../continuity/envelope.js'
 import { requestBrowserWalletSignature, type BrowserWalletReady } from '../../wallet/browserWallet.js'
 import { FlowTimeline } from '../shared/components/FlowTimeline.js'
-import { FieldRow } from '../shared/components/FieldRow.js'
+import { FieldList } from '../shared/components/FieldRow.js'
+import { Paragraph } from '../../../ui/Paragraph.js'
 import { OPEN_BROWSER_HINT } from '../shared/components/WalletApprovalScreen.js'
 import { readCustodyMode } from '../custody/state.js'
 import { shortAddress } from '../shared/model/format.js'
@@ -151,16 +152,13 @@ export const OperatorWalletsScreen: React.FC<OperatorWalletsScreenProps> = ({
     return (
       <Surface
         title="Operator Wallets"
-        subtitle="Set up Advanced custody first."
+        subtitle="Operator wallets need Advanced custody. Switch to it from Custody Mode first."
         footer={footerHint('↵ select · esc back')}
       >
-        <Box flexDirection="column">
-          {phase.kind === 'main' && phase.error ? <Text color={theme.accentError}>{phase.error}</Text> : null}
-        </Box>
-        <Box marginTop={1}>
+        {phase.kind === 'main' && phase.error ? <Box marginBottom={1}><Paragraph color={theme.accentError}>{phase.error}</Paragraph></Box> : null}
+        <Box>
           <Select<'back'>
             options={[
-              { value: 'back', role: 'section', label: 'Navigation' },
               { value: 'back', label: 'Back', role: 'utility' },
             ]}
             hintLayout="inline"
@@ -200,42 +198,25 @@ export const OperatorWalletsScreen: React.FC<OperatorWalletsScreenProps> = ({
   return (
     <Surface
       title="Operator Wallets"
-      subtitle="Owner wallet controls this list."
+      subtitle="Operator wallets can save snapshots without the owner wallet. The owner controls this list, and adding one never asks for a token approval."
       footer={footerHint('↵ select · esc back')}
     >
-      <Box flexDirection="column">
-        <FieldRow label="Owner Wallet" labelWidth={18} value={shortAddress(ownerAddress)} />
-        <Box marginTop={1} flexDirection="column">
-          <Text color={theme.dim}>Operator Wallets</Text>
-          {records.length > 0
+      <FieldList fields={[
+        { label: 'Owner wallet', value: shortAddress(ownerAddress) },
+        {
+          label: 'Operators',
+          value: records.length > 0
             ? records.map(record => {
                 const isActive = record.address.toLowerCase() === activeOperatorAddress?.toLowerCase()
                 const approved = record.verifiedAt ? `approved ${record.verifiedAt.slice(0, 10)}` : null
-                const meta = [isActive ? 'active' : null, approved].filter(Boolean).join(' · ')
-                return (
-                  <Box key={record.address} flexDirection="row">
-                    <Box flexShrink={0}>
-                      <Text color={isActive ? theme.accentPeriwinkle : theme.text}>
-                        {shortAddress(record.address)}
-                      </Text>
-                    </Box>
-                    {meta ? (
-                      <Box flexShrink={1}>
-                        <Text color={theme.dim}>{`  ${meta}`}</Text>
-                      </Box>
-                    ) : null}
-                  </Box>
-                )
-              })
-            : <Text color={theme.dim}>No operator wallets saved.</Text>}
-        </Box>
-        <Box marginTop={1} flexDirection="column">
-          <Text color={theme.dim}>Add as many operator wallets as needed; unlink any saved wallet here.</Text>
-          <Text color={theme.dim}>No approve(), setApprovalForAll(), transferFrom(), or token approval is requested.</Text>
-        </Box>
-        {phaseNotice ? <Text color={theme.accentPeriwinkle}>{phaseNotice}</Text> : null}
-        {phaseError ? <Text color={theme.accentError}>{phaseError}</Text> : null}
-      </Box>
+                return [shortAddress(record.address), isActive ? 'active' : null, approved].filter(Boolean).join(' · ')
+              }).join('\n')
+            : 'None yet',
+          ...(records.length > 0 ? {} : { valueColor: theme.dim }),
+        },
+      ]} />
+      {phaseNotice ? <Box marginTop={1}><Paragraph color={theme.accentPeriwinkle}>{phaseNotice}</Paragraph></Box> : null}
+      {phaseError ? <Box marginTop={1}><Paragraph color={theme.accentError}>{phaseError}</Paragraph></Box> : null}
       <Box marginTop={1}>
         <Select<OperatorAction>
           options={options}
@@ -284,22 +265,19 @@ function operatorOptions(args: {
   activeOperatorAddress: Address | undefined
 }): Array<SelectOption<OperatorAction>> {
   const options: Array<SelectOption<OperatorAction>> = [
-    { value: 'add-browser', role: 'section', label: 'Operator Wallets' },
     { value: 'add-browser', label: 'Add Wallet' },
   ]
-  if (args.records[0]) options.push({ value: `remove:${args.records[0].address}`, role: 'section', label: 'Operator Wallets' })
   for (const record of args.records) {
     const active = args.activeOperatorAddress?.toLowerCase() === record.address.toLowerCase()
     if (!active) {
       options.push({
         value: `activate:${record.address}`,
-        label: `Set Active: ${shortAddress(record.address)}`,
+        label: `Make ${shortAddress(record.address)} Active`,
       })
     }
     options.push({
       value: `remove:${record.address}`,
       label: `Unlink ${shortAddress(record.address)}${active ? ' (active)' : ''}`,
-      ...(active ? {} : { hint: 'Remove' }),
     })
   }
   if (args.records.length > 1) {
@@ -308,10 +286,7 @@ function operatorOptions(args: {
       label: 'Unlink All Operator Wallets',
     })
   }
-  options.push(
-    { value: 'back', role: 'section', label: 'Navigation' },
-    { value: 'back', label: 'Back', role: 'utility' },
-  )
+  options.push({ value: 'back', label: 'Back', role: 'utility' })
   return options
 }
 
@@ -328,17 +303,17 @@ const WalletWaitSurface: React.FC<{
     }
   })
   return (
-    <Surface title={title} subtitle={subtitle} footer={footerHint('esc cancels')}>
+    <Surface title={title} subtitle={subtitle} footer={footerHint('esc cancel')}>
       {walletSession ? (
         <Box flexDirection="column">
           <Text color={theme.accentBlue} underline>{walletSession.url}</Text>
           <Text color={theme.dim}>{OPEN_BROWSER_HINT}</Text>
           <Box marginTop={1}>
-            <Spinner label="waiting for operator wallet signature..." />
+            <Spinner label="Waiting for the operator wallet…" />
           </Box>
         </Box>
       ) : (
-        <Spinner label="opening wallet request..." />
+        <Spinner label="Opening the wallet page…" />
       )}
     </Surface>
   )

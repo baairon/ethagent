@@ -87,10 +87,6 @@ For everything ethagent writes outside the vault, see [Files and locations](#fil
 
 You grow these mostly by talking. Your agent updates its own soul and memory as you work, and you can ask it to write itself a skill. Changes sync everywhere automatically. Open ethagent to edit by hand, or choose **Save Snapshot** to back it up onchain.
 
-<p align="center">
-  <img src="preview/skills.svg" alt="ethagent skills catalog: public and private skills" width="100%">
-</p>
-
 ## History
 
 Every snapshot you save also stays on your machine, file by file, byte for byte, so your agent can tell you what changed and when, and undo its own mistakes. There's nothing to turn on, and none of it touches the chain. Each version of a file is stored once, so a skill that never changes costs nothing per save.

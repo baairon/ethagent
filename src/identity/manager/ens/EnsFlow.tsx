@@ -1,5 +1,5 @@
 import React from 'react'
-import { Box, Text } from 'ink'
+import { Text } from 'ink'
 import { Surface } from '../../../ui/Surface.js'
 import { Select } from '../../../ui/Select.js'
 import { theme } from '../../../ui/theme.js'
@@ -7,7 +7,6 @@ import { openImageFilePicker } from '../../profile/imagePicker.js'
 import { readOwnerAddressField } from '../../identityCompat.js'
 import type { BrowserWalletReady } from '../../wallet/browserWallet.js'
 import type { ProfileUpdates, Step } from '../reducer.js'
-import { readCustodyMode } from '../custody/state.js'
 import { OperatorWalletsScreen } from './EnsOperatorWalletsScreen.js'
 import { EditProfileFlow } from '../profile/EditProfileFlow.js'
 import { WalletApprovalScreen } from '../shared/components/WalletApprovalScreen.js'
@@ -272,25 +271,24 @@ export const EnsFlow: React.FC<EnsFlowProps> = ({
   if (step.kind === 'ens-records-tx') {
     return (
       <WalletApprovalScreen
-        title={step.clearRecords ? 'Unlink ENS' : 'Update ENS Records'}
+        title={step.clearRecords ? `Unlink ${step.fullName}` : `Link ${step.fullName}`}
         subtitle={step.clearRecords
-          ? `Ethereum Mainnet: sign one transaction to clear ethagent record values on ${step.fullName}. Requires gas.`
-          : `Ethereum Mainnet: sign one transaction to set ENS records on ${step.fullName}. Requires gas.`}
+          ? 'Approve one transaction on Ethereum Mainnet to clear its agent records. It needs gas.'
+          : 'Approve one transaction on Ethereum Mainnet to set its agent records. It needs gas.'}
         walletSession={walletSession}
-        label={step.clearRecords ? 'waiting for wallet to clear ENS records...' : 'waiting for wallet to update ENS records...'}
+        label="Waiting for your wallet…"
         onCancel={() => onSetStep({ kind: 'edit-profile-ens', identity: step.identity, registry: step.registry, returnTo: step.returnTo })}
       />
     )
   }
 
   if (step.kind === 'ens-setup-registry-tx') {
-    const signer = step.setup.mode === 'simple' ? 'Connected wallet' : 'Owner wallet'
     return (
       <WalletApprovalScreen
-        title={step.setup.mode === 'simple' ? 'Use Connected Wallet' : 'Use Owner Wallet'}
-        subtitle={`${signer} signs one Ethereum Mainnet ENS registry transaction for ${step.setup.fullName}.`}
+        title={`Create ${step.setup.fullName}`}
+        subtitle={setupStepLine(step.setup, 1, 'register the subdomain')}
         walletSession={walletSession}
-        label="waiting for wallet to register the ENS name..."
+        label="Waiting for your wallet…"
         onCancel={() => onSetStep({
           kind: 'edit-profile-ens',
           identity: step.identity,
@@ -303,13 +301,12 @@ export const EnsFlow: React.FC<EnsFlowProps> = ({
   }
 
   if (step.kind === 'ens-setup-records-tx') {
-    const signer = step.setup.mode === 'simple' ? 'Connected wallet' : 'Owner wallet'
     return (
       <WalletApprovalScreen
-        title={step.setup.mode === 'simple' ? 'Use Connected Wallet' : 'Use Owner Wallet'}
-        subtitle={`${signer} signs one Ethereum Mainnet resolver transaction for ${step.setup.fullName}.`}
+        title={`Create ${step.setup.fullName}`}
+        subtitle={setupStepLine(step.setup, step.setup.txCount, 'set its records')}
         walletSession={walletSession}
-        label="waiting for wallet to set ENS records..."
+        label="Waiting for your wallet…"
         onCancel={() => onSetStep({
           kind: 'edit-profile-ens',
           identity: step.identity,
@@ -333,30 +330,22 @@ export const EnsFlow: React.FC<EnsFlowProps> = ({
   )
 }
 
-function publicProfileWalletApprovalView(step: StepOf<'public-profile-signing'>): {
+function publicProfileWalletApprovalView(_step: StepOf<'public-profile-signing'>): {
   title: string
   subtitle: React.ReactNode
   label: string
 } {
-  if (usesAdvancedSetup(step)) {
-    return {
-      title: 'Use Wallet',
-      subtitle: 'Sign the public profile and ERC-8004 token URI update.',
-      label: 'waiting for wallet signature...',
-    }
-  }
   return {
-    title: 'Use Wallet',
-    subtitle: 'Sign the public profile and ERC-8004 token URI update.',
-    label: 'waiting for wallet signature...',
+    title: 'Publish Profile',
+    subtitle: 'Approve in your wallet to publish your profile and point your token at it.',
+    label: 'Waiting for your wallet…',
   }
 }
 
-function usesAdvancedSetup(step: StepOf<'public-profile-signing'>): boolean {
-  const state = (step.identity.state ?? {}) as Record<string, unknown>
-  const custodyMode = step.profileUpdates?.custodyMode ?? readCustodyMode(state)
-  const ownerAddress = step.profileUpdates?.ownerAddress ?? readOwnerAddressField(state)
-  return custodyMode === 'advanced' && typeof ownerAddress === 'string' && ownerAddress.trim().length > 0
+function setupStepLine(setup: { txCount: number; mode: 'simple' | 'advanced' }, index: number, action: string): string {
+  const signer = setup.mode === 'simple' ? 'your wallet' : 'your owner wallet'
+  const prefix = setup.txCount > 1 ? `Transaction ${index} of ${setup.txCount}: ${action}.` : `${action.charAt(0).toUpperCase()}${action.slice(1)}.`
+  return `${prefix} Approve it in ${signer}. It needs gas on Ethereum Mainnet.`
 }
 
 function isEditProfileStep(step: IdentityManagerEnsStep): step is StepOf<
@@ -378,16 +367,12 @@ function isEditProfileStep(step: IdentityManagerEnsStep): step is StepOf<
 const EnsVaultGate: React.FC<{ onWithdraw: () => void; onBack: () => void }> = ({ onWithdraw, onBack }) => (
   <Surface
     title="ENS Name"
-    footer={<Text color={theme.dim}>Token in Vault · ↵ select · esc back</Text>}
+    subtitle="Your token is in the Vault. The owner wallet must hold it directly to set up a name."
+    footer={<Text color={theme.dim}>↵ select · esc back</Text>}
   >
-    <Box marginBottom={1}>
-      <Text color={theme.textSubtle}>The owner wallet must hold the token directly to sign the ENS setup transaction.</Text>
-    </Box>
     <Select<'withdraw' | 'back'>
       options={[
-        { value: 'withdraw', role: 'section', label: 'Proceed' },
-        { value: 'withdraw', label: 'Withdraw Token from Vault' },
-        { value: 'back', role: 'section', label: 'Navigation' },
+        { value: 'withdraw', label: 'Withdraw Token from Vault', hint: 'You can return it afterwards' },
         { value: 'back', label: 'Back', role: 'utility' },
       ]}
       hintLayout="inline"

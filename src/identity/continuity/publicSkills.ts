@@ -57,7 +57,7 @@ export function defaultPublicSkillsProfile(identity: EthagentIdentity): PublicSk
     : identity.agentId ? `ethagent #${identity.agentId}` : 'ethagent'
   const description = typeof state.description === 'string' && state.description.trim()
     ? state.description.trim()
-    : 'privacy-first AI agent with a portable Ethereum identity'
+    : 'privacy-first agent with a portable Ethereum identity'
   const imageUrl = typeof state.imageUrl === 'string' && state.imageUrl.trim()
     ? state.imageUrl.trim()
     : undefined

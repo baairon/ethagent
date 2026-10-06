@@ -17,7 +17,7 @@ export const BusyScreen: React.FC<BusyScreenProps> = ({ title, subtitle, label, 
   useAppInput((input, key) => {
     if ((key.escape || (key.ctrl && input === 'c')) && onCancel) onCancel()
   }, { isActive: Boolean(onCancel) })
-  const resolvedFooter = footer ?? (onCancel ? <Text color={theme.dim}>esc cancels</Text> : undefined)
+  const resolvedFooter = footer ?? (onCancel ? <Text color={theme.dim}>esc cancel</Text> : undefined)
   return (
     <Surface title={title} subtitle={subtitle} footer={resolvedFooter}>
       <Spinner label={label} />

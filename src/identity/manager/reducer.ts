@@ -103,7 +103,7 @@ export type Step =
   | { kind: 'storage-credential-forget-confirm' }
   | { kind: 'details' }
   | { kind: 'save-prompt'; back: Step }
-  | { kind: 'busy'; label: string }
+  | { kind: 'busy'; label: string; title?: string }
   | { kind: 'error'; error: IdentityManagerErrorView; back: Step }
   | { kind: 'identity-unlinked'; identity: EthagentIdentity; registry: Erc8004RegistryConfig; onChainOwner?: string; back: Step }
 
