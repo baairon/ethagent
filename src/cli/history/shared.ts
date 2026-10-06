@@ -93,7 +93,7 @@ export function parseHistoryArgs(args: string[], options: ParseArgsConfig['optio
 export async function requireIdentity(deps: HistoryDeps): Promise<{ config: EthagentConfig; identity: EthagentIdentity }> {
   const config = await deps.loadConfig().catch(() => null)
   if (!config?.identity) {
-    throw new HistoryError(1, 'No agent identity yet.', 'Create or link one by running `npx ethagent` in a terminal.')
+    throw new HistoryError(1, 'No agent identity yet.', 'Mint one with `ethagent create`, or bring one back with `ethagent restore <token-id>`.')
   }
   return { config, identity: config.identity }
 }

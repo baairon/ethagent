@@ -115,9 +115,9 @@ export async function runCustodyCommand(
       }, deps, config, identity, writeSeams)
     }
     if (values.yes || values.operator) throw new HistoryError(2, '--yes and --operator need a change: --advanced, --simple, or an operator flag', `usage: ${CUSTODY_USAGE}`)
-    if (!identity.agentId) throw new HistoryError(1, 'This identity has no agent token ID yet.', 'Create or restore it with `npx ethagent` first.')
+    if (!identity.agentId) throw new HistoryError(1, 'This identity has no agent token ID yet.', 'Mint one with `ethagent create`, or bring one back with `ethagent restore <token-id>`.')
     const registry = resolveRegistryForIdentity(identity, config)
-    if (!registry) throw new HistoryError(1, 'No agent registry is configured for this identity.', 'Run `npx ethagent` to set it up.')
+    if (!registry) throw new HistoryError(1, 'No agent registry is configured for this identity.', '`ethagent restore <token-id>` records it.')
     const agentId = BigInt(identity.agentId)
     const state = identity.state as Record<string, unknown> | undefined
     const custodyMode = readCustodyMode(state) ?? 'simple'

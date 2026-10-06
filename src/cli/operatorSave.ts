@@ -28,24 +28,24 @@ export async function runOperatorSave(args: string[] = []): Promise<number> {
   const privateKey = operatorKey.key
 
   const config = await loadConfig().catch(() => null)
-  if (!config?.identity) return fail(1, 'No agent identity yet. Run `npx ethagent` to create or link one.')
+  if (!config?.identity) return fail(1, 'No agent identity yet. Mint one with `ethagent create`, or bring one back with `ethagent restore <token-id>`.')
   const identity = config.identity
-  if (!identity.agentId) return fail(1, 'This identity has no agent token ID yet. Create or restore it with `npx ethagent` first.')
+  if (!identity.agentId) return fail(1, 'This identity has no agent token ID yet. Mint one with `ethagent create`, or bring one back with `ethagent restore <token-id>`.')
 
   const registry = resolveRegistryForIdentity(identity, config)
-  if (!registry) return fail(1, 'No agent registry configured for this identity. Run `npx ethagent` to set it up.')
+  if (!registry) return fail(1, 'No agent registry configured for this identity. `ethagent restore <token-id>` records it.')
 
   const vault = await continuityVaultStatus(identity).catch(() => ({ ready: false }))
-  if (!vault.ready) return fail(1, 'Local continuity files are not restored. Run `npx ethagent` and restore this identity before saving a snapshot.')
+  if (!vault.ready) return fail(1, 'Local continuity files are not restored. Bring them back with `ethagent restore --operator` before saving a snapshot.')
 
   const role = snapshotSaveWalletRole(identity, undefined)
   if (role !== 'operator') {
-    return fail(1, `This agent is not set up for operator-key saves (current role: ${role}). The owner must save once and authorize this operator wallet via \`npx ethagent\` -> Custody Mode.`)
+    return fail(1, `This agent is not set up for operator-key saves (current role: ${role}). The owner must save once and authorize this operator wallet with \`ethagent custody --add-operator\`.`)
   }
 
   const vaultAddress = resolveVaultAddress(identity, config.erc8004?.operatorVaults)
   if (!vaultAddress) {
-    return fail(1, 'Advanced custody is configured but the operator vault address could not be resolved. Run `npx ethagent` -> Custody Mode to repair the vault link.')
+    return fail(1, 'Advanced custody is configured but the operator vault address could not be resolved. `ethagent custody` shows where the token is held, and `ethagent custody --advanced` previews the repair.')
   }
 
   let jwt: string | undefined
@@ -53,10 +53,10 @@ export async function runOperatorSave(args: string[] = []): Promise<number> {
     jwt = await resolveValidatedPinataJwt()
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err)
-    return fail(3, `The configured Pinata JWT is invalid or unreachable (${detail}). Update it via \`npx ethagent\` -> IPFS Storage, then retry.`)
+    return fail(3, `The configured Pinata JWT is invalid or unreachable (${detail}). Replace it with \`ethagent storage --set\` (reads the JWT from stdin), then retry.`)
   }
   if (!jwt) {
-    return fail(3, 'No IPFS storage credential configured, so the snapshot cannot be pinned. Run `npx ethagent` once and set up IPFS Storage (or export PINATA_JWT), then retry.')
+    return fail(3, 'No IPFS storage credential configured, so the snapshot cannot be pinned. Save one with `ethagent storage --set` (or export PINATA_JWT), then retry.')
   }
 
   let signAndTransaction
@@ -112,7 +112,7 @@ export async function runOperatorSave(args: string[] = []): Promise<number> {
     if (txHash) stdout.write(`  tx:       ${txHash}\n`)
     if (agentUri) stdout.write(`  agentURI: ${agentUri}\n`)
   } else {
-    stdout.write('Snapshot pinned locally, but the onchain pointer was not rotated. Retry, or publish with `npx ethagent`.\n')
+    stdout.write('Snapshot pinned locally, but the onchain pointer was not rotated. Retry, or publish it with the owner wallet through `ethagent save`.\n')
     if (cid) stdout.write(`  pinned CID: ${cid}\n`)
   }
   return published ? 0 : 4

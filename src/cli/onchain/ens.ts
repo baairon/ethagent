@@ -221,7 +221,7 @@ export async function runEnsCommand(args: string[], deps: HistoryDeps, seams: En
     const mode = parseMode(values, positionals)
     const { config, identity } = await requireIdentity(deps)
     const registry = resolveRegistryForIdentity(identity, config)
-    if (!registry) throw new HistoryError(1, 'No agent registry is configured for this identity.', 'Run `npx ethagent` to set it up.')
+    if (!registry) throw new HistoryError(1, 'No agent registry is configured for this identity.', '`ethagent restore <token-id>` records it.')
 
     if (mode.kind === 'read') {
       const view = await readView(identity, registry, deps, seams)
@@ -230,7 +230,7 @@ export async function runEnsCommand(args: string[], deps: HistoryDeps, seams: En
       return 0
     }
 
-    if (!identity.agentId) throw new HistoryError(1, 'This identity has no agent token ID yet.', 'Create or restore it with `npx ethagent` first.')
+    if (!identity.agentId) throw new HistoryError(1, 'This identity has no agent token ID yet.', 'Mint one with `ethagent create`, or bring one back with `ethagent restore <token-id>`.')
     const owner = getAddress(humanOwnerAddress(identity))
     const signer = chooseSigner(deps, Boolean(values.operator), owner)
     const client = seams.readClient()
@@ -332,14 +332,14 @@ export async function runEnsCommand(args: string[], deps: HistoryDeps, seams: En
     let saveReady: { jwt: string } | null = null
     if (publishName !== null) {
       const vault = await seams.vaultStatus(identity).catch(() => ({ ready: false }))
-      if (!vault.ready) throw new HistoryError(1, 'Local continuity files are not restored.', 'Run `npx ethagent` and restore this identity before changing its name. Nothing was sent.')
+      if (!vault.ready) throw new HistoryError(1, 'Local continuity files are not restored.', 'Bring them back with `ethagent restore` before changing its name. Nothing was sent.')
       let jwt: string | undefined
       try {
         jwt = await seams.resolveJwt()
       } catch (err) {
         throw new HistoryError(3, `The configured Pinata JWT is invalid or unreachable (${err instanceof Error ? err.message : String(err)}). Nothing was sent.`)
       }
-      if (!jwt) throw new HistoryError(3, 'No IPFS storage credential configured, so the name cannot be published.', 'Set up IPFS Storage in `npx ethagent` (or export PINATA_JWT), then retry. Nothing was sent.')
+      if (!jwt) throw new HistoryError(3, 'No IPFS storage credential configured, so the name cannot be published.', 'Save one with `ethagent storage --set` (or export PINATA_JWT), then retry. Nothing was sent.')
       saveReady = { jwt }
       await seams.pullHarness(identity).catch(() => [])
     }

@@ -30,7 +30,7 @@ function stampState(): void {
 export async function runBootstrap(opts: { quiet?: boolean } = {}): Promise<number> {
   const config = await loadConfig()
   if (!config?.identity) {
-    if (!opts.quiet) process.stdout.write('ethagent: no identity yet; run `npx ethagent` to create or link one first\n')
+    if (!opts.quiet) process.stdout.write('ethagent: no identity yet; run `npx ethagent create` or `npx ethagent restore <token-id>` first\n')
     return 0
   }
 

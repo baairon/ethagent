@@ -4,7 +4,7 @@ import { continuityVaultRef } from '../identity/continuity/storage.js'
 export async function runVaultDir(): Promise<number> {
   const config = await loadConfig().catch(() => null)
   if (!config?.identity) {
-    process.stderr.write('ethagent: no identity yet; run `npx ethagent` to create one (the vault exists once an identity is set)\n')
+    process.stderr.write('ethagent: no identity yet; run `npx ethagent create` or `npx ethagent restore <token-id>` (the vault exists once an identity is set)\n')
     return 1
   }
   process.stdout.write(continuityVaultRef(config.identity).dir + '\n')

@@ -19,7 +19,9 @@ export function buildPortableInstruction(opts: PortableInstructionOptions): stri
     'put its folder in the vault skills dir (NOT this read-only mirror): run `npx ethagent --vault-dir` to print the vault ' +
     "path, then create or edit the `<name>/SKILL.md` folder inside its `skills/` subdir. Past snapshots are kept locally " +
     'byte for byte; `npx ethagent status --json` and `npx ethagent diff --json` show what changed. ' +
-    '`npx ethagent custody --json`, `ens --json`, and `profile --json` show the onchain identity; `create`, `restore`, ' +
+    '`npx ethagent check --json` lists the agent\'s identifiers and what needs attention; `custody --json`, `ens --json`, ' +
+    '`profile --json`, and `skills --json` show the rest and are read-only. Change skill visibility or delete a skill with ' +
+    '`skills --public`, `--private`, or `--delete` only when the user asks. `create`, `restore`, ' +
     "`profile`, `custody`, `ens`, and `transfer` preview without `--yes`, and anything with `--yes` is the user's to run."
   )
 }
