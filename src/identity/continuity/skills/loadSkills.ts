@@ -136,19 +136,6 @@ async function walkSkillFileStats(root: string): Promise<SkillFileStat[]> {
   return out
 }
 
-export async function readSkill(identity: EthagentIdentity, name: string): Promise<Skill> {
-  const entries = await listSkills(identity)
-  const lookup = name.replace(/^.*:/, '').replace(/:SKILL$/i, '')
-  const match = entries.find(entry =>
-    entry.name === name
-    || entry.name === lookup
-    || entry.displayName === name
-    || entry.displayName === lookup,
-  )
-  if (!match) throw new Error(`unknown private skill: ${name}`)
-  return loadSkillBody(match)
-}
-
 export async function readSkillByRelativePath(
   identity: EthagentIdentity,
   relativePath: string,
@@ -168,26 +155,6 @@ export async function readSkillByRelativePath(
     parsed,
   })
   return { ...entry, body: parsed.body }
-}
-
-export async function readSkillFile(
-  identity: EthagentIdentity,
-  skillName: string,
-  filePath: string,
-): Promise<{ relativePath: string; absolutePath: string; content: string }> {
-  if (!isValidSegment(skillName)) throw new Error('skill name is invalid')
-  const ref = await ensureContinuityVault(identity)
-  const skillDir = path.join(ref.skillsDir, skillName)
-  const normalizedFile = filePath.replace(/\\/g, '/').replace(/^\/+/, '')
-  const rel = `${skillName}/${normalizedFile}`
-  if (!isValidSkillFilePath(rel)) throw new Error('skill file path is not allowed')
-  const absolute = path.resolve(skillDir, normalizedFile)
-  if (!isWithin(ref.skillsDir, absolute)) throw new Error('skill file path escapes the vault')
-  const stat = await statOrNull(absolute)
-  if (!stat || !stat.isFile()) throw new Error(`skill file not found: ${rel}`)
-  if (stat.size > MAX_SKILL_FILE_BYTES) throw new Error(`skill file too large: ${rel}`)
-  const content = await fs.readFile(absolute, 'utf8')
-  return { relativePath: rel, absolutePath: absolute, content }
 }
 
 export async function loadSkillsTree(identity: EthagentIdentity): Promise<ContinuitySkillsTree> {
@@ -724,12 +691,6 @@ function pickDescription(fromFrontmatter: string | undefined, body: string): str
     if (trimmed) return trimmed.slice(0, 280)
   }
   return ''
-}
-
-async function loadSkillBody(entry: SkillIndexEntry): Promise<Skill> {
-  const raw = await fs.readFile(entry.absolutePath, 'utf8')
-  const parsed = parseSkillFile(raw)
-  return { ...entry, body: parsed.body }
 }
 
 export { isValidSkillEntryKey, isValidSkillFilePath } from './skillPaths.js'

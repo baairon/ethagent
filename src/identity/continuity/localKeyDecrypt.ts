@@ -92,14 +92,3 @@ export async function decryptWithSigner(envelope: ContinuitySnapshotEnvelope, si
   }
   return { ok: false, reason: 'signature-mismatch' }
 }
-
-export function envelopeChallengeFor(envelope: ContinuitySnapshotEnvelope, address: string): string | null {
-  const me = address.toLowerCase()
-  if (isWalletContinuitySnapshotEnvelope(envelope)) {
-    return envelope.slots.find(slot => slot.address.toLowerCase() === me)?.challenge ?? null
-  }
-  if (isTransferContinuitySnapshotEnvelope(envelope)) {
-    return [envelope.slots.owner, envelope.slots.target].find(slot => slot.address.toLowerCase() === me)?.challenge ?? null
-  }
-  return envelope.ownerAddress.toLowerCase() === me ? envelope.challenge : null
-}

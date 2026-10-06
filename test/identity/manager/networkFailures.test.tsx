@@ -9,7 +9,7 @@ import { RestoreFlow } from '../../../src/identity/manager/restore/RestoreFlow.j
 import { restoreTokenSelectionStep } from '../../../src/identity/manager/restore/discover.js'
 import { runRestoreFetch } from '../../../src/identity/manager/restore/fetch.js'
 import { downloadProgress } from '../../../src/identity/manager/restore/progress.js'
-import { awaitConfirmedReceipt, awaitOptionalReceipt } from '../../../src/identity/manager/shared/effects/receipts.js'
+import { awaitConfirmedReceipt } from '../../../src/identity/manager/shared/effects/receipts.js'
 import { scopeCallbacks, type EffectCallbacks, type RestoreProgress } from '../../../src/identity/manager/shared/effects/types.js'
 import type { Step } from '../../../src/identity/manager/reducer.js'
 import {
@@ -344,6 +344,5 @@ test('receipt waits carry no hidden deadline: a slow transaction is not reported
     },
   }
   await awaitConfirmedReceipt(client as never, '0xabc', 'Agent registration')
-  await awaitOptionalReceipt(client as never, '0xdef', 'Operator sync')
-  assert.deepEqual(seen, [{ hash: '0xabc', timeout: 0 }, { hash: '0xdef', timeout: 0 }])
+  assert.deepEqual(seen, [{ hash: '0xabc', timeout: 0 }])
 })

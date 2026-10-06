@@ -116,11 +116,3 @@ export function manualReasonTitle(reason: EnsSetupBlockedPlan['reason']): string
       return 'The name could not be checked.'
   }
 }
-
-export function readValidationFromState(state: Record<string, unknown> | undefined): { ok: boolean; reason?: string } | null {
-  const raw = state?.ensValidation
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
-  const obj = raw as Record<string, unknown>
-  if (typeof obj.ok !== 'boolean') return null
-  return { ok: obj.ok, ...(typeof obj.reason === 'string' ? { reason: obj.reason } : {}) }
-}

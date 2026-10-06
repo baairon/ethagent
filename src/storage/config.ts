@@ -206,24 +206,6 @@ export function getConfiguredVaultAddress(
   return config?.erc8004?.operatorVaults?.[String(chainId)]
 }
 
-export function buildSeedConfigForIdentity(args: {
-  identity: EthagentIdentity
-  chainId: number
-  rpcUrl: string
-  identityRegistryAddress: string
-}): EthagentConfig {
-  return {
-    version: 2,
-    firstSeenAt: new Date().toISOString(),
-    identity: { ...args.identity, source: 'erc8004' },
-    erc8004: {
-      chainId: args.chainId,
-      rpcUrl: args.rpcUrl,
-      identityRegistryAddress: args.identityRegistryAddress,
-    },
-  }
-}
-
 export function setConfiguredVaultAddress(
   config: EthagentConfig,
   chainId: number,
@@ -279,14 +261,6 @@ async function savePendingTxMutation(
     }
   }
   return null
-}
-
-export async function deleteConfig(): Promise<void> {
-  try {
-    await fs.unlink(getConfigPath())
-  } catch (err: unknown) {
-    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err
-  }
 }
 
 export function normalizeConfig(config: EthagentConfig): EthagentConfig {

@@ -30,19 +30,3 @@ export async function awaitConfirmedReceipt(
     }
   }
 }
-
-export async function awaitOptionalReceipt(
-  client: Pick<PublicClient, 'waitForTransactionReceipt'>,
-  hash: Hex,
-  action: string,
-): Promise<void> {
-  let receipt
-  try {
-    receipt = await client.waitForTransactionReceipt({ hash, timeout: 0 })
-  } catch {
-    return
-  }
-  if (receipt.status !== 'success') {
-    throw new Error(`${action} reverted onchain (tx ${hash}).`)
-  }
-}

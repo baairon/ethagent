@@ -4,7 +4,7 @@ import React from 'react'
 import { render } from 'ink-testing-library'
 import { LazyMenu } from '../../../src/identity/manager/shared/components/LazyMenu.js'
 import { changeSummaryCandidates, type LocalChangeItem } from '../../../src/identity/manager/continuity/state.js'
-import { joinWithMore, wrapWords } from '../../../src/ui/text.js'
+import { wrapWords } from '../../../src/ui/text.js'
 
 const WIDTH = 42
 
@@ -80,12 +80,6 @@ test('change summaries go from full names to a skill count to a total', () => {
     '4 changes',
   ])
   assert.deepEqual(changeSummaryCandidates([items[1]!]), ['MEMORY.md'])
-})
-
-test('whole-item shortening never splits an item', () => {
-  assert.equal(joinWithMore(['SOUL.md', 'MEMORY.md', 'canvas'], 40), 'SOUL.md, MEMORY.md, canvas')
-  assert.equal(joinWithMore(['SOUL.md', 'MEMORY.md', 'canvas'], 20), 'SOUL.md +2 more')
-  assert.equal(joinWithMore(['SOUL.md', 'MEMORY.md'], 5), null)
 })
 
 test('word wrapping trims at the break instead of starting a line with a space', () => {
