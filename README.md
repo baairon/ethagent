@@ -24,7 +24,7 @@ You'll need an Ethereum wallet, the one that holds and unlocks your agent. Day-t
 
 A guided menu does the rest: name it and write who it is. When you're done, your wallet signs once to put it onchain.
 
-Prefer no menu? `ethagent create --name <text> --network <network>` does the same headlessly, previewing first and minting with `--yes`. Every menu action has a command like this; see [Setting up and moving an agent](#setting-up-and-moving-an-agent).
+Prefer no menu? `ethagent create --name <text> --network <network>` does the same headlessly, previewing first and minting with `--yes`. Every menu action has a command like this, except deleting an ENS subname, which stays in the menu on purpose; see [Setting up and moving an agent](#setting-up-and-moving-an-agent).
 
 <p align="center">
   <img src="preview/menu.svg" alt="ethagent main menu for a linked agent" width="100%">
@@ -77,7 +77,7 @@ There's no app to keep open and no command to remember. ethagent works through t
 | A restore, refetch, or rollback is about to overwrite the vault | The exact bytes are checkpointed first, so it can be undone. |
 | You approve a save | ethagent encrypts everything on your machine, pins it to IPFS, points your token at it, checks that the pointer landed, and keeps the exact bytes in local history. |
 
-That's the foundation your agent builds on. Its vault and history are plain files on your machine that any tool can read. Every command but the manager runs headless, and the history commands answer in versioned JSON that only ever gains fields, with fixed exit codes and a hint that names the fix, so what your agent builds on them keeps working when ethagent updates itself. More in [History](#history) and [Output and exit codes](#output-and-exit-codes).
+That's the foundation your agent builds on. Its vault and history are plain files on your machine that any tool can read. Every command but the manager runs headless, and the history and onchain commands answer in versioned JSON that only ever gains fields, with fixed exit codes and a hint that names the fix, so what your agent builds on them keeps working when ethagent updates itself. More in [History](#history) and [Output and exit codes](#output-and-exit-codes).
 
 For everything ethagent writes outside the vault, see [Files and locations](#files-and-locations).
 
@@ -127,7 +127,7 @@ You choose how tightly the agent is held, and you can change it later.
 - **Simple.** One wallet owns the agent and signs every save. The default for solo use.
 - **Advanced.** Most people never need this. Your main wallet owns the agent and keeps it in a Vault. Approved "operator" wallets can save backups and publish updates without the main wallet signing each time. Only the owner can move or sell the agent, so operators can **never** take it.
 
-To move the agent to another wallet, stage a transfer snapshot in ethagent. Both wallets sign locally to re-encrypt your soul, memory, and skills for the new owner, so both must be on the same machine. Then transfer the token, and the new owner restores the agent exactly as you left it.
+To move the agent to another wallet, stage a transfer snapshot with `ethagent transfer <address>` or from the menu. Both wallets sign locally to re-encrypt your soul, memory, and skills for the new owner, so both must be on the same machine. Then transfer the token, and the new owner restores the agent exactly as you left it.
 
 ## Architecture
 
@@ -206,7 +206,7 @@ Run any of these with `npx ethagent`. Commands marked interactive need a termina
 | `rollback <ref> [--yes] [--json]` | Put past bytes back. Previews until `--yes`. | Writes the vault |
 | `forget <ref> [--yes] [--json]` | Erase versions from local history. Previews until `--yes`. | Deletes history |
 | `storage [--set \| --forget] [--json]` | Where snapshots are pinned and whether a credential is set. `--set` saves a Pinata JWT read from stdin; `--forget` removes it after a preview. | Read-only; `--set` and `--forget` write secrets |
-| `create --name <text> --network <network> [--advanced] [--import] [--yes] [--json]` | Mint a new agent with its first snapshot. `--advanced` continues into a Vault in the same tab. Previews until `--yes`. | Opens your wallet |
+| `create --name <text> --network <network> [--description <text>] [--advanced] [--import] [--replace] [--yes] [--json]` | Mint a new agent with its first snapshot. `--advanced` continues into a Vault in the same tab; `--replace` is needed when this machine already has an agent. Previews until `--yes`. | Opens your wallet |
 | `restore [<token-id> \| <name>] [--network <network>] [--operator] [--yes] [--json]` | Rebuild an agent on this machine, or with no target pull the newest onchain snapshot into the vault. Previews until `--yes`. | Opens your wallet, or none with `--operator` |
 | `restore --owner <address\|name> [--json]` | List the agents a wallet holds or operates. | Goes online |
 | `profile [--name <text>] [--description <text>] [--image <path\|url\|none>] [--operator] [--yes] [--json]` | Show the public profile, or change it and publish in one save. Previews until `--yes`. | Opens your wallet, or none with `--operator` |
