@@ -28,8 +28,15 @@ export const FIRST_COMMITTED_VAULT_BUILD: VaultBuild = {
 }
 
 // A build deployed before the source was committed (1,955 bytes), read from Vault
-// 0x6bdC52c8e262c6D139e618260400614c2Bfe51d7 on Base, which holds token #45744. It
-// behaves like the current build except that it has no heldAgent() view.
+// 0x6bdC52c8e262c6D139e618260400614c2Bfe51d7 on Base, which holds token #45744. Its
+// executable code was reproduced from a reconstructed source with solc 0.8.24 (only
+// the metadata hash differs). The owner, operator, and refusal rules match the
+// current build, with three differences:
+// - no heldAgent() view;
+// - no registry or token binding: it accepts any ERC-721 (AlreadyDeposited per
+//   token, no UnexpectedToken);
+// - no operator epoch: approvals survive a withdraw and apply to whoever deposits
+//   the same token next.
 export const PRE_RELEASE_VAULT_BUILD: VaultBuild = {
   id: 'pre-release',
   label: 'pre-release build, no heldAgent()',
