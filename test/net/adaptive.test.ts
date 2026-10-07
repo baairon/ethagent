@@ -116,6 +116,28 @@ test('host measurements persist to the machine-local file and a corrupt file jus
   }
 })
 
+test('temp files a killed process left behind are swept on load; fresh ones are kept', async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'ethagent-hosts-'))
+  const file = path.join(dir, 'hosts.json')
+  const stale = `${file}.123.1.tmp`
+  const fresh = `${file}.456.2.tmp`
+  process.env.ETHAGENT_HOSTS_FILE = file
+  try {
+    await fs.writeFile(stale, '{}')
+    await fs.writeFile(fresh, '{}')
+    const old = new Date(Date.now() - 10 * 60_000)
+    await fs.utimes(stale, old, old)
+    resetHostStatsForTest(true)
+    rto('any.example')
+    await assert.rejects(fs.access(stale))
+    await fs.access(fresh)
+  } finally {
+    process.env.ETHAGENT_HOSTS_FILE = ''
+    resetHostStatsForTest()
+    await fs.rm(dir, { recursive: true, force: true })
+  }
+})
+
 test('a host that never answers is dropped only after its backoff passes the ceiling', async t => {
   resetHostStatsForTest()
   t.mock.timers.enable({ apis: ['setTimeout'] })
