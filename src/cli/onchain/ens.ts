@@ -1,7 +1,7 @@
 import { getAddress, type Address, type PublicClient } from 'viem'
 import type { EthagentConfig, EthagentIdentity } from '../../storage/config.js'
 import { saveConfig } from '../../storage/config.js'
-import { createMainnetClient, validateAgentEnsLink } from '../../identity/ens/ensLookup.js'
+import { createMainnetClient, normalizeEthDomain, splitSubdomainName, validateAgentEnsLink } from '../../identity/ens/ensLookup.js'
 import { readAddressRecord, readTextRecords } from '../../identity/ens/ensAutomation/read.js'
 import { resolveRegistryForIdentity } from '../../identity/registry/registryConfig.js'
 import { DEFAULT_ETHEREUM_RPC_URL, type Erc8004RegistryConfig } from '../../identity/registry/erc8004.js'
@@ -59,9 +59,10 @@ const HELP = [
   '  ethagent ens --unlink            clear the agent records on the linked name, then publish',
   '                                   the unlinked state in one owner-signed save.',
   '  ethagent ens --delete            unlink as above, then remove the subname from its parent.',
-  '                                   Signed by the wallet that manages the parent, never the',
-  '                                   operator key. The parent can recreate it, unless its fuses',
-  '                                   forbid that.',
+  '                                   Signed by the wallet that manages the parent: the browser',
+  '                                   wallet, or with --operator the operator key when it is the',
+  '                                   parent\'s manager. The parent can recreate it, unless its',
+  '                                   fuses forbid that.',
   '  ethagent ens --set <key>=<value> --clear <key>',
   '                                   write every record change on the linked name in one',
   '                                   resolver multicall. No save is needed.',
@@ -69,7 +70,7 @@ const HELP = [
   'Writes preview first and send nothing without --yes. ENS transactions are signed by the',
   'browser wallet, or with --operator by the operator key (run through `keychain exec ethagent',
   '-- ethagent ens <args> --operator`, which injects ' + OPERATOR_KEY_ENV + '). The operator key only',
-  'writes text records and creates subnames under a parent it controls. Publishing a name',
+  'writes text records, and creates or deletes subnames under a parent it controls. Publishing a name',
   'change always needs the owner wallet.',
   '',
 ].join('\n')
@@ -240,9 +241,6 @@ export async function runEnsCommand(args: string[], deps: HistoryDeps, seams: En
 
     if (!identity.agentId) throw new HistoryError(1, 'This identity has no agent token ID yet.', 'Mint one with `ethagent create`, or bring one back with `ethagent restore <token-id>`.')
     const owner = getAddress(humanOwnerAddress(identity))
-    if (mode.kind === 'delete' && values.operator) {
-      throw new HistoryError(2, '--delete is signed by the wallet that manages the parent name, never the operator key.', 'Drop --operator; `ethagent ens --unlink --operator` clears the records instead.')
-    }
     const signer = chooseSigner(deps, Boolean(values.operator), owner)
     const client = seams.readClient()
     const currentName = readIdentityStateString(identity.state as Record<string, unknown> | undefined, 'ensName')
@@ -280,6 +278,8 @@ export async function runEnsCommand(args: string[], deps: HistoryDeps, seams: En
       summary = { action: 'unlink', name: plan.name, records: plan.current }
     } else if (mode.kind === 'delete') {
       if (!currentName) throw new HistoryError(1, 'No ENS name is linked, so there is nothing to delete.')
+      // Only the parent's manager can remove a subname. When that is the agent's operator
+      // key, it may sign: it could already remove the name at the ENS contracts directly.
       const plan = await planEnsDelete({
         client,
         name: currentName,
@@ -287,6 +287,14 @@ export async function runEnsCommand(args: string[], deps: HistoryDeps, seams: En
         signerRole: signer.role,
         identityRegistryAddress: registry.identityRegistryAddress,
         agentId: identity.agentId,
+      }).catch(async (err: unknown) => {
+        if (!(err instanceof EnsPlanRefusal) || signer.kind === 'operator') throw err
+        const operator = readIdentityStateString(identity.state as Record<string, unknown> | undefined, 'activeOperatorAddress')
+        const parent = splitSubdomainName(normalizeEthDomain(currentName))?.parent
+        if (!operator || !parent) throw err
+        const control = await readNameControl(client, parent).catch(() => null)
+        if (!control?.owner || control.owner.toLowerCase() !== operator.toLowerCase()) throw err
+        throw new EnsPlanRefusal(err.message, `The operator key ${getAddress(operator)} manages ${parent}: run it through \`keychain exec ethagent -- ethagent ens --delete --operator\`.`)
       })
       transactions = plan.transactions
       publishName = ''
