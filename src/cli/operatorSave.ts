@@ -1,7 +1,9 @@
 import { stdout, stderr } from 'node:process'
 import { loadConfig, saveConfig, type EthagentIdentity } from '../storage/config.js'
 import { resolveRegistryForIdentity } from '../identity/registry/registryConfig.js'
-import { continuityVaultStatus } from '../identity/continuity/storage/status.js'
+import { continuityVaultStatus, continuityWorkingTreeStatus } from '../identity/continuity/storage/status.js'
+import { listPublishedContinuitySnapshots } from '../identity/continuity/snapshots.js'
+import { discoverOwnedAgentBackupByTokenId } from '../identity/registry/erc8004/discovery.js'
 import { resolveValidatedPinataJwt } from '../identity/storage/pinataJwt.js'
 import { resolveVaultAddress } from '../identity/manager/custody/transactions.js'
 import { runOperatorWalletRebackup } from '../identity/manager/continuity/vault.js'
@@ -11,23 +13,53 @@ import { createLocalKeySignAndTransaction } from '../identity/wallet/localKeyWal
 import type { EffectCallbacks } from '../identity/manager/shared/effects/types.js'
 import type { Step } from '../identity/manager/reducer.js'
 import { INVALID_OPERATOR_KEY_MESSAGE, OPERATOR_KEY_ENV, readOperatorKey } from './operatorKey.js'
+import { pullHarnessSoulMemoryIntoVault } from './sync.js'
+import { nothingToSave, saveJson, verifyPublished } from './saveVerify.js'
 
-export async function runOperatorSave(args: string[] = []): Promise<number> {
+export type RunOperatorSaveDeps = {
+  readOperatorKey: typeof readOperatorKey
+  loadConfig: typeof loadConfig
+  saveConfig: typeof saveConfig
+  resolveValidatedPinataJwt: typeof resolveValidatedPinataJwt
+  continuityVaultStatus: typeof continuityVaultStatus
+  continuityWorkingTreeStatus: typeof continuityWorkingTreeStatus
+  listPublishedContinuitySnapshots: typeof listPublishedContinuitySnapshots
+  pullHarnessSoulMemoryIntoVault: typeof pullHarnessSoulMemoryIntoVault
+  runOperatorWalletRebackup: typeof runOperatorWalletRebackup
+  createSigner: typeof createLocalKeySignAndTransaction
+  discoverOwnedAgentBackupByTokenId: typeof discoverOwnedAgentBackupByTokenId
+}
+
+const defaultDeps: RunOperatorSaveDeps = {
+  readOperatorKey,
+  loadConfig,
+  saveConfig,
+  resolveValidatedPinataJwt,
+  continuityVaultStatus,
+  continuityWorkingTreeStatus,
+  listPublishedContinuitySnapshots,
+  pullHarnessSoulMemoryIntoVault,
+  runOperatorWalletRebackup,
+  createSigner: createLocalKeySignAndTransaction,
+  discoverOwnedAgentBackupByTokenId,
+}
+
+export async function runOperatorSave(args: string[] = [], deps: RunOperatorSaveDeps = defaultDeps): Promise<number> {
   const json = args.includes('--json')
   const fail = (code: number, message: string): number => {
-    if (json) stdout.write(JSON.stringify({ ok: false, code, error: message }) + '\n')
+    if (json) stdout.write(saveJson({ ok: false, code, error: message }))
     else stderr.write(message + '\n')
     return code
   }
 
-  const operatorKey = readOperatorKey()
+  const operatorKey = deps.readOperatorKey()
   if (!operatorKey.ok && operatorKey.reason === 'missing') {
     return fail(3, `No operator key available. The os-keychain skill injects ${OPERATOR_KEY_ENV}; run this via \`keychain operator-save\` (set the key first with \`keychain set ethagent/operator_key\`).`)
   }
   if (!operatorKey.ok) return fail(2, INVALID_OPERATOR_KEY_MESSAGE)
   const privateKey = operatorKey.key
 
-  const config = await loadConfig().catch(() => null)
+  const config = await deps.loadConfig().catch(() => null)
   if (!config?.identity) return fail(1, 'No agent identity yet. Mint one with `ethagent create`, or bring one back with `ethagent restore <token-id>`.')
   const identity = config.identity
   if (!identity.agentId) return fail(1, 'This identity has no agent token ID yet. Mint one with `ethagent create`, or bring one back with `ethagent restore <token-id>`.')
@@ -35,7 +67,7 @@ export async function runOperatorSave(args: string[] = []): Promise<number> {
   const registry = resolveRegistryForIdentity(identity, config)
   if (!registry) return fail(1, 'No agent registry configured for this identity. `ethagent restore <token-id>` records it.')
 
-  const vault = await continuityVaultStatus(identity).catch(() => ({ ready: false }))
+  const vault = await deps.continuityVaultStatus(identity).catch(() => ({ ready: false }))
   if (!vault.ready) return fail(1, 'Local continuity files are not restored. Bring them back with `ethagent restore --operator` before saving a snapshot.')
 
   const role = snapshotSaveWalletRole(identity, undefined)
@@ -48,9 +80,17 @@ export async function runOperatorSave(args: string[] = []): Promise<number> {
     return fail(1, 'Advanced custody is configured but the operator vault address could not be resolved. `ethagent custody` shows where the token is held, and `ethagent custody --advanced` previews the repair.')
   }
 
+  // Same as `save`: take in the tools' edits, and send nothing when nothing changed.
+  await deps.pullHarnessSoulMemoryIntoVault(identity).catch(() => [])
+  if (await nothingToSave(identity, deps)) {
+    if (json) stdout.write(saveJson({ ok: true, skipped: true, reason: 'no-local-changes' }))
+    else stdout.write('No local changes since the last snapshot; nothing to save.\n')
+    return 0
+  }
+
   let jwt: string | undefined
   try {
-    jwt = await resolveValidatedPinataJwt()
+    jwt = await deps.resolveValidatedPinataJwt()
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err)
     return fail(3, `The configured Pinata JWT is invalid or unreachable (${detail}). Replace it with \`ethagent storage --set\` (reads the JWT from stdin), then retry.`)
@@ -61,7 +101,7 @@ export async function runOperatorSave(args: string[] = []): Promise<number> {
 
   let signAndTransaction
   try {
-    signAndTransaction = createLocalKeySignAndTransaction({ privateKey, rpcUrl: registry.rpcUrl, chainId: registry.chainId })
+    signAndTransaction = deps.createSigner({ privateKey, rpcUrl: registry.rpcUrl, chainId: registry.chainId })
   } catch (err) {
     return fail(1, `Could not initialize the local-key signer: ${err instanceof Error ? err.message : String(err)}`)
   }
@@ -71,7 +111,7 @@ export async function runOperatorSave(args: string[] = []): Promise<number> {
     onStep: () => {},
     onWalletReady: () => {},
     onIdentityComplete: async (nextIdentity: EthagentIdentity) => {
-      await saveConfig({ ...config, identity: nextIdentity })
+      await deps.saveConfig({ ...config, identity: nextIdentity })
       savedIdentity = nextIdentity
     },
   }
@@ -86,7 +126,7 @@ export async function runOperatorSave(args: string[] = []): Promise<number> {
   }
 
   try {
-    await runOperatorWalletRebackup({
+    await deps.runOperatorWalletRebackup({
       step,
       callbacks,
       walletPurpose: 'rotate-agent-uri-vault-operator',
@@ -104,13 +144,19 @@ export async function runOperatorSave(args: string[] = []): Promise<number> {
   const agentUri = ni.agentUri ?? ni.backup?.agentUri ?? null
   const published = Boolean(txHash || ni.backup?.metadataCid)
 
+  const verification = published
+    ? await verifyPublished({ saved: ni, agentId: identity.agentId, registry, discover: deps.discoverOwnedAgentBackupByTokenId })
+    : undefined
+
   if (json) {
-    stdout.write(JSON.stringify({ ok: true, published, cid, txHash, agentUri }) + '\n')
+    stdout.write(saveJson({ ok: true, published, ...(verification ? { verification } : {}), cid, txHash, agentUri }))
   } else if (published) {
     stdout.write('Snapshot published onchain via operator key (no wallet popup).\n')
     if (cid) stdout.write(`  CID:      ${cid}\n`)
     if (txHash) stdout.write(`  tx:       ${txHash}\n`)
     if (agentUri) stdout.write(`  agentURI: ${agentUri}\n`)
+    if (verification === 'verified') stdout.write('  verified: onchain pointer resolves to this snapshot.\n')
+    else if (verification === 'mismatch') stderr.write('  warning: the onchain pointer does not yet resolve to this snapshot (propagation delay?).\n')
   } else {
     stdout.write('Snapshot pinned locally, but the onchain pointer was not rotated. Retry, or publish it with the owner wallet through `ethagent save`.\n')
     if (cid) stdout.write(`  pinned CID: ${cid}\n`)
