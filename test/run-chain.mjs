@@ -103,8 +103,28 @@ async function main() {
   // Base chain starts just past it instead of at block 0.
   const home = await fs.mkdtemp(path.join(os.tmpdir(), 'ethagent-chain-'))
   const genesis = path.join(home, 'base-genesis.json')
+  // Every fork through Cancun from block 0 and a base fee, spelled out: an Anvil that
+  // reads a bare genesis as pre-London refuses EIP-1559 transactions.
   await fs.writeFile(genesis, JSON.stringify({
-    config: { chainId: 8453 },
+    config: {
+      chainId: 8453,
+      homesteadBlock: 0,
+      eip150Block: 0,
+      eip155Block: 0,
+      eip158Block: 0,
+      byzantiumBlock: 0,
+      constantinopleBlock: 0,
+      petersburgBlock: 0,
+      istanbulBlock: 0,
+      berlinBlock: 0,
+      londonBlock: 0,
+      mergeNetsplitBlock: 0,
+      terminalTotalDifficulty: 0,
+      terminalTotalDifficultyPassed: true,
+      shanghaiTime: 0,
+      cancunTime: 0,
+    },
+    baseFeePerGas: '0x3b9aca00',
     nonce: '0x0',
     timestamp: `0x${Math.floor(Date.now() / 1000).toString(16)}`,
     extraData: '0x',
