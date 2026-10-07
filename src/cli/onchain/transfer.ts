@@ -3,7 +3,7 @@ import type { EthagentConfig } from '../../storage/config.js'
 import { saveConfig } from '../../storage/config.js'
 import { resolveRegistryForIdentity } from '../../identity/registry/registryConfig.js'
 import { continuityVaultStatus } from '../../identity/continuity/storage/status.js'
-import { resolveValidatedPinataJwt } from '../../identity/storage/pinataJwt.js'
+import { resolveUploadCredential, resolveValidatedPinataJwt } from '../../identity/storage/pinataJwt.js'
 import { assertTokenNotInVault, TokenInVaultError } from '../../identity/manager/custody/preflight.js'
 import { resolveTransferTargetAddress, runTokenTransferSigning } from '../../identity/manager/transfer/effects.js'
 import { humanOwnerAddress } from '../../identity/manager/custody/helpers.js'
@@ -38,11 +38,11 @@ export type TransferSeams = {
   saveConfig: (config: EthagentConfig) => Promise<void>
 }
 
-const defaultSeams: TransferSeams = {
+export const defaultSeams: TransferSeams = {
   resolveTarget: handle => resolveTransferTargetAddress(handle),
   assertNotInVault: assertTokenNotInVault,
   sign: runTokenTransferSigning,
-  resolveJwt: resolveValidatedPinataJwt,
+  resolveJwt: resolveUploadCredential,
   vaultStatus: continuityVaultStatus,
   pullHarness: pullHarnessSoulMemoryIntoVault,
   openExternal: url => openExternalUrl(url),

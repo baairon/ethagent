@@ -4,7 +4,7 @@ import { resolveRegistryForIdentity } from '../identity/registry/registryConfig.
 import { continuityVaultStatus, continuityWorkingTreeStatus } from '../identity/continuity/storage/status.js'
 import { listPublishedContinuitySnapshots } from '../identity/continuity/snapshots.js'
 import { discoverOwnedAgentBackupByTokenId } from '../identity/registry/erc8004/discovery.js'
-import { resolveValidatedPinataJwt } from '../identity/storage/pinataJwt.js'
+import { resolveUploadCredential, resolveValidatedPinataJwt } from '../identity/storage/pinataJwt.js'
 import { resolveVaultAddress } from '../identity/manager/custody/transactions.js'
 import { runOperatorWalletRebackup } from '../identity/manager/continuity/vault.js'
 import { deriveAgentName } from '../identity/manager/shared/effects/profilePrep.js'
@@ -30,11 +30,11 @@ export type RunOperatorSaveDeps = {
   discoverOwnedAgentBackupByTokenId: typeof discoverOwnedAgentBackupByTokenId
 }
 
-const defaultDeps: RunOperatorSaveDeps = {
+export const defaultOperatorSaveDeps: RunOperatorSaveDeps = {
   readOperatorKey,
   loadConfig,
   saveConfig,
-  resolveValidatedPinataJwt,
+  resolveValidatedPinataJwt: resolveUploadCredential,
   continuityVaultStatus,
   continuityWorkingTreeStatus,
   listPublishedContinuitySnapshots,
@@ -44,7 +44,7 @@ const defaultDeps: RunOperatorSaveDeps = {
   discoverOwnedAgentBackupByTokenId,
 }
 
-export async function runOperatorSave(args: string[] = [], deps: RunOperatorSaveDeps = defaultDeps): Promise<number> {
+export async function runOperatorSave(args: string[] = [], deps: RunOperatorSaveDeps = defaultOperatorSaveDeps): Promise<number> {
   const json = args.includes('--json')
   const fail = (code: number, message: string): number => {
     if (json) stdout.write(saveJson({ ok: false, code, error: message }))
@@ -95,7 +95,7 @@ export async function runOperatorSave(args: string[] = [], deps: RunOperatorSave
     const detail = err instanceof Error ? err.message : String(err)
     return fail(3, `The configured Pinata JWT is invalid or unreachable (${detail}). Replace it with \`ethagent storage --set\` (reads the JWT from stdin), then retry.`)
   }
-  if (!jwt) {
+  if (jwt === undefined) {
     return fail(3, 'No IPFS storage credential configured, so the snapshot cannot be pinned. Save one with `ethagent storage --set` (or export PINATA_JWT), then retry.')
   }
 

@@ -1,5 +1,5 @@
 import { getSecret, hasSecret, rmSecret, setSecret, type KeyBackend } from '../../storage/secrets.js'
-import { extractPinataJwt, validatePinataJwt, type FetchLike } from './ipfs.js'
+import { DEFAULT_IPFS_API_URL, extractPinataJwt, isPinataUploadUrl, validatePinataJwt, type FetchLike } from './ipfs.js'
 
 const ACCOUNT = 'pinata:jwt'
 
@@ -41,6 +41,14 @@ export async function resolveValidatedPinataJwt(fetchImpl: FetchLike = fetch): P
   const jwt = await resolvePinataJwt()
   if (!jwt) return undefined
   return validatePinataJwt(jwt, fetchImpl)
+}
+
+// What a save needs to pin: a validated Pinata JWT when uploads go to Pinata, or '' when
+// ETHAGENT_IPFS_API_URL points at another IPFS API that needs none. undefined means a
+// Pinata credential is needed and missing.
+export async function resolveUploadCredential(fetchImpl: FetchLike = fetch): Promise<string | undefined> {
+  if (!isPinataUploadUrl(DEFAULT_IPFS_API_URL)) return ''
+  return resolveValidatedPinataJwt(fetchImpl)
 }
 
 export function invalidatePinataJwtCache(): void {

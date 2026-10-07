@@ -3,7 +3,7 @@ import { loadConfig, saveConfig, type EthagentConfig, type EthagentIdentity } fr
 import { resolveRegistryForIdentity } from '../identity/registry/registryConfig.js'
 import { continuityVaultStatus, continuityWorkingTreeStatus } from '../identity/continuity/storage/status.js'
 import { listPublishedContinuitySnapshots } from '../identity/continuity/snapshots.js'
-import { resolveValidatedPinataJwt } from '../identity/storage/pinataJwt.js'
+import { resolveUploadCredential, resolveValidatedPinataJwt } from '../identity/storage/pinataJwt.js'
 import { runRebackupSigning } from '../identity/manager/continuity/effects.js'
 import type { EffectCallbacks } from '../identity/manager/shared/effects/types.js'
 import { isWalletCancelled } from '../identity/manager/shared/utils.js'
@@ -30,7 +30,7 @@ export type RunSaveDeps = {
 const defaultDeps: RunSaveDeps = {
   loadConfig,
   saveConfig,
-  resolveValidatedPinataJwt,
+  resolveValidatedPinataJwt: resolveUploadCredential,
   continuityVaultStatus,
   continuityWorkingTreeStatus,
   listPublishedContinuitySnapshots,
@@ -95,7 +95,7 @@ export async function runSave(args: string[] = [], deps: RunSaveDeps = defaultDe
     const detail = err instanceof Error ? err.message : String(err)
     return fail(3, `The configured Pinata JWT is invalid or unreachable (${detail}). The wallet was not opened. Replace it with \`ethagent storage --set\` (reads the JWT from stdin), then retry \`ethagent save\`.`)
   }
-  if (!jwt) {
+  if (jwt === undefined) {
     return fail(3, 'No IPFS storage credential configured, so the snapshot cannot be pinned and the wallet was not opened. Save one with `ethagent storage --set` (reads the JWT from stdin), or export PINATA_JWT in this shell, then retry `ethagent save`.')
   }
 

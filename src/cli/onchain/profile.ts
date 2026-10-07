@@ -4,7 +4,7 @@ import type { EthagentConfig, EthagentIdentity } from '../../storage/config.js'
 import { saveConfig } from '../../storage/config.js'
 import { resolveRegistryForIdentity } from '../../identity/registry/registryConfig.js'
 import { continuityVaultStatus } from '../../identity/continuity/storage/status.js'
-import { resolveValidatedPinataJwt } from '../../identity/storage/pinataJwt.js'
+import { resolveUploadCredential, resolveValidatedPinataJwt } from '../../identity/storage/pinataJwt.js'
 import { validateAgentIconReference, isAgentIconUrl } from '../../identity/profile/agentIcon.js'
 import { resolveAgentIconPath, deriveAgentName } from '../../identity/manager/shared/effects/profilePrep.js'
 import { runRebackupSigningInSession } from '../../identity/manager/continuity/effects.js'
@@ -54,11 +54,11 @@ export type ProfileSeams = {
   saveConfig: (config: EthagentConfig) => Promise<void>
 }
 
-const defaultSeams: ProfileSeams = {
+export const defaultSeams: ProfileSeams = {
   publishOwner: runRebackupSigningInSession,
   publishOperator: runOperatorWalletRebackup,
   operatorRunner: createLocalKeySignAndTransaction,
-  resolveJwt: resolveValidatedPinataJwt,
+  resolveJwt: resolveUploadCredential,
   vaultStatus: continuityVaultStatus,
   pullHarness: pullHarnessSoulMemoryIntoVault,
   imageExists: async file => fs.stat(file).then(stat => stat.isFile(), () => false),

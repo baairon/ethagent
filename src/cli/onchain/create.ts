@@ -1,6 +1,6 @@
 import type { EthagentConfig, EthagentIdentity } from '../../storage/config.js'
 import { saveConfig } from '../../storage/config.js'
-import { resolveValidatedPinataJwt } from '../../identity/storage/pinataJwt.js'
+import { resolveUploadCredential, resolveValidatedPinataJwt } from '../../identity/storage/pinataJwt.js'
 import { runCreateSigning } from '../../identity/manager/create/effects.js'
 import { scanImportCandidates, type ImportCandidate } from '../../identity/manager/create/importScan.js'
 import { openBrowserWalletSession, type BrowserWalletReady, type BrowserWalletSession } from '../../identity/wallet/browserWallet.js'
@@ -37,10 +37,10 @@ export type CreateSeams = {
   custody: CustodyWriteSeams
 }
 
-const defaultSeams: CreateSeams = {
+export const defaultSeams: CreateSeams = {
   sign: runCreateSigning,
   scanImports: scanImportCandidates,
-  resolveJwt: resolveValidatedPinataJwt,
+  resolveJwt: resolveUploadCredential,
   openSession: onReady => openBrowserWalletSession({ title: 'ethagent create', onReady }),
   openExternal: url => openExternalUrl(url),
   saveConfig,

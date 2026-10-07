@@ -1,10 +1,10 @@
 import { getAddress, type Address, type PublicClient } from 'viem'
 import type { EthagentConfig, EthagentIdentity } from '../../storage/config.js'
 import { saveConfig } from '../../storage/config.js'
-import { createMainnetClient, normalizeEthDomain, splitSubdomainName, validateAgentEnsLink } from '../../identity/ens/ensLookup.js'
+import { createMainnetClient, ensRpcUrl, normalizeEthDomain, splitSubdomainName, validateAgentEnsLink } from '../../identity/ens/ensLookup.js'
 import { readAddressRecord, readTextRecords } from '../../identity/ens/ensAutomation/read.js'
 import { resolveRegistryForIdentity } from '../../identity/registry/registryConfig.js'
-import { DEFAULT_ETHEREUM_RPC_URL, type Erc8004RegistryConfig } from '../../identity/registry/erc8004.js'
+import type { Erc8004RegistryConfig } from '../../identity/registry/erc8004.js'
 import { humanOwnerAddress } from '../../identity/manager/custody/helpers.js'
 import { readIdentityStateString } from '../../identity/manager/custody/state.js'
 import { resolveVaultAddress } from '../../identity/manager/custody/transactions.js'
@@ -28,7 +28,7 @@ import { isWalletCancelled } from '../../identity/manager/shared/utils.js'
 import type { EffectCallbacks } from '../../identity/manager/shared/effects/types.js'
 import type { Step } from '../../identity/manager/reducer.js'
 import { continuityVaultStatus } from '../../identity/continuity/storage/status.js'
-import { resolveValidatedPinataJwt } from '../../identity/storage/pinataJwt.js'
+import { resolveUploadCredential, resolveValidatedPinataJwt } from '../../identity/storage/pinataJwt.js'
 import { openBrowserWalletSession, type BrowserWalletSession, type BrowserWalletReady } from '../../identity/wallet/browserWallet.js'
 import { createLocalKeySender, type LocalKeySender } from '../../identity/wallet/localKeyWallet.js'
 import { openExternalUrl } from '../../utils/openExternal.js'
@@ -88,13 +88,13 @@ export type EnsSeams = {
   saveConfig: (config: EthagentConfig) => Promise<void>
 }
 
-const defaultSeams: EnsSeams = {
+export const defaultSeams: EnsSeams = {
   ensClient: () => createMainnetEnsPublicClient(),
   readClient: () => createMainnetClient(),
-  operatorSender: privateKey => createLocalKeySender({ privateKey, chainId: 1, rpcUrl: DEFAULT_ETHEREUM_RPC_URL }),
+  operatorSender: privateKey => createLocalKeySender({ privateKey, chainId: 1, rpcUrl: ensRpcUrl() }),
   openSession: onReady => openBrowserWalletSession({ title: 'ethagent ENS', onReady }),
   publish: runRebackupSigningInSession,
-  resolveJwt: resolveValidatedPinataJwt,
+  resolveJwt: resolveUploadCredential,
   vaultStatus: continuityVaultStatus,
   pullHarness: pullHarnessSoulMemoryIntoVault,
   openExternal: url => openExternalUrl(url),
@@ -385,7 +385,7 @@ export async function runEnsCommand(args: string[], deps: HistoryDeps, seams: En
       } catch (err) {
         throw new HistoryError(3, `The configured Pinata JWT is invalid or unreachable (${err instanceof Error ? err.message : String(err)}). Nothing was sent.`)
       }
-      if (!jwt) throw new HistoryError(3, 'No IPFS storage credential configured, so the name cannot be published.', 'Save one with `ethagent storage --set` (or export PINATA_JWT), then retry. Nothing was sent.')
+      if (jwt === undefined) throw new HistoryError(3, 'No IPFS storage credential configured, so the name cannot be published.', 'Save one with `ethagent storage --set` (or export PINATA_JWT), then retry. Nothing was sent.')
       saveReady = { jwt }
       await seams.pullHarness(identity).catch(() => [])
     }

@@ -78,7 +78,7 @@ export type RestoreSeams = {
   saveConfig: (config: EthagentConfig) => Promise<void>
 }
 
-const defaultSeams: RestoreSeams = {
+export const defaultSeams: RestoreSeams = {
   resolveTokenId: resolveAgentTokenIdToCandidate,
   resolveEns: resolveAgentEnsToCandidate,
   ensTokenChain: async name => {

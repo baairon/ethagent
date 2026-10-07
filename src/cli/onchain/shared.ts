@@ -36,7 +36,7 @@ export async function requireStorage(resolveJwt: () => Promise<string | undefine
   } catch (err) {
     throw new HistoryError(3, `The configured Pinata JWT is invalid or unreachable (${err instanceof Error ? err.message : String(err)}). Nothing was signed or sent.`, 'Replace it with `ethagent storage --set`.')
   }
-  if (!jwt) {
+  if (jwt === undefined) {
     throw new HistoryError(3, 'No IPFS storage credential is configured. Nothing was signed or sent.', 'Save one with `ethagent storage --set` (reads the JWT from stdin), or export PINATA_JWT.')
   }
   return jwt

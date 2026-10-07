@@ -34,7 +34,7 @@ async function readAllStdin(): Promise<string> {
   return Buffer.concat(chunks).toString('utf8')
 }
 
-const defaultSeams: StorageSeams = {
+export const defaultSeams: StorageSeams = {
   has: hasPinataJwt,
   save: async input => {
     const saved = await savePinataJwt(input)
