@@ -209,14 +209,14 @@ Run any of these with `npx ethagent`. Commands marked interactive need a termina
 | `storage [--set \| --forget] [--json]` | Where snapshots are pinned and whether a credential is set. `--set` saves a Pinata JWT read from stdin; `--forget` removes it after a preview. | Read-only; `--set` and `--forget` write secrets |
 | `create --name <text> --network <network> [--description <text>] [--advanced] [--import] [--replace] [--yes] [--json]` | Mint a new agent with its first snapshot. `--advanced` continues into a Vault in the same tab; `--replace` is needed when this machine already has an agent. Previews until `--yes`. | Opens your wallet |
 | `restore [<token-id> \| <name>] [--network <network>] [--operator] [--yes] [--json]` | Rebuild an agent on this machine, or with no target pull the newest onchain snapshot into the vault. Previews until `--yes`. | Opens your wallet, or none with `--operator` |
-| `restore --owner <address\|name> [--json]` | List the agents a wallet holds or operates. | Goes online |
+| `restore --owner <address\|name> [--json]` | List the agents a wallet holds or operates, including ones it deposited into a Vault. When the RPC can't serve the log history to check, it says so and exits 1 instead of listing nothing; point `ETHAGENT_RPC_URL` at a fuller RPC and pass `--network`. | Goes online |
 | `profile [--name <text>] [--description <text>] [--image <path\|url\|none>] [--operator] [--yes] [--json]` | Show the public profile, or change it and publish in one save. Previews until `--yes`. | Opens your wallet, or none with `--operator` |
 | `custody [--json]` | Custody mode, the Vault and its build, whether it holds the token, the Vault-level owner, and the approved operators. | Goes online |
 | `custody --verify [--json]` | Also simulates, sending nothing: the owner withdrawing and changing an operator, the operator rotating the agent URI, and the operator and a stranger being refused. Exits 4 on a mismatch. | Goes online |
 | `ens [--json]` | The linked name, its records, the two-way check, the resolver, who controls the name, and whether the operator key could sign for it. | Goes online |
 | `ens <name> [--operator] [--yes] [--json]` | Point the agent at a name: create it under a parent the signer controls, write the agent records, clear them on the old name, then publish the name. Previews until `--yes`. | Opens your wallet |
 | `ens --unlink [--operator] [--yes] [--json]` | Clear the agent records on the linked name, then publish it unlinked. Previews until `--yes`. | Opens your wallet |
-| `ens --delete [--yes] [--json]` | Unlink as above, then remove the subname from its parent. Signed by the wallet that manages the parent. Previews until `--yes`. | Opens your wallet |
+| `ens --delete [--operator] [--yes] [--json]` | Unlink as above, then remove the subname from its parent. Signed by the wallet that manages the parent, which may be the operator key. Previews until `--yes`. | Opens your wallet |
 | `ens --set <key>=<value> --clear <key> [--operator] [--yes] [--json]` | Write every record change in one transaction. No save needed. Previews until `--yes`. | Opens your wallet, or none with `--operator` |
 | `custody --advanced [--yes] [--json]` | Deploy a Vault (or reuse one), deposit the token, and save. Previews until `--yes`. | Opens your wallet |
 | `custody --simple [--yes] [--json]` | Revoke the Vault's operators, withdraw the token, and save. Previews until `--yes`. | Opens your wallet |
@@ -231,13 +231,13 @@ Run any of these with `npx ethagent`. Commands marked interactive need a termina
 1. It pulls in any edits from your tools.
 2. If nothing changed since the last snapshot, it stops there.
 3. Otherwise it prints a link and opens your wallet in the browser. You sign one message and approve one transaction.
-4. ethagent encrypts everything, pins it to IPFS, points your token at it, and checks that the pointer landed.
+4. ethagent encrypts everything, pins it to IPFS, points your token at it, and checks that the pointer landed (`verification` in the JSON: `verified`, `mismatch`, or `unknown`).
 
 | Flag | Effect |
 | --- | --- |
 | `--json` | Print the result as JSON. |
 | `--no-open` | Print the wallet link without opening the browser. |
-| `--operator` | Save with no popup, signed by an approved operator key (Advanced custody), read from `ETHAGENT_OPERATOR_KEY`. |
+| `--operator` | Save with no popup, signed by an approved operator key (Advanced custody), read from `ETHAGENT_OPERATOR_KEY`. It skips when nothing changed and checks the pointer the same way. |
 
 | Exit code | Meaning |
 | --- | --- |
@@ -253,8 +253,8 @@ Run any of these with `npx ethagent`. Commands marked interactive need a termina
 
 - **Previews.** ENS changes preview by default. They list every transaction, simulate the ones that can run now from the signer, and send nothing. Rerun with `--yes` to send.
 - **Signers.** ENS transactions are signed in your browser wallet, in one tab for the whole change. With `--operator`, the operator key signs them with no popup instead. Run it as `keychain exec ethagent -- ethagent ens <args> --operator`.
-- **What the operator key may do.** It only writes text records and creates subnames under a parent it controls. It never sets `addr` on an existing name and never changes ownership.
-- **Deleting.** `ens --delete` clears the records, removes the subname from its parent, then publishes the agent unlinked. Only the wallet that manages the parent can sign it, never the operator key. Whoever manages the parent can create the name again, unless its fuses forbid that. A run stopped after the removal finishes when run again.
+- **What the operator key may do.** It only writes text records, and creates or deletes subnames under a parent it controls. It never sets `addr` on an existing name and never changes ownership.
+- **Deleting.** `ens --delete` clears the records, removes the subname from its parent, then publishes the agent unlinked. Only the wallet that manages the parent can sign it; that is the operator key when the key manages the parent, which could already remove the name at the ENS contracts. Whoever manages the parent can create the name again, unless its fuses forbid that. A run stopped after the removal finishes when run again.
 - **Publishing.** Changing, unlinking, or deleting the name always ends with one owner-signed save. A stolen operator key therefore can't point your agent at a name it registered. Local state takes the new name only after that save lands.
 - **Control check.** Before anything is sent, the command refuses unless the signer controls the name: as its owner, its NameWrapper owner, or a delegate approved on its resolver.
 
