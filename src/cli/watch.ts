@@ -9,7 +9,9 @@ import {
   daemonDisabled,
   daemonLogPath,
   daemonStatus,
+  DAEMON_HEARTBEAT_MS,
   stopDaemon,
+  touchDaemonPid,
   tryClaimDaemonPid,
 } from './daemon.js'
 
@@ -113,6 +115,7 @@ export async function runWatch(argv: string[]): Promise<number> {
     return 0
   }
 
+  const heartbeat = setInterval(touchDaemonPid, DAEMON_HEARTBEAT_MS)
   let rescan: NodeJS.Timeout | null = null
   let timer: NodeJS.Timeout | null = null
   let syncing = false
@@ -129,6 +132,7 @@ export async function runWatch(argv: string[]): Promise<number> {
 
   const cleanup = (): void => {
     stopped = true
+    clearInterval(heartbeat)
     if (rescan) clearTimeout(rescan)
     if (timer) clearTimeout(timer)
     for (const watcher of watched.values()) { try { watcher.close() } catch {} }

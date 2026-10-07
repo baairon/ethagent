@@ -16,6 +16,9 @@ import {
   readDaemonPid,
   resumeSync,
   writeDaemonPid,
+  daemonPidPath,
+  stopDaemon,
+  touchDaemonPid,
 } from '../../src/cli/daemon.js'
 import { withHome } from '../support/home.js'
 
@@ -234,6 +237,25 @@ test('daemon is single-instance: ensureDaemon is a no-op while a live pid file e
     assert.equal(ensureDaemon(), false)
     clearDaemonPid()
     assert.equal(daemonStatus().running, false)
+  })
+})
+
+test('a pid file that stopped beating is not a running daemon, and its pid is never signalled', async () => {
+  await withHome(async () => {
+    // The test runner's own pid stands in for a pid the system handed to another process.
+    writeDaemonPid()
+    const old = new Date(Date.now() - 10 * 60_000)
+    await fs.utimes(daemonPidPath(), old, old)
+    assert.equal(daemonStatus().running, false)
+    assert.equal(readDaemonPid(), null, 'the stale file is cleared')
+    writeDaemonPid()
+    await fs.utimes(daemonPidPath(), old, old)
+    assert.equal(stopDaemon(), false, 'a stale pid is not ours to signal')
+    writeDaemonPid()
+    await fs.utimes(daemonPidPath(), old, old)
+    touchDaemonPid()
+    assert.equal(daemonStatus().running, true, 'a heartbeat makes it current again')
+    clearDaemonPid()
   })
 })
 
