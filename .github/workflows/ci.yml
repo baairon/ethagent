@@ -42,3 +42,20 @@ jobs:
         working-directory: contracts
       - run: forge test -vv
         working-directory: contracts
+
+  chain:
+    name: Chain suite (anvil)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: recursive
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.5.1
+      - run: npm ci
+      - run: npm run test:chain

@@ -12,6 +12,7 @@ export {
   splitSubdomainName,
 } from './ensLookup/names.js'
 export { createMainnetClient } from './ensLookup/client.js'
+export { ensRpcUrl, ensRpcUrls } from './ensLookup/constants.js'
 export { resolveEnsAddress, readEthagentTextRecords, readResolverAddress } from './ensLookup/resolve.js'
 export { parseAgentTokenReference } from './ensLookup/tokenReference.js'
 export { discoverOwnedEnsNameDetails, discoverOwnedEnsNames } from './ensLookup/discovery.js'

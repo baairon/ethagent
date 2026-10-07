@@ -37,7 +37,7 @@ async function localChangedFiles(identity: EthagentIdentity): Promise<string[] |
   }
 }
 
-const defaultSeams: CheckSeams = {
+export const defaultSeams: CheckSeams = {
   reconcile: runReconciliation,
   localChanges: localChangedFiles,
 }

@@ -36,7 +36,7 @@ import {
 } from '../../identity/manager/shared/operatorAccess.js'
 import type { ProfileUpdates, Step } from '../../identity/manager/reducer.js'
 import { continuityVaultStatus } from '../../identity/continuity/storage/status.js'
-import { resolveValidatedPinataJwt } from '../../identity/storage/pinataJwt.js'
+import { resolveUploadCredential, resolveValidatedPinataJwt } from '../../identity/storage/pinataJwt.js'
 import { signMessage } from '../../identity/crypto/eth.js'
 import { openBrowserWalletSession, type BrowserWalletReady, type BrowserWalletSession } from '../../identity/wallet/browserWallet.js'
 import { openExternalUrl } from '../../utils/openExternal.js'
@@ -81,7 +81,7 @@ export const defaultCustodyWriteSeams: CustodyWriteSeams = {
   revoke: revokeVaultOperatorsBeforeWithdraw,
   recordVault: recordDeployedVault,
   publish: runRebackupSigningInSession,
-  resolveJwt: resolveValidatedPinataJwt,
+  resolveJwt: resolveUploadCredential,
   vaultStatus: continuityVaultStatus,
   pullHarness: pullHarnessSoulMemoryIntoVault,
   openSession: onReady => openBrowserWalletSession({ title: 'ethagent custody', onReady }),

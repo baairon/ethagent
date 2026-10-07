@@ -20,6 +20,7 @@
     "typecheck": "tsc --noEmit",
     "test": "node test/run-tests.mjs",
     "test:coverage": "node test/run-tests.mjs --coverage",
+    "test:chain": "node test/run-chain.mjs",
     "previews": "tsx scripts/render-previews.ts",
     "prepack": "npm run build",
     "contracts:build": "cd contracts && forge build",

@@ -26,7 +26,7 @@ import {
   withEthagentPointers,
 } from '../../registry/erc8004.js'
 import { resolveValidatedPinataJwt, savePinataJwt } from '../../storage/pinataJwt.js'
-import { openBrowserWalletSession, prepareTransactionGasFee } from '../../wallet/browserWallet.js'
+import { openBrowserWalletSession, prepareTransactionGasFee, type BrowserWalletSession } from '../../wallet/browserWallet.js'
 import { resolveEnsAddress } from '../../ens/ensLookup.js'
 import type { Step } from '../reducer.js'
 import type { EffectCallbacks } from '../shared/effects/types.js'
@@ -119,6 +119,7 @@ export async function runTokenTransferStorageSubmit(
 export async function runTokenTransferSigning(
   step: Extract<Step, { kind: 'token-transfer-signing' }>,
   callbacks: EffectCallbacks,
+  opts: { session?: BrowserWalletSession } = {},
 ): Promise<TokenTransferResult> {
   if (!step.identity.agentId) throw new Error('Cannot prepare token transfer: identity is missing an agent token ID')
   const transferAgentId = step.identity.agentId
@@ -132,7 +133,10 @@ export async function runTokenTransferSigning(
   const senderChallenge = createTransferContinuitySnapshotChallenge({ token, ownerAddress, targetAddress, role: 'sender' })
   const targetChallenge = createTransferContinuitySnapshotChallenge({ token, ownerAddress, targetAddress, role: 'receiver' })
 
-  const session = await openBrowserWalletSession({ onReady: callbacks.onWalletReady, ...(callbacks.signal ? { signal: callbacks.signal } : {}) })
+  // A caller's tab (the headless command's) stays open for it to close; one opened here
+  // closes with the transfer.
+  const ownSession = !opts.session
+  const session = opts.session ?? await openBrowserWalletSession({ onReady: callbacks.onWalletReady, ...(callbacks.signal ? { signal: callbacks.signal } : {}) })
   try {
 
   callbacks.onTokenTransferProgress?.(tokenTransferProgressForPhase('sender-sign', ownerAddress, targetAddress))
@@ -281,8 +285,10 @@ export async function runTokenTransferSigning(
   }
 
   } finally {
-    await session.close().catch(() => {})
-    callbacks.onWalletReady(null)
+    if (ownSession) {
+      await session.close().catch(() => {})
+      callbacks.onWalletReady(null)
+    }
   }
 }
 

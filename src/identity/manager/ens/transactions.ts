@@ -1,12 +1,11 @@
 import type { Address, Hex, PublicClient } from 'viem'
 import {
   blockTimeMsForChain,
-  DEFAULT_ETHEREUM_RPC_URL,
   RegisterAgentPreflightError,
   createErc8004PublicClient,
   supportedErc8004ChainForId,
 } from '../../registry/erc8004.js'
-import { encodeSetEnsip25TextRecord, readEthagentTextRecords } from '../../ens/ensLookup.js'
+import { encodeSetEnsip25TextRecord, ensRpcUrl, readEthagentTextRecords } from '../../ens/ensLookup.js'
 import { encodeEnsRecordsTransaction, encodeEnsRegistryTransaction, readAddressRecord, type EnsSetupPlan, type EnsSubdomainDeletePlan } from '../../ens/ensAutomation.js'
 import type { AgentEnsRecordState, AgentEnsRecords, AgentRecordDiff } from '../../ens/agentRecords.js'
 import { changedRecords, clearedRecords, diffRecords } from '../../ens/agentRecords.js'
@@ -282,7 +281,7 @@ async function refreshEnsSetupAgainstChain(setup: EnsSetupPlan, publicClient: Pu
 export function createMainnetEnsPublicClient(): PublicClient {
   return createErc8004PublicClient({
     chainId: 1,
-    rpcUrl: DEFAULT_ETHEREUM_RPC_URL,
+    rpcUrl: ensRpcUrl(),
   })
 }
 

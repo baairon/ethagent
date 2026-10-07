@@ -1,7 +1,7 @@
 import { createPublicClient, type PublicClient } from 'viem'
 import { mainnet } from 'viem/chains'
 import { adaptiveRpcTransport } from '../../../net/rpc.js'
-import { ENS_RPC_URLS } from './constants.js'
+import { ensRpcUrls } from './constants.js'
 
 // ENS lives on mainnet. Reads go through the adaptive transport: each endpoint gets the
 // bound it has earned, a slow one gets a competitor, and nothing is cut off by a fixed
@@ -9,7 +9,7 @@ import { ENS_RPC_URLS } from './constants.js'
 export function createMainnetClient(): PublicClient {
   return createPublicClient({
     chain: mainnet,
-    transport: adaptiveRpcTransport(ENS_RPC_URLS),
+    transport: adaptiveRpcTransport(ensRpcUrls()),
   })
 }
 

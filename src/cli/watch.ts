@@ -5,14 +5,14 @@ import { continuityVaultRef } from '../identity/continuity/storage/paths.js'
 import { runSync } from './sync.js'
 import { BUILT_IN_ADAPTERS, adapterManagedFilePaths } from './syncAdapters/index.js'
 import {
-  clearDaemonPid,
+  claimDaemonPid,
   daemonDisabled,
   daemonLogPath,
   daemonStatus,
   DAEMON_HEARTBEAT_MS,
+  releaseDaemonPid,
   stopDaemon,
   touchDaemonPid,
-  tryClaimDaemonPid,
 } from './daemon.js'
 
 const DEBOUNCE_MS = 400
@@ -110,12 +110,17 @@ export async function runWatch(argv: string[]): Promise<number> {
     return 0
   }
 
-  if (!tryClaimDaemonPid()) {
+  if (!(await claimDaemonPid())) {
     if (!isDaemon) process.stdout.write('ethagent: watcher already running\n')
     return 0
   }
 
-  const heartbeat = setInterval(touchDaemonPid, DAEMON_HEARTBEAT_MS)
+  const heartbeat = setInterval(() => {
+    if (touchDaemonPid()) return
+    logDaemon('stopping: sync was paused, or another watcher took over')
+    cleanup()
+    process.exit(0)
+  }, DAEMON_HEARTBEAT_MS)
   let rescan: NodeJS.Timeout | null = null
   let timer: NodeJS.Timeout | null = null
   let syncing = false
@@ -137,7 +142,7 @@ export async function runWatch(argv: string[]): Promise<number> {
     if (timer) clearTimeout(timer)
     for (const watcher of watched.values()) { try { watcher.close() } catch {} }
     watched.clear()
-    clearDaemonPid()
+    releaseDaemonPid()
   }
   process.on('SIGTERM', () => { cleanup(); process.exit(0) })
   process.on('SIGINT', () => { cleanup(); process.exit(0) })

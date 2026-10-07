@@ -28,7 +28,7 @@ export type CustodySeams = {
   client: (registry: Erc8004RegistryConfig) => CustodyClient
 }
 
-const defaultSeams: CustodySeams = {
+export const defaultSeams: CustodySeams = {
   client: registry => createErc8004PublicClient(registry),
 }
 
