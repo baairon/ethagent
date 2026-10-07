@@ -89,6 +89,18 @@ export async function giveName(name: string, to: Address): Promise<void> {
   })
 }
 
+// Sends the agent token from one wallet to another, as the owner does in their own
+// wallet after a prepared transfer; ethagent never moves it.
+export async function sendToken(from: Role, to: Address, tokenId: bigint): Promise<void> {
+  const wallet = createWalletClient({ account: privateKeyToAccount(KEYS[from]), chain: base, transport: http(BASE_RPC) })
+  await wallet.writeContract({
+    address: REGISTRY,
+    abi: [{ type: 'function', name: 'safeTransferFrom', stateMutability: 'nonpayable', inputs: [{ name: 'from', type: 'address' }, { name: 'to', type: 'address' }, { name: 'tokenId', type: 'uint256' }], outputs: [] }],
+    functionName: 'safeTransferFrom',
+    args: [ADDRESS[from], to, tokenId],
+  })
+}
+
 const CHAINS = { 1: { chain: mainnet, rpc: MAINNET_RPC }, 8453: { chain: base, rpc: BASE_RPC } } as const
 
 // A wallet session that signs with the development keys instead of a browser tab. A

@@ -5,7 +5,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { createPublicClient, getAddress, http, namehash, parseAbi, type Address } from 'viem'
 import { base, mainnet } from 'viem/chains'
-import { ADDRESS, chainDeps, giveName, KEYS, placeContracts, REGISTRY, RPC, TestWallet } from './harness.js'
+import { ADDRESS, chainDeps, giveName, KEYS, placeContracts, REGISTRY, RPC, sendToken, TestWallet } from './harness.js'
 import { loadConfig, type EthagentIdentity } from '../../src/storage/config.js'
 import { continuityVaultRef } from '../../src/identity/continuity/storage/paths.js'
 import { runCreateCommand, defaultSeams as createSeams } from '../../src/cli/onchain/create.js'
@@ -85,6 +85,11 @@ async function editMemory(line: string): Promise<void> {
 test.before(async () => {
   await placeContracts()
   await giveName('example.eth', ADDRESS.owner)
+})
+
+test('the suite cannot reach a public RPC or gateway', async () => {
+  await assert.rejects(fetch('https://mainnet.base.org'), /refuses mainnet.base.org/)
+  await assert.rejects(fetch('https://ethereum.publicnode.com'), /refuses/)
 })
 
 test('create --yes mints the agent and pins its first snapshot', async () => {
@@ -219,4 +224,23 @@ test('transfer --yes re-encrypts the agent for the receiver, who restores it aft
   ok(await runTransferCommand([ADDRESS.receiver, '--yes', '--json'], deps, { ...transferSeams, ...walletSeams }), deps)
   assert.equal(await holder(), ADDRESS.owner, 'ethagent never moves the token itself')
   assert.ok(wallet.prompts.some(prompt => prompt.endsWith(':receiver')), 'the receiver signed in the same wallet session')
+
+  const original = await identity()
+  const memory = await fs.readFile(continuityVaultRef(original).memoryPath, 'utf8')
+  await sendToken('owner', ADDRESS.receiver, tokenIdFrom(original))
+  const home = process.env.HOME!
+  const fresh = await fs.mkdtemp(path.join(os.tmpdir(), 'ethagent-chain-receiver-'))
+  process.env.HOME = fresh
+  try {
+    wallet.use('receiver')
+    const restore = chainDeps()
+    ok(await runRestoreCommand([String(tokenIdFrom(original)), '--network', 'base', '--yes', '--json'], restore, { ...restoreSeams, ...walletSeams }), restore)
+    const restored = await identity()
+    assert.equal(getAddress(restored.ownerAddress ?? restored.address), ADDRESS.receiver)
+    assert.equal(await fs.readFile(continuityVaultRef(restored).memoryPath, 'utf8'), memory)
+  } finally {
+    process.env.HOME = home
+    wallet.use('owner')
+    await fs.rm(fresh, { recursive: true, force: true })
+  }
 })

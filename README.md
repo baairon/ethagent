@@ -456,7 +456,8 @@ With `--json`, every history and onchain command prints one line of ASCII-only J
 | --- | --- |
 | `ETHAGENT_OPERATOR_KEY` | The operator key for `save --operator`, `fetch`, `restore --operator`, `profile --operator`, `custody --add-operator --operator`, and `ens --operator`. Inject it from your OS keychain; never type it into a command. |
 | `ETHAGENT_RPC_URL` | The RPC endpoint asked first for the agent's network. Use one that keeps history when the public endpoints can't reach back far enough for a wallet search. |
-| `ETHAGENT_IPFS_API_URL` | Where snapshots are uploaded, in place of Pinata. |
+| `ETHAGENT_ENS_RPC_URL` | An Ethereum Mainnet RPC endpoint asked first for every ENS read and write. |
+| `ETHAGENT_IPFS_API_URL` | Where snapshots are uploaded, in place of Pinata: an IPFS HTTP API (`/api/v0/add`). No Pinata credential is needed then. |
 | `PINATA_JWT` | IPFS storage credential, if you haven't set one up in the manager. |
 | `PINATA_GATEWAY_URL` | Your own IPFS gateway. Downloads try it before any other source. |
 | `ETHAGENT_IPFS_GATEWAYS` | Gateways to download from, separated by commas, in place of the built-in ones. |
@@ -464,6 +465,17 @@ With `--json`, every history and onchain command prints one line of ASCII-only J
 | `ETHAGENT_HOSTS_FILE` | Where ethagent remembers how quickly each host answers, so the fastest is asked first, and how many blocks each serves per log query. Defaults to `~/.ethagent/hosts.json`. Leave it empty to remember nothing. |
 | `ETHAGENT_HARNESS_FILES` | Extra instruction files to keep in sync, separated by commas. |
 | `ETHAGENT_NO_DAEMON` | Set to `1` to turn off background sync. |
+
+## Development
+
+```bash
+npm ci
+npm run typecheck
+npm test              # unit tests, no network
+npm run test:chain    # every command that sends, on local chains (needs Foundry)
+```
+
+`npm run test:chain` starts two local Anvil chains (one for ENS on Ethereum Mainnet, one for the agent registry on Base) and serves IPFS from the test runner. Stand-ins for the registry and the ENS contracts, in `contracts/test/chain`, sit at the real addresses, and the real Vault is deployed by ethagent itself. It then walks one agent's whole life with `--yes`: create, profile, ENS link and records, Advanced custody, the operator key, an operator save, `check`, restoring on a fresh machine, ENS delete, Simple custody, and a transfer the receiver restores. A test wallet signs in place of the browser tab, and nothing leaves the machine. CI runs it on every pull request.
 
 ## Updating
 
