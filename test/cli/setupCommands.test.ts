@@ -146,13 +146,15 @@ function transferSeams(record: { signed?: boolean; saved?: EthagentConfig } = {}
       return getAddress(handle)
     },
     assertNotInVault: async () => {},
-    sign: async step => {
+    sign: async (step, _callbacks, opts) => {
+      assert.ok(opts?.session, 'both signatures and the publish go through the command\'s wallet tab')
       record.signed = true
       return { identity: { ...step.identity, backup: { cid: 'bafytransfer' } as never }, snapshotCid: 'bafytransfer', txHash: '0xpublish' }
     },
     resolveJwt: async () => 'jwt',
     vaultStatus: async () => ({ ready: true }) as never,
     pullHarness: async () => [],
+    openSession: async () => ({ close: async () => {} }) as never,
     openExternal: () => {},
     saveConfig: async config => { record.saved = config },
   }

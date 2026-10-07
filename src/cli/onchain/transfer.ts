@@ -8,9 +8,10 @@ import { assertTokenNotInVault, TokenInVaultError } from '../../identity/manager
 import { resolveTransferTargetAddress, runTokenTransferSigning } from '../../identity/manager/transfer/effects.js'
 import { humanOwnerAddress } from '../../identity/manager/custody/helpers.js'
 import { openExternalUrl } from '../../utils/openExternal.js'
+import { openBrowserWalletSession } from '../../identity/wallet/browserWallet.js'
 import { pullHarnessSoulMemoryIntoVault } from '../sync.js'
 import { emitJson, failFrom, HistoryError, parseHistoryArgs, requireIdentity, type HistoryDeps } from '../history/shared.js'
-import { quietCallbacks, requireStorage, walletCancelled } from './shared.js'
+import { quietCallbacks, requireStorage, walletCancelled, WalletTab, type OpenSession } from './shared.js'
 
 export const TRANSFER_USAGE = 'ethagent transfer <address|name> [--yes] [--no-open] [--json]'
 
@@ -34,6 +35,7 @@ export type TransferSeams = {
   resolveJwt: typeof resolveValidatedPinataJwt
   vaultStatus: typeof continuityVaultStatus
   pullHarness: typeof pullHarnessSoulMemoryIntoVault
+  openSession: OpenSession
   openExternal: (url: string) => void
   saveConfig: (config: EthagentConfig) => Promise<void>
 }
@@ -45,6 +47,7 @@ export const defaultSeams: TransferSeams = {
   resolveJwt: resolveUploadCredential,
   vaultStatus: continuityVaultStatus,
   pullHarness: pullHarnessSoulMemoryIntoVault,
+  openSession: onReady => openBrowserWalletSession({ title: 'ethagent transfer', onReady }),
   openExternal: url => openExternalUrl(url),
   saveConfig,
 }
@@ -113,8 +116,11 @@ export async function runTransferCommand(args: string[], deps: HistoryDeps, seam
     const jwt = await requireStorage(seams.resolveJwt)
     await seams.pullHarness(identity).catch(() => [])
     const noOpen = Boolean(values['no-open'])
+    const tab = new WalletTab(seams.openSession, deps.io, json, noOpen, seams.openExternal)
     let result
     try {
+      const session = await tab.get()
+      await (json ? deps.io.err : deps.io.out)('Sign with the owner wallet, switch to the receiver wallet when asked, then approve the publish with the owner.\n')
       result = await seams.sign({
         kind: 'token-transfer-signing',
         identity,
@@ -123,18 +129,13 @@ export async function runTransferCommand(args: string[], deps: HistoryDeps, seam
         targetAddress: target,
         pinataJwt: jwt,
         returnTo: { kind: 'menu' },
-      }, quietCallbacks({
-        onWalletReady: ready => {
-          if (!ready) return
-          const sink = json ? deps.io.err : deps.io.out
-          void sink(`Approve in your browser wallet tab: ${ready.url}\nSign with the owner wallet, switch to the receiver wallet when asked, then approve the publish with the owner.\n`)
-          if (!noOpen) seams.openExternal(ready.url)
-        },
-      }))
+      }, quietCallbacks(), { session })
     } catch (err: unknown) {
       const cancelled = walletCancelled(err, [])
       if (cancelled) throw cancelled
       throw err
+    } finally {
+      await tab.close()
     }
     await seams.saveConfig({ ...config, identity: result.identity })
     const output = { applied: true, ...summary, snapshot: result.snapshotCid, txHash: result.txHash }
