@@ -402,3 +402,15 @@ test('ens --delete --operator works when the operator key manages the parent, an
   assert.equal(await runEnsCommand(['--delete', '--json'], browser, ensSeams(names)), 1)
   assert.match(String(browser.io.json().hint), /ens --delete --operator/)
 })
+
+test('ens without a key in the shell still says whether the active operator could sign', async () => {
+  const id = identity({ ensName: 'agent.example.eth', activeOperatorAddress: OPERATOR })
+  const d = deps(id)
+  assert.equal(await runEnsCommand(['--json'], d, ensSeams({
+    'agent.example.eth': { owner: OPERATOR, resolver: RESOLVER, addr: OWNER },
+  })), 0)
+  assert.deepEqual(d.io.json().operator, { address: OPERATOR, canSign: true, via: 'owner', keyAvailable: false })
+  const none = deps(identity({ ensName: 'agent.example.eth', activeOperatorAddress: '' }))
+  assert.equal(await runEnsCommand(['--json'], none, ensSeams({ 'agent.example.eth': { owner: OWNER, resolver: RESOLVER } })), 0)
+  assert.equal(none.io.json().operator, null)
+})

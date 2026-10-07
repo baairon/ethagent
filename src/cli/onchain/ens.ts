@@ -176,6 +176,13 @@ async function readView(identity: EthagentIdentity, registry: Erc8004RegistryCon
     operator = { address: getAddress(key.address), canSign: Boolean(how), via: how }
   } else if (key && !key.ok && key.reason === 'invalid') {
     operator = { error: INVALID_OPERATOR_KEY_MESSAGE }
+  } else {
+    // No key in this shell: still say whether the agent's active operator could sign.
+    const active = readIdentityStateString(state, 'activeOperatorAddress')
+    if (active) {
+      const how = await signerControlOf(client, control, getAddress(active))
+      operator = { address: getAddress(active), canSign: Boolean(how), via: how, keyAvailable: false }
+    }
   }
   return {
     name: control.name,
@@ -204,9 +211,9 @@ function printView(view: Record<string, unknown>): string {
   for (const [key, value] of entries) lines.push(`  ${key} = ${value}`)
   lines.push(`  resolver: ${String(view.resolver ?? 'none')}`)
   lines.push(`  controlled by: ${control.owner ?? 'nobody'}${control.wrapped ? ' (wrapped)' : ''}`)
-  const operator = view.operator as { address?: string; canSign?: boolean; via?: string; error?: string } | null
+  const operator = view.operator as { address?: string; canSign?: boolean; via?: string; error?: string; keyAvailable?: boolean } | null
   if (operator?.error) lines.push(`  operator key: ${operator.error}`)
-  else if (operator) lines.push(`  operator key ${operator.address}: ${operator.canSign ? `can sign (${operator.via})` : 'cannot sign for this name'}`)
+  else if (operator) lines.push(`  operator key ${operator.address}: ${operator.canSign ? `can sign (${operator.via})` : 'cannot sign for this name'}${operator.keyAvailable === false ? ' · key not in this shell' : ''}`)
   else lines.push('  operator key: not available in this shell')
   return `${lines.join('\n')}\n`
 }
