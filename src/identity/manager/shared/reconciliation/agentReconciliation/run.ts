@@ -9,6 +9,8 @@ import { isAgentInVault, resolveConfiguredVaultAddress, vaultBuildForCode, type 
 import type { EthagentConfig, EthagentIdentity } from '../../../../../storage/config.js'
 import { readVaultAddressField } from '../../../../identityCompat.js'
 import { readCustodyMode } from '../../../custody/state.js'
+import { hasPendingPublish } from '../../../continuity/state.js'
+import { ERC8004_ABI } from '../../../../registry/erc8004/abi.js'
 import { continuityWorkingTreeStatus, type ContinuityWorkingTreeStatus } from '../../../../continuity/storage.js'
 import { listPublishedContinuitySnapshots } from '../../../../continuity/snapshots.js'
 import type { AgentReconciliation } from './types.js'
@@ -150,7 +152,10 @@ function fallbackToken(): TokenProbe {
 
 type CustodyProbe = { kind: 'simple' | 'advanced' | 'withdrawn' | 'mid-flow-uri-pending' | 'unknown' }
 
-async function probeCustody(args: {
+// Mid-flow is the token sitting in the Vault while this machine has not yet saved the
+// switch to Advanced. A differing agent URI alone is not it: another machine saving
+// changes the URI too.
+export async function probeCustody(args: {
   client: PublicClient
   registry: Erc8004RegistryConfig
   agentId: bigint
@@ -167,23 +172,8 @@ async function probeCustody(args: {
       agentId: args.agentId,
     })
     if (!status.inVault) return { kind: 'withdrawn' }
-    const localUri = args.identity.agentUri ?? args.identity.backup?.agentUri
-    if (localUri) {
-      try {
-        const onChain = await args.client.readContract({
-          address: args.registry.identityRegistryAddress,
-          abi: ERC8004_AGENT_URI_ABI,
-          functionName: 'agentURI',
-          args: [args.agentId],
-        }) as string
-        if (onChain && onChain !== localUri) {
-          return { kind: 'mid-flow-uri-pending' }
-        }
-      } catch {
-      }
-    }
-    if (status.ownerAddress?.toLowerCase() === args.expectedOwner.toLowerCase()) {
-      return { kind: 'advanced' }
+    if (readCustodyMode(args.identity.state as Record<string, unknown> | undefined) !== 'advanced') {
+      return { kind: 'mid-flow-uri-pending' }
     }
     return { kind: 'advanced' }
   } catch {
@@ -193,17 +183,10 @@ async function probeCustody(args: {
 
 type AgentUriProbe = { kind: 'in-sync' | 'chain-newer' | 'local-newer' | 'unknown' }
 
-const ERC8004_AGENT_URI_ABI = [
-  {
-    type: 'function',
-    name: 'agentURI',
-    stateMutability: 'view',
-    inputs: [{ name: 'agentId', type: 'uint256' }],
-    outputs: [{ name: '', type: 'string' }],
-  },
-] as const
-
-async function probeAgentUri(args: {
+// The registry's tokenURI is the onchain pointer; agentURI is not part of its ABI and
+// reverts. A difference is this machine's when it has a pinned snapshot waiting to
+// publish, and the chain's (another machine saved since) otherwise.
+export async function probeAgentUri(args: {
   client: PublicClient
   registry: Erc8004RegistryConfig
   agentId: bigint
@@ -214,13 +197,13 @@ async function probeAgentUri(args: {
   try {
     const onChain = await args.client.readContract({
       address: args.registry.identityRegistryAddress,
-      abi: ERC8004_AGENT_URI_ABI,
-      functionName: 'agentURI',
+      abi: ERC8004_ABI,
+      functionName: 'tokenURI',
       args: [args.agentId],
     }) as string
     if (onChain === localUri) return { kind: 'in-sync' }
-    if (!onChain) return { kind: 'local-newer' }
-    return { kind: 'local-newer' }
+    if (!onChain || hasPendingPublish(args.identity)) return { kind: 'local-newer' }
+    return { kind: 'chain-newer' }
   } catch {
     return { kind: 'unknown' }
   }

@@ -66,9 +66,40 @@ export function isPidAlive(pid: number): boolean {
   }
 }
 
-export function daemonStatus(): { running: boolean; pid: number | null } {
+// The daemon touches its pid file every DAEMON_HEARTBEAT_MS. A pid file left quiet for
+// longer than DAEMON_STALE_MS belongs to a daemon that is gone, even when the operating
+// system has since handed its pid to some other process.
+export const DAEMON_HEARTBEAT_MS = 30_000
+export const DAEMON_STALE_MS = 120_000
+
+function heartbeatFresh(): boolean {
+  try {
+    return Date.now() - fs.statSync(daemonPidPath()).mtimeMs < DAEMON_STALE_MS
+  } catch {
+    return false
+  }
+}
+
+// The pid of a daemon that is alive and still beating, or null.
+function liveDaemonPid(): number | null {
   const pid = readDaemonPid()
-  return pid && isPidAlive(pid) ? { running: true, pid } : { running: false, pid: null }
+  return pid && isPidAlive(pid) && heartbeatFresh() ? pid : null
+}
+
+export function touchDaemonPid(): void {
+  if (readDaemonPid() !== process.pid) return
+  try {
+    const now = new Date()
+    fs.utimesSync(daemonPidPath(), now, now)
+  } catch {}
+}
+
+export function daemonStatus(): { running: boolean; pid: number | null } {
+  const pid = liveDaemonPid()
+  if (pid) return { running: true, pid }
+  // A leftover file would otherwise read as running the moment its pid is reused.
+  if (readDaemonPid() !== null) clearDaemonPid()
+  return { running: false, pid: null }
 }
 
 export function writeDaemonPid(): void {
@@ -129,9 +160,10 @@ export function ensureDaemon(): boolean {
 }
 
 export function stopDaemon(): boolean {
-  const pid = readDaemonPid()
+  // Only a pid that is still beating is ours to signal; a stale one may be anything now.
+  const pid = liveDaemonPid()
   let stopped = false
-  if (pid && isPidAlive(pid)) {
+  if (pid) {
     try {
       process.kill(pid, 'SIGTERM')
       stopped = true

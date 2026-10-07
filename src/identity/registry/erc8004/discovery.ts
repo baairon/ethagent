@@ -157,7 +157,6 @@ async function findCandidateTokenIds(args: {
   ownerAddress: Address
   fromBlock: bigint
 }): Promise<bigint[]> {
-  const tokenIds = new Set<bigint>()
   let balance: bigint
   try {
     balance = await args.publicClient.readContract({
@@ -175,8 +174,38 @@ async function findCandidateTokenIds(args: {
       cause: err,
     })
   }
-  if (balance === 0n) return []
+  const direct = balance === 0n ? [] : await findDirectTokenIds({ ...args, balance })
+  // A token deposited into a Vault is owned by the Vault, so balanceOf never counts it.
+  // The deposit is a transfer out of this wallet, which is what this scan looks for.
+  let vaulted: bigint[] = []
+  try {
+    vaulted = await findVaultHeldTokenIds(args)
+  } catch (err: unknown) {
+    // With agents already found, a failed Vault scan only means a Vault-held one may be
+    // missing; with none found, an empty list would claim the wallet holds nothing.
+    if (direct.length === 0) {
+      throw new AgentTokenIdRequiredError({
+        ownerAddress: args.ownerAddress,
+        registry: args.registry,
+        balance,
+        detail: cleanRpcError(err),
+        cause: err,
+      })
+    }
+  }
+  return [...new Set([...direct, ...vaulted])]
+}
 
+async function findDirectTokenIds(args: {
+  publicClient: PublicClient
+  injectedClient: boolean
+  registry: Erc8004RegistryConfig
+  ownerAddress: Address
+  fromBlock: bigint
+  balance: bigint
+}): Promise<bigint[]> {
+  const tokenIds = new Set<bigint>()
+  const balance = args.balance
   const enumerableTokenIds = await findEnumerableTokenIds({
     publicClient: args.publicClient,
     registry: args.registry,
@@ -186,13 +215,7 @@ async function findCandidateTokenIds(args: {
   if (enumerableTokenIds) return enumerableTokenIds
 
   try {
-    for await (const logs of getTransferLogChunksBackwards({
-      publicClient: args.publicClient,
-      injectedClient: args.injectedClient,
-      registry: args.registry,
-      ownerAddress: args.ownerAddress,
-      fromBlock: args.fromBlock,
-    })) {
+    for await (const logs of getTransferLogChunksBackwards({ ...args, direction: 'to' })) {
       for (const log of logs) {
         const tokenId = log.args.tokenId
         if (tokenId === undefined || tokenIds.has(tokenId)) continue
@@ -222,7 +245,50 @@ async function findCandidateTokenIds(args: {
   return [...tokenIds]
 }
 
-// Transfer logs into the owner, newest first, through scanLogs: each endpoint's
+// Tokens this wallet sent away that now sit in a Vault recording it as the owner.
+async function findVaultHeldTokenIds(args: {
+  publicClient: PublicClient
+  injectedClient: boolean
+  registry: Erc8004RegistryConfig
+  ownerAddress: Address
+  fromBlock: bigint
+}): Promise<bigint[]> {
+  const seen = new Set<bigint>()
+  const held: bigint[] = []
+  for await (const logs of getTransferLogChunksBackwards({ ...args, direction: 'from' })) {
+    for (const log of logs) {
+      const tokenId = log.args.tokenId
+      if (tokenId === undefined || seen.has(tokenId)) continue
+      seen.add(tokenId)
+      const vaultOwner = await readVaultLevelOwnerOf(args.publicClient, args.registry.identityRegistryAddress, tokenId, args.ownerAddress)
+      if (vaultOwner && vaultOwner.toLowerCase() === args.ownerAddress.toLowerCase()) held.push(tokenId)
+    }
+  }
+  return held
+}
+
+async function readVaultLevelOwnerOf(
+  publicClient: PublicClient,
+  registry: Address,
+  tokenId: bigint,
+  ownerAddress: Address,
+): Promise<Address | undefined> {
+  try {
+    const currentOwner = await publicClient.readContract({
+      address: registry,
+      abi: ERC8004_ABI,
+      functionName: 'ownerOf',
+      args: [tokenId],
+    }) as Address
+    // Still in this wallet: the direct lookup already counts it.
+    if (currentOwner.toLowerCase() === ownerAddress.toLowerCase()) return undefined
+    return await readVaultLevelOwner({ publicClient, identityRegistryAddress: registry, tokenId }, getAddress(currentOwner))
+  } catch {
+    return undefined
+  }
+}
+
+// Transfer logs into (or out of) the owner, newest first, through scanLogs: each endpoint's
 // learned block range instead of fixed windows, handing over when an endpoint cannot
 // reach back far enough. An injected client (tests, callers with their own transport)
 // answers for every endpoint.
@@ -232,6 +298,7 @@ async function* getTransferLogChunksBackwards(args: {
   registry: Erc8004RegistryConfig
   ownerAddress: Address
   fromBlock: bigint
+  direction: 'to' | 'from'
 }): AsyncGenerator<TransferLog[]> {
   const latest = await args.publicClient.getBlockNumber()
   if (args.fromBlock > latest) return
@@ -253,7 +320,7 @@ async function* getTransferLogChunksBackwards(args: {
     query: async (url, fromBlock, toBlock) => await clientFor(url).getLogs({
       address: args.registry.identityRegistryAddress,
       event: TRANSFER_EVENT,
-      args: { to: args.ownerAddress },
+      args: args.direction === 'to' ? { to: args.ownerAddress } : { from: args.ownerAddress },
       fromBlock,
       toBlock,
     }) as TransferLog[],

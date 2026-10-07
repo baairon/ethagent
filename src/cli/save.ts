@@ -11,10 +11,8 @@ import type { Step } from '../identity/manager/reducer.js'
 import { openExternalUrl } from '../utils/openExternal.js'
 import { pullHarnessSoulMemoryIntoVault } from './sync.js'
 import { discoverOwnedAgentBackupByTokenId } from '../identity/registry/erc8004/discovery.js'
-import { DEFAULT_IPFS_API_URL } from '../identity/storage/ipfs.js'
 import { resolveVaultAddress } from '../identity/manager/custody/transactions.js'
-import { hasPendingPublish } from '../identity/manager/continuity/state.js'
-import { getAddress } from 'viem'
+import { nothingToSave, saveJson, verifyPublished } from './saveVerify.js'
 
 export type RunSaveDeps = {
   loadConfig: typeof loadConfig
@@ -56,7 +54,7 @@ export async function runSave(args: string[] = [], deps: RunSaveDeps = defaultDe
   }
 
   const fail = (code: number, message: string): number => {
-    if (json) stdout.write(JSON.stringify({ ok: false, code, error: message }) + '\n')
+    if (json) stdout.write(saveJson({ ok: false, code, error: message }))
     else stderr.write(message + '\n')
     return code
   }
@@ -84,16 +82,8 @@ export async function runSave(args: string[] = [], deps: RunSaveDeps = defaultDe
 
   await deps.pullHarnessSoulMemoryIntoVault(identity).catch(() => [])
 
-  let publishState: string | undefined
-  try {
-    const [latest] = await deps.listPublishedContinuitySnapshots(identity, 1)
-    const tree = await deps.continuityWorkingTreeStatus(identity, latest)
-    publishState = tree.publishState
-  } catch {
-    publishState = undefined
-  }
-  if (publishState === 'published' && !hasPendingPublish(identity)) {
-    if (json) stdout.write(JSON.stringify({ ok: true, skipped: true, reason: 'no-local-changes' }) + '\n')
+  if (await nothingToSave(identity, deps)) {
+    if (json) stdout.write(saveJson({ ok: true, skipped: true, reason: 'no-local-changes' }))
     else stdout.write('No local changes since the last snapshot; nothing to save.\n')
     return 0
   }
@@ -158,21 +148,9 @@ export async function runSave(args: string[] = [], deps: RunSaveDeps = defaultDe
   const published = Boolean(ni.backup?.txHash || ni.backup?.metadataCid)
 
   if (published) {
-    let verification: 'verified' | 'mismatch' | 'unknown' = 'unknown'
-    try {
-      const candidate = await deps.discoverOwnedAgentBackupByTokenId({
-        ...registry,
-        ownerHandle: getAddress(ni.ownerAddress ?? ni.address),
-        tokenId: BigInt(identity.agentId),
-        ipfsApiUrl: ni.backup?.ipfsApiUrl ?? DEFAULT_IPFS_API_URL,
-      })
-      const onchainCid = candidate.backup?.cid ?? null
-      verification = onchainCid ? (onchainCid === cid ? 'verified' : 'mismatch') : 'unknown'
-    } catch {
-      verification = 'unknown'
-    }
+    const verification = await verifyPublished({ saved: ni, agentId: identity.agentId, registry, discover: deps.discoverOwnedAgentBackupByTokenId })
     if (json) {
-      stdout.write(JSON.stringify({ ok: true, published: true, verification, cid, txHash: ni.backup?.txHash ?? null, agentUri: ni.agentUri ?? null }) + '\n')
+      stdout.write(saveJson({ ok: true, published: true, verification, cid, txHash: ni.backup?.txHash ?? null, agentUri: ni.agentUri ?? null }))
     } else {
       stdout.write('Snapshot published onchain.\n')
       if (cid) stdout.write(`  CID:      ${cid}\n`)
@@ -186,7 +164,7 @@ export async function runSave(args: string[] = [], deps: RunSaveDeps = defaultDe
 
   const detail = completionMessage || 'Snapshot saved locally. The owner wallet still needs to publish to rotate the onchain pointer.'
   if (json) {
-    stdout.write(JSON.stringify({ ok: true, published: false, pending: 'owner-publish', cid, message: detail }) + '\n')
+    stdout.write(saveJson({ ok: true, published: false, pending: 'owner-publish', cid, message: detail }))
   } else {
     stdout.write(`${detail}\n`)
     if (cid) stdout.write(`  pinned CID: ${cid}\n`)

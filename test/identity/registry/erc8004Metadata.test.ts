@@ -580,15 +580,18 @@ test('discoverOwnedAgentBackups uses the curated start block when fromBlock is o
   assert.equal(scannedFromBlock, 41_663_783n)
 })
 
-test('discoverOwnedAgentBackups skips log scans when balance is zero', async () => {
+test('discoverOwnedAgentBackups with balance zero only scans for tokens sent into a Vault', async () => {
   const candidates = await discoverOwnedAgentBackups({
     chainId: 8453,
     rpcUrl: 'https://mainnet.base.org',
     identityRegistryAddress: DEFAULT_ERC8004_IDENTITY_REGISTRY_ADDRESS,
     ownerHandle: '0x000000000000000000000000000000000000dEaD',
     publicClient: {
-      getLogs: async () => {
-        throw new Error('logs should not be scanned for an empty wallet')
+      getBlockNumber: async () => 41_663_783n,
+      getLogs: async (args: { args?: Record<string, unknown> }) => {
+        assert.equal(args.args?.from, '0x000000000000000000000000000000000000dEaD')
+        assert.equal(args.args?.to, undefined)
+        return []
       },
       readContract: async (call: { functionName: string }) => {
         if (call.functionName === 'balanceOf') return 0n
@@ -598,6 +601,61 @@ test('discoverOwnedAgentBackups skips log scans when balance is zero', async () 
   })
 
   assert.deepEqual(candidates, [])
+})
+
+test('discoverOwnedAgentBackups lists an agent its owner deposited into a Vault', async () => {
+  const owner = '0x000000000000000000000000000000000000dEaD'
+  const vault = '0x6bdC0000000000000000000000000000000051d7'
+  const stranger = '0x000000000000000000000000000000000000bEEF'
+  const candidates = await discoverOwnedAgentBackups({
+    chainId: 8453,
+    rpcUrl: 'https://base.publicnode.com',
+    identityRegistryAddress: DEFAULT_ERC8004_IDENTITY_REGISTRY_ADDRESS,
+    ownerHandle: owner,
+    publicClient: {
+      getBlockNumber: async () => 41_663_783n,
+      getLogs: async (args: { args?: Record<string, unknown> }) => {
+        assert.equal(args.args?.from, owner)
+        // 45744 went into the Vault; 12 was sold to a stranger and is not this wallet's.
+        return [{ args: { tokenId: 45_744n } }, { args: { tokenId: 12n } }]
+      },
+      readContract: async (call: { address: string; functionName: string; args: unknown[] }) => {
+        if (call.functionName === 'balanceOf') return 0n
+        if (call.functionName === 'ownerOf') return call.args[0] === 45_744n ? vault : stranger
+        if (call.functionName === 'agentOwner') {
+          if (call.address.toLowerCase() === vault.toLowerCase()) return owner
+          throw new Error('not a Vault')
+        }
+        if (call.functionName === 'tokenURI') return agentDataUri('bafy-vaulted', 'vaulted agent')
+        throw new Error(`unexpected read: ${call.functionName}`)
+      },
+    } as any,
+  })
+
+  assert.deepEqual(candidates.map(candidate => candidate.agentId), [45_744n])
+  assert.equal(candidates[0]?.ownerAddress, owner)
+  assert.equal(candidates[0]?.backup?.cid, 'bafy-vaulted')
+})
+
+test('discoverOwnedAgentBackups says it could not check rather than listing nothing', async () => {
+  await assert.rejects(() => discoverOwnedAgentBackups({
+    chainId: 8453,
+    rpcUrl: 'https://mainnet.base.org',
+    identityRegistryAddress: DEFAULT_ERC8004_IDENTITY_REGISTRY_ADDRESS,
+    ownerHandle: '0x000000000000000000000000000000000000dEaD',
+    publicClient: {
+      getBlockNumber: async () => 41_663_783n,
+      getLogs: async () => { throw new Error('block range too large') },
+      readContract: async (call: { functionName: string }) => {
+        if (call.functionName === 'balanceOf') return 0n
+        throw new Error(`unexpected read: ${call.functionName}`)
+      },
+    } as any,
+  }), (err: unknown) => {
+    assert.ok(err instanceof AgentTokenIdRequiredError)
+    assert.match(String(err.detail), /ETHAGENT_RPC_URL/)
+    return true
+  })
 })
 
 test('discoverOwnedAgentBackups verifies ownership before loading agent metadata', async () => {
@@ -659,8 +717,10 @@ test('discoverOwnedAgentBackups uses enumerable owner indexes before log scans',
     identityRegistryAddress: DEFAULT_ERC8004_IDENTITY_REGISTRY_ADDRESS,
     ownerHandle: owner,
     publicClient: {
-      getLogs: async () => {
-        throw new Error('logs should not be scanned when enumerable lookup works')
+      getBlockNumber: async () => 41_663_783n,
+      getLogs: async (args: { args?: Record<string, unknown> }) => {
+        assert.equal(args.args?.to, undefined, 'the owner\'s own tokens come from the enumerable index, not logs')
+        return []
       },
       readContract: async (call: { functionName: string; args: unknown[] }) => {
         if (call.functionName === 'balanceOf') return 1n

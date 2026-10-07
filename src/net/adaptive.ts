@@ -1,7 +1,5 @@
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
-import { mkdir } from 'node:fs/promises'
+import { mkdirSync, readdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { atomicWriteText } from '../storage/atomicWrite.js'
 import { getConfigDir } from '../storage/config.js'
 
 export type FetchLike = (input: string | URL, init?: RequestInit) => Promise<Response>
@@ -40,11 +38,28 @@ function statsFile(): string | null {
   return path.join(getConfigDir(), 'hosts.json')
 }
 
+const STALE_TEMP_MS = 60_000
+
+// Temp files a killed process never renamed into place. Ones under a minute old may
+// belong to a process still writing, so they are left alone.
+function sweepStaleTemps(file: string): void {
+  try {
+    const dir = path.dirname(file)
+    const prefix = `${path.basename(file)}.`
+    for (const name of readdirSync(dir)) {
+      if (!name.startsWith(prefix) || !name.endsWith('.tmp')) continue
+      const temp = path.join(dir, name)
+      if (Date.now() - statSync(temp).mtimeMs > STALE_TEMP_MS) unlinkSync(temp)
+    }
+  } catch {}
+}
+
 function load(): void {
   if (loaded) return
   loaded = true
   const file = statsFile()
   if (!file) return
+  sweepStaleTemps(file)
   try {
     const raw = JSON.parse(readFileSync(file, 'utf8')) as Record<string, Partial<HostStats>>
     for (const [host, value] of Object.entries(raw)) {
@@ -69,20 +84,28 @@ function statsText(): string {
   return `${JSON.stringify(Object.fromEntries(measured), null, 2)}\n`
 }
 
-// A one-shot command ends before a deferred write gets its turn, so whatever is still
-// unsaved goes out synchronously as the process exits.
-function saveOnExit(): void {
-  if (changesSaved === changes) return
+// Every write is synchronous: the file is small, and a write that is never interrupted
+// can't be cut off by process.exit halfway, leaving its temp file behind.
+function writeStats(): void {
   const file = statsFile()
   if (!file) return
+  const upTo = changes
   try {
     mkdirSync(path.dirname(file), { recursive: true })
     const temp = `${file}.${process.pid}.tmp`
     writeFileSync(temp, statsText(), { mode: 0o600 })
     renameSync(temp, file)
+    changesSaved = Math.max(changesSaved, upTo)
   } catch {
     // The cache is an optimization; losing one update costs nothing.
   }
+}
+
+// A one-shot command ends before a deferred write gets its turn, so whatever is still
+// unsaved goes out as the process exits.
+function saveOnExit(): void {
+  if (changesSaved === changes) return
+  writeStats()
 }
 
 function persist(): void {
@@ -97,10 +120,7 @@ function persist(): void {
   writeQueued = true
   setImmediate(() => {
     writeQueued = false
-    const upTo = changes
-    void mkdir(path.dirname(file), { recursive: true })
-      .then(() => atomicWriteText(file, statsText()))
-      .then(() => { changesSaved = Math.max(changesSaved, upTo) }, () => {})
+    writeStats()
   }).unref?.()
 }
 

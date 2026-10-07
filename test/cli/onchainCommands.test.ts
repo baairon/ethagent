@@ -359,7 +359,7 @@ test('ens --delete previews clearing the records, removing the subname from its 
   assert.match(String(out.note), /can create it again/)
 })
 
-test('ens --delete refuses when the signer does not manage the parent, and never takes the operator key', async () => {
+test('ens --delete refuses when the signer does not manage the parent', async () => {
   const id = identity({ ensName: 'meow.femboi.eth' })
   const other = getAddress('0x00000000000000000000000000000000000beef1')
   const d = deps(id)
@@ -369,7 +369,7 @@ test('ens --delete refuses when the signer does not manage the parent, and never
   })), 1)
   assert.match(String(d.io.json().hint), /--unlink/)
   const op = operatorDeps(id)
-  assert.equal(await runEnsCommand(['--delete', '--operator', '--json'], op, ensSeams({})), 2)
+  assert.equal(await runEnsCommand(['--delete', '--operator', '--json'], op, ensSeams({})), 1, 'an operator key that manages no parent is refused')
   const top = deps(identity({ ensName: 'femboi.eth' }))
   assert.equal(await runEnsCommand(['--delete', '--json'], top, ensSeams({ 'femboi.eth': { owner: OWNER } })), 1)
   assert.match(String(top.io.json().error), /not a subdomain/)
@@ -384,4 +384,33 @@ test('ens --delete resumes: a subname already removed leaves only the save', asy
   const out = d.io.json() as Record<string, any>
   assert.deepEqual(out.transactions, [])
   assert.equal(out.publish.ensName, '')
+})
+
+test('ens --delete --operator works when the operator key manages the parent, and the browser path points there', async () => {
+  const id = identity({ ensName: 'agent.example.eth', activeOperatorAddress: OPERATOR })
+  const names = {
+    'example.eth': { owner: OPERATOR },
+    'agent.example.eth': { owner: OPERATOR, resolver: RESOLVER, addr: OWNER, text: { [ENSIP25_BASE]: '1' } },
+  }
+  const op = operatorDeps(id)
+  assert.equal(await runEnsCommand(['--delete', '--operator', '--json'], op, ensSeams(names)), 0, op.io.stdout())
+  const out = op.io.json() as Record<string, any>
+  assert.deepEqual(out.signer, { kind: 'operator', address: OPERATOR })
+  assert.deepEqual(out.transactions.map((tx: any) => tx.step), ['clear-records', 'delete-subdomain'])
+  assert.equal(out.publish.signer, 'owner wallet', 'the unlinked save still needs the owner')
+  const browser = deps(id)
+  assert.equal(await runEnsCommand(['--delete', '--json'], browser, ensSeams(names)), 1)
+  assert.match(String(browser.io.json().hint), /ens --delete --operator/)
+})
+
+test('ens without a key in the shell still says whether the active operator could sign', async () => {
+  const id = identity({ ensName: 'agent.example.eth', activeOperatorAddress: OPERATOR })
+  const d = deps(id)
+  assert.equal(await runEnsCommand(['--json'], d, ensSeams({
+    'agent.example.eth': { owner: OPERATOR, resolver: RESOLVER, addr: OWNER },
+  })), 0)
+  assert.deepEqual(d.io.json().operator, { address: OPERATOR, canSign: true, via: 'owner', keyAvailable: false })
+  const none = deps(identity({ ensName: 'agent.example.eth', activeOperatorAddress: '' }))
+  assert.equal(await runEnsCommand(['--json'], none, ensSeams({ 'agent.example.eth': { owner: OWNER, resolver: RESOLVER } })), 0)
+  assert.equal(none.io.json().operator, null)
 })
