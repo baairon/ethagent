@@ -5,7 +5,7 @@ import { getAddress, type Address, type Hex } from 'viem'
 import { runRestoreCommand, type RestoreSeams } from '../../src/cli/onchain/restore.js'
 import type { HistoryDeps } from '../../src/cli/history/shared.js'
 import type { EthagentConfig, EthagentIdentity } from '../../src/storage/config.js'
-import type { Erc8004AgentCandidate } from '../../src/identity/registry/erc8004.js'
+import { AgentTokenIdRequiredError, type Erc8004AgentCandidate } from '../../src/identity/registry/erc8004.js'
 import { createContinuitySnapshotChallenge, createContinuitySnapshotEnvelope } from '../../src/identity/continuity/envelope.js'
 import { addressFromPrivateKey, generatePrivateKey, signMessage } from '../../src/identity/crypto/eth.js'
 import { runRestoreAuthorize } from '../../src/identity/manager/restore/apply.js'
@@ -183,4 +183,25 @@ test('restore with an identity previews a refetch and warns about local changes'
     assert.equal(out.action, 'refetch')
     assert.match(out.warnings.join('\n'), /local changes/)
   })
+})
+
+test('restore --owner reports why it could not list agents instead of an empty list', async () => {
+  const owner = getAddress('0xA1E9000000000000000000000000000000000001')
+  const d = deps(null)
+  const failing: RestoreSeams = {
+    ...seams(candidateFor(owner), envelopeFor(generatePrivateKey() as Hex)),
+    discoverOwner: async () => {
+      throw new AgentTokenIdRequiredError({
+        ownerAddress: owner,
+        registry: { chainId: 8453, rpcUrl: 'https://mainnet.base.org', identityRegistryAddress: REGISTRY },
+        balance: 0n,
+        detail: 'mainnet.base.org refused even a one-block query',
+      })
+    },
+  }
+  assert.equal(await runRestoreCommand(['--owner', owner, '--network', 'base', '--json'], d, failing), 1)
+  const out = d.io.json()
+  assert.match(String(out.error), /refused even a one-block query/)
+  assert.match(String(out.hint), /ETHAGENT_RPC_URL/)
+  assert.match(String(out.hint), /--network base/)
 })

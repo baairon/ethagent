@@ -3,6 +3,7 @@ import type { EthagentConfig, EthagentIdentity } from '../../storage/config.js'
 import { saveConfig } from '../../storage/config.js'
 import { DEFAULT_IPFS_API_URL } from '../../identity/storage/ipfs.js'
 import {
+  AgentTokenIdRequiredError,
   chainIdForNetwork,
   discoverOwnedAgentBackupByTokenId,
   discoverOwnedAgentBackups,
@@ -204,7 +205,18 @@ export async function runRestoreCommand(args: string[], deps: HistoryDeps, seams
       if (target) throw new HistoryError(2, 'choose either a target or --owner', `usage: ${RESTORE_USAGE}`)
       const owner = values.owner.trim()
       if (!isAddress(owner) && !/^([a-z0-9-]+\.)+eth$/i.test(owner)) throw new HistoryError(2, '--owner expects an address or a .eth name')
-      const candidates = await seams.discoverOwner(owner, network ? registryForNetwork(network) : undefined)
+      let candidates: Erc8004AgentCandidate[]
+      try {
+        candidates = await seams.discoverOwner(owner, network ? registryForNetwork(network) : undefined)
+      } catch (err: unknown) {
+        if (!(err instanceof AgentTokenIdRequiredError)) throw err
+        // Never an empty list: the scan did not finish, so say why and how to get past it.
+        throw new HistoryError(
+          1,
+          `${err.message}${err.detail ? ` ${err.detail}` : ''}`,
+          `Point ETHAGENT_RPC_URL at a ${network ?? '<network>'} RPC that serves full log history and pass --network, or restore directly with \`ethagent restore <token-id> --network ${network ?? '<network>'}\`.`,
+        )
+      }
       const rows = candidates.map(candidateJson)
       if (json) {
         await emitJson(deps.io, { owner, agents: rows })
