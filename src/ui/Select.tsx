@@ -4,6 +4,7 @@ import { theme, gradientColor } from './theme.js'
 import { useContentWidth } from './layout.js'
 import { truncateEnd, wrapWords } from './text.js'
 import { useAppInput } from '../app/input/AppInputProvider.js'
+import { navigateList } from '../app/keybindings/listNavigation.js'
 
 const SELECT_CHROME_ROWS = 17
 const MIN_VISIBLE = 4
@@ -102,24 +103,21 @@ export function Select<T>({
   const hasBelow = windowEnd < options.length
   const hintColumn = hintLayout === 'inline' ? inlineHintColumn(options, contentWidth) : 0
 
-  const moveBy = (delta: number) => {
-    if (options.length === 0) return
-    let next = index
-    for (let i = 0; i < options.length; i += 1) {
-      next = (next + delta + options.length) % options.length
-      const candidate = options[next]
-      if (isSelectableOption(candidate)) {
-        setIndex(next)
-        onHighlight?.(candidate.value)
-        return
-      }
-    }
-  }
-
   useAppInput((input, key) => {
-    if (key.upArrow || input === 'k') moveBy(-1)
-    else if (key.downArrow || input === 'j') moveBy(1)
-    else if (key.return) {
+    const next = navigateList(input, key, {
+      index,
+      count: options.length,
+      // One row short of the window, so a page jump keeps a row of context.
+      page: visibleCount - 1,
+      selectable: at => isSelectableOption(options[at]),
+    })
+    if (next !== null) {
+      const option = options[next]
+      if (next !== index && option) {
+        setIndex(next)
+        onHighlight?.(option.value)
+      }
+    } else if (key.return) {
       const selected = options[index]
       if (isSelectableOption(selected)) onSubmit(selected.value)
     } else if (key.escape || (key.ctrl && input === 'c')) {

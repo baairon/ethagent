@@ -4,6 +4,7 @@ import { theme, gradientColor } from '../../../../ui/theme.js'
 import { useContentWidth } from '../../../../ui/layout.js'
 import { firstThatFits, wrapWords } from '../../../../ui/text.js'
 import { useAppInput } from '../../../../app/input/AppInputProvider.js'
+import { navigateList } from '../../../../app/keybindings/listNavigation.js'
 
 export type LazyMenuItem<T> = {
   kind?: 'item'
@@ -59,19 +60,17 @@ export function LazyMenu<T>({ rows, width, onSubmit, onCancel }: Props<T>) {
     })
   }, [sig, rows])
 
-  const moveBy = (delta: number) => {
-    if (rows.length === 0) return
-    let next = index
-    for (let i = 0; i < rows.length; i += 1) {
-      next = (next + delta + rows.length) % rows.length
-      const candidate = rows[next]
-      if (candidate && isItem(candidate) && !candidate.disabled) { setIndex(next); return }
-    }
-  }
-
   useAppInput((input, key) => {
-    if (key.upArrow || input === 'k') moveBy(-1)
-    else if (key.downArrow || input === 'j') moveBy(1)
+    const next = navigateList(input, key, {
+      index,
+      count: rows.length,
+      page: rows.length,
+      selectable: at => {
+        const row = rows[at]
+        return row !== undefined && isItem(row) && !row.disabled
+      },
+    })
+    if (next !== null) setIndex(next)
     else if (key.return) {
       const r = rows[index]
       if (r && isItem(r) && !r.disabled) onSubmit(r.value)

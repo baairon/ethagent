@@ -1,14 +1,14 @@
 import type { Key } from 'ink'
 import type { Action, Binding, KeybindingContextName } from './types.js'
 
-export function resolveKey(
+export function resolveKey<A extends Action>(
   input: string,
   key: Key,
   activeContexts: KeybindingContextName[],
-  bindings: Binding[],
-): Action | null {
+  bindings: Binding<A>[],
+): A | null {
   const ctxSet = new Set(activeContexts)
-  let match: Binding | undefined
+  let match: Binding<A> | undefined
   for (const binding of bindings) {
     if (!ctxSet.has(binding.context)) continue
     if (matchesChord(input, key, binding.chord)) {
@@ -37,6 +37,8 @@ function keyNameOf(input: string, key: Key): string | null {
   if (key.delete) return 'delete'
   if (key.pageUp) return 'pageup'
   if (key.pageDown) return 'pagedown'
+  if (key.home) return 'home'
+  if (key.end) return 'end'
   if (!input) return null
   return input.length === 1 ? input.toLowerCase() : input
 }
