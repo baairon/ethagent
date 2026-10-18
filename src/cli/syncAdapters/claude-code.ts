@@ -2,8 +2,7 @@ import fs from 'node:fs/promises'
 import { readdirSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { MANIFEST_FILE, mirrorAsSkillFolders, pathExists, readManifest, type PublicSkill } from './shared.js'
-import { isValidSegment } from '../../identity/continuity/skills/skillPaths.js'
+import { mirrorAsSkillFolders, pathExists, removeMirroredSkills, type PublicSkill } from './shared.js'
 import { injectManagedBlock, readManagedContext, renderManagedBlock, writeManagedSyncState } from './managedBlock.js'
 import type { ManagedRead, SyncContext } from './index.js'
 
@@ -189,14 +188,7 @@ export const claudeCodeAdapter = {
     return [claudeMdPath(), ...(await projectMemoryMirrorsUnder(claudeDir()))]
   },
   async cleanup(): Promise<void> {
-    const skillsDir = claudeSkillsDir()
-    const manifest = await readManifest(skillsDir)
-    await Promise.all(
-      manifest.skills
-        .filter(name => isValidSegment(name))
-        .map(name => fs.rm(path.join(skillsDir, name), { recursive: true, force: true }).catch(() => {}))
-    )
-    await fs.rm(path.join(skillsDir, MANIFEST_FILE), { force: true }).catch(() => {})
+    await removeMirroredSkills(claudeSkillsDir())
   },
   async mirror(skills: PublicSkill[], context?: SyncContext): Promise<{ count: number; skipped: number }> {
     const result = await mirrorAsSkillFolders(claudeSkillsDir(), skills)

@@ -3,7 +3,14 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
-import { mirrorAsSkillFolders, readManifest, type PublicSkill } from '../../../src/cli/syncAdapters/shared.js'
+import {
+  MANIFEST_FILE,
+  MIRROR_MARKER,
+  mirrorAsSkillFolders,
+  readManifest,
+  removeMirroredSkills,
+  type PublicSkill,
+} from '../../../src/cli/syncAdapters/shared.js'
 import { parseSkillFile } from '../../../src/identity/continuity/skills/frontmatter.js'
 
 async function makeVaultSkill(
@@ -201,6 +208,150 @@ test('mirrorAsSkillFolders removes managed skills that are no longer present ups
     await assert.rejects(fs.access(path.join(harness, 'drop')))
     const manifest = await readManifest(harness)
     assert.deepEqual(manifest.skills, ['keep'])
+  } finally {
+    await fs.rm(tmp, { recursive: true, force: true }).catch(() => null)
+  }
+})
+
+test('mirrorAsSkillFolders marks each mirrored folder and restores a missing marker', async () => {
+  const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'ethagent-mirror-'))
+  try {
+    const vault = path.join(tmp, 'vault')
+    const harness = path.join(tmp, 'harness')
+    await fs.mkdir(vault, { recursive: true })
+    const skill = await makeVaultSkill(vault, 'demo')
+
+    await mirrorAsSkillFolders(harness, [skill])
+    await fs.access(path.join(harness, 'demo', MIRROR_MARKER))
+
+    await fs.rm(path.join(harness, 'demo', MIRROR_MARKER))
+    await mirrorAsSkillFolders(harness, [skill])
+    await fs.access(path.join(harness, 'demo', MIRROR_MARKER))
+  } finally {
+    await fs.rm(tmp, { recursive: true, force: true }).catch(() => null)
+  }
+})
+
+test('a corrupt manifest does not disown mirrored folders', async () => {
+  const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'ethagent-mirror-'))
+  try {
+    const vault = path.join(tmp, 'vault')
+    const harness = path.join(tmp, 'harness')
+    await fs.mkdir(vault, { recursive: true })
+    const skill = await makeVaultSkill(vault, 'demo')
+
+    await mirrorAsSkillFolders(harness, [skill])
+    await fs.writeFile(path.join(harness, MANIFEST_FILE), '{"version":1,"skills":[')
+    await fs.writeFile(skill.absolutePath, '---\nname: demo\ndescription: demo desc\nvisibility: private\n---\n\nnew body\n')
+
+    const result = await mirrorAsSkillFolders(harness, [skill])
+    assert.equal(result.count, 1)
+    assert.equal(result.skipped, 0)
+    assert.match(await fs.readFile(path.join(harness, 'demo', 'SKILL.md'), 'utf8'), /new body/)
+    assert.deepEqual((await readManifest(harness)).skills, ['demo'])
+  } finally {
+    await fs.rm(tmp, { recursive: true, force: true }).catch(() => null)
+  }
+})
+
+test('a deleted manifest does not disown mirrored folders', async () => {
+  const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'ethagent-mirror-'))
+  try {
+    const vault = path.join(tmp, 'vault')
+    const harness = path.join(tmp, 'harness')
+    await fs.mkdir(vault, { recursive: true })
+    const skill = await makeVaultSkill(vault, 'demo')
+
+    await mirrorAsSkillFolders(harness, [skill])
+    await fs.rm(path.join(harness, MANIFEST_FILE))
+    await fs.writeFile(skill.absolutePath, '---\nname: demo\ndescription: demo desc\nvisibility: private\n---\n\nnew body\n')
+
+    const result = await mirrorAsSkillFolders(harness, [skill])
+    assert.equal(result.count, 1)
+    assert.equal(result.skipped, 0)
+    assert.match(await fs.readFile(path.join(harness, 'demo', 'SKILL.md'), 'utf8'), /new body/)
+    assert.deepEqual((await readManifest(harness)).skills, ['demo'])
+  } finally {
+    await fs.rm(tmp, { recursive: true, force: true }).catch(() => null)
+  }
+})
+
+test('a corrupt manifest with no mirror markers leaves every folder as it was', async () => {
+  const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'ethagent-mirror-'))
+  try {
+    const vault = path.join(tmp, 'vault')
+    const harness = path.join(tmp, 'harness')
+    await fs.mkdir(vault, { recursive: true })
+    const skill = await makeVaultSkill(vault, 'demo')
+    await fs.mkdir(path.join(harness, 'demo'), { recursive: true })
+    await fs.writeFile(path.join(harness, 'demo', 'SKILL.md'), 'older copy\n')
+    await fs.writeFile(path.join(harness, MANIFEST_FILE), 'not json')
+
+    const result = await mirrorAsSkillFolders(harness, [skill])
+    assert.deepEqual(result, { count: 0, skipped: 0 })
+    assert.equal(await fs.readFile(path.join(harness, 'demo', 'SKILL.md'), 'utf8'), 'older copy\n')
+    assert.equal(await fs.readFile(path.join(harness, MANIFEST_FILE), 'utf8'), 'not json')
+  } finally {
+    await fs.rm(tmp, { recursive: true, force: true }).catch(() => null)
+  }
+})
+
+test('a skill dropped upstream is removed through its marker when the manifest is gone', async () => {
+  const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'ethagent-mirror-'))
+  try {
+    const vault = path.join(tmp, 'vault')
+    const harness = path.join(tmp, 'harness')
+    await fs.mkdir(vault, { recursive: true })
+    const keep = await makeVaultSkill(vault, 'keep')
+    const drop = await makeVaultSkill(vault, 'drop')
+
+    await mirrorAsSkillFolders(harness, [keep, drop])
+    await fs.rm(path.join(harness, MANIFEST_FILE))
+
+    await mirrorAsSkillFolders(harness, [keep])
+    await fs.access(path.join(harness, 'keep', 'SKILL.md'))
+    await assert.rejects(fs.access(path.join(harness, 'drop')))
+    assert.deepEqual((await readManifest(harness)).skills, ['keep'])
+  } finally {
+    await fs.rm(tmp, { recursive: true, force: true }).catch(() => null)
+  }
+})
+
+test('mirrorAsSkillFolders leaves no staging or trash folders behind after a refresh', async () => {
+  const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'ethagent-mirror-'))
+  try {
+    const vault = path.join(tmp, 'vault')
+    const harness = path.join(tmp, 'harness')
+    await fs.mkdir(vault, { recursive: true })
+    const skill = await makeVaultSkill(vault, 'demo', { withFiles: true })
+
+    await mirrorAsSkillFolders(harness, [skill])
+    await fs.writeFile(path.join(vault, 'demo', 'scripts', 'install.mjs'), 'export const x = 2\n')
+    await mirrorAsSkillFolders(harness, [skill])
+
+    assert.equal(await fs.readFile(path.join(harness, 'demo', 'scripts', 'install.mjs'), 'utf8'), 'export const x = 2\n')
+    const leftovers = (await fs.readdir(harness)).filter(name => name.startsWith('.') && name !== '.gitignore' && name !== MANIFEST_FILE)
+    assert.deepEqual(leftovers, [])
+  } finally {
+    await fs.rm(tmp, { recursive: true, force: true }).catch(() => null)
+  }
+})
+
+test('removeMirroredSkills removes owned folders and the manifest but keeps unmanaged ones', async () => {
+  const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'ethagent-mirror-'))
+  try {
+    const vault = path.join(tmp, 'vault')
+    const harness = path.join(tmp, 'harness')
+    await fs.mkdir(vault, { recursive: true })
+    const skill = await makeVaultSkill(vault, 'demo')
+    await mirrorAsSkillFolders(harness, [skill])
+    await fs.mkdir(path.join(harness, 'manual'), { recursive: true })
+    await fs.writeFile(path.join(harness, 'manual', 'SKILL.md'), 'hand written\n')
+
+    await removeMirroredSkills(harness)
+    await assert.rejects(fs.access(path.join(harness, 'demo')))
+    await assert.rejects(fs.access(path.join(harness, MANIFEST_FILE)))
+    assert.equal(await fs.readFile(path.join(harness, 'manual', 'SKILL.md'), 'utf8'), 'hand written\n')
   } finally {
     await fs.rm(tmp, { recursive: true, force: true }).catch(() => null)
   }

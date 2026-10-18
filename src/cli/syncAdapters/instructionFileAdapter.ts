@@ -2,8 +2,7 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { parseSkillFile } from '../../identity/continuity/skills/frontmatter.js'
-import { MANIFEST_FILE, mirrorAsSkillFolders, readManifest, type PublicSkill } from './shared.js'
-import { isValidSegment } from '../../identity/continuity/skills/skillPaths.js'
+import { mirrorAsSkillFolders, removeMirroredSkills, type PublicSkill } from './shared.js'
 import { injectManagedBlock, neutralizeManagedMarkers, readManagedContext, renderManagedBlock, writeManagedSyncState } from './managedBlock.js'
 import { preserveHarnessSkillEdits, writeLastExtraHash } from './skillEdits.js'
 import { buildPortableInstruction } from '../harnessGuidance.js'
@@ -72,14 +71,7 @@ export async function mirrorInstructionFile(
 }
 
 export async function cleanupInstructionFileSkills(target: string): Promise<void> {
-  const skillsDir = skillsDirFor(target)
-  const manifest = await readManifest(skillsDir)
-  await Promise.all(
-    manifest.skills
-      .filter(name => isValidSegment(name))
-      .map(name => fs.rm(path.join(skillsDir, name), { recursive: true, force: true }).catch(() => {})),
-  )
-  await fs.rm(path.join(skillsDir, MANIFEST_FILE), { force: true }).catch(() => {})
+  await removeMirroredSkills(skillsDirFor(target))
 }
 
 export type InstructionFileAdapterOptions = {
