@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="preview/image.svg" alt="ethagent first run panel" width="100%">
+  <img src="https://git.bairon.dev/baairon/ethagent/raw/branch/master/preview/image.svg" alt="ethagent first run panel" width="100%">
 </p>
 
 Everything your agent learns about you stays behind in the tool, machine, or platform where it learned it.
@@ -27,7 +27,7 @@ A guided menu does the rest: name it and write who it is. When you're done, your
 Prefer no menu? `ethagent create --name <text> --network <network>` does the same headlessly, previewing first and minting with `--yes`. Every menu action has a command like this; see [Setting up and moving an agent](#setting-up-and-moving-an-agent).
 
 <p align="center">
-  <img src="preview/menu.svg" alt="ethagent main menu for a linked agent" width="100%">
+  <img src="https://git.bairon.dev/baairon/ethagent/raw/branch/master/preview/menu.svg" alt="ethagent main menu for a linked agent" width="100%">
 </p>
 
 **2. Use it anywhere.** That's the whole setup. ethagent wires itself into the AI tools you use, on any machine or OS, and your agent follows you and keeps learning. After this you rarely open the menu again: only to edit something by hand, change custody, or restore on a new machine, and each of those has a headless command too. [Underneath](#underneath) shows what runs in the meantime.
@@ -35,7 +35,7 @@ Prefer no menu? `ethagent create --name <text> --network <network>` does the sam
 If a tool wasn't picked up, `npx ethagent --status` lists the ones ethagent keeps in sync. Open the missing tool and paste this to its agent:
 
 ```text
-I use ethagent to carry my agent's soul, memory, and skills across my tools: https://github.com/baairon/ethagent (read the README first if you want to check it). Connect this tool by running `npx ethagent --add` with the full path of the instructions file you load at the start of every session. It adds one marked ethagent block to that file and a `skills` folder beside it, keeps both in sync, and leaves the rest of the file alone.
+I use ethagent to carry my agent's soul, memory, and skills across my tools: https://git.bairon.dev/baairon/ethagent (read the README first if you want to check it). Connect this tool by running `npx ethagent --add` with the full path of the instructions file you load at the start of every session. It adds one marked ethagent block to that file and a `skills` folder beside it, keeps both in sync, and leaves the rest of the file alone.
 ```
 
 An agent should be careful with a command that edits its own instructions, so the prompt says what it does and where to verify it.

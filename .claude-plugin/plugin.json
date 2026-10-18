@@ -1,10 +1,10 @@
 {
   "name": "ethagent",
-  "version": "6.0.0",
+  "version": "6.1.0",
   "description": "Portable Ethereum identity for your agent. Its soul, memory, and skills live onchain via ERC-8004 + IPFS and snap back into any session.",
   "author": { "name": "bairon.dev" },
-  "homepage": "https://github.com/baairon/ethagent",
-  "repository": "https://github.com/baairon/ethagent",
+  "homepage": "https://git.bairon.dev/baairon/ethagent",
+  "repository": "https://git.bairon.dev/baairon/ethagent",
   "license": "MIT",
   "keywords": ["ethereum", "identity", "ens", "erc-8004"],
   "hooks": {

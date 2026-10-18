@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ forgejo.ref }}
+  cancel-in-progress: ${{ forgejo.event_name == 'pull_request' }}
+
+jobs:
+  test:
+    name: Typecheck and test (Node ${{ matrix.node }})
+    runs-on: docker
+    container:
+      image: "docker.io/library/node:${{ matrix.node }}-bookworm"
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [20, 22]
+
+    steps:
+      - uses: https://data.forgejo.org/actions/checkout@v6
+
+      - run: npm ci
+
+      - run: npm run typecheck
+
+      - run: npm test
+
+  contracts:
+    name: Contracts (forge)
+    runs-on: docker
+    container:
+      image: "docker.io/library/node:22-bookworm"
+    env:
+      # foundryup links forge and anvil into $FOUNDRY_DIR/bin, which is already on PATH.
+      FOUNDRY_DIR: /usr/local
+
+    steps:
+      - uses: https://data.forgejo.org/actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - run: curl -fsSL https://foundry.paradigm.xyz | bash && foundryup
+
+      - run: forge build --sizes
+        working-directory: contracts
+
+      - run: forge test -vv
+        working-directory: contracts
+
+  chain:
+    name: Chain suite (anvil)
+    runs-on: docker
+    container:
+      image: "docker.io/library/node:22-bookworm"
+    env:
+      FOUNDRY_DIR: /usr/local
+
+    steps:
+      - uses: https://data.forgejo.org/actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - run: curl -fsSL https://foundry.paradigm.xyz | bash && foundryup --install v1.5.1
+
+      - run: npm ci
+
+      - run: npm run test:chain

@@ -47,7 +47,7 @@ type AgentCard = {
 
 const ETHAGENT_PRODUCER = {
   name: 'ethagent',
-  url: 'https://github.com/baairon/ethagent',
+  url: 'https://git.bairon.dev/baairon/ethagent',
 } as const
 
 export function defaultPublicSkillsProfile(identity: EthagentIdentity): PublicSkillsProfile {
