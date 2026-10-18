@@ -84,7 +84,7 @@ async function markedFolders(root: string): Promise<string[]> {
   const marked: string[] = []
   for (const ent of entries) {
     if (!ent.isDirectory() || ent.name.startsWith('.') || !isValidSegment(ent.name)) continue
-    if (await pathExists(path.join(root, ent.name, MIRROR_MARKER))) marked.push(ent.name)
+    if (await hasMirrorMarker(path.join(root, ent.name), ent.name)) marked.push(ent.name)
   }
   return marked
 }
@@ -123,8 +123,22 @@ async function readOwnership(root: string): Promise<Ownership | null> {
   return { names, sigs: read.manifest.sigs ?? {}, manifestUnreadable: false }
 }
 
-async function writeMirrorMarker(dir: string): Promise<void> {
-  await fs.writeFile(path.join(dir, MIRROR_MARKER), 'Mirrored by ethagent from the vault. Edit the skill in the vault; changes here are overwritten.\n')
+function mirrorMarkerText(name: string): string {
+  return `Mirrored by ethagent from the vault as "${name}". Edit the skill in the vault; changes here are overwritten.\n`
+}
+
+// A marker claims only the folder it names, so a mirrored folder copied under another name,
+// marker and all, stays the user's instead of being removed as a stale mirror.
+async function hasMirrorMarker(dir: string, name: string): Promise<boolean> {
+  try {
+    return await fs.readFile(path.join(dir, MIRROR_MARKER), 'utf8') === mirrorMarkerText(name)
+  } catch {
+    return false
+  }
+}
+
+export async function writeMirrorMarker(dir: string, name: string): Promise<void> {
+  await fs.writeFile(path.join(dir, MIRROR_MARKER), mirrorMarkerText(name))
 }
 
 async function moveToTrash(root: string, name: string): Promise<string | null> {
@@ -279,8 +293,8 @@ export async function mirrorAsSkillFolders(
       continue
     }
     if (exists && isOurs && ownership.sigs[skill.name] === sig) {
-      if (!(await pathExists(path.join(targetDir, MIRROR_MARKER)))) {
-        try { await writeMirrorMarker(targetDir) } catch (err) {
+      if (!(await hasMirrorMarker(targetDir, skill.name))) {
+        try { await writeMirrorMarker(targetDir, skill.name) } catch (err) {
           issues.push({ kind: 'mirror', root, skill: skill.name, detail: `could not restore marker: ${(err as Error).message}` })
         }
       }
@@ -292,7 +306,7 @@ export async function mirrorAsSkillFolders(
     try {
       await fs.rm(tmpDir, { recursive: true, force: true })
       await copyVettedSkillTree(srcDir, tmpDir)
-      await writeMirrorMarker(tmpDir)
+      await writeMirrorMarker(tmpDir, skill.name)
       await replaceSkillFolder(root, skill.name, tmpDir)
       owned.push(skill.name)
       sigs[skill.name] = sig

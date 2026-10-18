@@ -3,6 +3,7 @@ import path from 'node:path'
 import type { EthagentIdentity } from '../storage/config.js'
 import { getConfigDir } from '../storage/config.js'
 import { atomicWriteText } from '../storage/atomicWrite.js'
+import { continuityVaultId } from '../identity/continuity/storage/paths.js'
 
 export type SyncIssue = {
   kind: 'detect' | 'reconcile' | 'skills' | 'adapter' | 'skipped' | 'mirror' | 'manifest' | 'remove' | 'source'
@@ -24,8 +25,10 @@ export function syncHealthPath(): string {
   return path.join(getConfigDir(), 'sync-health.json')
 }
 
+// Keyed like the vault, not by identity.address: restore records the Vault contract there
+// while owner saves record the wallet, and either way it is the same agent on this machine.
 function identityKey(identity: EthagentIdentity): string {
-  return [identity.chainId ?? '', identity.identityRegistryAddress?.toLowerCase() ?? '', identity.agentId ?? '', identity.address.toLowerCase()].join(':')
+  return continuityVaultId(identity)
 }
 
 export async function readSyncHealth(identity: EthagentIdentity): Promise<SyncHealth | null> {
@@ -61,6 +64,12 @@ export async function writeSyncHealth(
   await fs.mkdir(getConfigDir(), { recursive: true })
   await atomicWriteText(syncHealthPath(), `${JSON.stringify(next, null, 2)}\n`, { mode: 0o600 })
   return next
+}
+
+// A folder the user owns under a skill's name is theirs to resolve, so it is recorded
+// without failing the sync; failing here would keep bootstrap and the hooks retrying forever.
+export function syncState(issues: readonly SyncIssue[]): 'ok' | 'failed' {
+  return issues.some(issue => issue.kind !== 'skipped') ? 'failed' : 'ok'
 }
 
 export function formatSyncIssue(issue: SyncIssue): string {

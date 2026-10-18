@@ -97,6 +97,16 @@ export async function injectManagedBlock(filePath: string, block: string): Promi
   await writeHarnessFile(filePath, next)
 }
 
+export async function hasManagedBlock(filePath: string): Promise<boolean> {
+  let existing: string
+  try { existing = await fs.readFile(filePath, 'utf8') } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return false
+    throw err
+  }
+  const startIdx = existing.indexOf(START)
+  return startIdx !== -1 && existing.indexOf(END) > startIdx
+}
+
 export async function removeManagedBlock(filePath: string): Promise<boolean> {
   let existing: string
   try { existing = await fs.readFile(filePath, 'utf8') } catch (err) {

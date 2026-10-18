@@ -11,7 +11,7 @@ export const BOOTSTRAP_VERSION = 2
 
 export type BootstrapSeams = {
   loadConfig: typeof loadConfig
-  detectTargets: () => Promise<SyncAdapter[]>
+  detectTargets: (onError: (adapter: SyncAdapter, error: Error) => void) => Promise<SyncAdapter[]>
   sync: () => Promise<number>
   daemonDisabled: () => boolean
   ensureDaemon: () => boolean
@@ -21,7 +21,7 @@ export type BootstrapSeams = {
 
 const defaultSeams: BootstrapSeams = {
   loadConfig,
-  detectTargets: () => detectSyncTargets(undefined, true),
+  detectTargets: onError => detectSyncTargets(undefined, onError),
   sync: () => runSync({ quiet: true }),
   daemonDisabled,
   ensureDaemon,
@@ -55,13 +55,11 @@ export async function runBootstrap(opts: { quiet?: boolean; seams?: BootstrapSea
     return 0
   }
 
-  let targets: SyncAdapter[]
-  try { targets = await seams.detectTargets() } catch (err) {
-    process.stderr.write(`ethagent: bootstrap could not detect harnesses: ${(err as Error).message}\n`)
-    return 1
-  }
   const actions: string[] = []
   const failures: string[] = []
+  const targets = await seams.detectTargets((adapter, err) => {
+    failures.push(`${adapter.name}: detection failed (${err.message})`)
+  })
   for (const adapter of targets) {
     if (!adapter.bootstrap) continue
     try {
@@ -129,7 +127,7 @@ export async function ensureBootstrapped(): Promise<void> {
     const config = await loadConfig()
     if (!config?.identity) return
     if (isStateFresh()) {
-      if (!daemonDisabled()) ensureDaemon()
+      ensureDaemon()
     } else if (!attemptedBootstrap) {
       attemptedBootstrap = true
       await runBootstrap({ quiet: true })

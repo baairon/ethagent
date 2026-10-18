@@ -3,7 +3,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { parseSkillFile } from '../../identity/continuity/skills/frontmatter.js'
 import { mirrorAsSkillFolders, removeMirroredSkills, type MirrorResult, type PublicSkill } from './shared.js'
-import { injectManagedBlock, neutralizeManagedMarkers, readManagedContext, renderManagedBlock, writeManagedSyncState } from './managedBlock.js'
+import { hasManagedBlock, injectManagedBlock, neutralizeManagedMarkers, readManagedContext, renderManagedBlock, writeManagedSyncState } from './managedBlock.js'
 import { preserveHarnessSkillEdits, writeLastExtraHash } from './skillEdits.js'
 import { buildPortableInstruction } from '../harnessGuidance.js'
 import type { ManagedRead, SyncContext, SyncAdapter } from './index.js'
@@ -17,9 +17,12 @@ type EnrichedSkill = PublicSkill & { body: string }
 async function enrichSkills(skills: PublicSkill[]): Promise<EnrichedSkill[]> {
   const out: EnrichedSkill[] = []
   for (const skill of skills) {
-    const raw = await fs.readFile(skill.absolutePath, 'utf8')
-    const { body } = parseSkillFile(raw)
-    out.push({ ...skill, body })
+    // The folder mirror reports an unreadable skill; leaving it out here keeps soul and memory flowing.
+    try {
+      const raw = await fs.readFile(skill.absolutePath, 'utf8')
+      const { body } = parseSkillFile(raw)
+      out.push({ ...skill, body })
+    } catch {}
   }
   return out
 }
@@ -68,6 +71,16 @@ export async function mirrorInstructionFile(
   return folder
 }
 
+// Bootstrap only seeds a file that has no block yet. Every sync rewrites the block in full,
+// so reseeding one would strip soul, memory, and skills until the next sync.
+export async function seedInstructionFile(target: string, harness: string): Promise<boolean> {
+  if (await hasManagedBlock(target)) return false
+  const block = renderManagedBlock(undefined, buildPortableInstruction({ harness, skillsLocation: skillsDirFor(target) }))
+  await injectManagedBlock(target, block)
+  await writeLastExtraHash(target, block)
+  return true
+}
+
 export async function cleanupInstructionFileSkills(target: string): Promise<void> {
   await removeMirroredSkills(skillsDirFor(target))
 }
@@ -104,9 +117,7 @@ export function makeInstructionFileAdapter(opts: InstructionFileAdapterOptions):
     async bootstrap(): Promise<string[]> {
       const target = file()
       await fs.mkdir(opts.ensureDir ? opts.ensureDir() : path.dirname(target), { recursive: true })
-      const block = renderManagedBlock(undefined, buildPortableInstruction({ harness: opts.name, skillsLocation: skillsDirFor(target) }))
-      await injectManagedBlock(target, block)
-      return [`${opts.name}: wrote bootstrap instructions to ${target}`]
+      return await seedInstructionFile(target, opts.name) ? [`${opts.name}: wrote bootstrap instructions to ${target}`] : []
     },
     async cleanup(): Promise<void> {
       await cleanupInstructionFileSkills(file())

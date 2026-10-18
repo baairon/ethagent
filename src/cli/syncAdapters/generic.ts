@@ -3,9 +3,8 @@ import os from 'node:os'
 import path from 'node:path'
 import { getConfigDir } from '../../storage/config.js'
 import { type MirrorIssue, type MirrorResult, type PublicSkill } from './shared.js'
-import { injectManagedBlock, readManagedContext, renderManagedBlock } from './managedBlock.js'
-import { cleanupInstructionFileSkills, mirrorInstructionFile, skillsDirFor } from './instructionFileAdapter.js'
-import { buildPortableInstruction } from '../harnessGuidance.js'
+import { readManagedContext } from './managedBlock.js'
+import { cleanupInstructionFileSkills, mirrorInstructionFile, seedInstructionFile, skillsDirFor } from './instructionFileAdapter.js'
 import type { ManagedRead, SyncContext, SyncAdapter } from './index.js'
 
 const HARNESSES_FILE = 'harnesses.json'
@@ -115,9 +114,7 @@ export const genericAdapter: SyncAdapter = {
     const actions: string[] = []
     for (const target of await readGenericTargets()) {
       await fs.mkdir(path.dirname(target), { recursive: true })
-      const block = renderManagedBlock(undefined, buildPortableInstruction({ harness: 'generic', skillsLocation: skillsDirFor(target) }))
-      await injectManagedBlock(target, block)
-      actions.push(`generic: wrote bootstrap instructions to ${target}`)
+      if (await seedInstructionFile(target, 'generic')) actions.push(`generic: wrote bootstrap instructions to ${target}`)
     }
     return actions
   },

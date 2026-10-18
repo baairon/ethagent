@@ -17,6 +17,7 @@ import { runRestoreCommand, defaultSeams as restoreSeams } from '../../src/cli/o
 import { runCheckCommand } from '../../src/cli/onchain/check.js'
 import { runTransferCommand, defaultSeams as transferSeams } from '../../src/cli/onchain/transfer.js'
 import { runOperatorSave, defaultOperatorSaveDeps } from '../../src/cli/operatorSave.js'
+import { runSync } from '../../src/cli/sync.js'
 
 // One agent's whole life on the local chains, in order. Every step sends real
 // transactions through the code the commands run, signed by the test wallet or the
@@ -164,7 +165,12 @@ test('save --operator publishes through the Vault with no wallet, then skips whe
   assert.equal(JSON.parse(again.out.trim()).skipped, true)
 })
 
-test('check finds nothing to fix and reads the real onchain pointer', async () => {
+test('check asks for a first mirror check, then finds nothing to fix and reads the real onchain pointer', async () => {
+  const unchecked = chainDeps()
+  assert.equal(await runCheckCommand(['--json'], unchecked), 4)
+  assert.deepEqual((unchecked.io.json().attention as Array<{ code: string }>).map(item => item.code), ['sync-unchecked'])
+  // No harness is wired in the sandbox, so this records a mirror check without writing one.
+  assert.equal(await runSync({ quiet: true, adapters: [] }), 0)
   const deps = chainDeps()
   ok(await runCheckCommand(['--json'], deps), deps)
   const out = deps.io.json() as Record<string, any>

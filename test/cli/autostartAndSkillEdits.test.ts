@@ -115,6 +115,37 @@ test('a failed skill-edit backup leaves the edited harness text untouched', asyn
   })
 })
 
+test('bootstrap seeds an instruction file once and leaves a mirrored block alone', async () => {
+  await withHome(async home => {
+    const file = path.join(home, '.tool', 'INSTRUCTIONS.md')
+    const adapter = makeInstructionFileAdapter({ name: 'tool', description: 'test harness', filePath: () => file, detect: async () => true })
+    assert.equal((await adapter.bootstrap?.())?.length, 1)
+    await adapter.mirror([], { soul: '# SOUL.md\n\nsoul text\n', memory: '# MEMORY.md\n\nmemory text\n' })
+    const mirrored = await fs.readFile(file, 'utf8')
+
+    assert.deepEqual(await adapter.bootstrap?.(), [])
+    assert.equal(await fs.readFile(file, 'utf8'), mirrored)
+    assert.equal(await countFiles(path.join(home, '.ethagent', 'skill-edits')), 0)
+  })
+})
+
+test('an unreadable skill is reported without holding back soul and memory in the instruction file', async () => {
+  await withHome(async home => {
+    const file = path.join(home, '.tool', 'INSTRUCTIONS.md')
+    const missing: SkillIndexEntry = {
+      name: 'gone', description: 'A skill whose file is missing', visibility: 'public',
+      relativePath: 'gone/SKILL.md', absolutePath: path.join(home, 'gone', 'SKILL.md'),
+    }
+    const adapter = makeInstructionFileAdapter({ name: 'tool', description: 'test harness', filePath: () => file, detect: async () => true })
+    const result = await adapter.mirror([missing], { soul: '# SOUL.md\n\nsoul text\n', memory: '# MEMORY.md\n\nmemory text\n' })
+    assert.deepEqual(result.issues.map(issue => [issue.kind, issue.skill]), [['source', 'gone']])
+    const text = await fs.readFile(file, 'utf8')
+    assert.match(text, /soul text/)
+    assert.match(text, /memory text/)
+    assert.doesNotMatch(text, /A skill whose file is missing/)
+  })
+})
+
 test('a failed sync-state write is reported by the instruction-file adapter', async () => {
   await withHome(async home => {
     const file = path.join(home, '.tool', 'INSTRUCTIONS.md')

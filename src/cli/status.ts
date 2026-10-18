@@ -41,7 +41,7 @@ export async function runStatus(version: string): Promise<number> {
   if (config?.identity) {
     process.stdout.write(`vault: ${continuityVaultRef(config.identity).dir}\n`)
     const detectionErrors: string[] = []
-    const targets = await detectSyncTargets(undefined, false, (adapter, err) => {
+    const targets = await detectSyncTargets(undefined, (adapter, err) => {
       detectionErrors.push(`${adapter.name}: ${err.message}`)
     })
     process.stdout.write(`wired into: ${targets.length ? targets.map(t => t.name).join(', ') : 'none detected yet'}\n`)

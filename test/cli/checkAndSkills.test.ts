@@ -126,6 +126,16 @@ test('check reports incomplete or unchecked local mirroring as attention', async
   assert.match(issue?.message ?? '', /C:\/skills\/demo/)
   assert.equal(issue?.fix, 'ethagent sync')
 
+  failed.syncHealth = async () => ({
+    version: 1, identityKey: 'test', state: 'ok', attemptedAt: '2026-03-01T00:00:00.000Z',
+    lastSuccessAt: '2026-03-01T00:00:00.000Z',
+    issues: [{ kind: 'skipped', location: 'C:/skills', skill: 'demo', detail: 'an unmanaged folder has this name; move or delete it' }],
+  })
+  const skipped = deps(identity())
+  assert.equal(await runCheckCommand(['--json'], skipped, failed), 4)
+  const collision = (skipped.io.json().attention as Array<{ code: string; message: string }>).find(item => item.code === 'sync-skipped')
+  assert.match(collision?.message ?? '', /C:\/skills\/demo/)
+
   failed.syncHealth = async () => null
   const unchecked = deps(identity())
   assert.equal(await runCheckCommand(['--json'], unchecked, failed), 4)

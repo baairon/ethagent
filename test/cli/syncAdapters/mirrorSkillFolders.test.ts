@@ -10,6 +10,7 @@ import {
   readManifest,
   removeMirroredSkills,
   skippedSkillFolders,
+  writeMirrorMarker,
   type PublicSkill,
 } from '../../../src/cli/syncAdapters/shared.js'
 import { parseSkillFile } from '../../../src/identity/continuity/skills/frontmatter.js'
@@ -45,7 +46,7 @@ test('skippedSkillFolders reports only same-named folders without ownership or a
   const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'ethagent-skipped-'))
   try {
     for (const name of ['unmanaged', 'owned', 'marked']) await fs.mkdir(path.join(tmp, name))
-    await fs.writeFile(path.join(tmp, 'marked', MIRROR_MARKER), '')
+    await writeMirrorMarker(path.join(tmp, 'marked'), 'marked')
     await fs.writeFile(path.join(tmp, MANIFEST_FILE), JSON.stringify({ version: 1, managedAt: new Date().toISOString(), skills: ['owned'] }))
     assert.deepEqual(await skippedSkillFolders(tmp, ['unmanaged', 'owned', 'marked', 'absent']), ['unmanaged'])
   } finally {
@@ -256,6 +257,45 @@ test('mirrorAsSkillFolders marks each mirrored folder and restores a missing mar
     await fs.rm(path.join(harness, 'demo', MIRROR_MARKER))
     await mirrorAsSkillFolders(harness, [skill])
     await fs.access(path.join(harness, 'demo', MIRROR_MARKER))
+  } finally {
+    await fs.rm(tmp, { recursive: true, force: true }).catch(() => null)
+  }
+})
+
+test('a mirrored folder copied under another name stays the user\'s', async () => {
+  const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'ethagent-mirror-'))
+  try {
+    const vault = path.join(tmp, 'vault')
+    const harness = path.join(tmp, 'harness')
+    await fs.mkdir(vault, { recursive: true })
+    const skill = await makeVaultSkill(vault, 'demo')
+
+    await mirrorAsSkillFolders(harness, [skill])
+    await fs.cp(path.join(harness, 'demo'), path.join(harness, 'demo-mine'), { recursive: true })
+    await fs.writeFile(path.join(harness, 'demo-mine', 'SKILL.md'), 'my own version\n')
+
+    await mirrorAsSkillFolders(harness, [skill])
+    assert.equal(await fs.readFile(path.join(harness, 'demo-mine', 'SKILL.md'), 'utf8'), 'my own version\n')
+    assert.deepEqual((await readManifest(harness)).skills, ['demo'])
+    assert.deepEqual(await skippedSkillFolders(harness, ['demo-mine']), ['demo-mine'])
+  } finally {
+    await fs.rm(tmp, { recursive: true, force: true }).catch(() => null)
+  }
+})
+
+test('a marker from before markers named their folder is rewritten while the manifest owns it', async () => {
+  const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'ethagent-mirror-'))
+  try {
+    const vault = path.join(tmp, 'vault')
+    const harness = path.join(tmp, 'harness')
+    await fs.mkdir(vault, { recursive: true })
+    const skill = await makeVaultSkill(vault, 'demo')
+
+    await mirrorAsSkillFolders(harness, [skill])
+    const marker = path.join(harness, 'demo', MIRROR_MARKER)
+    await fs.writeFile(marker, 'Mirrored by ethagent from the vault. Edit the skill in the vault; changes here are overwritten.\n')
+    await mirrorAsSkillFolders(harness, [skill])
+    assert.match(await fs.readFile(marker, 'utf8'), /as "demo"/)
   } finally {
     await fs.rm(tmp, { recursive: true, force: true }).catch(() => null)
   }

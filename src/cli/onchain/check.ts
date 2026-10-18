@@ -8,7 +8,7 @@ import { listPublishedContinuitySnapshots } from '../../identity/continuity/snap
 import { continuityWorkingTreeStatus } from '../../identity/continuity/storage/status.js'
 import { emitJson, failFrom, HistoryError, parseHistoryArgs, requireIdentity, type HistoryDeps } from '../history/shared.js'
 import { networkOfChain } from './shared.js'
-import { readSyncHealth, type SyncHealth } from '../syncHealth.js'
+import { formatSyncIssue, readSyncHealth, type SyncHealth } from '../syncHealth.js'
 
 export const CHECK_USAGE = 'ethagent check [--json]'
 
@@ -143,7 +143,12 @@ export async function runCheckCommand(args: string[], deps: HistoryDeps, seams: 
     if (!syncHealth) {
       attention.push({ code: 'sync-unchecked', message: 'This machine has not completed a mirror check.', fix: 'ethagent sync' })
     } else if (syncHealth.state === 'failed') {
-      attention.push({ code: 'sync-incomplete', message: `The last mirror attempt was incomplete: ${syncHealth.issues.map(issue => issue.skill ? `${issue.location}/${issue.skill}: ${issue.detail}` : `${issue.location}: ${issue.detail}`).join('; ')}.`, fix: 'ethagent sync' })
+      attention.push({ code: 'sync-incomplete', message: `The last mirror attempt was incomplete: ${syncHealth.issues.map(formatSyncIssue).join('; ')}.`, fix: 'ethagent sync' })
+    } else {
+      const skipped = syncHealth.issues.filter(issue => issue.kind === 'skipped')
+      if (skipped.length > 0) {
+        attention.push({ code: 'sync-skipped', message: `Some skills were not mirrored because a folder ethagent does not own has their name: ${skipped.map(issue => issue.skill ? `${issue.location}/${issue.skill}` : issue.location).join(', ')}.`, fix: 'Move or delete those folders, then run ethagent sync.' })
+      }
     }
     const chain = {
       reachable: recon.rpc === 'reachable',

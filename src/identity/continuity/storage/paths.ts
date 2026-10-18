@@ -13,7 +13,7 @@ export function continuityVaultRef(identity: Pick<EthagentIdentity, 'chainId' | 
   }
 }
 
-function continuityVaultId(identity: Pick<EthagentIdentity, 'chainId' | 'identityRegistryAddress' | 'agentId' | 'address'>): string {
+export function continuityVaultId(identity: Pick<EthagentIdentity, 'chainId' | 'identityRegistryAddress' | 'agentId' | 'address'>): string {
   const chain = identity.chainId?.toString() ?? 'unknown-chain'
   const registry = sanitizePathPart(identity.identityRegistryAddress ?? 'unknown-registry')
   const token = sanitizePathPart(identity.agentId ?? identity.address)
