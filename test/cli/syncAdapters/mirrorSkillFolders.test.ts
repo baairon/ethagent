@@ -9,6 +9,7 @@ import {
   mirrorAsSkillFolders,
   readManifest,
   removeMirroredSkills,
+  skippedSkillFolders,
   type PublicSkill,
 } from '../../../src/cli/syncAdapters/shared.js'
 import { parseSkillFile } from '../../../src/identity/continuity/skills/frontmatter.js'
@@ -39,6 +40,18 @@ async function makeVaultSkill(
     absolutePath: skillFile,
   }
 }
+
+test('skippedSkillFolders reports only same-named folders without ownership or a marker', async () => {
+  const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'ethagent-skipped-'))
+  try {
+    for (const name of ['unmanaged', 'owned', 'marked']) await fs.mkdir(path.join(tmp, name))
+    await fs.writeFile(path.join(tmp, 'marked', MIRROR_MARKER), '')
+    await fs.writeFile(path.join(tmp, MANIFEST_FILE), JSON.stringify({ version: 1, managedAt: new Date().toISOString(), skills: ['owned'] }))
+    assert.deepEqual(await skippedSkillFolders(tmp, ['unmanaged', 'owned', 'marked', 'absent']), ['unmanaged'])
+  } finally {
+    await fs.rm(tmp, { recursive: true, force: true })
+  }
+})
 
 test('mirrorAsSkillFolders copies the whole skill folder (scripts + assets), not just SKILL.md', async () => {
   const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'ethagent-mirror-'))

@@ -91,6 +91,9 @@ export function makeInstructionFileAdapter(opts: InstructionFileAdapterOptions):
     async detect(): Promise<boolean> {
       return opts.detect()
     },
+    async skillsDirs(): Promise<string[]> {
+      return [skillsDirFor(file())]
+    },
     async readManaged(): Promise<ManagedRead | null> {
       return readManagedContext(file())
     },

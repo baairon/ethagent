@@ -3,6 +3,7 @@ import path from 'node:path'
 import { createHash } from 'node:crypto'
 import { ensureTrailingNewline } from '../../identity/continuity/storage/files.js'
 import { normalizeSnapshotContent } from '../../identity/continuity/storage/status.js'
+import { atomicWriteText } from '../../storage/atomicWrite.js'
 import type { ManagedRead, SyncContext } from './index.js'
 
 const SYNC_STATE_FILE = '.ethagent-sync.json'
@@ -14,6 +15,25 @@ const SOUL_START = '<!-- ethagent:soul:start -->'
 const SOUL_END = '<!-- ethagent:soul:end -->'
 const MEMORY_START = '<!-- ethagent:memory:start -->'
 const MEMORY_END = '<!-- ethagent:memory:end -->'
+const LOCKED_FILE_CODES = new Set(['EPERM', 'EBUSY', 'EACCES'])
+
+async function writeHarnessFile(file: string, text: string): Promise<void> {
+  const target = await fs.realpath(file).catch((err: NodeJS.ErrnoException) => {
+    if (err.code === 'ENOENT') return file
+    throw err
+  })
+  const stat = await fs.stat(target).catch((err: NodeJS.ErrnoException) => {
+    if (err.code === 'ENOENT') return null
+    throw err
+  })
+  const mode = stat ? stat.mode & 0o777 : 0o644
+  try {
+    await atomicWriteText(target, text, { mode })
+  } catch (err) {
+    if (!LOCKED_FILE_CODES.has((err as NodeJS.ErrnoException).code ?? '')) throw err
+    await fs.writeFile(target, text, 'utf8')
+  }
+}
 
 function stripFirstHeader(value: string): string {
   return value.replace(/^#[^\n]*\n/, '')
@@ -72,7 +92,7 @@ export async function injectManagedBlock(filePath: string, block: string): Promi
   }
 
   if (next === existing) return
-  await fs.writeFile(filePath, next, 'utf8')
+  await writeHarnessFile(filePath, next)
 }
 
 export async function removeManagedBlock(filePath: string): Promise<boolean> {
@@ -90,7 +110,7 @@ export async function removeManagedBlock(filePath: string): Promise<boolean> {
   if (remainder.trim() === '') {
     await fs.rm(filePath, { force: true })
   } else {
-    await fs.writeFile(filePath, `${remainder}\n`, 'utf8')
+    await writeHarnessFile(filePath, `${remainder}\n`)
   }
   await fs.rm(syncStatePath(filePath), { force: true })
   return true
@@ -166,7 +186,7 @@ export async function writeManagedSyncState(managedFilePath: string, context: Sy
     memoryHash: hashManagedBody(stripFirstHeader(context.memory)),
   }
   try {
-    await fs.writeFile(syncStatePath(managedFilePath), `${JSON.stringify(state)}\n`, 'utf8')
+    await atomicWriteText(syncStatePath(managedFilePath), `${JSON.stringify(state)}\n`, { mode: 0o644 })
   } catch {
   }
 }

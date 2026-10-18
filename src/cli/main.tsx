@@ -21,9 +21,8 @@ import { runVaultDir } from './vaultDir.js'
 import { runResetCommand } from './reset.js'
 import { runSave } from './save.js'
 import { ensureBootstrapped } from './bootstrap.js'
-import { ensureDaemon } from './daemon.js'
 import { runWatch } from './watch.js'
-import { runAddTool, runPause, runResume } from './prefs.js'
+import { runAddTool, runEnsureDaemon, runPause, runResume } from './prefs.js'
 import { HISTORY_COMMANDS } from './history/commands.js'
 import { ONCHAIN_COMMANDS } from './onchain/commands.js'
 
@@ -223,7 +222,7 @@ async function main(): Promise<number> {
   if (flags.has('--pretool-guard')) return runPreToolGuard()
   if (flags.has('--memory-guard')) return runMemoryGuard()
   if (flags.has('--skill-guard')) return runSkillGuard()
-  if (flags.has('--ensure-daemon')) { ensureDaemon(); return 0 }
+  if (flags.has('--ensure-daemon')) return runEnsureDaemon()
 
   if (argv[0] === 'watch') return runWatch(argv.slice(1))
 

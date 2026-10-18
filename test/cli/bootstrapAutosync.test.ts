@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
+import os from 'node:os'
 import path from 'node:path'
 import { spawn } from 'node:child_process'
 import { once } from 'node:events'
@@ -12,6 +13,7 @@ import {
   claimDaemonPid,
   clearDaemonPid,
   daemonDisabled,
+  daemonSpawnSpec,
   daemonStatus,
   ensureDaemon,
   isPaused,
@@ -32,6 +34,19 @@ import { withHome } from '../support/home.js'
 
 const context = { soul: '# SOUL.md\n\nsoul body\n', memory: '# MEMORY.md\n\nmemory body\n' }
 const watcherCommand: CommandLineReader = () => 'node --import tsx/esm /opt/ethagent/src/cli/main.tsx watch --daemon'
+
+test('daemonSpawnSpec launches a detached, windowless watcher directly through tsx', () => {
+  const spec = daemonSpawnSpec()
+  assert.equal(spec.command, process.execPath)
+  assert.equal(spec.options.detached, true)
+  assert.equal(spec.options.windowsHide, true)
+  assert.equal(spec.options.cwd, os.homedir())
+  assert.deepEqual(spec.args.slice(-2), ['watch', '--daemon'])
+  assert.equal(spec.args[0], '--import')
+  assert.match(spec.args[1] ?? '', /tsx/)
+  assert.match(spec.args[2] ?? '', /[\\/]src[\\/]cli[\\/]main\.tsx$/)
+  assert.ok(!spec.args.some(arg => /bin[\\/]ethagent\.js/.test(arg)))
+})
 const otherCommand: CommandLineReader = () => 'node /srv/app/server.js'
 
 test('injectManagedBlock is idempotent: an identical second write does not touch the file', async () => {
@@ -343,6 +358,7 @@ test('isWatcherCommandLine recognizes a watcher of any version on every platform
   for (const line of [
     'node --import file:///home/a/.npm/_npx/1f/node_modules/tsx/dist/esm/index.mjs /home/a/.npm/_npx/1f/node_modules/ethagent/src/cli/main.tsx watch --daemon',
     'node --import file:///C:/Users/a/dev/ethagent/node_modules/tsx/dist/esm/index.mjs C:\\Users\\a\\dev\\ethagent\\src\\cli\\main.tsx watch --daemon',
+    '"C:\\Program Files\\nodejs\\node.exe" --import file:///C:/Users/a/dev/ethagent/node_modules/tsx/dist/esm/index.mjs "C:\\Users\\a\\dev\\ethagent\\src\\cli\\main.tsx" watch --daemon',
     '"C:\\Program Files\\nodejs\\node.exe" --import file:///C:/x/tsx/dist/esm/index.mjs "C:\\Users\\a b\\ethagent\\src\\cli\\main.tsx" watch --daemon',
     'node --import tsx/esm /opt/ethagent/src/cli/main.tsx watch',
   ]) {
@@ -401,4 +417,3 @@ async function withEnv(key: string, value: string, fn: () => Promise<void>): Pro
     else process.env[key] = prev
   }
 }
-

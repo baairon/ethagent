@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { loadConfig } from '../storage/config.js'
 import { continuityVaultRef } from '../identity/continuity/storage/paths.js'
 import { runSync } from './sync.js'
@@ -30,6 +31,36 @@ function logDaemon(message: string): void {
   try {
     fs.appendFileSync(daemonLogPath(), `${new Date().toISOString()} ${message}\n`)
   } catch {}
+}
+
+function timestampDaemonOutput(): void {
+  for (const stream of [process.stdout, process.stderr]) {
+    const original = stream.write.bind(stream)
+    let pending = ''
+    stream.write = ((chunk: string | Uint8Array, encoding?: BufferEncoding | (() => void), callback?: () => void) => {
+      const text = typeof chunk === 'string' ? chunk : Buffer.from(chunk).toString('utf8')
+      pending += text
+      let newline = pending.indexOf('\n')
+      while (newline !== -1) {
+        original(`${new Date().toISOString()} ${pending.slice(0, newline + 1)}`)
+        pending = pending.slice(newline + 1)
+        newline = pending.indexOf('\n')
+      }
+      const done = typeof encoding === 'function' ? encoding : callback
+      done?.()
+      return true
+    }) as typeof stream.write
+    process.on('exit', () => { if (pending) original(`${new Date().toISOString()} ${pending}\n`) })
+  }
+}
+
+function packageVersion(): string {
+  try {
+    const file = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'package.json')
+    return (JSON.parse(fs.readFileSync(file, 'utf8')) as { version?: string }).version ?? '0.0.0'
+  } catch {
+    return '0.0.0'
+  }
 }
 
 export function keyPath(p: string): string {
@@ -98,6 +129,7 @@ export async function runWatch(argv: string[]): Promise<number> {
   }
 
   const isDaemon = argv.includes('--daemon')
+  if (isDaemon) timestampDaemonOutput()
 
   if (daemonDisabled()) {
     if (!isDaemon) process.stdout.write('ethagent: background sync is paused or disabled\n')
@@ -114,6 +146,7 @@ export async function runWatch(argv: string[]): Promise<number> {
     if (!isDaemon) process.stdout.write('ethagent: watcher already running\n')
     return 0
   }
+  if (isDaemon) logDaemon(`started pid ${process.pid} (ethagent v${packageVersion()})`)
 
   const heartbeat = setInterval(() => {
     if (touchDaemonPid()) return

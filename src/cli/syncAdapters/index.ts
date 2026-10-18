@@ -35,6 +35,7 @@ export type SyncAdapter = {
   cleanup?: () => Promise<void>
   bootstrap?: () => Promise<string[]>
   instructionFilePath?: () => string
+  skillsDirs?: () => Promise<string[]>
   mirror: (skills: PublicSkill[], context?: SyncContext) => Promise<{ count: number; skipped: number }>
 }
 

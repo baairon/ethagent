@@ -1,6 +1,7 @@
 import { execFileSync, spawn, type ExecFileSyncOptionsWithStringEncoding } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
+import os from 'node:os'
 import { fileURLToPath } from 'node:url'
 import { getConfigDir } from '../storage/config.js'
 
@@ -213,6 +214,28 @@ export function daemonEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   return out
 }
 
+export function daemonSpawnSpec(): {
+  command: string
+  args: string[]
+  options: { detached: true; windowsHide: true; cwd: string; env: NodeJS.ProcessEnv }
+} {
+  return {
+    command: process.execPath,
+    args: ['--import', import.meta.resolve('tsx/esm'), path.resolve(__dirname, 'main.tsx'), 'watch', '--daemon'],
+    options: { detached: true, windowsHide: true, cwd: os.homedir(), env: daemonEnv(process.env) },
+  }
+}
+
+export async function waitForDaemon(timeoutMs = 5_000): Promise<{ running: boolean; pid: number | null }> {
+  const deadline = Date.now() + timeoutMs
+  let status = daemonStatus()
+  while (!status.running && Date.now() < deadline) {
+    await new Promise(resolve => setTimeout(resolve, Math.min(100, deadline - Date.now())))
+    status = daemonStatus()
+  }
+  return status
+}
+
 export function ensureDaemon(): boolean {
   if (daemonDisabled()) return false
   // Only a beating daemon is left alone. A watcher that went quiet (an older version, or
@@ -221,14 +244,17 @@ export function ensureDaemon(): boolean {
   try {
     fs.mkdirSync(getConfigDir(), { recursive: true })
     const out = fs.openSync(daemonLogPath(), 'a')
-    const child = spawn(process.execPath, [binEntry(), 'watch', '--daemon'], {
-      detached: process.platform !== 'win32',
-      stdio: ['ignore', out, out],
-      windowsHide: true,
-      env: daemonEnv(process.env),
-    })
-    child.unref()
-    try { fs.closeSync(out) } catch {}
+    // A detached direct watcher survives its launcher on Windows and skips the bin entry's console hop.
+    const spec = daemonSpawnSpec()
+    try {
+      const child = spawn(spec.command, spec.args, {
+        ...spec.options,
+        stdio: ['ignore', out, out],
+      })
+      child.unref()
+    } finally {
+      try { fs.closeSync(out) } catch {}
+    }
     return true
   } catch {
     return false

@@ -75,6 +75,9 @@ export const genericAdapter: SyncAdapter = {
   async detect(): Promise<boolean> {
     return (await readGenericTargets()).length > 0
   },
+  async skillsDirs(): Promise<string[]> {
+    return (await readGenericTargets()).map(skillsDirFor)
+  },
   async readManaged(): Promise<ManagedRead | null> {
     let newest: ManagedRead | null = null
     for (const target of await readGenericTargets()) {

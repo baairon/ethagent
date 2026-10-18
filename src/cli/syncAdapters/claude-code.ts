@@ -155,6 +155,9 @@ export const claudeCodeAdapter = {
   async detect(): Promise<boolean> {
     return pathExists(claudeDir())
   },
+  async skillsDirs(): Promise<string[]> {
+    return [claudeSkillsDir()]
+  },
   async bootstrap(): Promise<string[]> {
     if (marketplacePluginInstalled()) {
       const removed = await removeClaudeHooks()

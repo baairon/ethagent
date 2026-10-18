@@ -80,6 +80,20 @@ async function markedFolders(root: string): Promise<string[]> {
   return marked
 }
 
+export async function skippedSkillFolders(root: string, names: readonly string[]): Promise<string[]> {
+  const [read, marked] = await Promise.all([loadManifest(root), markedFolders(root)])
+  if (read.state === 'unreadable') return []
+  const owned = new Set(read.state === 'ok' ? read.manifest.skills : [])
+  const markedNames = new Set(marked)
+  const skipped: string[] = []
+  for (const name of new Set(names)) {
+    if (owned.has(name) || markedNames.has(name) || !isValidSegment(name)) continue
+    const folder = await fs.stat(path.join(root, name)).catch(() => null)
+    if (folder?.isDirectory()) skipped.push(name)
+  }
+  return skipped
+}
+
 async function readOwnership(root: string): Promise<Ownership | null> {
   let read = await loadManifest(root)
   if (read.state === 'unreadable') {

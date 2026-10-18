@@ -1,6 +1,38 @@
 import { addGenericTarget } from './syncAdapters/generic.js'
 import { runSync } from './sync.js'
-import { ensureDaemon, pauseSync, resumeSync } from './daemon.js'
+import { loadConfig } from '../storage/config.js'
+import { daemonLogPath, daemonStatus, ensureDaemon, isPaused, pauseSync, resumeSync, waitForDaemon } from './daemon.js'
+
+export async function runEnsureDaemon(): Promise<number> {
+  if (isPaused()) {
+    process.stdout.write('ethagent: background sync paused\n')
+    return 0
+  }
+  if (process.env.ETHAGENT_NO_DAEMON && !['0', 'false'].includes(process.env.ETHAGENT_NO_DAEMON.toLowerCase())) {
+    process.stdout.write('ethagent: background sync disabled\n')
+    return 0
+  }
+  let config: Awaited<ReturnType<typeof loadConfig>>
+  try {
+    config = await loadConfig()
+  } catch (err) {
+    process.stderr.write(`ethagent: could not read identity: ${(err as Error).message}\n`)
+    return 1
+  }
+  if (!config?.identity) {
+    process.stdout.write('ethagent: no identity yet\n')
+    return 0
+  }
+  const current = daemonStatus()
+  if (!current.running) ensureDaemon()
+  const status = current.running ? current : await waitForDaemon()
+  if (status.running) {
+    process.stdout.write(`ethagent: background sync running (pid ${status.pid})\n`)
+    return 0
+  }
+  process.stderr.write(`ethagent: background sync did not start; see ${daemonLogPath()}\n`)
+  return 1
+}
 
 export async function runAddTool(args: string[]): Promise<number> {
   const rawPath = args[0]
@@ -10,9 +42,9 @@ export async function runAddTool(args: string[]): Promise<number> {
   }
   const resolved = await addGenericTarget(rawPath)
   await runSync({ quiet: true })
-  ensureDaemon()
+  const daemonResult = await runEnsureDaemon()
   process.stdout.write(`ethagent: added ${resolved} and synced your agent into it\n`)
-  return 0
+  return daemonResult
 }
 
 export async function runPause(): Promise<number> {
@@ -23,7 +55,5 @@ export async function runPause(): Promise<number> {
 
 export async function runResume(): Promise<number> {
   resumeSync()
-  ensureDaemon()
-  process.stdout.write('ethagent: background sync resumed\n')
-  return 0
+  return runEnsureDaemon()
 }

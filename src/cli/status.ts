@@ -5,6 +5,10 @@ import { continuityVaultRef } from '../identity/continuity/storage.js'
 import { continuityWorkingTreeStatus } from '../identity/continuity/storage/status.js'
 import { listPublishedContinuitySnapshots } from '../identity/continuity/snapshots.js'
 import { changedContinuitySnapshotFiles } from '../identity/manager/continuity/state.js'
+import { listSkills } from '../identity/continuity/skills/loadSkills.js'
+import { daemonDisabled, daemonStatus, isPaused } from './daemon.js'
+import { selectMirrorSkills } from './sync.js'
+import { skippedSkillFolders } from './syncAdapters/shared.js'
 
 function shortAddr(addr: string | undefined): string {
   if (!addr) return ''
@@ -34,8 +38,34 @@ export async function runStatus(version: string): Promise<number> {
   process.stdout.write(bits.join(' · ') + '\n')
   if (config?.identity) {
     process.stdout.write(`vault: ${continuityVaultRef(config.identity).dir}\n`)
-    const names = (await detectSyncTargets().catch(() => [])).map(t => t.name)
-    process.stdout.write(`wired into: ${names.length ? names.join(', ') : 'none detected yet'}\n`)
+    const targets = await detectSyncTargets().catch(() => [])
+    process.stdout.write(`wired into: ${targets.length ? targets.map(t => t.name).join(', ') : 'none detected yet'}\n`)
+    const daemon = daemonStatus()
+    const background = isPaused()
+      ? 'paused'
+      : daemonDisabled()
+        ? 'disabled'
+        : daemon.running
+          ? `running (pid ${daemon.pid})`
+          : 'not running (start with: ethagent --ensure-daemon)'
+    process.stdout.write(`background sync: ${background}\n`)
+    try {
+      const names = selectMirrorSkills(await listSkills(config.identity)).map(skill => skill.name)
+      const seen = new Set<string>()
+      for (const adapter of targets) {
+        for (const dir of await adapter.skillsDirs?.() ?? []) {
+          if (seen.has(dir)) continue
+          seen.add(dir)
+          const skipped = await skippedSkillFolders(dir, names)
+          if (skipped.length > 0) {
+            process.stdout.write(`skills not mirrored into ${dir}: ${skipped.join(', ')} (a folder that isn't ethagent's has that name; move or delete it)\n`)
+          }
+        }
+      }
+    } catch (err) {
+      process.stderr.write(`ethagent: could not check skipped skill folders: ${(err as Error).message}\n`)
+      return 1
+    }
   }
   return 0
 }

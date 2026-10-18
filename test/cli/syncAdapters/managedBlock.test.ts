@@ -6,7 +6,7 @@ import path from 'node:path'
 import { pullHarnessSoulMemoryIntoVault, pushVaultSoulMemoryToHarness, reconcileSoulMemory } from '../../../src/cli/sync.js'
 import { claudeCodeAdapter } from '../../../src/cli/syncAdapters/claude-code.js'
 import { codexAdapter } from '../../../src/cli/syncAdapters/codex.js'
-import { parseManagedContext, removeManagedBlock, renderManagedBlock } from '../../../src/cli/syncAdapters/managedBlock.js'
+import { injectManagedBlock, parseManagedContext, removeManagedBlock, renderManagedBlock } from '../../../src/cli/syncAdapters/managedBlock.js'
 import { continuityVaultRef, readContinuityFiles, writeContinuityFiles } from '../../../src/identity/continuity/storage.js'
 import type { SkillIndexEntry } from '../../../src/identity/continuity/skills/types.js'
 import type { EthagentIdentity } from '../../../src/storage/config.js'
@@ -22,6 +22,45 @@ const identity: EthagentIdentity = {
   agentId: '42',
   state: { name: 'test agent', description: 'public test agent' },
 }
+
+test('injectManagedBlock preserves a symlink and leaves no temporary files', async t => {
+  const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'ethagent-managed-link-'))
+  try {
+    const target = path.join(tmp, 'real.md')
+    const link = path.join(tmp, 'AGENTS.md')
+    await fs.writeFile(target, 'outside\n')
+    try {
+      await fs.symlink(target, link, 'file')
+    } catch (err) {
+      if (['EPERM', 'EACCES', 'ENOTSUP'].includes((err as NodeJS.ErrnoException).code ?? '')) {
+        t.skip('file symlinks are unavailable')
+        return
+      }
+      throw err
+    }
+    await injectManagedBlock(link, renderManagedBlock(undefined, 'first'))
+    assert.equal((await fs.lstat(link)).isSymbolicLink(), true)
+    assert.match(await fs.readFile(target, 'utf8'), /first/)
+    await injectManagedBlock(link, renderManagedBlock(undefined, 'second'))
+    assert.match(await fs.readFile(target, 'utf8'), /second/)
+    assert.deepEqual((await fs.readdir(tmp)).sort(), ['AGENTS.md', 'real.md'])
+  } finally {
+    await fs.rm(tmp, { recursive: true, force: true })
+  }
+})
+
+test('injectManagedBlock cleans its temporary files after a replacement', async () => {
+  const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'ethagent-managed-atomic-'))
+  try {
+    const file = path.join(tmp, 'AGENTS.md')
+    await injectManagedBlock(file, renderManagedBlock(undefined, 'first'))
+    await injectManagedBlock(file, renderManagedBlock(undefined, 'second'))
+    assert.deepEqual(await fs.readdir(tmp), ['AGENTS.md'])
+    assert.match(await fs.readFile(file, 'utf8'), /second/)
+  } finally {
+    await fs.rm(tmp, { recursive: true, force: true })
+  }
+})
 
 test('a literal ethagent marker in soul/memory is neutralized, so the body round-trips without truncation', () => {
   const context = {
@@ -441,4 +480,3 @@ test('removeManagedBlock is a no-op when the file is missing or has no ethagent 
     assert.equal(await fs.readFile(file, 'utf8'), content)
   })
 })
-
