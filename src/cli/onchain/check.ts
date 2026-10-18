@@ -8,6 +8,7 @@ import { listPublishedContinuitySnapshots } from '../../identity/continuity/snap
 import { continuityWorkingTreeStatus } from '../../identity/continuity/storage/status.js'
 import { emitJson, failFrom, HistoryError, parseHistoryArgs, requireIdentity, type HistoryDeps } from '../history/shared.js'
 import { networkOfChain } from './shared.js'
+import { readSyncHealth, type SyncHealth } from '../syncHealth.js'
 
 export const CHECK_USAGE = 'ethagent check [--json]'
 
@@ -24,6 +25,7 @@ const HELP = [
 export type CheckSeams = {
   reconcile: (identity: EthagentIdentity, config: EthagentConfig) => Promise<AgentReconciliation>
   localChanges: (identity: EthagentIdentity) => Promise<string[] | null>
+  syncHealth: (identity: EthagentIdentity) => Promise<SyncHealth | null>
 }
 
 async function localChangedFiles(identity: EthagentIdentity): Promise<string[] | null> {
@@ -40,6 +42,7 @@ async function localChangedFiles(identity: EthagentIdentity): Promise<string[] |
 export const defaultSeams: CheckSeams = {
   reconcile: runReconciliation,
   localChanges: localChangedFiles,
+  syncHealth: readSyncHealth,
 }
 
 type Attention = { code: string; message: string; fix?: string }
@@ -134,9 +137,14 @@ export async function runCheckCommand(args: string[], deps: HistoryDeps, seams: 
     // ETHAGENT_RPC_URL replaces the saved RPC for this read, so a failing endpoint can be routed around.
     const rpcOverride = deps.env.ETHAGENT_RPC_URL?.trim()
     const probed = rpcOverride ? { ...identity, rpcUrl: rpcOverride } : identity
-    const [recon, changed] = await Promise.all([seams.reconcile(probed, config), seams.localChanges(identity)])
+    const [recon, changed, syncHealth] = await Promise.all([seams.reconcile(probed, config), seams.localChanges(identity), seams.syncHealth(identity)])
     const valuesView = tokenValues(identity)
     const attention = attentionItems(identity, recon, changed)
+    if (!syncHealth) {
+      attention.push({ code: 'sync-unchecked', message: 'This machine has not completed a mirror check.', fix: 'ethagent sync' })
+    } else if (syncHealth.state === 'failed') {
+      attention.push({ code: 'sync-incomplete', message: `The last mirror attempt was incomplete: ${syncHealth.issues.map(issue => issue.skill ? `${issue.location}/${issue.skill}: ${issue.detail}` : `${issue.location}: ${issue.detail}`).join('; ')}.`, fix: 'ethagent sync' })
+    }
     const chain = {
       reachable: recon.rpc === 'reachable',
       token: recon.token,

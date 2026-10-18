@@ -2,7 +2,7 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { getConfigDir } from '../../storage/config.js'
-import { type PublicSkill } from './shared.js'
+import { type MirrorIssue, type MirrorResult, type PublicSkill } from './shared.js'
 import { injectManagedBlock, readManagedContext, renderManagedBlock } from './managedBlock.js'
 import { cleanupInstructionFileSkills, mirrorInstructionFile, skillsDirFor } from './instructionFileAdapter.js'
 import { buildPortableInstruction } from '../harnessGuidance.js'
@@ -32,25 +32,30 @@ function readEnvTargets(): string[] {
 
 async function readConfigFileTargets(): Promise<string[]> {
   const out: string[] = []
-  try {
-    const parsed = JSON.parse(await fs.readFile(harnessesConfigPath(), 'utf8')) as unknown
-    const list = Array.isArray(parsed)
-      ? parsed
-      : parsed && typeof parsed === 'object'
-        ? (parsed as { targets?: unknown }).targets
+  let raw: string
+  try { raw = await fs.readFile(harnessesConfigPath(), 'utf8') } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return []
+    throw new Error(`could not read ${harnessesConfigPath()}: ${(err as Error).message}`)
+  }
+  let parsed: unknown
+  try { parsed = JSON.parse(raw) } catch (err) {
+    throw new Error(`${harnessesConfigPath()} has invalid JSON: ${(err as Error).message}`)
+  }
+  const list = Array.isArray(parsed)
+    ? parsed
+    : parsed && typeof parsed === 'object'
+      ? (parsed as { targets?: unknown }).targets
+      : null
+  if (!Array.isArray(list)) throw new Error(`${harnessesConfigPath()} must contain a target list`)
+  for (const item of list) {
+    const p = typeof item === 'string'
+      ? item
+      : item && typeof item === 'object'
+        ? (item as { path?: unknown }).path
         : null
-    if (Array.isArray(list)) {
-      for (const item of list) {
-        const p =
-          typeof item === 'string'
-            ? item
-            : item && typeof item === 'object'
-              ? (item as { path?: unknown }).path
-              : null
-        if (typeof p === 'string' && p.trim()) out.push(path.resolve(expandHome(p.trim())))
-      }
-    }
-  } catch {}
+    if (typeof p !== 'string' || !p.trim()) throw new Error(`${harnessesConfigPath()} contains a target without a path`)
+    out.push(path.resolve(expandHome(p.trim())))
+  }
   return out
 }
 
@@ -116,13 +121,21 @@ export const genericAdapter: SyncAdapter = {
     }
     return actions
   },
-  async mirror(skills: PublicSkill[], context?: SyncContext): Promise<{ count: number; skipped: number }> {
+  async mirror(skills: PublicSkill[], context?: SyncContext): Promise<MirrorResult> {
     const targets = await readGenericTargets()
     let skipped = 0
+    let count = 0
+    const issues: MirrorIssue[] = []
     for (const target of targets) {
-      const result = await mirrorInstructionFile(target, 'generic', skills, context)
-      skipped += result.skipped
+      try {
+        const result = await mirrorInstructionFile(target, 'generic', skills, context)
+        count += result.count
+        skipped += result.skipped
+        issues.push(...result.issues)
+      } catch (err) {
+        issues.push({ kind: 'mirror', root: skillsDirFor(target), detail: `could not sync ${target}: ${(err as Error).message}` })
+      }
     }
-    return { count: targets.length ? skills.length : 0, skipped }
+    return { count, skipped, issues }
   },
 }

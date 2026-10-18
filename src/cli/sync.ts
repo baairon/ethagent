@@ -16,62 +16,93 @@ import {
   type SyncContext,
 } from './syncAdapters/index.js'
 import type { PublicSkill } from './syncAdapters/shared.js'
+import { formatSyncIssue, writeSyncHealth, type SyncIssue, type SyncHealth } from './syncHealth.js'
 
-export type SyncOptions = { quiet?: boolean }
+export type SyncOptions = { quiet?: boolean; adapters?: SyncAdapter[]; requireIdentity?: boolean }
 
 export function selectMirrorSkills(all: readonly PublicSkill[]): PublicSkill[] {
   return all.filter(s => !isDraftScaffold(s))
 }
 
 export async function runSync(opts: SyncOptions = {}): Promise<number> {
-  const config = await loadConfig()
-  if (!config?.identity) return 0
-
-  const targets = await detectSyncTargets()
-  if (targets.length === 0) {
-    if (!opts.quiet) process.stdout.write('ethagent: no harness detected\n')
+  let config: Awaited<ReturnType<typeof loadConfig>>
+  try { config = await loadConfig() } catch (err) {
+    process.stderr.write(`ethagent: could not read identity for sync: ${(err as Error).message}\n`)
+    return 1
+  }
+  if (!config?.identity) {
+    if (opts.requireIdentity) {
+      process.stderr.write('ethagent: no identity yet; create or restore one before syncing\n')
+      return 1
+    }
     return 0
   }
-
-  let context: SyncContext
-  let pulled: string[] = []
-  try {
-    const reconciled = await reconcileSoulMemory(config.identity, targets)
-    context = { soul: reconciled.soul, memory: reconciled.memory }
-    pulled = reconciled.pulled
-  } catch (err) {
-    process.stderr.write(`ethagent: could not reconcile soul/memory, skipping sync to avoid overwriting harness files (${(err as Error).message})\n`)
-    return 1
-  }
-
-  let all: Awaited<ReturnType<typeof listSkills>>
-  try {
-    all = await listSkills(config.identity)
-  } catch (err) {
-    process.stderr.write(`ethagent: could not load skills, skipped skill mirror (soul/memory already synced) (${(err as Error).message})\n`)
-    return 1
-  }
-  const mirrorSkills: PublicSkill[] = selectMirrorSkills(all)
-
-  const summaries: string[] = []
-  for (const adapter of targets) {
+  const identity = config.identity
+  const finish = async (state: SyncHealth['state'], issues: SyncIssue[]): Promise<number> => {
+    for (const issue of issues) process.stderr.write(`ethagent: sync incomplete: ${formatSyncIssue(issue)}\n`)
     try {
-      const { count, skipped } = await adapter.mirror(mirrorSkills, context)
-      let summary = `${adapter.name}: ${count} skill${count === 1 ? '' : 's'}`
-      if (skipped > 0) summary += `, skipped ${skipped} unmanaged`
-      summaries.push(summary)
+      await writeSyncHealth(identity, state, new Date().toISOString(), issues)
     } catch (err) {
-      summaries.push(`${adapter.name}: failed (${(err as Error).message})`)
+      process.stderr.write(`ethagent: could not record sync health: ${(err as Error).message}\n`)
+      return 1
     }
+    return state === 'failed' ? 1 : 0
   }
-  if (!opts.quiet) {
-    process.stdout.write(`ethagent: synced -> ${summaries.join(' | ')}\n`)
-    if (pulled.length > 0) {
-      process.stdout.write(`ethagent: pulled ${pulled.join(', ')} drift from your harness into the vault\n`)
+
+  try {
+    const issues: SyncIssue[] = []
+    const targets = await detectSyncTargets(opts.adapters ?? BUILT_IN_ADAPTERS, false, (adapter, err) => {
+      issues.push({ kind: 'detect', location: adapter.name, detail: err.message })
+    })
+    if (targets.length === 0) {
+      if (!opts.quiet) process.stdout.write(issues.length > 0 ? 'ethagent: harness detection incomplete\n' : 'ethagent: no harness detected\n')
+      return finish(issues.length > 0 ? 'failed' : 'no-targets', issues)
     }
+
+    let context: SyncContext
+    let pulled: string[] = []
+    try {
+      const reconciled = await reconcileSoulMemory(config.identity, targets)
+      context = { soul: reconciled.soul, memory: reconciled.memory }
+      pulled = reconciled.pulled
+    } catch (err) {
+      issues.push({ kind: 'reconcile', location: 'soul/memory', detail: `could not reconcile; harness writes were skipped: ${(err as Error).message}` })
+      return finish('failed', issues)
+    }
+
+    let all: Awaited<ReturnType<typeof listSkills>>
+    try {
+      all = await listSkills(config.identity)
+    } catch (err) {
+      issues.push({ kind: 'skills', location: 'vault skills', detail: `could not load skills: ${(err as Error).message}` })
+      return finish('failed', issues)
+    }
+    const mirrorSkills: PublicSkill[] = selectMirrorSkills(all)
+
+    const summaries: string[] = []
+    for (const adapter of targets) {
+      try {
+        const { count, skipped, issues: mirrorIssues } = await adapter.mirror(mirrorSkills, context)
+        let summary = `${adapter.name}: ${count} skill${count === 1 ? '' : 's'}`
+        if (skipped > 0) summary += `, skipped ${skipped} unmanaged`
+        summaries.push(summary)
+        issues.push(...mirrorIssues.map(issue => ({ kind: issue.kind, location: issue.root, ...(issue.skill ? { skill: issue.skill } : {}), detail: issue.detail })))
+      } catch (err) {
+        summaries.push(`${adapter.name}: failed (${(err as Error).message})`)
+        issues.push({ kind: 'adapter', location: adapter.name, detail: (err as Error).message })
+      }
+    }
+    if (!opts.quiet) {
+      process.stdout.write(`ethagent: ${issues.length > 0 ? 'sync incomplete' : 'synced'} -> ${summaries.join(' | ')}\n`)
+      if (pulled.length > 0) {
+        process.stdout.write(`ethagent: pulled ${pulled.join(', ')} drift from your harness into the vault\n`)
+      }
+    }
+    if (!opts.quiet) await reportLocalChanges(config.identity)
+    return finish(issues.length > 0 ? 'failed' : 'ok', issues)
+  } catch (err) {
+    return finish('failed', [{ kind: 'adapter', location: 'sync', detail: (err as Error).message }])
   }
-  if (!opts.quiet) await reportLocalChanges(config.identity)
-  return 0
 }
 
 async function reportLocalChanges(identity: EthagentIdentity): Promise<void> {
@@ -111,8 +142,8 @@ export async function planSoulMemoryReconcile(
 
   const readsPerAdapter = await Promise.all(
     adapters.map(async adapter => {
-      if (adapter.readManagedCandidates) return adapter.readManagedCandidates().catch(() => [])
-      if (adapter.readManaged) { const r = await adapter.readManaged().catch(() => null); return r ? [r] : [] }
+      if (adapter.readManagedCandidates) return adapter.readManagedCandidates()
+      if (adapter.readManaged) { const r = await adapter.readManaged(); return r ? [r] : [] }
       return []
     }),
   )
@@ -154,10 +185,19 @@ function pickNewest(
   return { content: reconstructVaultFile(vaultContent, winningBody, fallbackHeader), pulled: true }
 }
 
-export async function detectSyncTargets(): Promise<SyncAdapter[]> {
+export async function detectSyncTargets(
+  adapters: SyncAdapter[] = BUILT_IN_ADAPTERS,
+  strict = false,
+  onError?: (adapter: SyncAdapter, error: Error) => void,
+): Promise<SyncAdapter[]> {
   const targets: SyncAdapter[] = []
-  for (const adapter of BUILT_IN_ADAPTERS) {
-    if (await adapter.detect().catch(() => false)) targets.push(adapter)
+  for (const adapter of adapters) {
+    try {
+      if (await adapter.detect()) targets.push(adapter)
+    } catch (err) {
+      if (strict) throw new Error(`${adapter.name}: ${(err as Error).message}`)
+      onError?.(adapter, err as Error)
+    }
   }
   return targets
 }
@@ -183,15 +223,20 @@ export async function pushVaultSoulMemoryToHarness(identity: EthagentIdentity): 
     const failed: string[] = []
     for (const adapter of targets) {
       try {
-        await adapter.mirror(mirrorSkills, context)
+        const result = await adapter.mirror(mirrorSkills, context)
+        if (result.issues.length > 0) failed.push(...result.issues.map(formatMirrorIssue))
       } catch {
         failed.push(adapter.name)
       }
     }
     if (failed.length > 0) {
-      process.stderr.write(`ethagent: could not push soul/memory to ${failed.join(', ')} (will reconcile on next sync)\n`)
+      process.stderr.write(`ethagent: could not fully mirror to ${failed.join(', ')} (will retry on next sync)\n`)
     }
   } catch {}
+}
+
+function formatMirrorIssue(issue: { root: string; skill?: string; detail: string }): string {
+  return `${issue.skill ? `${issue.root}/${issue.skill}` : issue.root}: ${issue.detail}`
 }
 
 export async function runSyncOnEdit(): Promise<number> {

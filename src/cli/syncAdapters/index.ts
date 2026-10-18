@@ -1,4 +1,4 @@
-import type { PublicSkill } from './shared.js'
+import type { MirrorResult, PublicSkill } from './shared.js'
 import { claudeCodeAdapter } from './claude-code.js'
 import { codexAdapter } from './codex.js'
 import { genericAdapter } from './generic.js'
@@ -36,7 +36,7 @@ export type SyncAdapter = {
   bootstrap?: () => Promise<string[]>
   instructionFilePath?: () => string
   skillsDirs?: () => Promise<string[]>
-  mirror: (skills: PublicSkill[], context?: SyncContext) => Promise<{ count: number; skipped: number }>
+  mirror: (skills: PublicSkill[], context?: SyncContext) => Promise<MirrorResult>
 }
 
 export const BUILT_IN_ADAPTERS: SyncAdapter[] = [

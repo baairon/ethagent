@@ -2,6 +2,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { createHash } from 'node:crypto'
 import { getConfigDir } from '../../storage/config.js'
+import { atomicWriteText } from '../../storage/atomicWrite.js'
 import { extractManagedExtra } from './managedBlock.js'
 
 function mirrorStatePath(filePath: string): string {
@@ -22,29 +23,28 @@ async function readLastExtraHash(filePath: string): Promise<string | null> {
 }
 
 export async function writeLastExtraHash(filePath: string, block: string): Promise<void> {
-  try {
-    await fs.writeFile(mirrorStatePath(filePath), `${JSON.stringify({ extraHash: hash(extractManagedExtra(block) ?? '') })}\n`, 'utf8')
-  } catch {}
+  await atomicWriteText(mirrorStatePath(filePath), `${JSON.stringify({ extraHash: hash(extractManagedExtra(block) ?? '') })}\n`, { mode: 0o644 })
 }
 
 export async function preserveHarnessSkillEdits(filePath: string, harness: string): Promise<string | null> {
   let content: string
   try {
     content = await fs.readFile(filePath, 'utf8')
-  } catch {
-    return null
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null
+    throw err
   }
   const extra = extractManagedExtra(content)
   if (!extra) return null
   const last = await readLastExtraHash(filePath)
-  if (last === null || hash(extra) === last) return null
+  if (hash(extra) === last) return null
   try {
     const dir = path.join(getConfigDir(), 'skill-edits')
     await fs.mkdir(dir, { recursive: true })
     const backup = path.join(dir, `${harness}-${Date.now()}.md`)
     await fs.writeFile(backup, `${extra}\n`, 'utf8')
     return backup
-  } catch {
-    return null
+  } catch (err) {
+    throw new Error(`could not preserve edited skill text from ${filePath}: ${(err as Error).message}`)
   }
 }

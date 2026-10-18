@@ -50,6 +50,7 @@ function checkSeams(r: AgentReconciliation, changed: string[] | null = [], seen:
   return {
     reconcile: async id => { seen.rpcUrl = id.rpcUrl; return r },
     localChanges: async () => changed,
+    syncHealth: async () => ({ version: 1, identityKey: 'test', state: 'ok', attemptedAt: '2026-03-01T00:00:00.000Z', lastSuccessAt: '2026-03-01T00:00:00.000Z', issues: [] }),
   }
 }
 
@@ -110,6 +111,25 @@ test('check reads through ETHAGENT_RPC_URL and refuses without an agent', async 
   assert.match(String(none.io.json().hint), /ethagent create/)
   const extra = deps(identity())
   assert.equal(await runCheckCommand(['extra', '--json'], extra, checkSeams(recon())), 2)
+})
+
+test('check reports incomplete or unchecked local mirroring as attention', async () => {
+  const failed = checkSeams(recon())
+  failed.syncHealth = async () => ({
+    version: 1, identityKey: 'test', state: 'failed', attemptedAt: '2026-03-01T00:00:00.000Z',
+    lastSuccessAt: null,
+    issues: [{ kind: 'skipped', location: 'C:/skills', skill: 'demo', detail: 'unmanaged folder' }],
+  })
+  const d = deps(identity())
+  assert.equal(await runCheckCommand(['--json'], d, failed), 4)
+  const issue = (d.io.json().attention as Array<{ code: string; message: string; fix?: string }>).find(item => item.code === 'sync-incomplete')
+  assert.match(issue?.message ?? '', /C:\/skills\/demo/)
+  assert.equal(issue?.fix, 'ethagent sync')
+
+  failed.syncHealth = async () => null
+  const unchecked = deps(identity())
+  assert.equal(await runCheckCommand(['--json'], unchecked, failed), 4)
+  assert.ok((unchecked.io.json().attention as Array<{ code: string }>).some(item => item.code === 'sync-unchecked'))
 })
 
 // --- skills -----------------------------------------------------------------------

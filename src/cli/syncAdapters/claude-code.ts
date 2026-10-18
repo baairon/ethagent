@@ -2,7 +2,7 @@ import fs from 'node:fs/promises'
 import { readdirSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { mirrorAsSkillFolders, pathExists, removeMirroredSkills, type PublicSkill } from './shared.js'
+import { mirrorAsSkillFolders, pathExists, removeMirroredSkills, type MirrorResult, type PublicSkill } from './shared.js'
 import { injectManagedBlock, readManagedContext, renderManagedBlock, writeManagedSyncState } from './managedBlock.js'
 import type { ManagedRead, SyncContext } from './index.js'
 
@@ -193,7 +193,7 @@ export const claudeCodeAdapter = {
   async cleanup(): Promise<void> {
     await removeMirroredSkills(claudeSkillsDir())
   },
-  async mirror(skills: PublicSkill[], context?: SyncContext): Promise<{ count: number; skipped: number }> {
+  async mirror(skills: PublicSkill[], context?: SyncContext): Promise<MirrorResult> {
     const result = await mirrorAsSkillFolders(claudeSkillsDir(), skills)
     if (context) {
       for (const target of [claudeMdPath(), ...(await projectMemoryTargets())]) {

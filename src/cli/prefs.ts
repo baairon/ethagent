@@ -41,10 +41,18 @@ export async function runAddTool(args: string[]): Promise<number> {
     return 2
   }
   const resolved = await addGenericTarget(rawPath)
-  await runSync({ quiet: true })
+  const syncResult = await runSync({ quiet: true })
   const daemonResult = await runEnsureDaemon()
+  if (syncResult !== 0) {
+    process.stderr.write(`ethagent: added ${resolved}, but sync is incomplete; run ethagent sync after fixing the errors above\n`)
+    return 1
+  }
+  if (daemonResult !== 0) {
+    process.stderr.write(`ethagent: added ${resolved} and synced it, but background sync did not start\n`)
+    return 1
+  }
   process.stdout.write(`ethagent: added ${resolved} and synced your agent into it\n`)
-  return daemonResult
+  return 0
 }
 
 export async function runPause(): Promise<number> {

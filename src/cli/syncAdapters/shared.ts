@@ -17,6 +17,15 @@ const SKILL_MIRROR_FORMAT = '3'
 
 export type PublicSkill = SkillIndexEntry
 
+export type MirrorIssue = {
+  kind: 'skipped' | 'mirror' | 'manifest' | 'remove' | 'source'
+  root: string
+  skill?: string
+  detail: string
+}
+
+export type MirrorResult = { count: number; skipped: number; issues: MirrorIssue[] }
+
 export const MANIFEST_FILE = '.ethagent-managed.json'
 export const MIRROR_MARKER = '.ethagent-mirror'
 const TRASH_DIR = '.ethagent-trash'
@@ -31,7 +40,7 @@ export type Manifest = {
 
 type ManifestRead = { state: 'ok'; manifest: Manifest } | { state: 'missing' } | { state: 'unreadable' }
 
-type Ownership = { names: Set<string>; sigs: Record<string, string> }
+type Ownership = { names: Set<string>; sigs: Record<string, string>; manifestUnreadable: boolean }
 
 function parseManifest(raw: string): Manifest | null {
   try {
@@ -109,9 +118,9 @@ async function readOwnership(root: string): Promise<Ownership | null> {
     process.stderr.write(`ethagent: ${MANIFEST_FILE} in ${root} is unreadable, so ownership comes from the mirror markers\n`)
   }
   const names = new Set(marked)
-  if (read.state !== 'ok') return { names, sigs: {} }
+  if (read.state !== 'ok') return { names, sigs: {}, manifestUnreadable: read.state === 'unreadable' }
   for (const name of read.manifest.skills) names.add(name)
-  return { names, sigs: read.manifest.sigs ?? {} }
+  return { names, sigs: read.manifest.sigs ?? {}, manifestUnreadable: false }
 }
 
 async function writeMirrorMarker(dir: string): Promise<void> {
@@ -170,12 +179,7 @@ export async function pathExists(file: string): Promise<boolean> {
 async function copyVettedSkillTree(srcDir: string, destDir: string, depth = 0): Promise<void> {
   if (depth > MAX_FOLDER_DEPTH) return
   await fs.mkdir(destDir, { recursive: true })
-  let entries: import('node:fs').Dirent[]
-  try {
-    entries = await fs.readdir(srcDir, { withFileTypes: true })
-  } catch {
-    return
-  }
+  const entries = await fs.readdir(srcDir, { withFileTypes: true })
   for (const ent of entries) {
     if (ent.isSymbolicLink()) continue
     if (ent.name.startsWith('.')) continue
@@ -188,8 +192,8 @@ async function copyVettedSkillTree(srcDir: string, destDir: string, depth = 0): 
       await copyVettedSkillTree(srcPath, destPath, depth + 1)
     } else if (ent.isFile()) {
       if (!isValidFilenameSegment(ent.name)) continue
-      const stat = await fs.stat(srcPath).catch(() => null)
-      if (!stat || stat.size > MAX_SKILL_FILE_BYTES) continue
+      const stat = await fs.stat(srcPath)
+      if (stat.size > MAX_SKILL_FILE_BYTES) continue
       if (depth === 0 && ent.name.toLowerCase() === 'skill.md' && await writeSanitizedSkillFile(srcPath, destPath)) continue
       await fs.copyFile(srcPath, destPath)
     }
@@ -208,12 +212,7 @@ async function writeSanitizedSkillFile(srcPath: string, destPath: string): Promi
 
 async function collectSignature(srcDir: string, rel = '', depth = 0): Promise<string[]> {
   if (depth > MAX_FOLDER_DEPTH) return []
-  let entries: import('node:fs').Dirent[]
-  try {
-    entries = await fs.readdir(srcDir, { withFileTypes: true })
-  } catch {
-    return []
-  }
+  const entries = await fs.readdir(srcDir, { withFileTypes: true })
   entries.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))
   const parts: string[] = []
   for (const ent of entries) {
@@ -228,10 +227,9 @@ async function collectSignature(srcDir: string, rel = '', depth = 0): Promise<st
       parts.push(...(await collectSignature(abs, relPath, depth + 1)))
     } else if (ent.isFile()) {
       if (!isValidFilenameSegment(ent.name)) continue
-      const stat = await fs.stat(abs).catch(() => null)
-      if (!stat || stat.size > MAX_SKILL_FILE_BYTES) continue
-      const buf = await fs.readFile(abs).catch(() => null)
-      if (!buf) continue
+      const stat = await fs.stat(abs)
+      if (stat.size > MAX_SKILL_FILE_BYTES) continue
+      const buf = await fs.readFile(abs)
       parts.push(`${relPath} ${createHash('sha256').update(buf).digest('hex')}`)
     }
   }
@@ -246,13 +244,16 @@ async function signatureOf(srcDir: string): Promise<string> {
 export async function mirrorAsSkillFolders(
   root: string,
   skills: PublicSkill[],
-): Promise<{ count: number; skipped: number }> {
+): Promise<MirrorResult> {
   await fs.mkdir(root, { recursive: true })
   if (!(await pathExists(path.join(root, '.gitignore')))) {
     await fs.writeFile(path.join(root, '.gitignore'), '*\n').catch(() => null)
   }
   const ownership = await readOwnership(root)
-  if (!ownership) return { count: 0, skipped: 0 }
+  if (!ownership) return { count: 0, skipped: 0, issues: [{ kind: 'manifest', root, detail: `${MANIFEST_FILE} is unreadable` }] }
+  const issues: MirrorIssue[] = ownership.manifestUnreadable
+    ? [{ kind: 'manifest', root, detail: `${MANIFEST_FILE} is unreadable; ownership was recovered from markers` }]
+    : []
   const incoming = new Set(skills.map(s => s.name))
   const owned: string[] = []
   const sigs: Record<string, string> = {}
@@ -261,11 +262,28 @@ export async function mirrorAsSkillFolders(
     const targetDir = path.join(root, skill.name)
     const exists = await pathExists(targetDir)
     const isOurs = ownership.names.has(skill.name)
-    if (exists && !isOurs) { skipped++; continue }
+    if (exists && !isOurs) {
+      skipped++
+      issues.push({ kind: 'skipped', root, skill: skill.name, detail: 'an unmanaged folder has this name; move or delete it' })
+      continue
+    }
     const srcDir = path.dirname(skill.absolutePath)
-    const sig = await signatureOf(srcDir)
+    let sig: string
+    try {
+      const source = await fs.stat(skill.absolutePath)
+      if (!source.isFile()) throw new Error('SKILL.md is not a file')
+      if (source.size > MAX_SKILL_FILE_BYTES) throw new Error('SKILL.md exceeds the mirror file size limit')
+      sig = await signatureOf(srcDir)
+    } catch (err) {
+      issues.push({ kind: 'source', root, skill: skill.name, detail: (err as Error).message })
+      continue
+    }
     if (exists && isOurs && ownership.sigs[skill.name] === sig) {
-      if (!(await pathExists(path.join(targetDir, MIRROR_MARKER)))) await writeMirrorMarker(targetDir).catch(() => null)
+      if (!(await pathExists(path.join(targetDir, MIRROR_MARKER)))) {
+        try { await writeMirrorMarker(targetDir) } catch (err) {
+          issues.push({ kind: 'mirror', root, skill: skill.name, detail: `could not restore marker: ${(err as Error).message}` })
+        }
+      }
       owned.push(skill.name)
       sigs[skill.name] = sig
       continue
@@ -280,18 +298,21 @@ export async function mirrorAsSkillFolders(
       sigs[skill.name] = sig
     } catch (err) {
       await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => null)
-      process.stderr.write(`ethagent: failed to mirror skill "${skill.name}": ${(err as Error).message}\n`)
+      issues.push({ kind: 'mirror', root, skill: skill.name, detail: (err as Error).message })
     }
   }
   const keep = new Set<string>(owned)
   for (const name of ownership.names) if (incoming.has(name)) keep.add(name)
   for (const stale of ownership.names) {
     if (keep.has(stale)) continue
-    if (!(await removeOwnedFolder(root, stale))) keep.add(stale)
+    if (!(await removeOwnedFolder(root, stale))) {
+      keep.add(stale)
+      issues.push({ kind: 'remove', root, skill: stale, detail: 'could not remove stale mirrored folder' })
+    }
   }
   await fs.rm(path.join(root, TRASH_DIR), { recursive: true, force: true }).catch(() => null)
   const keptSigs: Record<string, string> = {}
   for (const name of keep) if (sigs[name]) keptSigs[name] = sigs[name]
   await writeManifest(root, [...keep], keptSigs)
-  return { count: owned.length, skipped }
+  return { count: owned.length, skipped, issues }
 }

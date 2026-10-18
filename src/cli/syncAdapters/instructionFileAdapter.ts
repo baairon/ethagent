@@ -2,7 +2,7 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { parseSkillFile } from '../../identity/continuity/skills/frontmatter.js'
-import { mirrorAsSkillFolders, removeMirroredSkills, type PublicSkill } from './shared.js'
+import { mirrorAsSkillFolders, removeMirroredSkills, type MirrorResult, type PublicSkill } from './shared.js'
 import { injectManagedBlock, neutralizeManagedMarkers, readManagedContext, renderManagedBlock, writeManagedSyncState } from './managedBlock.js'
 import { preserveHarnessSkillEdits, writeLastExtraHash } from './skillEdits.js'
 import { buildPortableInstruction } from '../harnessGuidance.js'
@@ -17,11 +17,9 @@ type EnrichedSkill = PublicSkill & { body: string }
 async function enrichSkills(skills: PublicSkill[]): Promise<EnrichedSkill[]> {
   const out: EnrichedSkill[] = []
   for (const skill of skills) {
-    try {
-      const raw = await fs.readFile(skill.absolutePath, 'utf8')
-      const { body } = parseSkillFile(raw)
-      out.push({ ...skill, body })
-    } catch {}
+    const raw = await fs.readFile(skill.absolutePath, 'utf8')
+    const { body } = parseSkillFile(raw)
+    out.push({ ...skill, body })
   }
   return out
 }
@@ -58,7 +56,7 @@ export async function mirrorInstructionFile(
   harness: string,
   skills: PublicSkill[],
   context?: SyncContext,
-): Promise<{ count: number; skipped: number }> {
+): Promise<MirrorResult> {
   await fs.mkdir(path.dirname(target), { recursive: true })
   const skillsDir = skillsDirFor(target)
   const folder = await mirrorAsSkillFolders(skillsDir, skills)
@@ -67,7 +65,7 @@ export async function mirrorInstructionFile(
   await injectManagedBlock(target, block)
   if (context) await writeManagedSyncState(target, context)
   await writeLastExtraHash(target, block)
-  return { count: skills.length, skipped: folder.skipped }
+  return folder
 }
 
 export async function cleanupInstructionFileSkills(target: string): Promise<void> {
@@ -113,7 +111,7 @@ export function makeInstructionFileAdapter(opts: InstructionFileAdapterOptions):
     async cleanup(): Promise<void> {
       await cleanupInstructionFileSkills(file())
     },
-    async mirror(skills: PublicSkill[], context?: SyncContext): Promise<{ count: number; skipped: number }> {
+    async mirror(skills: PublicSkill[], context?: SyncContext): Promise<MirrorResult> {
       if (opts.ensureDir) await fs.mkdir(opts.ensureDir(), { recursive: true })
       return mirrorInstructionFile(file(), opts.name, skills, context)
     },

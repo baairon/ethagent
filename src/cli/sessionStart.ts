@@ -39,10 +39,14 @@ function skillsLocationPhrase(identity?: EthagentIdentity | null): string {
 export async function runSessionStart(): Promise<number> {
   try {
     await runSync({ quiet: true })
-  } catch {}
+  } catch (err) {
+    process.stderr.write(`ethagent: session-start sync failed: ${(err as Error).message}\n`)
+  }
   try {
     ensureDaemon()
-  } catch {}
+  } catch (err) {
+    process.stderr.write(`ethagent: session-start could not start background sync: ${(err as Error).message}\n`)
+  }
   const identity = await loadConfig().then(c => c?.identity ?? null).catch(() => null)
   process.stdout.write(
     JSON.stringify({

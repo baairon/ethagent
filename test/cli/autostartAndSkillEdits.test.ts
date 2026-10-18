@@ -93,6 +93,39 @@ test('a harness edit to the skill section is preserved before the next mirror ov
   })
 })
 
+test('a failed skill-edit backup leaves the edited harness text untouched', async () => {
+  await withHome(async home => {
+    const file = path.join(home, '.tool', 'INSTRUCTIONS.md')
+    const skillPath = path.join(home, 'skill.md')
+    await fs.writeFile(skillPath, '---\nname: demo\ndescription: A demo skill\n---\noriginal skill body\n')
+    const skill: SkillIndexEntry = {
+      name: 'demo', description: 'A demo skill', visibility: 'public',
+      relativePath: 'demo/SKILL.md', absolutePath: skillPath,
+    }
+    const adapter = makeInstructionFileAdapter({ name: 'tool', description: 'test harness', filePath: () => file, detect: async () => true })
+    const ctx = { soul: '# SOUL.md\n\nsoul\n', memory: '# MEMORY.md\n\nmemory\n' }
+    await adapter.mirror([skill], ctx)
+    const edited = (await fs.readFile(file, 'utf8')).replace('original skill body', 'do not lose this edit')
+    await fs.writeFile(file, edited)
+    await fs.mkdir(path.join(home, '.ethagent'), { recursive: true })
+    await fs.writeFile(path.join(home, '.ethagent', 'skill-edits'), 'blocks backup directory')
+
+    await assert.rejects(adapter.mirror([skill], ctx), /could not preserve edited skill text/)
+    assert.equal(await fs.readFile(file, 'utf8'), edited)
+  })
+})
+
+test('a failed sync-state write is reported by the instruction-file adapter', async () => {
+  await withHome(async home => {
+    const file = path.join(home, '.tool', 'INSTRUCTIONS.md')
+    await fs.mkdir(path.dirname(file), { recursive: true })
+    await fs.mkdir(path.join(path.dirname(file), '.ethagent-sync.json'))
+    const adapter = makeInstructionFileAdapter({ name: 'tool', description: 'test harness', filePath: () => file, detect: async () => true })
+    const ctx = { soul: '# SOUL.md\n\nsoul\n', memory: '# MEMORY.md\n\nmemory\n' }
+    await assert.rejects(adapter.mirror([], ctx))
+  })
+})
+
 test('shellProfilePaths targets the OneDrive Documents profile when redirected (Windows)', () => {
   if (process.platform !== 'win32') {
     assert.ok(shellProfilePaths().some(p => p.endsWith('.bashrc')))
@@ -163,4 +196,3 @@ async function countFiles(dir: string): Promise<number> {
     return 0
   }
 }
-

@@ -6,7 +6,7 @@ import path from 'node:path'
 import { pullHarnessSoulMemoryIntoVault, pushVaultSoulMemoryToHarness, reconcileSoulMemory } from '../../../src/cli/sync.js'
 import { claudeCodeAdapter } from '../../../src/cli/syncAdapters/claude-code.js'
 import { codexAdapter } from '../../../src/cli/syncAdapters/codex.js'
-import { injectManagedBlock, parseManagedContext, removeManagedBlock, renderManagedBlock } from '../../../src/cli/syncAdapters/managedBlock.js'
+import { injectManagedBlock, parseManagedContext, readManagedContext, removeManagedBlock, renderManagedBlock } from '../../../src/cli/syncAdapters/managedBlock.js'
 import { continuityVaultRef, readContinuityFiles, writeContinuityFiles } from '../../../src/identity/continuity/storage.js'
 import type { SkillIndexEntry } from '../../../src/identity/continuity/skills/types.js'
 import type { EthagentIdentity } from '../../../src/storage/config.js'
@@ -57,6 +57,19 @@ test('injectManagedBlock cleans its temporary files after a replacement', async 
     await injectManagedBlock(file, renderManagedBlock(undefined, 'second'))
     assert.deepEqual(await fs.readdir(tmp), ['AGENTS.md'])
     assert.match(await fs.readFile(file, 'utf8'), /second/)
+  } finally {
+    await fs.rm(tmp, { recursive: true, force: true })
+  }
+})
+
+test('an unreadable harness path fails instead of being treated as an empty file', async () => {
+  const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'ethagent-managed-unreadable-'))
+  try {
+    const file = path.join(tmp, 'AGENTS.md')
+    await fs.mkdir(file)
+    await assert.rejects(injectManagedBlock(file, renderManagedBlock(undefined, 'new body')))
+    await assert.rejects(readManagedContext(file))
+    assert.equal((await fs.stat(file)).isDirectory(), true)
   } finally {
     await fs.rm(tmp, { recursive: true, force: true })
   }

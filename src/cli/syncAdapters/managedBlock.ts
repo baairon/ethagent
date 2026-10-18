@@ -72,7 +72,9 @@ export function renderManagedBlock(context: SyncContext | undefined, extra?: str
 export async function injectManagedBlock(filePath: string, block: string): Promise<void> {
   await fs.mkdir(path.dirname(filePath), { recursive: true })
   let existing = ''
-  try { existing = await fs.readFile(filePath, 'utf8') } catch {}
+  try { existing = await fs.readFile(filePath, 'utf8') } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err
+  }
 
   let next: string
   const startIdx = existing.indexOf(START)
@@ -97,7 +99,10 @@ export async function injectManagedBlock(filePath: string, block: string): Promi
 
 export async function removeManagedBlock(filePath: string): Promise<boolean> {
   let existing: string
-  try { existing = await fs.readFile(filePath, 'utf8') } catch { return false }
+  try { existing = await fs.readFile(filePath, 'utf8') } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return false
+    throw err
+  }
 
   const startIdx = existing.indexOf(START)
   const endIdx = existing.indexOf(END)
@@ -158,8 +163,9 @@ export async function readManagedContext(filePath: string): Promise<ManagedRead 
   try {
     content = await fs.readFile(filePath, 'utf8')
     mtimeMs = (await fs.stat(filePath)).mtimeMs
-  } catch {
-    return null
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null
+    throw err
   }
   const { soul, memory } = parseManagedContext(content)
   const { soulHash, memoryHash } = await readManagedSyncState(filePath)
@@ -185,15 +191,19 @@ export async function writeManagedSyncState(managedFilePath: string, context: Sy
     soulHash: hashManagedBody(stripFirstHeader(context.soul)),
     memoryHash: hashManagedBody(stripFirstHeader(context.memory)),
   }
-  try {
-    await atomicWriteText(syncStatePath(managedFilePath), `${JSON.stringify(state)}\n`, { mode: 0o644 })
-  } catch {
-  }
+  await atomicWriteText(syncStatePath(managedFilePath), `${JSON.stringify(state)}\n`, { mode: 0o644 })
 }
 
 async function readManagedSyncState(managedFilePath: string): Promise<{ soulHash?: string; memoryHash?: string }> {
+  let raw: string
   try {
-    const parsed = JSON.parse(await fs.readFile(syncStatePath(managedFilePath), 'utf8')) as Record<string, unknown>
+    raw = await fs.readFile(syncStatePath(managedFilePath), 'utf8')
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return {}
+    throw err
+  }
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>
     return {
       soulHash: typeof parsed.soulHash === 'string' ? parsed.soulHash : undefined,
       memoryHash: typeof parsed.memoryHash === 'string' ? parsed.memoryHash : undefined,

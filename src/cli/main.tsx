@@ -11,7 +11,7 @@ import { TerminalSizeProvider } from '../ui/layout.js'
 import { IdentityManager } from '../identity/manager/IdentityManager.js'
 import type { IdentityManagerResult } from '../identity/manager/IdentityManager.js'
 import { loadConfig, saveConfig, type EthagentConfig } from '../storage/config.js'
-import { runSyncOnEdit } from './sync.js'
+import { runSync, runSyncOnEdit } from './sync.js'
 import { runMemoryGuard } from './memoryGuard.js'
 import { runSkillGuard } from './skillGuard.js'
 import { runPreToolGuard } from './pretoolGuard.js'
@@ -48,6 +48,7 @@ function printHelp(): void {
     '  ethagent reset [--yes]      delete local identity, continuity, and secrets (asks first unless --yes)',
     '  ethagent --add <path>       wire another tool by its config file (e.g. AGENTS.md)',
     '  ethagent pause              pause background sync (resume with: ethagent resume)',
+    '  ethagent sync               mirror this agent into detected tools now',
     '  ethagent --status           print a one-line identity summary',
     "  ethagent --vault-dir        print this agent's vault directory path",
     '',
@@ -218,6 +219,13 @@ async function main(): Promise<number> {
     return 0
   }
   if (flags.has('--sync-on-edit')) return runSyncOnEdit()
+  if (argv[0] === 'sync') {
+    if (argv.length > 1) {
+      process.stderr.write('usage: ethagent sync\n')
+      return 2
+    }
+    return runSync({ requireIdentity: true })
+  }
   if (flags.has('--session-start')) return runSessionStart()
   if (flags.has('--pretool-guard')) return runPreToolGuard()
   if (flags.has('--memory-guard')) return runMemoryGuard()

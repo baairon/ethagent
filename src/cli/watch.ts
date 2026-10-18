@@ -196,7 +196,8 @@ export async function runWatch(argv: string[]): Promise<number> {
     if (syncing || Date.now() < cooldownUntil) { trigger(); return }
     syncing = true
     try {
-      await runSync({ quiet: true })
+      const code = await runSync({ quiet: true })
+      if (code !== 0) logDaemon('sync incomplete; see the errors above and run ethagent sync after fixing them')
     } catch (err) {
       logDaemon(`sync error: ${(err as Error).message}`)
     }

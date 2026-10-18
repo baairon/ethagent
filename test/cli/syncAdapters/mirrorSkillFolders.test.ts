@@ -157,10 +157,26 @@ test('mirrorAsSkillFolders leaves an existing unmanaged folder untouched and rep
     const result = await mirrorAsSkillFolders(harness, [skill])
     assert.equal(result.skipped, 1)
     assert.equal(result.count, 0)
+    assert.deepEqual(result.issues.map(issue => [issue.kind, issue.skill]), [['skipped', 'manual']])
     const body = await fs.readFile(path.join(harness, 'manual', 'SKILL.md'), 'utf8')
     assert.equal(body, 'hand written\n')
   } finally {
     await fs.rm(tmp, { recursive: true, force: true }).catch(() => null)
+  }
+})
+
+test('mirrorAsSkillFolders reports a missing skill source without claiming it mirrored', async () => {
+  const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'ethagent-mirror-'))
+  try {
+    const result = await mirrorAsSkillFolders(path.join(tmp, 'harness'), [{
+      name: 'missing', description: 'fixture', visibility: 'private',
+      relativePath: 'missing/SKILL.md', absolutePath: path.join(tmp, 'vault', 'missing', 'SKILL.md'),
+    }])
+    assert.equal(result.count, 0)
+    assert.deepEqual(result.issues.map(issue => [issue.kind, issue.skill]), [['source', 'missing']])
+    assert.deepEqual((await readManifest(path.join(tmp, 'harness'))).skills, [])
+  } finally {
+    await fs.rm(tmp, { recursive: true, force: true })
   }
 })
 
@@ -301,7 +317,9 @@ test('a corrupt manifest with no mirror markers leaves every folder as it was', 
     await fs.writeFile(path.join(harness, MANIFEST_FILE), 'not json')
 
     const result = await mirrorAsSkillFolders(harness, [skill])
-    assert.deepEqual(result, { count: 0, skipped: 0 })
+    assert.equal(result.count, 0)
+    assert.equal(result.skipped, 0)
+    assert.deepEqual(result.issues.map(issue => issue.kind), ['manifest'])
     assert.equal(await fs.readFile(path.join(harness, 'demo', 'SKILL.md'), 'utf8'), 'older copy\n')
     assert.equal(await fs.readFile(path.join(harness, MANIFEST_FILE), 'utf8'), 'not json')
   } finally {

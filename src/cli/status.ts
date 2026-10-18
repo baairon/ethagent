@@ -9,6 +9,7 @@ import { listSkills } from '../identity/continuity/skills/loadSkills.js'
 import { daemonDisabled, daemonStatus, isPaused } from './daemon.js'
 import { selectMirrorSkills } from './sync.js'
 import { skippedSkillFolders } from './syncAdapters/shared.js'
+import { formatSyncIssue, readSyncHealth } from './syncHealth.js'
 
 function shortAddr(addr: string | undefined): string {
   if (!addr) return ''
@@ -36,10 +37,16 @@ export async function runStatus(version: string): Promise<number> {
   const localChanges = config?.identity ? await localChangesSegment(config.identity) : null
   if (localChanges) bits.push(localChanges)
   process.stdout.write(bits.join(' · ') + '\n')
+  let detectionFailed = false
   if (config?.identity) {
     process.stdout.write(`vault: ${continuityVaultRef(config.identity).dir}\n`)
-    const targets = await detectSyncTargets().catch(() => [])
+    const detectionErrors: string[] = []
+    const targets = await detectSyncTargets(undefined, false, (adapter, err) => {
+      detectionErrors.push(`${adapter.name}: ${err.message}`)
+    })
     process.stdout.write(`wired into: ${targets.length ? targets.map(t => t.name).join(', ') : 'none detected yet'}\n`)
+    for (const error of detectionErrors) process.stdout.write(`harness detection failed: ${error}\n`)
+    detectionFailed = detectionErrors.length > 0
     const daemon = daemonStatus()
     const background = isPaused()
       ? 'paused'
@@ -49,6 +56,18 @@ export async function runStatus(version: string): Promise<number> {
           ? `running (pid ${daemon.pid})`
           : 'not running (start with: ethagent --ensure-daemon)'
     process.stdout.write(`background sync: ${background}\n`)
+    const health = await readSyncHealth(config.identity)
+    if (!health) {
+      process.stdout.write('last sync: never checked (run: ethagent sync)\n')
+    } else if (health.state === 'no-targets') {
+      process.stdout.write(`last sync: no harness detected (${health.attemptedAt})\n`)
+    } else if (health.state === 'ok') {
+      process.stdout.write(`last sync: complete (${health.attemptedAt})\n`)
+    } else {
+      const previous = health.lastSuccessAt ? `; last complete ${health.lastSuccessAt}` : ''
+      process.stdout.write(`last sync: incomplete (${health.attemptedAt}${previous}; run: ethagent sync)\n`)
+      for (const issue of health.issues) process.stdout.write(`  ${formatSyncIssue(issue)}\n`)
+    }
     try {
       const names = selectMirrorSkills(await listSkills(config.identity)).map(skill => skill.name)
       const seen = new Set<string>()
@@ -67,7 +86,7 @@ export async function runStatus(version: string): Promise<number> {
       return 1
     }
   }
-  return 0
+  return detectionFailed ? 1 : 0
 }
 
 async function localChangesSegment(identity: EthagentIdentity): Promise<string | null> {
