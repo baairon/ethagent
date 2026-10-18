@@ -191,9 +191,10 @@ Run any of these with `npx ethagent`. Commands marked interactive need a termina
 | `save [--json] [--no-open] [--operator]` | Back up your agent onchain. See [Saving](#saving). | Opens your wallet |
 | `--add <path>` | Connect a tool by the instructions file it loads every session. Adds one marked ethagent block to that file and a `skills` folder beside it, keeps both in sync, and leaves the rest of the file alone. | Writes that file |
 | `pause` / `resume` | Stop or restart background sync. | Local |
-| `--status` | One-line summary: agent, network, local changes, connected tools. | Read-only |
+| `sync` | Sync the vault and every connected tool now, both ways, and record whether it finished. `--status` and `check` show the result. | Writes the vault and your tools |
+| `--status` | Agent, network, local changes, the vault path, connected tools, background sync, and the last sync with anything it skipped. | Read-only |
 | `--vault-dir` | Print the vault path. | Read-only |
-| `check [--json]` | Every value that identifies the agent: token ID, network, registry, owner, agent URI, snapshot, metadata and agent card CIDs, ENS name, custody, Vault, operator, last saved, pending publish, transfer state, and any unconfirmed transaction. Then anything that needs attention, each with the command that fixes it. Exits 4 when something does. | Goes online |
+| `check [--json]` | Every value that identifies the agent: token ID, network, registry, owner, agent URI, snapshot, metadata and agent card CIDs, ENS name, custody, Vault, operator, last saved, pending publish, transfer state, and any unconfirmed transaction. Then anything that needs attention, each with the command that fixes it, including this machine's last sync when it never ran, didn't finish, or skipped a folder. Exits 4 when something does. | Goes online |
 | `skills [--json]` | Every skill in the vault, its visibility, and whether the Agent Card publishes it. | Read-only |
 | `skills --public <name> \| --private <name> [--json]` | Change a skill's visibility and update the Agent Card. `ethagent save` publishes it. | Writes the vault |
 | `skills --delete <name> [--yes] [--json]` | Remove a skill's folder. Previews until `--yes`, checkpoints first, and names the rollback that brings it back. | Writes the vault |
@@ -445,7 +446,7 @@ With `--json`, every history and onchain command prints one line of ASCII-only J
 | Code | Meaning |
 | --- | --- |
 | `0` | Done. `diff` returns 0 whether or not anything differs and reports `identical`. |
-| `1` | Failed: unknown ref, missing path, or a store error. |
+| `1` | Failed: unknown ref, missing path, a store error, or a `sync` that couldn't finish. |
 | `2` | Usage error, or a ref that matches more than one thing. |
 | `3` | The snapshot isn't cached here or there's no key to open it, `--operator` ran without an injected operator key, or the wallet approval was cancelled. |
 | `4` | Partly done (a custody change or `create --advanced` that stopped after something landed; run it again to finish), `status --verify` or `custody --verify` found a mismatch, or `check` found something that needs attention. |
@@ -479,7 +480,7 @@ npm run test:chain    # every command that sends, on local chains (needs Foundry
 
 ## Updating
 
-ethagent updates itself: `npx ethagent` always fetches the latest version, so new releases reach you with nothing to install. Check your version with `ethagent --version`.
+ethagent updates itself: `npx ethagent` always fetches the latest version, so new releases reach you with nothing to install. The background watcher switches to the new version the next time ethagent runs. Check your version with `ethagent --version`.
 
 For a global install, update it with:
 
