@@ -49,6 +49,21 @@ export function daemonDisabled(): boolean {
   return isPaused()
 }
 
+export function packageVersion(): string {
+  try {
+    const file = path.resolve(__dirname, '..', '..', 'package.json')
+    return (JSON.parse(fs.readFileSync(file, 'utf8')) as { version?: string }).version ?? '0.0.0'
+  } catch {
+    return '0.0.0'
+  }
+}
+
+// A watcher records its version after its pid. Readers that predate the version still
+// parse the pid alone.
+function pidFileText(): string {
+  return `${process.pid} ${packageVersion()}\n`
+}
+
 export function readDaemonPid(): number | null {
   try {
     const pid = Number.parseInt(fs.readFileSync(daemonPidPath(), 'utf8').trim(), 10)
@@ -56,6 +71,37 @@ export function readDaemonPid(): number | null {
   } catch {
     return null
   }
+}
+
+// The version the watcher recorded, or null for a watcher from before 6.1.0, which wrote
+// its pid alone.
+export function readDaemonVersion(): string | null {
+  try {
+    return fs.readFileSync(daemonPidPath(), 'utf8').trim().split(/\s+/)[1] ?? null
+  } catch {
+    return null
+  }
+}
+
+// Whether the recorded watcher is older than this install, so an upgrade replaces it. A
+// newer watcher is left alone, so two installs of different versions never take turns
+// replacing each other.
+function daemonOutdated(): boolean {
+  const recorded = readDaemonVersion()
+  return !recorded || isOlderVersion(recorded, packageVersion())
+}
+
+// Compares major.minor.patch; anything after the patch number is ignored.
+export function isOlderVersion(version: string, than: string): boolean {
+  const parts = (value: string): number[] => {
+    const numbers = value.split(/[.+-]/).map(part => Number.parseInt(part, 10) || 0)
+    return [numbers[0] ?? 0, numbers[1] ?? 0, numbers[2] ?? 0]
+  }
+  const [a, b] = [parts(version), parts(than)]
+  for (let i = 0; i < 3; i += 1) {
+    if (a[i] !== b[i]) return a[i]! < b[i]!
+  }
+  return false
 }
 
 export function isPidAlive(pid: number): boolean {
@@ -144,7 +190,7 @@ export function touchDaemonPid(): boolean {
   }
   // The file was removed, or left by a pid that is gone: take it back.
   try {
-    fs.writeFileSync(daemonPidPath(), `${process.pid}\n`)
+    fs.writeFileSync(daemonPidPath(), pidFileText())
     return true
   } catch {
     return false
@@ -158,26 +204,26 @@ export function daemonStatus(read: CommandLineReader = readProcessCommandLine): 
 
 export function writeDaemonPid(): void {
   fs.mkdirSync(getConfigDir(), { recursive: true })
-  fs.writeFileSync(daemonPidPath(), `${process.pid}\n`, 'utf8')
+  fs.writeFileSync(daemonPidPath(), pidFileText(), 'utf8')
 }
 
-// Takes the pid file for a watcher that is starting. A watcher that is beating keeps it.
-// One that is alive but quiet is an older version or has stalled, so it is stopped first,
-// and the file is taken only once that process is gone: an old watcher removes the pid
-// file on its way out.
+// Takes the pid file for a watcher that is starting. A watcher that is beating keeps it,
+// unless it is an older version. One that is older, or alive but quiet (from before the
+// heartbeat, or stalled), is stopped first, and the file is taken only once that process
+// is gone: an old watcher removes the pid file on its way out.
 export async function claimDaemonPid(read: CommandLineReader = readProcessCommandLine): Promise<boolean> {
   fs.mkdirSync(getConfigDir(), { recursive: true })
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
-      fs.writeFileSync(daemonPidPath(), `${process.pid}\n`, { flag: 'wx' })
+      fs.writeFileSync(daemonPidPath(), pidFileText(), { flag: 'wx' })
       return true
     } catch {}
     const beating = liveDaemonPid()
-    if (beating && beating !== process.pid) return false
-    const quiet = beating ? null : daemonPid(read)
-    if (quiet && quiet !== process.pid) {
-      try { process.kill(quiet, 'SIGTERM') } catch {}
-      if (!(await pidGone(quiet))) return false
+    if (beating && beating !== process.pid && !daemonOutdated()) return false
+    const replaced = beating ?? daemonPid(read)
+    if (replaced && replaced !== process.pid) {
+      try { process.kill(replaced, 'SIGTERM') } catch {}
+      if (!(await pidGone(replaced))) return false
     }
     clearDaemonPid()
   }
@@ -226,21 +272,27 @@ export function daemonSpawnSpec(): {
   }
 }
 
+// Waits for a watcher this install would leave alone, so an older one still running while
+// its replacement starts does not count.
 export async function waitForDaemon(timeoutMs = 5_000): Promise<{ running: boolean; pid: number | null }> {
   const deadline = Date.now() + timeoutMs
-  let status = daemonStatus()
+  const current = (): { running: boolean; pid: number | null } => {
+    const status = daemonStatus()
+    return status.running && !daemonOutdated() ? status : { running: false, pid: null }
+  }
+  let status = current()
   while (!status.running && Date.now() < deadline) {
     await new Promise(resolve => setTimeout(resolve, Math.min(100, deadline - Date.now())))
-    status = daemonStatus()
+    status = current()
   }
   return status
 }
 
 export function ensureDaemon(): boolean {
   if (daemonDisabled()) return false
-  // Only a beating daemon is left alone. A watcher that went quiet (an older version, or
-  // one that stalled) is taken over by the one started here, as it claims the pid file.
-  if (liveDaemonPid()) return false
+  // Only a beating daemon of this version or newer is left alone. An older one, or a
+  // watcher that went quiet, is taken over by the one started here as it claims the pid file.
+  if (liveDaemonPid() && !daemonOutdated()) return false
   try {
     fs.mkdirSync(getConfigDir(), { recursive: true })
     const out = fs.openSync(daemonLogPath(), 'a')

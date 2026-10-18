@@ -18,9 +18,12 @@ import {
   ensureDaemon,
   isPaused,
   isPidAlive,
+  isOlderVersion,
   isWatcherCommandLine,
+  packageVersion,
   pauseSync,
   readDaemonPid,
+  readDaemonVersion,
   readProcessCommandLine,
   releaseDaemonPid,
   resumeSync,
@@ -28,6 +31,7 @@ import {
   daemonPidPath,
   stopDaemon,
   touchDaemonPid,
+  waitForDaemon,
   type CommandLineReader,
 } from '../../src/cli/daemon.js'
 import { withHome } from '../support/home.js'
@@ -316,16 +320,44 @@ test('a starting watcher claims over a quiet pid that is not a watcher, without 
   })
 })
 
-test('a starting watcher leaves a beating one in place', async () => {
+test('a starting watcher leaves a beating one of this version or newer in place', async () => {
   await withHome(async () => {
     await withStandIn(async pid => {
-      await writePid(pid)
-      assert.equal(await claimDaemonPid(watcherCommand), false)
-      assert.equal(readDaemonPid(), pid)
-      assert.equal(isPidAlive(pid), true)
-      assert.equal(ensureDaemon(), false)
+      for (const version of [packageVersion(), '999.0.0']) {
+        await writePid(pid, version)
+        assert.equal(await claimDaemonPid(watcherCommand), false, version)
+        assert.equal(readDaemonPid(), pid)
+        assert.equal(isPidAlive(pid), true)
+        assert.equal(ensureDaemon(), false, version)
+        assert.deepEqual(await waitForDaemon(0), { running: true, pid })
+      }
     })
   })
+})
+
+test('a starting watcher replaces a beating one from an older version', async () => {
+  await withHome(async () => {
+    await withStandIn(async pid => {
+      // A watcher from before 6.1.0 wrote its pid alone, with no version.
+      await writePid(pid)
+      assert.deepEqual(await waitForDaemon(0), { running: false, pid: null }, 'an outdated watcher is not the one to wait for')
+      assert.equal(await claimDaemonPid(watcherCommand), true)
+      assert.equal(isPidAlive(pid), false, 'the old watcher was stopped before the file was taken')
+      assert.equal(readDaemonPid(), process.pid)
+      assert.equal(readDaemonVersion(), packageVersion())
+      clearDaemonPid()
+    })
+  })
+})
+
+test('isOlderVersion compares major, minor, and patch numerically', () => {
+  assert.equal(isOlderVersion('6.0.0', '6.1.0'), true)
+  assert.equal(isOlderVersion('6.9.0', '6.10.0'), true)
+  assert.equal(isOlderVersion('6', '6.1.0'), true)
+  assert.equal(isOlderVersion('6.1.0-beta.1', '6.1.1'), true)
+  assert.equal(isOlderVersion('6.1.0', '6.1.0'), false)
+  assert.equal(isOlderVersion('6.2.0', '6.1.0'), false)
+  assert.equal(isOlderVersion('10.0.0', '9.9.9'), false)
 })
 
 test('the heartbeat tells a watcher to stop when sync is paused or another watcher took over', async () => {
@@ -382,9 +414,9 @@ test('readProcessCommandLine reads how a live process was started', () => {
   assert.equal(isWatcherCommandLine(line), false)
 })
 
-async function writePid(pid: number): Promise<void> {
+async function writePid(pid: number, version?: string): Promise<void> {
   await fs.mkdir(path.dirname(daemonPidPath()), { recursive: true })
-  await fs.writeFile(daemonPidPath(), `${pid}\n`, 'utf8')
+  await fs.writeFile(daemonPidPath(), version ? `${pid} ${version}\n` : `${pid}\n`, 'utf8')
 }
 
 // A pid file whose last beat was ten minutes ago.

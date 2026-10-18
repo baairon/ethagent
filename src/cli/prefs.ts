@@ -23,9 +23,8 @@ export async function runEnsureDaemon(): Promise<number> {
     process.stdout.write('ethagent: no identity yet\n')
     return 0
   }
-  const current = daemonStatus()
-  if (!current.running) ensureDaemon()
-  const status = current.running ? current : await waitForDaemon()
+  // ensureDaemon leaves a current watcher alone and replaces an older or stalled one.
+  const status = ensureDaemon() ? await waitForDaemon() : daemonStatus()
   if (status.running) {
     process.stdout.write(`ethagent: background sync running (pid ${status.pid})\n`)
     return 0

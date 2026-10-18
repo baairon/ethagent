@@ -1,6 +1,5 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { loadConfig } from '../storage/config.js'
 import { continuityVaultRef } from '../identity/continuity/storage/paths.js'
 import { runSync } from './sync.js'
@@ -11,6 +10,7 @@ import {
   daemonLogPath,
   daemonStatus,
   DAEMON_HEARTBEAT_MS,
+  packageVersion,
   releaseDaemonPid,
   stopDaemon,
   touchDaemonPid,
@@ -51,15 +51,6 @@ function timestampDaemonOutput(): void {
       return true
     }) as typeof stream.write
     process.on('exit', () => { if (pending) original(`${new Date().toISOString()} ${pending}\n`) })
-  }
-}
-
-function packageVersion(): string {
-  try {
-    const file = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'package.json')
-    return (JSON.parse(fs.readFileSync(file, 'utf8')) as { version?: string }).version ?? '0.0.0'
-  } catch {
-    return '0.0.0'
   }
 }
 
