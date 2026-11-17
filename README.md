@@ -35,7 +35,7 @@ Prefer no menu? `ethagent create --name <text> --network <network>` does the sam
 If a tool wasn't picked up, `npx ethagent --status` lists the ones ethagent keeps in sync. Open the missing tool and paste this to its agent:
 
 ```text
-I use ethagent to carry my agent's soul, memory, and skills across my tools: https://git.bairon.dev/baairon/ethagent (read the README first if you want to check it). Connect this tool by running `npx ethagent --add` with the full path of the instructions file you load at the start of every session. It adds one marked ethagent block to that file and a `skills` folder beside it, keeps both in sync, and leaves the rest of the file alone.
+I use ethagent to carry my agent's soul, memory, and skills across my tools: https://github.com/baairon/ethagent (read the README first if you want to check it). Connect this tool by running `npx ethagent --add` with the full path of the instructions file you load at the start of every session. It adds one marked ethagent block to that file and a `skills` folder beside it, keeps both in sync, and leaves the rest of the file alone.
 ```
 
 An agent should be careful with a command that edits its own instructions, so the prompt says what it does and where to verify it.
@@ -390,7 +390,7 @@ Instructions for the agent.
 | `argument-hint` | Optional usage hint for arguments. |
 | `version`, `tags` | Optional. |
 
-What a save packs: folder and file names of letters, digits, `.`, `_`, and `-`; files with an extension; up to 4 folders deep; up to 2 MiB per file and 500 files in total. Build caches (`__pycache__`, `.pyc`, `node_modules`) and dotfiles are left out. Files are stored as text, so `ethagent status` lists anything a save would skip or couldn't store exactly.
+What a save packs: folder and file names of letters, digits, `.`, `_`, and `-`; files with an extension; up to 4 folders deep; up to 2 MiB per file and 64 MiB of skills in total. Build caches (`__pycache__`, `.pyc`, `node_modules`) and dotfiles are left out. Files are stored as text, so `ethagent status` lists anything a save would skip or couldn't store exactly. When the skills pass the total, the save stops and no snapshot is published: trim them, or raise the budget with `ETHAGENT_MAX_SKILLS_MB`. A snapshot with more than 500 skill files needs ethagent 6.2.0 or newer to restore; older versions refuse it.
 
 `ethagent skills` lists the skills and which ones the Agent Card publishes; `--public <name>` and `--private <name>` set `visibility` for you. A public skill without a real description is treated as a draft and left off the card.
 
@@ -464,6 +464,7 @@ With `--json`, every history and onchain command prints one line of ASCII-only J
 | `ETHAGENT_IPFS_GATEWAYS` | Gateways to download from, separated by commas, in place of the built-in ones. |
 | `ETHAGENT_IPFS_ROUTERS` | Content routers that find more sources for a file, separated by commas. Leave it empty to turn that off. |
 | `ETHAGENT_HOSTS_FILE` | Where ethagent remembers how quickly each host answers, so the fastest is asked first, and how many blocks each serves per log query. Defaults to `~/.ethagent/hosts.json`. Leave it empty to remember nothing. |
+| `ETHAGENT_MAX_SKILLS_MB` | How many MiB of skills a save may pack. Defaults to 64, which uploads as about 90 MB, under the 100 MB Pinata takes in one request. A bigger budget needs your own IPFS API (`ETHAGENT_IPFS_API_URL`); 256 is the most it accepts, and a save that size needs over 2 GB of RAM. Set it for your user, not for one shell, so every `save` and `status` sees the same budget. A snapshot saved under a bigger budget restores in full anywhere. |
 | `ETHAGENT_HARNESS_FILES` | Extra instruction files to keep in sync, separated by commas. |
 | `ETHAGENT_NO_DAEMON` | Set to `1` to turn off background sync. |
 

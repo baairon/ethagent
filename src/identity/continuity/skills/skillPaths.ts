@@ -3,6 +3,13 @@ import path from 'node:path'
 export const SKILL_FILE_NAME = 'SKILL.md'
 export const MAX_FOLDER_DEPTH = 4
 export const MAX_SKILL_FILE_BYTES = 2 * 1024 * 1024
+export const DEFAULT_SKILL_TREE_MB = 64
+export const MAX_SKILL_TREE_MB = 256
+
+export function skillTreeByteLimit(): number {
+  const mb = Number(process.env.ETHAGENT_MAX_SKILLS_MB)
+  return (mb > 0 ? Math.min(mb, MAX_SKILL_TREE_MB) : DEFAULT_SKILL_TREE_MB) * 1024 * 1024
+}
 
 const BUILD_CACHE_DIRS = new Set(['__pycache__', 'node_modules'])
 const BUILD_CACHE_FILE_RE = /\.py[co]$/i

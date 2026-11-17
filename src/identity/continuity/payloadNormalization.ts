@@ -9,6 +9,8 @@ import type {
   WalletContinuitySnapshotSlot,
 } from './envelope.js'
 
+const V1_MAX_SKILL_FILES = 500
+
 type ContinuityTranscriptSummary = {
   sessionId?: string
   createdAt?: string
@@ -22,7 +24,7 @@ export function continuityPayloadFromArgs(args: {
 }): ContinuitySnapshotPayload {
   const skills = normalizeContinuitySkills(args.payload.skills)
   return {
-    version: 1,
+    version: skills && Object.keys(skills).length > V1_MAX_SKILL_FILES ? 2 : 1,
     ownerAddress: args.ownerAddress,
     createdAt: args.createdAt,
     ...(args.payload.sequence !== undefined ? { sequence: args.payload.sequence } : {}),
@@ -37,12 +39,12 @@ export function continuityPayloadFromArgs(args: {
 export function normalizeContinuityPayload(input: unknown): ContinuitySnapshotPayload {
   if (!input || typeof input !== 'object') throw new Error('Continuity snapshot payload is invalid')
   const obj = input as Partial<ContinuitySnapshotPayload>
-  if (obj.version !== 1) throw new Error('Continuity snapshot payload version is invalid')
+  if (obj.version !== 1 && obj.version !== 2) throw new Error('Continuity snapshot payload version is invalid')
   if (typeof obj.ownerAddress !== 'string') throw new Error('Continuity snapshot owner is invalid')
   if (typeof obj.createdAt !== 'string') throw new Error('Continuity snapshot timestamp is invalid')
   const skills = normalizeContinuitySkills(obj.skills)
   return {
-    version: 1,
+    version: obj.version,
     ownerAddress: toChecksumAddress(obj.ownerAddress),
     createdAt: obj.createdAt,
     ...(typeof obj.sequence === 'number' && Number.isSafeInteger(obj.sequence) ? { sequence: obj.sequence } : {}),

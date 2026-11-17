@@ -5,7 +5,6 @@ const PRIVATE_SKILL_FILE_RE = /^[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)+$/
 const PRIVATE_SKILL_LAST_SEG_FILE_RE = /^[A-Za-z0-9._-]+\.[A-Za-z0-9]+$/
 const LEGACY_NESTED_SKILL_RE = /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+\/.+$/
 const LEGACY_FLAT_NAME_MD_RE = /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+\.md$/i
-const MAX_PRIVATE_SKILL_ENTRIES = 500
 const MAX_PRIVATE_SKILL_PATH_LEN = 256
 
 export function normalizeContinuitySkills(input: unknown): ContinuitySkillsTree | undefined {
@@ -15,7 +14,6 @@ export function normalizeContinuitySkills(input: unknown): ContinuitySkillsTree 
   const out: ContinuitySkillsTree = {}
   let count = 0
   const tryInsert = (key: string, rawValue: unknown): void => {
-    if (count >= MAX_PRIVATE_SKILL_ENTRIES) return
     if (typeof rawValue !== 'string') return
     if (key.length === 0 || key.length > MAX_PRIVATE_SKILL_PATH_LEN) return
     if (key.includes('\0')) return

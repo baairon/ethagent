@@ -65,7 +65,7 @@ export async function localContinuitySnapshotContentHashes(
   const privateFiles = await readContinuityFiles(identity)
   await syncAgentCardManifest(identity).catch(() => undefined)
   const agentCard = await readAgentCardFile(identity)
-  const skills = await loadSkillsTree(identity).catch(() => ({} as ContinuitySkillsTree))
+  const skills = await loadSkillsTree(identity, Infinity).catch(() => ({} as ContinuitySkillsTree))
   return continuitySnapshotContentHashes(privateFiles, agentCard, skills)
 }
 

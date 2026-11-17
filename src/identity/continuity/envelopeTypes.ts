@@ -25,7 +25,7 @@ export type ContinuityAgentSnapshot = {
 }
 
 export type ContinuitySnapshotPayload = {
-  version: 1
+  version: 1 | 2
   ownerAddress: string
   createdAt: string
   sequence?: number

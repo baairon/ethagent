@@ -16,6 +16,7 @@ import {
   MAX_FOLDER_DEPTH,
   MAX_SKILL_FILE_BYTES,
   SKILL_FILE_NAME,
+  skillTreeByteLimit,
 } from './skillPaths.js'
 import type {
   ContinuitySkillsTree,
@@ -25,7 +26,6 @@ import type {
 } from './types.js'
 
 const MAX_SKILL_ENTRIES = 200
-const MAX_TREE_FILES = 500
 
 type IdentityKey = Pick<EthagentIdentity, 'chainId' | 'identityRegistryAddress' | 'agentId' | 'address'>
 
@@ -116,7 +116,6 @@ async function walkSkillFileStats(root: string): Promise<SkillFileStat[]> {
     return out
   }
   for (const skillEnt of skillDirents) {
-    if (out.length >= MAX_TREE_FILES) break
     if (!skillEnt.isDirectory() || skillEnt.isSymbolicLink()) continue
     if (!isValidSegment(skillEnt.name)) continue
     const skillDir = path.join(root, skillEnt.name)
@@ -125,7 +124,6 @@ async function walkSkillFileStats(root: string): Promise<SkillFileStat[]> {
     const files: SkillFileEntry[] = []
     await walkFolderFiles(skillDir, '', 0, files)
     for (const file of files) {
-      if (out.length >= MAX_TREE_FILES) break
       out.push({
         rel: `${skillEnt.name}/${file.relativePath}`,
         mtimeMs: file.mtimeMs,
@@ -157,10 +155,10 @@ export async function readSkillByRelativePath(
   return { ...entry, body: parsed.body }
 }
 
-export async function loadSkillsTree(identity: EthagentIdentity): Promise<ContinuitySkillsTree> {
+export async function loadSkillsTree(identity: EthagentIdentity, limit?: number): Promise<ContinuitySkillsTree> {
   const ref = await ensureContinuityVault(identity)
   await migrateLegacySkillFiles(ref.skillsDir)
-  return (await collectSkillsTree(ref.skillsDir, 'write')).tree
+  return (await collectSkillsTree(ref.skillsDir, 'write', limit)).tree
 }
 
 export type SkillSkipReason = 'unsupported-name' | 'too-deep' | 'too-large' | 'over-limit' | 'no-skill-file'
@@ -187,6 +185,7 @@ export async function listSkillEntriesView(skillsDir: string): Promise<SkillInde
 async function collectSkillsTree(
   skillsDir: string,
   mode: 'pure' | 'write',
+  limit = skillTreeByteLimit(),
 ): Promise<Omit<PackedSkillsView, 'legacyLayout'>> {
   const tree: ContinuitySkillsTree = {}
   const lossy: string[] = []
@@ -198,9 +197,8 @@ async function collectSkillsTree(
   } catch {
     return { tree, lossy, skipped, normalizesOnSave }
   }
-  let totalFiles = 0
+  let totalBytes = 0
   for (const skillEnt of categoryDirents) {
-    if (totalFiles >= MAX_TREE_FILES && mode === 'write') break
     if (!skillEnt.isDirectory() || skillEnt.isSymbolicLink()) continue
     if (skillEnt.name.startsWith('.') || isBuildCacheName(skillEnt.name)) continue
     if (!isValidSegment(skillEnt.name)) {
@@ -217,11 +215,6 @@ async function collectSkillsTree(
     await walkFolderFiles(skillDir, '', 0, files, mode === 'pure' ? { prefix: `${skillEnt.name}/`, list: skipped } : undefined)
     for (const file of files) {
       const rel = `${skillEnt.name}/${file.relativePath}`
-      if (totalFiles >= MAX_TREE_FILES) {
-        if (mode === 'write') break
-        skipped.push({ path: rel, reason: 'over-limit' })
-        continue
-      }
       if (!isValidSkillFilePath(rel)) {
         skipped.push({ path: rel, reason: 'unsupported-name' })
         continue
@@ -229,6 +222,10 @@ async function collectSkillsTree(
       if (file.sizeBytes > MAX_SKILL_FILE_BYTES) {
         skipped.push({ path: rel, reason: 'too-large' })
         continue
+      }
+      if (totalBytes + file.sizeBytes > limit) {
+        if (mode === 'write') throw new Error(`skills are over the ${limit / (1024 * 1024)} MiB snapshot budget (ETHAGENT_MAX_SKILLS_MB): ethagent status lists what does not fit`)
+        skipped.push({ path: rel, reason: 'over-limit' })
       }
       const bytes = await fs.readFile(file.absolutePath).catch(() => null)
       if (bytes === null) continue
@@ -244,7 +241,7 @@ async function collectSkillsTree(
         }
       }
       tree[rel] = content
-      totalFiles++
+      totalBytes += file.sizeBytes
     }
   }
   return { tree, lossy, skipped, normalizesOnSave }

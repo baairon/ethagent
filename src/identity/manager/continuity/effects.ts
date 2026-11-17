@@ -176,6 +176,7 @@ async function runRebackupSigningInner(
 ): Promise<void> {
   const sourceAgentId = step.identity.agentId
   if (!sourceAgentId) throw new Error('Cannot back up: identity is missing an agent token ID')
+  await prepareSyncedSkillsTree(step.identity)
   const resolvedUpdates = resolveProfileUpdatesEpoch(step.identity, step.profileUpdates)
   step = { ...step, ...(resolvedUpdates !== undefined ? { profileUpdates: resolvedUpdates } : {}) }
   if (snapshotSaveWalletRole(step.identity, step.profileUpdates) === 'operator') {

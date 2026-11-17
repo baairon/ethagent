@@ -8,6 +8,7 @@ import {
   restoreContinuitySnapshotEnvelope,
   serializeContinuitySnapshotEnvelope,
 } from '../../../src/identity/continuity/envelope.js'
+import { continuityPayloadFromArgs, normalizeContinuityPayload } from '../../../src/identity/continuity/payloadNormalization.js'
 import { addressFromPrivateKey, generatePrivateKey, signMessage } from '../../../src/identity/crypto/eth.js'
 
 test('continuity snapshot round-trips an optional private skills tree', () => {
@@ -110,6 +111,31 @@ test('normalizeContinuitySkills rejects unsafe keys', () => {
   assert.deepEqual(upgradedLegacyFlat, { 'cat-name/SKILL.md': 'body' })
 })
 
+test('normalizeContinuitySkills keeps every file of a tree past 500 entries', () => {
+  assert.equal(Object.keys(normalizeContinuitySkills(skillTree(600)) ?? {}).length, 600)
+})
+
+test('a payload is version 1 up to 500 skill files and version 2 past that, and only those two are read', () => {
+  const payloadWith = (skillFiles: number) => continuityPayloadFromArgs({
+    ownerAddress: '0x0000000000000000000000000000000000000001',
+    createdAt: new Date(0).toISOString(),
+    payload: {
+      agent: {},
+      files: { 'SOUL.md': '# s\n', 'MEMORY.md': '# m\n' },
+      skills: skillTree(skillFiles),
+      transcript: [],
+      state: {},
+    },
+  })
+  const v1 = payloadWith(500)
+  const v2 = payloadWith(501)
+  assert.equal(v1.version, 1)
+  assert.equal(v2.version, 2)
+  assert.equal(normalizeContinuityPayload(v1).version, 1)
+  assert.equal(normalizeContinuityPayload(v2).version, 2)
+  assert.throws(() => normalizeContinuityPayload({ ...v1, version: 3 }), /payload version is invalid/)
+})
+
 test('parseContinuitySnapshotEnvelope ignores unknown payload extensions on restore', () => {
   const privateKey = generatePrivateKey()
   const ownerAddress = addressFromPrivateKey(privateKey)
@@ -132,3 +158,9 @@ test('parseContinuitySnapshotEnvelope ignores unknown payload extensions on rest
   })
   assert.deepEqual(restored.files, { 'SOUL.md': '# s\n', 'MEMORY.md': '# m\n' })
 })
+
+function skillTree(files: number): Record<string, string> {
+  const tree: Record<string, string> = { 'big/SKILL.md': 'body' }
+  for (let i = 1; i < files; i++) tree[`big/f${i}.md`] = 'x'
+  return tree
+}

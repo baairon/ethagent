@@ -12,12 +12,19 @@ import {
   listSkillsTree,
   materializeSkillsTree,
   loadSkillsTree,
+  readSkillsTreeView,
   setSkillVisibility,
 } from '../../../src/identity/continuity/skills/loadSkills.js'
 import { isDraftScaffold } from '../../../src/identity/continuity/skills/scaffold.js'
 import {
+  DEFAULT_SKILL_TREE_MB,
+  MAX_SKILL_TREE_MB,
+  skillTreeByteLimit,
+} from '../../../src/identity/continuity/skills/skillPaths.js'
+import {
   continuityVaultRef,
   ensureContinuityVault,
+  localContinuitySnapshotContentHashes,
 } from '../../../src/identity/continuity/storage.js'
 import type { EthagentIdentity } from '../../../src/storage/config.js'
 import { withHome } from '../../support/home.js'
@@ -149,6 +156,50 @@ test('loadSkillsTree writes visibility: private to any SKILL.md missing it on sn
 
     const onDisk = await fs.readFile(skillFile, 'utf8')
     assert.match(onDisk, /visibility:\s*private/)
+  })
+})
+
+test('skillTreeByteLimit follows ETHAGENT_MAX_SKILLS_MB, clamps it, and falls back to the default', () => {
+  const mib = 1024 * 1024
+  const prev = process.env.ETHAGENT_MAX_SKILLS_MB
+  try {
+    delete process.env.ETHAGENT_MAX_SKILLS_MB
+    assert.equal(skillTreeByteLimit(), DEFAULT_SKILL_TREE_MB * mib)
+    process.env.ETHAGENT_MAX_SKILLS_MB = '128'
+    assert.equal(skillTreeByteLimit(), 128 * mib)
+    process.env.ETHAGENT_MAX_SKILLS_MB = '9999'
+    assert.equal(skillTreeByteLimit(), MAX_SKILL_TREE_MB * mib)
+    process.env.ETHAGENT_MAX_SKILLS_MB = 'lots'
+    assert.equal(skillTreeByteLimit(), DEFAULT_SKILL_TREE_MB * mib)
+  } finally {
+    if (prev === undefined) delete process.env.ETHAGENT_MAX_SKILLS_MB
+    else process.env.ETHAGENT_MAX_SKILLS_MB = prev
+  }
+})
+
+test('skills past the snapshot budget are listed by the pure view and refused by a save', async () => {
+  await withSkillsHome(async () => {
+    await ensureContinuityVault(identity)
+    await writeSkill('big', '---\nname: big\nvisibility: private\n---\n\nbody\n')
+    const ref = continuityVaultRef(identity)
+    const all = ['big/SKILL.md', 'big/a.txt', 'big/b.txt', 'big/c.txt']
+    for (const rel of all.slice(1)) {
+      await fs.writeFile(path.join(ref.skillsDir, rel), 'x'.repeat(400 * 1024), { mode: 0o600 })
+    }
+    const prev = process.env.ETHAGENT_MAX_SKILLS_MB
+    process.env.ETHAGENT_MAX_SKILLS_MB = '1'
+    try {
+      const view = await readSkillsTreeView(ref.skillsDir)
+      assert.deepEqual(Object.keys(view.tree).sort(), all)
+      assert.ok(view.skipped.length > 0 && view.skipped.every(skip => skip.reason === 'over-limit'))
+      await assert.rejects(() => loadSkillsTree(identity), /snapshot budget/)
+      assert.ok((await localContinuitySnapshotContentHashes(identity))['private-skills'])
+      delete process.env.ETHAGENT_MAX_SKILLS_MB
+      assert.deepEqual(Object.keys(await loadSkillsTree(identity)).sort(), all)
+    } finally {
+      if (prev === undefined) delete process.env.ETHAGENT_MAX_SKILLS_MB
+      else process.env.ETHAGENT_MAX_SKILLS_MB = prev
+    }
   })
 })
 
